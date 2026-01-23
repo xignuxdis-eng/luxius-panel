@@ -1,0 +1,21 @@
+import { Routes, Route } from "react-router-dom";
+import DashboardAdmin from "./index";
+import StockManagementPage from "./stock";
+import GestionUsuarios from "./usuarios";
+
+export default function AdminRouter() {
+  return (
+    <Routes>
+      <Route path="/" element={<DashboardAdmin />} />
+      <Route path="/stock" element={<StockManagementPage />} />
+      <Route path="/usuarios" element={<GestionUsuarios />} />
+      <Route path="/configuracion" element={
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Configuración</h2>
+          <p className="text-gray-600">Configura los parámetros del sistema.</p>
+          <p className="text-gray-500 text-center py-8">Funcionalidad en desarrollo...</p>
+        </div>
+      } />
+    </Routes>
+  );
+}

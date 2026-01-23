@@ -1,63 +1,28 @@
 import { Routes, Route } from "react-router-dom";
-import DashboardAdmin from "./index";
+import PanelGeneral from "./index";
+import GestionUsuarios from "./usuarios";
 import StockManagementPage from "./stock";
+import OrdenesPage from "./ordenes";
+import PresupuestosPage from "./presupuestos";
+import ReportesPage from "./reportes";
+import EstadisticasPage from "./estadisticas";
+import ConfiguracionPage from "./configuracion";
+import AdminUploadPage from "./upload";
+import PreciosPage from "./precios";
 
 export default function AdminRouter() {
-  return (
-    <Routes>
-      <Route path="/" element={<DashboardAdmin />} />
-      <Route path="/stock" element={<StockManagementPage />} />
-      <Route path="/usuarios" element={
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              Gestión de Usuarios 👥
-            </h1>
-            <p className="text-gray-600">
-              Administra los usuarios del sistema.
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <p className="text-gray-500 text-center py-8">
-              Funcionalidad en desarrollo...
-            </p>
-          </div>
-        </div>
-      } />
-      <Route path="/estadisticas" element={
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              Estadísticas 📊
-            </h1>
-            <p className="text-gray-600">
-              Visualiza estadísticas del sistema.
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <p className="text-gray-500 text-center py-8">
-              Funcionalidad en desarrollo...
-            </p>
-          </div>
-        </div>
-      } />
-      <Route path="/configuracion" element={
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              Configuración ⚙️
-            </h1>
-            <p className="text-gray-600">
-              Configura los parámetros del sistema.
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <p className="text-gray-500 text-center py-8">
-              Funcionalidad en desarrollo...
-            </p>
-          </div>
-        </div>
-      } />
-    </Routes>
-  );
-} 
+    return (
+        <Routes>
+            <Route path="/" element={<PanelGeneral />} />
+            <Route path="/usuarios" element={<GestionUsuarios />} />
+            <Route path="/stock" element={<StockManagementPage />} />
+            <Route path="/ordenes" element={<OrdenesPage />} />
+            <Route path="/presupuestos" element={<PresupuestosPage />} />
+            <Route path="/precios" element={<PreciosPage />} />
+            <Route path="/reportes" element={<ReportesPage />} />
+            <Route path="/estadisticas" element={<EstadisticasPage />} />
+            <Route path="/configuracion" element={<ConfiguracionPage />} />
+            <Route path="/upload" element={<AdminUploadPage />} />
+        </Routes>
+    );
+}

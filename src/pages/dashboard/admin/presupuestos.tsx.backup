@@ -1,0 +1,805 @@
+import React, { useState, useEffect } from 'react';
+import { apiService } from '../../../services/api';
+import { Presupuesto, PresupuestoItem, User, Material } from '../../../services/api';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Download, 
+  Eye, 
+  Calendar, 
+  DollarSign, 
+  User as UserIcon,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle
+} from 'lucide-react';
+
+const AdminPresupuestos: React.FC = () => {
+  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
+  const [clientes, setClientes] = useState<User[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Estados para el formulario
+  const [showForm, setShowForm] = useState(false);
+  const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
+  const [formData, setFormData] = useState({
+    cliente_id: '',
+    cliente_nombre: '',
+    cliente_direccion: '',
+    cliente_ciudad: '',
+    cliente_provincia: '',
+    cliente_telefono: '',
+    cliente_codigo_postal: '',
+    comercial: '',
+    numero_cliente: '',
+    metodo_pago: '',
+    terminos_pedido: '',
+    solicitado_por: '',
+    moneda: 'ARS' as 'ARS' | 'USD',
+    notas: '',
+    condiciones: '',
+    validez_dias: 30,
+    items: [] as Array<{
+      material_id?: number;
+      descripcion: string;
+      cantidad: number;
+      ancho_m: number;
+      alto_m: number;
+      demasia: boolean;
+      soldadura: boolean;
+      laminado: boolean;
+      caños_soportes: boolean;
+      instalacion: boolean;
+    }>
+  });
+
+  // Estados para filtros
+  const [filters, setFilters] = useState({
+    estado: '',
+    cliente_id: undefined as number | undefined,
+    limit: 50,
+    offset: 0
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [filters]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [presupuestosRes, clientesRes, materialsRes] = await Promise.all([
+        apiService.getPresupuestos(filters),
+        apiService.getClients(),
+        apiService.getMaterials()
+      ]);
+
+      if (presupuestosRes.success) {
+        setPresupuestos(presupuestosRes.presupuestos);
+      }
+      setClientes(clientesRes);
+      setMaterials(materialsRes);
+    } catch (err) {
+      setError('Error cargando datos');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      
+      const submitData = {
+        ...formData,
+        cliente_id: parseInt(formData.cliente_id),
+        items: formData.items.filter(item => item.descripcion.trim() !== '')
+      };
+
+      if (editingPresupuesto) {
+        const response = await apiService.updatePresupuesto(editingPresupuesto.id, {
+          cliente_id: submitData.cliente_id,
+          cliente_nombre: submitData.cliente_nombre,
+          cliente_direccion: submitData.cliente_direccion,
+          cliente_ciudad: submitData.cliente_ciudad,
+          cliente_provincia: submitData.cliente_provincia,
+          cliente_telefono: submitData.cliente_telefono,
+          cliente_codigo_postal: submitData.cliente_codigo_postal,
+          comercial: submitData.comercial,
+          numero_cliente: submitData.numero_cliente,
+          metodo_pago: submitData.metodo_pago,
+          terminos_pedido: submitData.terminos_pedido,
+          solicitado_por: submitData.solicitado_por,
+          moneda: submitData.moneda,
+          notas: submitData.notas,
+          condiciones: submitData.condiciones,
+          validez_dias: submitData.validez_dias,
+          items: submitData.items as any
+        });
+        if (response.success) {
+          setPresupuestos(prev => prev.map(p => p.id === editingPresupuesto.id ? response.presupuesto : p));
+        }
+      } else {
+        const response = await apiService.createPresupuesto(submitData);
+        if (response.success) {
+          setPresupuestos(prev => [response.presupuesto, ...prev]);
+        }
+      }
+
+      resetForm();
+      setShowForm(false);
+    } catch (err) {
+      setError('Error guardando presupuesto');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este presupuesto?')) return;
+    
+    try {
+      const response = await apiService.deletePresupuesto(id);
+      if (response.success) {
+        setPresupuestos(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (err) {
+      setError('Error eliminando presupuesto');
+      console.error(err);
+    }
+  };
+
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    try {
+      const response = await apiService.updatePresupuestoEstado(id, newStatus);
+      if (response.success) {
+        setPresupuestos(prev => prev.map(p => p.id === id ? response.presupuesto : p));
+      }
+    } catch (err) {
+      setError('Error actualizando estado');
+      console.error(err);
+    }
+  };
+
+  const handleGeneratePDF = async (id: number) => {
+    try {
+      const blob = await apiService.generatePresupuestoPDF(id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Presupuesto_${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setError('Error generando PDF');
+      console.error(err);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      cliente_id: '',
+      cliente_nombre: '',
+      cliente_direccion: '',
+      cliente_ciudad: '',
+      cliente_provincia: '',
+      cliente_telefono: '',
+      cliente_codigo_postal: '',
+      comercial: '',
+      numero_cliente: '',
+      metodo_pago: '',
+      terminos_pedido: '',
+      solicitado_por: '',
+      moneda: 'ARS',
+      notas: '',
+      condiciones: '',
+      validez_dias: 30,
+      items: []
+    });
+    setEditingPresupuesto(null);
+  };
+
+  const addItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        descripcion: '',
+        cantidad: 1,
+        ancho_m: 0,
+        alto_m: 0,
+        demasia: false,
+        soldadura: false,
+        laminado: false,
+        caños_soportes: false,
+        instalacion: false
+      }]
+    }));
+  };
+
+  const removeItem = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateItem = (index: number, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  const getStatusIcon = (estado: string) => {
+    switch (estado) {
+      case 'aprobado': return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'rechazado': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'vencido': return <AlertTriangle className="w-4 h-4 text-orange-500" />;
+      case 'enviado': return <Clock className="w-4 h-4 text-blue-500" />;
+      default: return <FileText className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = (estado: string) => {
+    switch (estado) {
+      case 'aprobado': return 'bg-green-100 text-green-800';
+      case 'rechazado': return 'bg-red-100 text-red-800';
+      case 'vencido': return 'bg-orange-100 text-orange-800';
+      case 'enviado': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: currency
+    }).format(amount);
+  };
+
+  if (loading && presupuestos.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Gestión de Presupuestos</h1>
+      </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      {/* Filtros */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <select
+            value={filters.estado}
+            onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">Todos los estados</option>
+            <option value="borrador">Borrador</option>
+            <option value="enviado">Enviado</option>
+            <option value="aprobado">Aprobado</option>
+            <option value="rechazado">Rechazado</option>
+            <option value="vencido">Vencido</option>
+          </select>
+
+          <select
+            value={filters.cliente_id || ''}
+            onChange={(e) => setFilters(prev => ({ ...prev, cliente_id: e.target.value ? parseInt(e.target.value) : undefined }))}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">Todos los clientes</option>
+            {clientes.map(cliente => (
+              <option key={cliente.id} value={cliente.id}>
+                {cliente.nombre} {cliente.apellido}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Botón Nuevo Presupuesto */}
+      <div className="flex justify-end mb-6">
+        <button
+          onClick={() => setShowForm(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-lg"
+        >
+          <Plus className="w-5 h-5" />
+          Nuevo Presupuesto
+        </button>
+      </div>
+
+      {/* Lista de Presupuestos */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Número
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Cliente
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {presupuestos.map((presupuesto) => (
+                <tr key={presupuesto.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {presupuesto.numero_presupuesto}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {presupuesto.cliente_nombre}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(presupuesto.fecha_creacion).toLocaleDateString('es-AR')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(presupuesto.estado)}`}>
+                      {getStatusIcon(presupuesto.estado)}
+                      <span className="ml-1">{presupuesto.estado.toUpperCase()}</span>
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatCurrency(presupuesto.total, presupuesto.moneda)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleGeneratePDF(presupuesto.id)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Descargar PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingPresupuesto(presupuesto);
+                          setFormData({
+                            cliente_id: presupuesto.cliente_id.toString(),
+                            cliente_nombre: presupuesto.cliente_nombre,
+                            cliente_direccion: presupuesto.cliente_direccion || '',
+                            cliente_ciudad: presupuesto.cliente_ciudad || '',
+                            cliente_provincia: presupuesto.cliente_provincia || '',
+                            cliente_telefono: presupuesto.cliente_telefono || '',
+                            cliente_codigo_postal: presupuesto.cliente_codigo_postal || '',
+                            comercial: presupuesto.comercial || '',
+                            numero_cliente: presupuesto.numero_cliente || '',
+                            metodo_pago: presupuesto.metodo_pago || '',
+                            terminos_pedido: presupuesto.terminos_pedido || '',
+                            solicitado_por: presupuesto.solicitado_por || '',
+                            moneda: presupuesto.moneda,
+                            notas: presupuesto.notas || '',
+                            condiciones: presupuesto.condiciones || '',
+                            validez_dias: presupuesto.validez_dias,
+                            items: presupuesto.items.map(item => ({
+                              material_id: item.material_id,
+                              descripcion: item.descripcion,
+                              cantidad: item.cantidad,
+                              ancho_m: item.ancho_m,
+                              alto_m: item.alto_m,
+                              demasia: item.demasia,
+                              soldadura: item.soldadura,
+                              laminado: item.laminado,
+                              caños_soportes: item.caños_soportes,
+                              instalacion: item.instalacion
+                            }))
+                          });
+                          setShowForm(true);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(presupuesto.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal de Formulario */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">
+                  {editingPresupuesto ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Información del Cliente */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Cliente *
+                    </label>
+                    <select
+                      required
+                      value={formData.cliente_id}
+                      onChange={(e) => {
+                        const cliente = clientes.find(c => c.id.toString() === e.target.value);
+                        setFormData(prev => ({
+                          ...prev,
+                          cliente_id: e.target.value,
+                          cliente_nombre: cliente ? `${cliente.nombre} ${cliente.apellido}` : '',
+                          cliente_direccion: cliente?.direccion || '',
+                          cliente_telefono: cliente?.telefono || ''
+                        }));
+                      }}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    >
+                      <option value="">Seleccionar cliente</option>
+                      {clientes.map(cliente => (
+                        <option key={cliente.id} value={cliente.id}>
+                          {cliente.nombre} {cliente.apellido}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Moneda
+                    </label>
+                    <select
+                      value={formData.moneda}
+                      onChange={(e) => setFormData(prev => ({ ...prev, moneda: e.target.value as 'ARS' | 'USD' }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    >
+                      <option value="ARS">ARS - Peso Argentino</option>
+                      <option value="USD">USD - Dólar Estadounidense</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dirección
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cliente_direccion}
+                      onChange={(e) => setFormData(prev => ({ ...prev, cliente_direccion: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Teléfono
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cliente_telefono}
+                      onChange={(e) => setFormData(prev => ({ ...prev, cliente_telefono: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ciudad
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cliente_ciudad}
+                      onChange={(e) => setFormData(prev => ({ ...prev, cliente_ciudad: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Provincia
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cliente_provincia}
+                      onChange={(e) => setFormData(prev => ({ ...prev, cliente_provincia: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                {/* Información Comercial */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Comercial
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.comercial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, comercial: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Número de Cliente
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.numero_cliente}
+                      onChange={(e) => setFormData(prev => ({ ...prev, numero_cliente: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Método de Pago
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.metodo_pago}
+                      onChange={(e) => setFormData(prev => ({ ...prev, metodo_pago: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Términos de Pedido
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.terminos_pedido}
+                      onChange={(e) => setFormData(prev => ({ ...prev, terminos_pedido: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                {/* Items del Presupuesto */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium">Items del Presupuesto</h3>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                    >
+                      + Agregar Item
+                    </button>
+                  </div>
+
+                  {formData.items.map((item, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Descripción *
+                          </label>
+                          <input
+                            required
+                            type="text"
+                            value={item.descripcion}
+                            onChange={(e) => updateItem(index, 'descripcion', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                            placeholder="Ej: Lona Front Light"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Cantidad
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.cantidad}
+                            onChange={(e) => updateItem(index, 'cantidad', parseInt(e.target.value) || 1)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Ancho (metros) *
+                          </label>
+                          <input
+                            required
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.ancho_m}
+                            onChange={(e) => updateItem(index, 'ancho_m', parseFloat(e.target.value) || 0)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Alto (metros) *
+                          </label>
+                          <input
+                            required
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.alto_m}
+                            onChange={(e) => updateItem(index, 'alto_m', parseFloat(e.target.value) || 0)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Servicios Adicionales */}
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={item.demasia}
+                            onChange={(e) => updateItem(index, 'demasia', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Demasía</span>
+                        </label>
+
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={item.soldadura}
+                            onChange={(e) => updateItem(index, 'soldadura', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Soldadura</span>
+                        </label>
+
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={item.laminado}
+                            onChange={(e) => updateItem(index, 'laminado', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Laminado</span>
+                        </label>
+
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={item.caños_soportes}
+                            onChange={(e) => updateItem(index, 'caños_soportes', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Caños/Soportes</span>
+                        </label>
+
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={item.instalacion}
+                            onChange={(e) => updateItem(index, 'instalacion', e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">Instalación</span>
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Eliminar Item
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Notas y Condiciones */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Notas
+                    </label>
+                    <textarea
+                      value={formData.notas}
+                      onChange={(e) => setFormData(prev => ({ ...prev, notas: e.target.value }))}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Condiciones
+                    </label>
+                    <textarea
+                      value={formData.condiciones}
+                      onChange={(e) => setFormData(prev => ({ ...prev, condiciones: e.target.value }))}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-end space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      resetForm();
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {loading ? 'Guardando...' : (editingPresupuesto ? 'Actualizar' : 'Crear')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminPresupuestos; 
