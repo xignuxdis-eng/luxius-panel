@@ -1,0 +1,644 @@
+[
+  {
+    "id": "11",
+    "persona": "MAXIMILIANO ROQUÉ",
+    "empresa": "NUCLEOTEC",
+    "relacion": "Usuario"
+  },
+  {
+    "id": "12",
+    "persona": "JUAN SEBASTIAN RODRIGUEZ",
+    "empresa": "STUDIO 7",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "14",
+    "persona": "NOMAXIMILIANO ROQUE",
+    "empresa": "",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "15",
+    "persona": "LUCIA PASTOR",
+    "empresa": "",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "16",
+    "persona": "HELMO TUCCI",
+    "empresa": "",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "17",
+    "persona": "CECILIA PINTO",
+    "empresa": "",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "18",
+    "persona": "JUAN DOMINGUEZ",
+    "empresa": "",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "21",
+    "persona": "3B PLASTICOS (BOCOS ALONSO PEDRO)",
+    "empresa": "3B PLASTICOS (BOCOS ALONSO PED",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "22",
+    "persona": "ADRIAN CORREA",
+    "empresa": "ADRIAN CORREA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "23",
+    "persona": "ADRIANA MAULU",
+    "empresa": "ADRIANA MAULU",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "24",
+    "persona": "ALEJANDRO GRAZIANI SA",
+    "empresa": "ALEJANDRO GRAZIANI SA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "25",
+    "persona": "ALVEAR 224",
+    "empresa": "ALVEAR 224",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "26",
+    "persona": "ARTELET",
+    "empresa": "ARTELET",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "27",
+    "persona": "BENDITO DISEÑO",
+    "empresa": "BENDITO DISEÑO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "28",
+    "persona": "C&C EDUARDO",
+    "empresa": "C&C EDUARDO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "29",
+    "persona": "CENTRO INTEGRAL PUBLICITARIO",
+    "empresa": "CENTRO INTEGRAL PUBLICITARIO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "30",
+    "persona": "CONCEPTO VISUAL",
+    "empresa": "CONCEPTO VISUAL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "31",
+    "persona": "HECTOR COPIACENTRO",
+    "empresa": "COPIACENTRO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "32",
+    "persona": "COSTA GRAFICA",
+    "empresa": "COSTA GRAFICA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "33",
+    "persona": "DANIEL OLIVA",
+    "empresa": "DANIEL OLIVA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "34",
+    "persona": "DIEGRAF",
+    "empresa": "DIEGRAF",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "35",
+    "persona": "CECILIA RODA",
+    "empresa": "CECILIA RODA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "36",
+    "persona": "CARLOS MERCADO DYSEY GRAFICA (DYSEY GRAFICA)",
+    "empresa": "DYSEY GRAFICA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "37",
+    "persona": "EDUARDO LIENDO IMPRESIONES",
+    "empresa": "EDUARDO LIENDO IMPRESIONES",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "38",
+    "persona": "ESTRATEGIA VISUAL/ALEKIAN ERNESTO",
+    "empresa": "ESTRATEGIA VISUAL/ALEKIAN ERNE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "39",
+    "persona": "EXPLOTTER",
+    "empresa": "EXPLOTTER",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "40",
+    "persona": "VALERIA AGUIRRE",
+    "empresa": "VALERIA AGUIRRE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "41",
+    "persona": "HUGO SASTRE _ GRAFICA + NEGOCIOS",
+    "empresa": "HUGO SASTRE _ GRAFICA + NEGOCIOS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "42",
+    "persona": "GRAFICA DON BOSCO",
+    "empresa": "GRAFICA DON BOSCO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "43",
+    "persona": "GRAFICA PUBLICITARIA",
+    "empresa": "GRAFICA PUBLICITARIA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "44",
+    "persona": "GRAFICA ROMA",
+    "empresa": "GRAFICA ROMA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "45",
+    "persona": "GRUPO RGB",
+    "empresa": "GRUPO RGB",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "46",
+    "persona": "OLOCCO JOSE",
+    "empresa": "OLOCCO JOSE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "47",
+    "persona": "IMAGINERIA PUBLICITARIA",
+    "empresa": "IMAGINERIA PUBLICITARIA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "48",
+    "persona": "IMPRENTA IMAGEN COLOR",
+    "empresa": "IMPRENTA IMAGEN COLOR",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "49",
+    "persona": "IMPRESID",
+    "empresa": "IMPRESID",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "50",
+    "persona": "IMPRESOS ALVEAR",
+    "empresa": "IMPRESOS ALVEAR",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "51",
+    "persona": "INDUSTRIAS CRAYON, SRL",
+    "empresa": "INDUSTRIAS CRAYON, SRL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "52",
+    "persona": "INDUSTRIAS MEDITERRANEO",
+    "empresa": "INDUSTRIAS MEDITERRANEO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "53",
+    "persona": "JADE",
+    "empresa": "JADE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "54",
+    "persona": "JUMP PUBLICIDAD GRAFICA",
+    "empresa": "JUMP PUBLICIDAD GRAFICA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "55",
+    "persona": "LASER PRINT",
+    "empresa": "LASER PRINT",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "56",
+    "persona": "LE PRINT /COMBA AGUSTIN",
+    "empresa": "LE PRINT /COMBA AGUSTIN",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "57",
+    "persona": "LE VRAUX LUIS",
+    "empresa": "LE VRAUX LUIS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "58",
+    "persona": "LETREROS IBARRA",
+    "empresa": "LETREROS IBARRA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "59",
+    "persona": "LYKOS",
+    "empresa": "LYKOS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "60",
+    "persona": "MAAT CREATE",
+    "empresa": "MAAT CREATE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "61",
+    "persona": "MADISON /LAURO MARCIAL PERETTI",
+    "empresa": "MADISON /LAURO MARCIAL PERETTI",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "62",
+    "persona": "MALDONADO PUBLICIDAD",
+    "empresa": "MALDONADO PUBLICIDAD",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "63",
+    "persona": "MARIANO SEMINARA",
+    "empresa": "MARIANO SEMINARA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "64",
+    "persona": "MEGA IMAGEN",
+    "empresa": "MEGA IMAGEN",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "65",
+    "persona": "MEGA POSTERS",
+    "empresa": "MEGA POSTERS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "66",
+    "persona": "MORO LETREROS",
+    "empresa": "MORO LETREROS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "67",
+    "persona": "MULTIGRAF/BOTASSO MARIA SOL",
+    "empresa": "MULTIGRAF/BOTASSO MARIA SOL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "68",
+    "persona": "NEWCLIP",
+    "empresa": "NEWCLIP",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "69",
+    "persona": "OFFSET ALFIO EUSEBI ALFIO",
+    "empresa": "OFFSET ALFIO EUSEBI ALFIO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "70",
+    "persona": "P&D",
+    "empresa": "P&D",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "71",
+    "persona": "SERI PRINT PIPINO",
+    "empresa": "SERI PRINT PIPINO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "72",
+    "persona": "PLOTTER INK/",
+    "empresa": "PLOTTER INK/",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "73",
+    "persona": "PREMAT INDUSTRIA GRAFICA SRL",
+    "empresa": "PREMAT INDUSTRIA GRAFICA SRL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "74",
+    "persona": "KOPIAR IMPRESOS",
+    "empresa": "KOPIAR IMPRESOS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "75",
+    "persona": "PROGRAF (PORTESSIO AXEL MARCELO)",
+    "empresa": "PROGRAFF (PORTESSIO AXEL MARCE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "76",
+    "persona": "PROTYPE",
+    "empresa": "PROTYPE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "77",
+    "persona": "PUBLICENTER",
+    "empresa": "PUBLICENTER",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "78",
+    "persona": "PUBLICIDAD INTEGRAL",
+    "empresa": "PUBLICIDAD INTEGRAL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "79",
+    "persona": "PUNTO PRINT",
+    "empresa": "PUNTO PRINT",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "80",
+    "persona": "RAYSIS CONSTRUCCIONES",
+    "empresa": "RAYSIS CONSTRUCCIONES",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "81",
+    "persona": "REGISTRO COMUNICACION VISUAL",
+    "empresa": "REGISTRO COMUNICACION VISUAL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "82",
+    "persona": "RIP",
+    "empresa": "RIP",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "83",
+    "persona": "ESTUDIO CLELAND",
+    "empresa": "CARLOS PATERSON",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "84",
+    "persona": "ROC",
+    "empresa": "ROC",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "85",
+    "persona": "ROF - RAUL FERNANDEZ - COOP. H",
+    "empresa": "ROF - RAUL FERNANDEZ - COOP. H",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "86",
+    "persona": "ROLANDO",
+    "empresa": "ROLANDO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "87",
+    "persona": "GRAFICA ROSSI",
+    "empresa": "GRAFICA ROSSI",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "88",
+    "persona": "ROTULACION INTEGRAL",
+    "empresa": "ROTULACION INTEGRAL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "89",
+    "persona": "ROTULOS HORIZONTE",
+    "empresa": "ROTULOS HORIZONTE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "90",
+    "persona": "EMILIO GALLO",
+    "empresa": "EMILIO GALLO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "91",
+    "persona": "SEGOVIA LETREROS / SEGHAN SA",
+    "empresa": "SEGOVIA LETREROS / SEGHAN SA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "92",
+    "persona": "SIGN3D COMUNICACION VISUAL",
+    "empresa": "SIGN3D COMUNICACION VISUAL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "93",
+    "persona": "SIGNS/ DEMARIA DIEGO VICTOR",
+    "empresa": "SIGNS/ DEMARIA DIEGO VICTOR",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "94",
+    "persona": "SOLUCIONES GRAFICAS",
+    "empresa": "SOLUCIONES GRAFICAS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "95",
+    "persona": "TAIT LETREROS",
+    "empresa": "TAIT LETREROS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "96",
+    "persona": "ADV CONSULTORES",
+    "empresa": "ADV CONSULTORES",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "97",
+    "persona": "T-clas AMERICO ESTEVES",
+    "empresa": "T-CLAS / AMERICO ESTEVES",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "98",
+    "persona": "TORO LETREROS",
+    "empresa": "TORO LETREROS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "99",
+    "persona": "TRATO DISEÑO",
+    "empresa": "TRATO DISEÑO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "100",
+    "persona": "VIRTUAL FABIAN BUSTOS",
+    "empresa": "VIRTUAL FABIAN BUSTOS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "101",
+    "persona": "Vision Publicitaria -NICOLAS Mansilla",
+    "empresa": "VISION PUBLICITARIA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "102",
+    "persona": "YAMIL COMUNICACION VISUAL",
+    "empresa": "YAMIL COMUNICACION VISUAL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "103",
+    "persona": "TRINIDAD TOSELLO ZOOM GRAFICA",
+    "empresa": "ZOOM GRAFICA (TOSELLO)",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "104",
+    "persona": "ZOOM LETREROS/ANABELA CAROSOTT",
+    "empresa": "ZOOM LETREROS/ANABELA CAROSOTT",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "105",
+    "persona": "LEO VIA PUBLICA",
+    "empresa": "LEO VIA PUBLICA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "106",
+    "persona": "GRAFICOS DIGITALES",
+    "empresa": "GRAFICOS DIGITALES",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "107",
+    "persona": "LA GAZETA",
+    "empresa": "LA GAZETA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "108",
+    "persona": "ENFOCAR FEDERICO CAZZOLA",
+    "empresa": "ENFOCAR FEDERICO CAZZOLA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "109",
+    "persona": "EFECTO X / VIGLIECCA MONICA",
+    "empresa": "EFECTO X / VIGLIECCA MONICA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "110",
+    "persona": "JULIO GONZALEZ",
+    "empresa": "JULIO GONZALEZ",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "111",
+    "persona": "COENDA PUBLICIDAD",
+    "empresa": "COENDA PUBLICIDAD",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "112",
+    "persona": "LUMINOSOS CARRIO/COKKE S.R.L",
+    "empresa": "LUMINOSOS CARRIO/COKKE S.R.L",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "113",
+    "persona": "FORMAS PY G SRL",
+    "empresa": "FORMAS PY G SRL",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "114",
+    "persona": "CARTELANDIA",
+    "empresa": "CARTELANDIA",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "115",
+    "persona": "PIPINO",
+    "empresa": "PIPINO",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "116",
+    "persona": "SUME VIA PUBLICA-FERNETTI",
+    "empresa": "SUME VIA PUBLICA-FERNETTI",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "117",
+    "persona": "GRAFIX (SIMONINI)",
+    "empresa": "GRAFIX (SIMONINI)",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "118",
+    "persona": "DISEÑARTE",
+    "empresa": "DISEÑARTE",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "119",
+    "persona": "NUTUS",
+    "empresa": "NUTUS",
+    "relacion": "Cliente"
+  },
+  {
+    "id": "120",
+    "persona": "JPW JUAN PAPURELLO",
+    "empresa": "JPW JUAN PAPURELLO",
+    "relacion": "Cliente"
+  }
+]

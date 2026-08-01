@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "nombre": "Retira el Cliente",
+        "descripcion": "Retiro en local",
+        "costo": 0,
+        "habilitado": true
+    },
+    {
+        "id": 2,
+        "nombre": "Envío Cadete",
+        "descripcion": "Envío por cadetería local",
+        "costo": 0,
+        "habilitado": true
+    },
+    {
+        "id": 3,
+        "nombre": "Envío Expreso",
+        "descripcion": "Envío por transporte/expreso",
+        "costo": 0,
+        "habilitado": true
+    },
+    {
+        "id": 4,
+        "nombre": "A Convenir",
+        "descripcion": "Coordinar con el vendedor",
+        "costo": 0,
+        "habilitado": true
+    }
+]

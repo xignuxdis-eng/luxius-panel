@@ -1,0 +1,242 @@
+.abm-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.abm-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.tab-link {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.tab-link:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-link.active {
+    background: var(--accent);
+    color: white;
+}
+
+.text-right {
+    text-align: right;
+}
+
+
+.abm-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    min-height: 400px;
+    box-shadow: var(--shadow-md);
+}
+
+.abm-list-view {
+    display: flex;
+    flex-direction: column;
+}
+
+.abm-actions-header {
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.input-field.sm {
+    max-width: 240px;
+    padding: 8px 12px;
+}
+
+.abm-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.abm-table th {
+    padding: 6px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+}
+
+.abm-table td {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+}
+
+.name-cell,
+.contact-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.name-cell .name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.name-cell .sub,
+.contact-cell .sub {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.vip-badge {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+    padding: 0px 4px;
+    border-radius: 4px;
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.pill {
+    padding: 2px 8px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.pill.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.pill.muted {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+
+.code-badge {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.table-ops {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.op-btn-sm {
+    padding: 6px 10px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    cursor: pointer !important;
+    position: relative;
+    z-index: 2;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.op-btn-sm * {
+    pointer-events: none !important;
+}
+
+.op-btn-sm:hover {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+/* Material Modal - Bobbin Management */
+.bobinas-manager {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bobinas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.bobinas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bobina-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.bobina-row>div {
+    flex: 1;
+}
+
+.bobina-remove-btn {
+    color: #ef4444;
+    padding: 8px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.bobina-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.empty-message {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+}
+
+.vip-badge {
+    background: #f59e0b;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-left: 8px;
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}

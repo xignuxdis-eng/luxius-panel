@@ -1,155 +1,133 @@
-import Profile from "./pages/dashboard/Profile";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import ProtectedRoute from "./components/ProtectedRoute";
-import DashboardLayout from "./components/DashboardLayout";
-import Login from "./pages/Login";
-import Cliente from "./pages/dashboard/cliente";
-import ClienteUpload from "./pages/dashboard/cliente/upload";
-import Artista from "./pages/dashboard/artista";
-import Impresor from "./pages/dashboard/impresor";
-import AdminRouter from "./pages/dashboard/admin/AdminRouter";
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuthStore } from '@store/authStore'
 
-function App() {
-  return (
-    <Router>
-      <Routes>
-        {/* Página de Login */}
-        <Route path="/login" element={<Login />} />
+// Layouts
+import MainLayout from '@components/layout/MainLayout'
 
-        {/* Ruta raíz del dashboard - redirige automáticamente según rol */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Navigate to="/dashboard/auto" replace />
-            </ProtectedRoute>
-          }
-        />
+// Pages
+import Login from '@pages/Login/Login'
+import Dashboard from '@pages/Dashboard/Dashboard'
+import Entrada from '@pages/Entrada/Entrada'
+import Diseno from '@pages/Diseno/Diseno'
+import Impresion from '@pages/Impresion/Impresion'
+import ABM from '@pages/ABM/ABM'
+import Reportes from '@pages/Reportes/Reportes'
+import Sistema from '@pages/Sistema/Sistema'
+import Analytics from '@pages/Analytics/Analytics'
 
-        {/* Dashboard Cliente */}
-        <Route
-          path="/dashboard/cliente"
-          element={
-            <ProtectedRoute expectedRole="cliente">
-              <DashboardLayout showSidebar={true}>
-                <Cliente />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/cliente/upload"
-          element={
-            <ProtectedRoute expectedRole="cliente">
-              <DashboardLayout showSidebar={true}>
-                <ClienteUpload />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/cliente/historial"
-          element={
-            <ProtectedRoute expectedRole="cliente">
-              <DashboardLayout showSidebar={true}>
-                <div className="space-y-6">
-                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                    <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                      Historial de Pedidos 📋
-                    </h1>
-                    <p className="text-gray-600">
-                      Aquí podés ver todos tus pedidos anteriores.
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                    <p className="text-gray-500 text-center py-8">
-                      Funcionalidad en desarrollo...
-                    </p>
-                  </div>
-                </div>
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/cliente/soporte"
-          element={
-            <ProtectedRoute expectedRole="cliente">
-              <DashboardLayout showSidebar={true}>
-                <div className="space-y-6">
-                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                    <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                      Chat de Soporte 💬
-                    </h1>
-                    <p className="text-gray-600">
-                      Comunicate con nuestro equipo de soporte.
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                    <p className="text-gray-500 text-center py-8">
-                      Funcionalidad en desarrollo...
-                    </p>
-                  </div>
-                </div>
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+import { useLocation } from 'react-router-dom'
+import { hasRolePermission } from '@/types/auth'
 
-        {/* Dashboard Artista */}
-        <Route
-          path="/dashboard/artista/*"
-          element={
-            <ProtectedRoute expectedRole="artista">
-              <DashboardLayout showSidebar={true}>
-                <Artista />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+// Protected Route wrapper
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const { user, isAuthenticated } = useAuthStore()
+    const location = useLocation()
 
-        {/* Dashboard Impresor */}
-        <Route
-          path="/dashboard/impresor/*"
-          element={
-            <ProtectedRoute expectedRole="impresor">
-              <DashboardLayout showSidebar={true}>
-                <Impresor />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+    if (!isAuthenticated || !user) {
+        return <Navigate to="/login" replace />
+    }
 
-        {/* Dashboard Admin */}
-        
-        {/* Perfil de Usuario (Universal) */}
-        <Route
-          path="/dashboard/profile"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout showSidebar={true}>
-                <Profile />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+    const currentPath = location.pathname
+    const allowed = hasRolePermission(user.role, currentPath)
 
-        <Route
-          path="/dashboard/admin/*"
-          element={
-            <ProtectedRoute expectedRole="admin">
-              <DashboardLayout showSidebar={true}>
-                <AdminRouter />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+    if (!allowed) {
+        console.warn(`User ${user.username} (role: ${user.role}) denied access to ${currentPath}`)
+        return <Navigate to="/" replace />
+    }
 
-        {/* Redirección para rutas no encontradas */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
-  );
+    return <>{children}</>
 }
 
-export default App;
+import Utilidades from '@pages/Utilidades/Utilidades'
+import Stock from '@pages/Stock/Stock'
+import Presupuestador from '@/pages/Presupuestador/Presupuestador'
+
+import { useEffect, useState } from 'react'
+import { initializeData } from '@/data/db'
+
+function App() {
+    const [isInitializing, setIsInitializing] = useState(true)
+
+    useEffect(() => {
+        const init = async () => {
+            const currentTheme = localStorage.getItem('theme') || 'pixel'
+            document.documentElement.setAttribute('data-theme', currentTheme)
+            if (currentTheme === 'pixel') {
+                document.body.classList.add('pixel-theme')
+            }
+
+            // Force a minimum loading time to prevent flicker and ensure storage is ready
+            const minTime = new Promise(resolve => setTimeout(resolve, 800));
+            const dataLoad = initializeData();
+            await Promise.all([dataLoad, minTime]);
+            setIsInitializing(false);
+        }
+        init();
+    }, []);
+
+    if (isInitializing) {
+        return (
+            <div style={{
+                height: '100vh',
+                width: '100vw',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: '#1a1b1e',
+                color: '#e0e0e0',
+                flexDirection: 'column',
+                gap: '1rem'
+            }}>
+                <div className="loader" style={{
+                    width: '48px',
+                    height: '48px',
+                    border: '5px solid #FFF',
+                    borderBottomColor: 'transparent',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    boxSizing: 'border-box',
+                    animation: 'rotation 1s linear infinite',
+                }}></div>
+                <style>{`
+                    @keyframes rotation {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `}</style>
+                <p>Sincronizando Sistema...</p>
+            </div>
+        )
+    }
+
+    return (
+        <Routes>
+            <Route path="/login" element={<Login />} />
+
+            <Route
+                path="/*"
+                element={
+                    <ProtectedRoute>
+                        <MainLayout>
+                            <Routes>
+                                <Route path="/" element={<Dashboard />} />
+                                <Route path="/entrada" element={<Entrada />} />
+                                <Route path="/presupuestador" element={<Presupuestador />} />
+                                <Route path="/diseno" element={<Diseno />} />
+                                <Route path="/impresion" element={<Impresion />} />
+                                <Route path="/stock" element={<Stock />} />
+                                <Route path="/analiticas" element={<Analytics />} />
+                                <Route path="/utilidades" element={<Utilidades />} />
+                                <Route path="/abm/*" element={<ABM />} />
+                                <Route path="/reportes" element={<Reportes />} />
+                                <Route path="/sistema/*" element={<Sistema />} />
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                            </Routes>
+                        </MainLayout>
+                    </ProtectedRoute>
+                }
+            />
+        </Routes>
+    )
+}
+
+export default App

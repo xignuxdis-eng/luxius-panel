@@ -1,0 +1,32 @@
+# Luxius UI Refinement & Portability Walkthrough
+
+I have completed the UI refinements to make Luxius more compact and professional, and prepared the project for transfer so you can continue working from home.
+
+## UI Improvements
+
+### Compact Design System
+- Reduced border radii and input padding globally for a denser, more modern feel.
+- Shrunk modal headers and padding to maximize content visibility.
+
+### Page Specific Refinements
+- **Entrada**: Optimized the orders table with smaller rows and clearer status badges. Added a "results count" to the filters bar.
+- **Dashboard**: Compacted stat cards and sidebar widgets.
+- **ABM**: Reduced padding in tables and headers.
+
+### Fixed Interactions
+- **Filters**: Fixed the filter bar logic. It now updates automatically as you change criteria.
+- **Nuevo Pedido**: The modal is now more compact, making it easier to use on smaller screens.
+
+## Project Packaging
+I have created a ZIP file containing the entire source code and database, excluding `node_modules` to keep the size manageable.
+
+- **Project Location**: [luxius](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius)
+- **ZIP Package**: [luxius_project.zip](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius_project.zip)
+
+> [!TIP]
+> When you set this up at home, simply run `npm install` (or use the [setup_env.ps1](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/setup_env.ps1) script if available) to restore dependencies.
+
+## Verification
+- Verified that all pages load correctly with the new styling.
+- Tested the search and filter functionality on the [Entrada](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/Entrada/Entrada.tsx#9-173) page.
+- Confirmed that "Agregar Pedido" correctly saves new records to the session storage.

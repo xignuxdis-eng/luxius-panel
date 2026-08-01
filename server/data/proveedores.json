@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "nombre": "Ceyal",
+        "contacto": "Ventas",
+        "telefono": "11-1234-5678",
+        "email": "ventas@ceyal.com.ar",
+        "direccion": "Av. Belgrano 123",
+        "cuit": "30-12345678-9",
+        "cbu": "ALIAS.CEYAL.MP",
+        "rubro": "Insumos Gráficos",
+        "saldo": 0,
+        "notas": "Principal proveedor de etiquetas",
+        "habilitado": true
+    },
+    {
+        "id": 2,
+        "nombre": "Grafica Global",
+        "contacto": "Mauro",
+        "telefono": "11-9876-5432",
+        "email": "mauro@global.com",
+        "direccion": "Mitre 450",
+        "cuit": "20-11223344-5",
+        "cbu": "GLOBAL.BANCO.RIO",
+        "rubro": "Lonas y Vinilos",
+        "saldo": -15000,
+        "notas": "Entrega rápida",
+        "habilitado": true
+    }
+]

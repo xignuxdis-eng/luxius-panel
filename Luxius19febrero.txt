@@ -1,0 +1,126 @@
+================================================================================
+INFORME TÉCNICO INTEGRAL DEL SISTEMA LUXIUS - 19 DE FEBRERO 2026
+================================================================================
+
+1) ARQUITECTURA GENERAL ACTUAL
+-------------------------------
+* Stack Tecnológico Real:
+  - Frontend: React 18.2, TypeScript, Vite, Zustand (Estado), Recharts (Gráficos), React Router DOM v6.
+  - Backend: Node.js con Express.js.
+  - Base de Datos: "NoSQL" basada en archivos JSON planos gestionados por el sistema de archivos (fs) y LowDB (parcialmente).
+* Estructura de Carpetas:
+  - /server: Servidor API, Daemons de proceso, logs de impresora y almacenamiento de datos JSON.
+  - /server/data: Repositorio de persistencia (Archivos .json).
+  - /server/uploads: Almacenamiento físico de archivos de producción.
+  - /src: Código fuente Frontend (Componentes, Páginas, Store, Types, Utils).
+  - /src/data: Capa de acceso a datos (db.ts) con lógica híbrida LocalStorage/API.
+* Servicios Activos:
+  - API Server (Puerto 5000).
+  - Vite Dev Server (Puerto 3005/5173).
+  - Sistema de Sincronización LocalStorage-Server.
+  - Daemon de Procesamiento de Logs de Impresora (XML Parser).
+* Middlewares:
+  - CORS (Habilitado para comunicación cross-origin).
+  - Multer (Gestión de carga de archivos hasta 500MB).
+  - Express.json/urlencoded (Límite 500MB).
+  - Auth Middleware (Validación de roles por rutas en Frontend).
+
+2) BASE DE DATOS (ARCHIVOS JSON)
+---------------------------------
+El sistema no utiliza SQL tradicional, sino una estructura relacional emulada en JSON:
+* Tablas principales (Archivos en server/data):
+  - ordenes.json: El núcleo del sistema. Almacena todas las OT.
+  - clientes.json: Datos de clientes, categorías y saldos.
+  - materiales.json: Inventario, precios por m2/ml y anchos permitidos.
+  - usuarios.json: Credenciales y roles.
+  - printer_stats.json: Datos históricos de producción real (logs procesados).
+  - servicios.json: Definición de tareas extras (laminado, ojalillado, etc.).
+  - maquinas.json: Registro de impresoras y estados.
+* Relaciones:
+  - OT (ordenes) -> Cliente (vía clientId).
+  - OT (ordenes) -> Material (vía material_codigo).
+  - Producción (printer_stats) -> OT (vía orderId extraído del nombre del archivo).
+* Índices: Se emulan mediante mapeos en memoria (ID numéricos auto-incrementales).
+
+3) SISTEMA DE ÓRDENES DE TRABAJO (OT)
+-------------------------------------
+* Flujo Completo:
+  1. preorden (Diseño): El artista recibe y prepara el archivo.
+  2. orden (Para Imprimir): El archivo está listo y validado técnicamente.
+  3. impreso: La máquina reporta la finalización o el usuario marca manualmente.
+  4. post (Terminaciones): Pasa a taller para acabados (laminado, corte).
+  5. completo (Listo para entregar): Control de calidad finalizado.
+  6. entregado: El cliente retira el pedido.
+  7. finalizado: Archivado histórico.
+* Datos persistidos: ID, OT (slug), estado, clientId, dimensiones (alto/ancho), copias, subtotal recalculado en backend, servicios aplicados (Record<string, boolean>), archivos (originales y renombrados), metadatos de imagen (DPI, color mode), consumo estimado.
+* Eventos disparados:
+  - Recálculo de precio automático en Backend (Security Logic).
+  - Renombrado inteligente de archivos (ID_XCOPIAS_MATERIAL_MEDIDAS).
+  - Validación de stock en tiempo real al crear/editar.
+
+4) SISTEMA DE LOGS
+------------------
+* Tipos de Logs:
+  - Logs de Impresora: Archivos XML generados por Roland VersaWorks (eventId 25 = éxito). Contienen consumo real de tinta (CMYK en ml) y m2 reales impresos.
+  - Logs de OT: Historizados en 'printer_stats' vinculando logs XML con registros de órdenes.
+  - Logs de Sistema: Almacenados en 'luxius_session_logs' (LocalStorage) para acciones de CRUD sobre entidades sensibles (roles, usuarios).
+* Almacenamiento: Los logs de impresora se mueven de '/printer_logs' a '/printer_logs/processed' tras ser parseados. Los datos extraídos se normalizan en printer_stats.json.
+
+5) SISTEMA DE STOCK
+-------------------
+* Cálculo: Se basa en el campo `stockActual` de los materiales.
+* Afectación:
+  - Un evento de creación de OT en estado de impresión genera un `stockWarning` si el `consumoEstimado` supera el disponible.
+  - El sistema calcula consumo por ml (si tipo es 'ml') o m2 (si tipo es 'm2').
+* Visibilidad: El rol 'impresion' y 'admin' pueden ver alertas críticas en el Dashboard y en la vista de Stock dedicada.
+* Alertas: Implementadas mediante el componente `FloatingAlarm.tsx` y widgets en el Dashboard principal.
+
+6) SISTEMA DE ANALÍTICAS
+------------------------
+* Métricas actuales: Facturación mensual, m2 vendidos vs impresos, consumo de tinta por color, eficiencia por máquina (min/m2), detección de reprocesos (fugas de material).
+* Fuentes: Cruce de ordenes.json y printer_stats.json.
+* Endpoints Backend:
+  - /api/analytics/process-logs: Procesa nuevos archivos XML.
+  - /api/analytics/reconciliation: Cruza lo cobrado con lo producido.
+  - /api/analytics/dashboard: Genera el resumen ejecutivo para el frontend.
+
+7) PERMISOS Y ROLES
+-------------------
+Jerarquía definida en src/types/auth.ts (Niveles 1-6):
+* principal/admin: Acceso total (Gestión de sistema, ABM, finanzas).
+* vendedor: Creación de órdenes (Entrada), gestión de clientes.
+* cliente: Vista restringida de sus propios pedidos y utilidades.
+* impresion: Vista de cola de producción y gestión de stock.
+* artista: Vista de diseño, asignación y preparación de archivos.
+
+8) ENDPOINTS BACKEND (RESUMEN)
+------------------------------
+* /api/:collection (GET, POST, PUT, DELETE): CRUD genérico para todas las entidades JSON.
+* /api/upload: Recepción de archivos vía Multer.
+* /api/migration/receive: Punto de entrada para sincronización masiva de datos.
+* /api/db/normalize-case: Herramienta de mantenimiento para pasar datos a MAYÚSCULAS.
+* /api/db/backup: Generador de backup JSON instantáneo.
+* /api/analytics/rebuild-stats: Purgado y reprocesamiento total de logs.
+
+9) FRONTEND
+-----------
+* Componentes Principales: Header, Sidebar, MainLayout, Dashboard, Modal.
+* Componentes Reutilizables: Button, Input, MediaPlayer, SharedFileViewerModal, FloatingCalculator.
+* Estado Global: Zustand con persistencia en LocalStorage para Auth (authStore) y Media (mediaStore).
+* Capa de Datos (db.ts): Contiene >80 funciones para manipular la lógica de negocio, gestionando la transición de LocalStorage hacia la API de forma transparente para las páginas.
+
+10) INCONSISTENCIAS Y MEJORAS
+-----------------------------
+* Inconsistencias Detectadas:
+  - El sistema aún guarda datos redundantes en LocalStorage que ya se persisten en el servidor (Riesgo de desincronización si dos usuarios editan desde distintos navegadores).
+  - Existen referencias a "v4" y "v2" en el código de reportes, sugiriendo lógica legada no migrada.
+  - El sistema de logs de sistema (CRUD) es puramente local (cada navegador tiene sus propios logs), no se centralizan en el servidor.
+  - Algunos campos financieros (pagoCuenta, saldo) se inicializan pero no tienen una lógica de flujo contable completa integrada con las OT.
+* Posibles Mejoras:
+  - Migración a una base de datos real (SQLite/PostgreSQL) para evitar problemas de corrupción al escribir archivos JSON concurrentemente.
+  - Centralización total de la lógica de stock en el backend (actualmente el descuento es mayormente referencial).
+  - Implementación de WebSockets para actualizaciones de estado de OT en tiempo real entre departamentos.
+
+================================================================================
+FIN DEL INFORME
+================================================================================

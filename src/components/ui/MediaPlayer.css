@@ -1,0 +1,543 @@
+.media-player {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 320px;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.media-player.minimized {
+    width: auto;
+    padding: 8px;
+    border-radius: 50px;
+}
+
+/* Hidden input */
+.hidden-input {
+    display: none;
+}
+
+/* Header */
+.player-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.player-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.player-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.queue-toggle-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    position: relative;
+}
+
+.queue-toggle-btn:hover,
+.queue-toggle-btn.active {
+    opacity: 1;
+}
+
+.queue-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--accent);
+    color: white;
+    font-size: 8px;
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 8px;
+    min-width: 12px;
+    text-align: center;
+}
+
+.minimize-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border: none;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: all 0.2s;
+    padding: 4px 8px;
+    color: white;
+    z-index: 10;
+}
+
+.minimize-btn:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+/* Minimized state */
+.minimized-player {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--accent), #ff8a50);
+    border: none;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(255, 107, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    animation: pulse 2s infinite;
+}
+
+.minimized-player:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 24px rgba(255, 107, 0, 0.5);
+}
+
+.minimized-player.playing {
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 4px 16px rgba(255, 107, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 4px 24px rgba(255, 107, 0, 0.6);
+    }
+}
+
+/* Queue Panel */
+.queue-panel {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.clear-queue-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.clear-queue-btn:hover {
+    opacity: 1;
+}
+
+.queue-empty {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 8px;
+    font-style: italic;
+}
+
+.queue-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    transition: background 0.2s;
+}
+
+.queue-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.queue-item.active {
+    background: rgba(255, 107, 0, 0.1);
+}
+
+.queue-item-play {
+    background: none;
+    border: none;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.7;
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.queue-item-play:hover {
+    opacity: 1;
+}
+
+.queue-item-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.queue-item-remove {
+    background: none;
+    border: none;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.4;
+    color: #ff5555;
+    transition: opacity 0.2s;
+}
+
+.queue-item-remove:hover {
+    opacity: 1;
+}
+
+/* Track Info */
+.player-track-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+}
+
+.track-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.track-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.track-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-artist {
+    font-size: 9px;
+    color: var(--text-muted);
+}
+
+.no-track {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Progress Bar */
+.player-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.time-current,
+.time-total {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-family: monospace;
+    min-width: 28px;
+}
+
+.time-total {
+    text-align: right;
+}
+
+.progress-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.progress-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Controls */
+.player-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+}
+
+.player-btn {
+    background: none;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    opacity: 0.8;
+}
+
+.player-btn:hover {
+    opacity: 1;
+    background: rgba(255, 107, 0, 0.1);
+}
+
+.player-btn.active {
+    color: var(--accent);
+    opacity: 1;
+}
+
+.play-btn {
+    font-size: 18px;
+    background: rgba(255, 107, 0, 0.1);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-btn:hover {
+    background: rgba(255, 107, 0, 0.2);
+}
+
+/* Volume */
+.player-volume {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px;
+}
+
+.volume-icon {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.volume-slider {
+    flex: 1;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 8px;
+    height: 8px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    background: var(--accent);
+    transform: scale(1.2);
+}
+
+/* Add Media */
+.player-add {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+}
+
+.add-file-btn,
+.add-url-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-file-btn:hover,
+.add-url-btn:hover {
+    border-color: var(--accent);
+    background: rgba(255, 107, 0, 0.1);
+}
+
+/* URL Input */
+.url-input-container {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.url-input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.url-input::placeholder {
+    color: var(--text-muted);
+}
+
+.url-add-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-weight: bold;
+    padding: 0 10px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.url-add-btn:hover {
+    opacity: 0.8;
+}
+
+/* YouTube Embed */
+.youtube-embed {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%;
+    margin-bottom: 8px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: #000;
+}
+
+.youtube-embed iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.youtube-close,
+.youtube-show-btn {
+    background: rgba(255, 107, 0, 0.8);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-size: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.youtube-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 10;
+}
+
+.youtube-show-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.youtube-close:hover,
+.youtube-show-btn:hover {
+    background: var(--accent);
+}
+
+/* Hidden YouTube container - keeps iframe in DOM when minimized */
+.youtube-hidden-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.youtube-hidden-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 8px;
+}
+
+/* When minimized, move container off-screen but keep in DOM */
+.youtube-hidden-container.hidden {
+    position: fixed;
+    bottom: -9999px;
+    right: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}

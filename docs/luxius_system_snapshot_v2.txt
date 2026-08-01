@@ -1,0 +1,225 @@
+LUXIUS SYSTEM SNAPSHOT V2 - TECHNICAL AUDIT
+DATE: 2026-02-19
+-------------------------------------------
+
+1. SYSTEM VERSION & DEPENDENCIES
+---------------------------------
+Version: 1.0.0
+Node Type: Module
+
+Dependencies:
+- lucide-react: ^0.563.0
+- pdf-lib: ^1.17.1
+- pdfjs-dist: ^5.4.530
+- react: ^18.2.0
+- react-dom: ^18.2.0
+- react-hook-form: ^7.49.2
+- react-router-dom: ^6.21.0
+- recharts: ^3.7.0
+- zustand: ^4.4.7
+
+DevDependencies:
+- @vitejs/plugin-react: ^4.2.1
+- typescript: ^5.3.3
+- vite: ^5.0.8
+
+2. DATA MODELS (JSON SCHEMAS)
+------------------------------
+MATERIAL (materiales.json):
+{
+    id: number,
+    codigo: string,
+    calidad: string,
+    descripcion: string,
+    tipo: string,
+    unidad?: string,
+    color?: string,
+    tipoCobro?: 'm2' | 'ml',
+    preciosPorAncho?: { maxAncho: number, precio: number }[],
+    precioM2: number,
+    ancho: number,
+    habilitado: boolean,
+    stockActual?: number,
+    stockMinimo?: number
+}
+
+ORDER (ordenes.json):
+{
+    id: number,
+    ot: string,
+    status: OrderStatus,
+    clientId: number,
+    clienteNombre: string,
+    material: string,
+    calidad: string,
+    alto: number,
+    ancho: number,
+    copias: number,
+    subtotal: number,
+    demasiasConfig?: { top: boolean, bottom: boolean, left: boolean, right: boolean },
+    servicios?: Record<string, boolean>,
+    archivos: string[],
+    archivosOriginales?: string[],
+    imgMetadata?: { width: number, height: number, dpi: number, format: string, colorMode: string },
+    fechaCreacion: string,
+    fechaEntrega: string,
+    category?: 'diseno' | 'impresion'
+}
+
+CLIENTE (clientes.json):
+{
+    id: number,
+    nombre: string,
+    empresa: string,
+    categoria: string,
+    habilitado: boolean,
+    fechaInicio: string
+}
+
+3. PRICING LOGIC (calculateItemPrice)
+--------------------------------------
+Location: src/pages/Entrada/NuevoPedidoModal.tsx
+
+const calculateItemPrice = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>) => {
+    const mat = getMateriales().find(m => m.codigo === materialCode)
+    if (!mat || h <= 0) return 0
+
+    let currentUnitPrice = mat.precioM2 || 0
+
+    // Tiered pricing by width
+    if (mat.preciosPorAncho && mat.preciosPorAncho.length > 0) {
+        const tier = mat.preciosPorAncho.find(t => w <= t.maxAncho)
+        if (tier) {
+            currentUnitPrice = tier.precio
+        } else {
+            currentUnitPrice = mat.preciosPorAncho[mat.preciosPorAncho.length - 1].precio
+        }
+    }
+
+    let basePrice = 0;
+    if (mat.tipoCobro === 'ml') {
+        basePrice = Math.round(h * c * currentUnitPrice)
+    } else {
+        basePrice = w > 0 ? Math.round(w * h * c * currentUnitPrice) : 0
+    }
+
+    // Add services prices
+    let servicesTotal = 0;
+    if (services) {
+        Object.entries(services).forEach(([sId, active]) => {
+            if (active) {
+                const s = availableServices.find(serv => String(serv.id) === sId);
+                if (s) servicesTotal += (s.precioBase || 0) * c;
+            }
+        });
+    }
+
+    return basePrice + servicesTotal;
+}
+
+4. BACKEND ENDPOINT (POST /api/:collection)
+--------------------------------------------
+Location: server/index.js
+
+app.post('/api/:collection', (req, res) => {
+    const { collection } = req.params;
+    const item = req.body;
+    const filename = collection === 'orders' ? 'ordenes' : collection;
+
+    const data = readCollection(filename);
+
+    // Auto ID & Date
+    if (!item.id) {
+        const maxId = data.length > 0 ? Math.max(...data.map(o => o.id || 0)) : 0;
+        item.id = maxId + 1;
+        if (!item.createdAt) {
+            item.createdAt = new Date().toISOString();
+        }
+    }
+
+    // Auto-generate OT if missing (for orders)
+    if (filename === 'ordenes' && !item.ot) {
+        item.ot = `OT-${item.id}`;
+    }
+
+    const index = data.findIndex(o => o.id === item.id);
+    let workingIndex = index;
+
+    if (index >= 0) {
+        data[index] = { ...data[index], ...item, updatedAt: new Date().toISOString() };
+    } else {
+        item.updatedAt = new Date().toISOString();
+        data.unshift(item);
+        workingIndex = 0;
+    }
+
+    // --- AUTOMATIC FILE RENAMING ---
+    if (filename === 'ordenes') {
+        const updatedFiles = processFileRenaming(data[workingIndex]);
+        if (updatedFiles) {
+            data[workingIndex].archivos = updatedFiles;
+        }
+    }
+
+    writeCollection(filename, data);
+    res.json(item);
+});
+
+5. STOCK LOGIC
+---------------
+Location: src/pages/Stock/Stock.tsx
+Implementation: Manual adjustment via UI. No automatic triggers on order completion.
+Ajuste Manual:
+const handleSaveAdjustment = (e: React.FormEvent) => {
+    const current = selectedMaterial.stockActual || 0
+    const amount = parseFloat(adjustmentAmount) || 0
+    let newStock = current
+    if (adjustmentType === 'add') newStock += amount
+    if (adjustmentType === 'subtract') newStock -= amount
+    if (adjustmentType === 'set') newStock = amount
+    if (newStock < 0) newStock = 0
+    saveMaterial({ ...selectedMaterial, stockActual: newStock })
+}
+
+6. AUTHENTICATION LOGIC
+------------------------
+Location: src/store/authStore.ts
+Provider: Zustand with 'persist' middleware (localStorage: 'luxius-auth-v3').
+Mechanism:
+- Compares credentials against 'luxius_session_usuarios' in localStorage.
+- If not found locally, fetches all users from API (/api/usuarios) and retries comparison.
+- Roles: admin, principal, sistema, diseno, impresion, vendedor, cliente.
+
+7. ENVIRONMENT & ENVIRONMENT VARIABLES
+---------------------------------------
+API_URL:
+const isDev = window.location.port === "3005" || window.location.port === "5173";
+export const API_URL = isDev ? `http://${window.location.hostname}:5000/api` : '/api';
+
+Database: JSON files stored in 'server/data/' (Production) or 'f:\Backup sistema Imprima\luxius_project\server\data'.
+
+8. BACKEND ROUTES (Express)
+----------------------------
+- POST /api/upload (Multer: File upload to /uploads)
+- GET /api/:collection (Fetch JSON data)
+- POST /api/:collection (Create/Update item)
+- PUT /api/:collection/:id (Update item by ID)
+- DELETE /api/:collection/:id (Delete item by ID)
+- GET /api/logs (Parse printer logs)
+- GET /api/stats (Printer consumption stats)
+
+9. FRONTEND PAGES
+------------------
+- /login: Authentication
+- /: Dashboard (Main overview)
+- /entrada: Order tracking and creation
+- /diseno: Design queue
+- /impresion: Print queue
+- /stock: Inventory management
+- /analiticas: Performance charts
+- /reportes: Data export
+- /sistema: User & Role management
+- /utilidades: Production tools
+
+-------------------------------------------
+END OF SNAPSHOT V2

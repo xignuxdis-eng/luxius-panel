@@ -1,0 +1,92 @@
+.quick-notes {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    height: 220px;
+    transition: border-color 0.3s ease;
+}
+
+.quick-notes:focus-within {
+    border-color: var(--accent);
+}
+
+.quick-notes h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+.notes-icon {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+.notes-textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    resize: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.6;
+    outline: none;
+    padding: 0;
+}
+
+.notes-textarea::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    opacity: 0.5;
+}
+
+/* Scrollbar for textarea */
+.notes-textarea::-webkit-scrollbar {
+    width: 4px;
+}
+
+.notes-textarea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notes-textarea::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+
+
+.notes-textarea::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+    font-style: italic;
+}
+
+/* Scrollbar for textarea */
+.notes-textarea::-webkit-scrollbar {
+    width: 6px;
+}
+
+.notes-textarea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notes-textarea::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.notes-textarea::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}

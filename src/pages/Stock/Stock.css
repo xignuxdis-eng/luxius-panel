@@ -1,0 +1,603 @@
+.stock-page {
+    padding: 24px;
+}
+
+.stock-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.stock-stats {
+    display: flex;
+    gap: 12px;
+}
+
+.stat-pill {
+    background: var(--bg-hover);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.stat-pill.warning {
+    background: rgba(255, 150, 0, 0.15);
+    color: #ff9800;
+    border: 1px solid rgba(255, 150, 0, 0.3);
+}
+
+.stock-section {
+    margin-bottom: 32px;
+}
+
+.section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-left: 8px;
+    border-left: 4px solid var(--accent);
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.stock-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.stock-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    min-height: 190px;
+    height: auto;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stock-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    border-color: var(--item-color, var(--accent));
+}
+
+.stock-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.stock-identity {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+}
+
+.stock-code {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stock-name-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 2px;
+    line-height: 1.2;
+    height: 2.4em;
+}
+
+.stock-type-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+/* Visuals Base */
+.stock-visual {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    margin: 4px 0 10px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.visual-bar {
+    position: absolute;
+    inset: 0;
+}
+
+.visual-fill {
+    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.visual-fill.success {
+    background: linear-gradient(to top, var(--item-color, #4caf50), rgba(255, 255, 255, 0.1));
+}
+
+.visual-fill.danger {
+    background: linear-gradient(to top, #f44336, #ff7961);
+}
+
+.current-value {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.current-value .number {
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+}
+
+.current-value .unit {
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.9;
+    margin-left: 2px;
+}
+
+/* Liquid specific */
+.liquid-tank {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.liquid-tank .visual-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 0%;
+}
+
+.liquid-wave {
+    position: absolute;
+    top: -8px;
+    left: 0;
+    width: 200%;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 35%;
+    animation: wave 4s infinite linear;
+}
+
+@keyframes wave {
+    0% {
+        transform: translateX(0) scaleY(1);
+    }
+
+    50% {
+        transform: translateX(-25%) scaleY(1.3);
+    }
+
+    100% {
+        transform: translateX(-50%) scaleY(1);
+    }
+}
+
+/* Roll specific */
+.type-rollo {
+    border-left: 5px solid var(--item-color, #4cfcff);
+}
+
+.type-plancha {
+    border-left: 5px solid var(--item-color, #ff4cb4);
+}
+
+.type-tinta {
+    border-left: 5px solid var(--item-color, #ffeb3b);
+}
+
+.type-solvente {
+    border-left: 5px solid var(--item-color, #e0e0e0);
+}
+
+.stock-card {
+    border-color: color-mix(in srgb, var(--item-color, var(--border)), transparent 60%);
+}
+
+.stock-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.progress-bar {
+    height: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.progress-fill.danger {
+    background: #ff4444;
+}
+
+.progress-fill.success {
+    background: #10b981;
+}
+
+/* Grouped Stock Card styles */
+.stock-card.is-grouped {
+    padding-bottom: 16px;
+}
+
+.variants-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    flex: 1;
+}
+
+.variant-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.variant-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(2px);
+}
+
+.variant-row.low {
+    border-color: rgba(255, 68, 68, 0.3);
+    background: rgba(255, 68, 68, 0.05);
+    box-shadow: 0 0 8px rgba(255, 68, 68, 0.1);
+}
+
+.variant-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.variant-width {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.variant-meter {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+    overflow: hidden;
+    width: 80%;
+}
+
+.variant-progress {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.variant-values {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.variant-number {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.variant-unit {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    font-weight: 400;
+}
+
+.mini-adjust {
+    padding: 4px 8px !important;
+    height: auto !important;
+    min-width: unset !important;
+    font-size: 0.8rem !important;
+    background: var(--bg-hover) !important;
+    border: 1px solid var(--border) !important;
+}
+
+.mini-adjust:hover {
+    background: var(--accent) !important;
+    color: white !important;
+}
+
+/* 3D Liquid Tank Styles */
+
+.liquid-tank-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.tank-3d-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    width: 65px;
+    position: relative;
+}
+
+.tank-3d-wrapper:hover {
+    transform: scale(1.05);
+}
+
+.tank-3d {
+    width: 50px;
+    height: 120px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.tank-cap {
+    height: 8px;
+    background: #2a2d34;
+    width: 100%;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tank-cap.top {
+    border-radius: 4px 4px 0 0;
+}
+
+.tank-cap.bottom {
+    border-radius: 0 0 4px 4px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: white;
+    font-weight: 800;
+}
+
+.tank-glass {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.tank-liquid {
+    width: 100%;
+    background: linear-gradient(to right, var(--liquid-color), rgba(0, 0, 0, 0.2) 150%);
+    position: relative;
+    transition: height 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.liquid-surface {
+    position: absolute;
+    top: -5px;
+    left: 0;
+    width: 100%;
+    height: 10px;
+    background: var(--liquid-color);
+    border-radius: 50%;
+    opacity: 0.9;
+    box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    z-index: 1;
+    filter: brightness(1.2);
+}
+
+.tank-reflections {
+    position: absolute;
+    top: 0;
+    left: 10%;
+    width: 20%;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.15), transparent);
+    pointer-events: none;
+    z-index: 3;
+}
+
+.tank-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-top: 4px;
+}
+
+.tank-liters {
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--liquid-color), transparent 50%);
+}
+
+.stock-card.type-tinta,
+.stock-card.type-solvente {
+    height: auto;
+    min-height: 250px;
+}
+
+.adjust-btn-overlay {
+    margin-top: 10px;
+    font-size: 0.65rem !important;
+    padding: 2px 10px !important;
+    background: var(--bg-hover) !important;
+    border: 1px solid var(--border) !important;
+    position: relative;
+    left: auto;
+    transform: none;
+    width: auto;
+}
+
+.stock-details-compact {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.stock-details-compact .detail {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.stock-modal {
+    max-width: 400px;
+}
+
+.adjustment-type-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    background: var(--bg-hover);
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.type-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.type-btn.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.big-input {
+    font-size: 1.5rem;
+    text-align: center;
+    padding: 12px;
+}
+
+/* Compact Substrate Gallery Styles */
+
+.substrate-gallery {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 0;
+}
+
+.roll-visual-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    position: relative;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.roll-visual-wrapper:hover {
+    transform: translateX(4px);
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.roll-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+}
+
+.roll-width {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    font-weight: 700;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 10px;
+    border-radius: 6px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.roll-stock {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.roll-stock small {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}

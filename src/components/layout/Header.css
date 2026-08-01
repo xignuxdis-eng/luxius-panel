@@ -1,0 +1,104 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 0;
+    margin-bottom: 32px;
+    animation: fadeIn 0.5s ease;
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.header-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+
+.header-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.header-datetime {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.header-time {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.header-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: capitalize;
+}
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    padding: 8px 16px 8px 8px;
+    border-radius: 50px;
+    border: 1px solid var(--border);
+}
+
+.header-avatar {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--secondary));
+    border-radius: 50%;
+}
+
+.header-username {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+[data-theme='pixel'] .header-title {
+    font-family: var(--font-pixel-title);
+    font-size: 22px;
+    color: var(--pixel-gold-coin);
+    text-shadow: 2px 2px 0px #000;
+}
+
+[data-theme='pixel'] .header-time {
+    font-family: var(--font-pixel-ui);
+    color: var(--pixel-neon-cyan);
+}
+
+[data-theme='pixel'] .header-user {
+    border-radius: 0;
+    border: 3px solid #000;
+    background: var(--pixel-bg-card);
+    box-shadow: inset -2px -2px 0px rgba(0, 0, 0, 0.5), inset 2px 2px 0px rgba(255, 255, 255, 0.2), 3px 3px 0px #000;
+}
+
+[data-theme='pixel'] .header-avatar {
+    border-radius: 0;
+    border: 2px solid #000;
+}
+
+[data-theme='pixel'] .header-username {
+    font-family: var(--font-pixel-ui);
+    font-size: 12px;
+    color: var(--pixel-text);
+}

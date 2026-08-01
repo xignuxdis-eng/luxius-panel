@@ -1,0 +1,60 @@
+# Luxius - Replicación Completa de IMPGESV2
+
+## Estado General
+- **Proyecto**: Luxius (Gestión de Impresión)
+- **Objetivo**: Replicar IMPGESV2 como aplicación web moderna
+- **Stack**: React 18 + Vite + TypeScript + Zustand
+- **Última Actualización**: 2026-01-27 12:30
+
+---
+
+## Fase 1: Investigación y Planificación ✅
+- [x] Explorar estructura actual de Luxius
+- [x] Navegar IMPGESV2 original y documentar todos los módulos
+- [x] Documentar API endpoints y estructuras de datos
+- [x] Crear plan de implementación detallado
+
+---
+
+## Fase 2: Infraestructura Base ✅
+- [x] Configuración de proyecto y dependencias
+- [x] Estructura de carpetas y Router
+- [x] Layout base (Sidebar, Header)
+- [x] Store de autenticación y tipos TS
+
+---
+
+## Fase 3: Módulos Principales ✅
+- [x] Módulo Entrada
+  - [x] Tabla de órdenes con datos reales
+  - [x] Modal "Nuevo Pedido" con tabs Trabajos/Promos
+  - [x] Lógica de filtros y badges de estado
+- [x] Módulo Diseño
+  - [x] Cola de producción en formato de tarjetas
+  - [x] Gestión de indicadores de estado y urgencia
+  - [x] Acciones para subir previas y descargar archivos
+- [x] Módulo Impresión
+  - [x] Barra de estado de máquinas (Online/Offline)
+  - [x] Cola de producción por máquina asignable
+  - [x] Sistema de registro de producción ("OK Impreso")
+
+---
+
+## Fase 4: Módulos de Soporte [/]
+- [ ] Módulo ABM (CRUD de entidades)
+- [ ] Módulo Reportes (generador)
+- [ ] Módulo Sistema (permisos, backup)
+
+---
+
+## Fase 5: Verificación y Pulido
+- [ ] Importar datos mock finales
+- [ ] Testing de flujos principales
+- [ ] Documentación final
+
+---
+
+## Notas Técnicas Recientes
+- Se completó la implementación de los 3 módulos core siguiendo fielmente el flujo de IMPGESV2.
+- El módulo de Impresión incluye el sistema de "Anidado" (máquinas) para asignar trabajos.
+- Se ha mantenido la coherencia visual con el sistema de diseño premium (dark/glass).

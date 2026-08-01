@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary": "Walkthrough of the Luxius print shop management system replication. Covers authentication with 6 user roles (Paola, Adrian.Dis, Adrian.Imp), core modules functionality (Entrada, Diseño, Impresión with full production flow), support modules (ABM, Reports, System maintenance), and UI/UX design features using a premium glassmorphic dark theme. Includes project structure and usage instructions.",
+  "updatedAt": "2026-01-27T14:57:41.157790100Z"
+}

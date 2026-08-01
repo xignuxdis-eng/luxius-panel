@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary": "Complete implementation plan for Luxius - a modern React-based replication of IMPGESV2. Includes 5 development phases: Setup, Authentication, Core Modules (Entrada, Diseño, Impresión), Support Modules (ABM, Reportes, Sistema), and Polish. Each phase has detailed file changes, component specifications, verification steps. Plan designed for multi-model handoff with clear checkpoints.",
+  "updatedAt": "2026-01-27T14:07:05.610605500Z"
+}

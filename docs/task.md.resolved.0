@@ -1,0 +1,59 @@
+# Luxius - Replicación Completa de IMPGESV2
+
+## Estado General
+- **Proyecto**: Luxius (Gestión de Impresión)
+- **Objetivo**: Replicar IMPGESV2 como aplicación web moderna
+- **Stack**: HTML5/CSS3/JavaScript (Vanilla) → Migración a React
+- **Última Actualización**: 2026-01-27
+
+---
+
+## Fase 1: Investigación y Planificación
+- [/] Explorar estructura actual de Luxius
+- [ ] Navegar IMPGESV2 original para documentar:
+  - [ ] Flujo de autenticación (login/logout)
+  - [ ] Módulo de Entrada (presupuestos/órdenes)
+  - [ ] Módulo de Diseño (cola de diseñadores)
+  - [ ] Módulo de Impresión (cola de producción)
+  - [ ] Módulo de Administración
+  - [ ] Módulo de Reportes
+  - [ ] Módulo de Sistema (configuración)
+- [ ] Documentar API endpoints y estructuras de datos
+- [ ] Crear plan de implementación detallado
+
+---
+
+## Fase 2: Infraestructura Base
+- [ ] Configurar proyecto React con Vite
+- [ ] Sistema de autenticación
+- [ ] Enrutamiento (React Router)
+- [ ] Estado global (Context/Zustand)
+- [ ] Sistema de diseño (componentes base)
+- [ ] Integración con API
+
+---
+
+## Fase 3: Módulos Principales
+- [ ] Dashboard (Panel de Control)
+- [ ] Módulo Entrada
+- [ ] Módulo Diseño
+- [ ] Módulo Impresión
+- [ ] Módulo Administración
+- [ ] Módulo Reportes
+- [ ] Módulo Sistema
+
+---
+
+## Fase 4: Verificación y Pulido
+- [ ] Testing de flujos principales
+- [ ] Optimización de rendimiento
+- [ ] Documentación final
+
+---
+
+## Notas para Cambio de Modelo
+> **IMPORTANTE**: Este archivo sirve como guía para cualquier modelo AI que continúe el trabajo.
+> 
+> - Revisar `implementation_plan.md` para detalles técnicos
+> - El archivo `IMPGESV2_analysis.md` contiene la documentación del sistema original
+> - Mantener actualizado este task.md después de cada sesión de trabajo

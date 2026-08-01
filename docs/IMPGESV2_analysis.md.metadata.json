@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Comprehensive reverse engineering documentation of the IMPGESV2 print shop management system. Includes system overview, workflow diagrams, all 7 modules (Inicio, Entrada, Diseño, Impresión, ABM, Reportes, Sistema), 6 user roles, database structure inference, order state machine, form field specifications, and references to captured screenshots and navigation recordings.",
+  "updatedAt": "2026-01-27T14:05:33.334697Z"
+}
