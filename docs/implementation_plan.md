@@ -1,0 +1,314 @@
+# Plan de Implementación: Luxius
+
+> **Replicación Moderna de IMPGESV2**
+> 
+> Fecha: 2026-01-27
+> Stack: React + Vite + TypeScript
+
+---
+
+## Objetivo
+
+Crear una aplicación web moderna llamada **Luxius** que replique toda la funcionalidad de IMPGESV2, mejorando la experiencia de usuario con un diseño premium dark mode.
+
+> [!IMPORTANT]
+> Este plan está diseñado para ser ejecutado por múltiples modelos AI. Cada fase tiene checkpoints claros y el archivo `task.md` debe actualizarse después de cada sesión.
+
+---
+
+## Decisiones de Diseño
+
+### Stack Tecnológico
+| Capa | Tecnología | Justificación |
+|------|------------|---------------|
+| Framework | React 18 + Vite | Rápido, moderno, HMR |
+| Lenguaje | TypeScript | Type safety, mejor DX |
+| Estado | Zustand | Ligero, sin boilerplate |
+| Routing | React Router v6 | Estándar de la industria |
+| Estilos | CSS Modules + Variables | Control total, ya hay base |
+| Forms | React Hook Form | Validación rápida |
+| HTTP | Fetch API / Mock | Sin backend real por ahora |
+| Auth | Context + LocalStorage | Mock inicial |
+
+### Estructura de Carpetas
+```
+luxius/
+├── public/
+├── src/
+│   ├── components/          # Componentes reutilizables
+│   │   ├── ui/              # Buttons, Cards, Inputs
+│   │   ├── layout/          # Sidebar, Header, Footer
+│   │   └── forms/           # Form components
+│   ├── pages/               # Vistas por ruta
+│   │   ├── Dashboard/
+│   │   ├── Entrada/
+│   │   ├── Diseno/
+│   │   ├── Impresion/
+│   │   ├── ABM/
+│   │   ├── Reportes/
+│   │   └── Sistema/
+│   ├── hooks/               # Custom hooks
+│   ├── store/               # Zustand stores
+│   ├── services/            # API calls (mock)
+│   ├── types/               # TypeScript interfaces
+│   ├── utils/               # Helpers
+│   ├── data/                # Mock data (clientes, órdenes, etc.)
+│   ├── App.tsx
+│   └── main.tsx
+├── package.json
+└── vite.config.ts
+```
+
+---
+
+## Fases de Desarrollo
+
+### Fase 1: Setup e Infraestructura
+**Duración estimada**: 1 sesión
+
+#### Tareas
+- [ ] Inicializar proyecto React + Vite + TypeScript
+- [ ] Migrar CSS existente a sistema modular
+- [ ] Configurar React Router
+- [ ] Crear layout base (Sidebar + Main)
+- [ ] Configurar Zustand para estado global
+
+#### [NEW] Archivos a Crear
+
+##### [NEW] [vite.config.ts](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/vite.config.ts)
+Configuración de Vite con alias de paths
+
+##### [NEW] [src/App.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/App.tsx)
+Router principal con rutas protegidas
+
+##### [NEW] [src/components/layout/Sidebar.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/components/layout/Sidebar.tsx)
+Navegación lateral con iconos y estados activos
+
+##### [NEW] [src/store/authStore.ts](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/store/authStore.ts)
+Store de autenticación con Zustand
+
+---
+
+### Fase 2: Autenticación y Roles
+**Duración estimada**: 1 sesión
+
+#### Tareas
+- [ ] Página de login con diseño premium
+- [ ] Sistema de roles (6 niveles)
+- [ ] Rutas protegidas por rol
+- [ ] Mock de usuarios con credenciales de prueba
+
+#### [NEW] Archivos a Crear
+
+##### [NEW] [src/pages/Login/Login.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/Login/Login.tsx)
+Formulario de login estilizado
+
+##### [NEW] [src/types/auth.ts](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/types/auth.ts)
+```typescript
+export type UserRole = 'principal' | 'admin' | 'vendedor' | 'cliente' | 'impresion' | 'diseno';
+
+export interface User {
+  id: number;
+  username: string;
+  name: string;
+  role: UserRole;
+  level: number;
+}
+```
+
+##### [NEW] [src/data/users.json](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/data/users.json)
+Mock de usuarios con las credenciales proporcionadas
+
+---
+
+### Fase 3: Módulos Core
+**Duración estimada**: 3-4 sesiones
+
+#### 3.1 Dashboard (Inicio)
+- [ ] Calendario mensual interactivo
+- [ ] Widgets de estadísticas en tiempo real
+- [ ] Búsqueda rápida
+- [ ] Información de contacto
+
+#### 3.2 Entrada (Gestión de Pedidos)
+- [ ] Tabla de órdenes con filtros avanzados
+- [ ] Modal de nuevo pedido (Tabs: Trabajos/Promos)
+- [ ] Formulario completo con todos los campos
+- [ ] Implementar Módulo de Carga de Archivos:
+  - [ ] Interfaz: Label "Archivo:", Botón con flecha verde, Input nombre archivo.
+  - [ ] Sub-modal "Subiendo archivo..." con zona drag-and-drop de color rojo.
+  - [ ] Estado de carga y muestra de dimensiones/tamaño (mock).
+- [ ] Acciones por orden (Resumen, Previa, Ver Orden)
+
+##### [NEW] [src/pages/Entrada/Entrada.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/Entrada/Entrada.tsx)
+Vista principal con tabla y filtros
+
+##### [NEW] [src/pages/Entrada/NuevoPedidoModal.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/Entrada/NuevoPedidoModal.tsx)
+Modal con formulario de nuevo pedido
+
+##### [NEW] [src/types/orden.ts](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/types/orden.ts)
+```typescript
+export type OrderStatus = 'carrito' | 'preorden' | 'orden' | 'diseno' | 'previa' | 'impreso' | 'completo' | 'entregado' | 'finalizado';
+
+export interface Order {
+  id: number;
+  ot: string;
+  status: OrderStatus;
+  clientId: number;
+  material: string;
+  calidad: string;
+  alto: number;
+  ancho: number;
+  copias: number;
+  total: number;
+  demasias: number;
+  accesorios: string[];
+  envio: string;
+  emergencia: boolean;
+  fechaCreacion: Date;
+  fechaEntrega: Date;
+  observaciones: string;
+}
+```
+
+#### 3.3 Diseño (Cola de Diseñadores)
+- [ ] Cola de trabajos pendientes
+- [ ] Gestión de previews
+- [ ] Filtros por estado y material
+- [ ] Descarga de archivos
+
+##### [NEW] [src/pages/Diseno/Diseno.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/Diseno/Diseno.tsx)
+Vista de cola con acciones de diseñador
+
+#### 3.4 Impresión (Cola de Producción)
+- [ ] Cola de producción por máquina
+- [ ] Asignación de trabajos a máquinas
+- [ ] Marcar como impreso
+- [ ] Reporte de sala
+
+##### [NEW] [src/pages/Impresion/Impresion.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/Impresion/Impresion.tsx)
+Vista de cola de impresión
+
+##### [NEW] [src/data/maquinas.json](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/data/maquinas.json)
+```json
+[
+  { "id": 1, "nombre": "Maquina 1 (740 Nueva)", "ancho": 740 },
+  { "id": 2, "nombre": "Maquina 2 (740 vieja)", "ancho": 740 },
+  { "id": 3, "nombre": "Maquina 3 (640)", "ancho": 640 },
+  { "id": 4, "nombre": "Anidado 4 axis", "ancho": 1600 }
+]
+```
+
+---
+
+### Fase 4: Módulos de Soporte
+**Duración estimada**: 2-3 sesiones
+
+#### 4.1 ABM (Gestión de Entidades)
+- [ ] CRUD de Clientes
+- [ ] CRUD de Materiales/Calidades
+- [ ] CRUD de Productos/Rollos
+- [ ] Gestión de Máquinas
+
+##### [NEW] [src/pages/ABM/ABM.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/ABM/ABM.tsx)
+Layout con tabs para cada entidad
+
+##### [NEW] [src/pages/ABM/Clientes.tsx](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/src/pages/ABM/Clientes.tsx)
+Gestión completa de clientes
+
+#### 4.2 Reportes
+- [ ] Generador de reportes
+- [ ] Exportación a pantalla/print
+- [ ] Filtros por fecha y categoría
+
+#### 4.3 Sistema
+- [ ] Gestión de permisos
+- [ ] Configuración de respaldos (mock)
+- [ ] Mensajería interna
+
+---
+
+### Fase 5: Pulido y Datos
+**Duración estimada**: 1-2 sesiones
+
+#### Tareas
+- [ ] Importar datos mock de IMPGESV2 (clientes, órdenes)
+- [ ] Animaciones y micro-interacciones
+- [ ] Responsive design
+- [ ] Testing de flujos principales
+- [ ] Documentación final
+
+---
+
+## Verificación
+
+### Tests Manuales por Módulo
+
+#### Login
+1. Navegar a http://localhost:5173 (o puerto asignado)
+2. Ingresar credenciales: paola / pgof123
+3. Verificar redirección al dashboard
+4. Verificar nombre de usuario en header
+
+#### Entrada
+1. Click en menú "Entrada"
+2. Verificar tabla de órdenes carga
+3. Click "Agregar Pedido"
+4. Llenar formulario completo
+5. Verificar orden aparece en tabla
+
+#### Impresión
+1. Login como adrian.imp / mejico
+2. Verificar solo ve módulo Impresión
+3. Verificar cola de trabajos
+4. Asignar trabajo a máquina
+5. Marcar como impreso
+
+### Comando para Ejecutar
+```powershell
+cd C:\Users\Impresion\.gemini\antigravity\scratch\luxius
+npm run dev
+```
+
+---
+
+## Extracción de Datos
+
+> [!CAUTION]
+> El usuario solicitó extraer datos de la base de datos de IMPGESV2 (clientes, métricas) pero **NO** tenemos acceso directo a la base de datos MySQL. 
+
+### Opciones para Obtener Datos:
+
+1. **Exportar desde Reportes de IMPGESV2**: Usar el módulo de Reportes para generar exports de clientes, ventas, etc.
+
+2. **Scraping via Browser**: Automatizar navegación para extraer datos de las tablas visibles.
+
+3. **Acceso Directo a DB**: Si el usuario puede proporcionar acceso phpMyAdmin o credenciales MySQL, podemos hacer dump directo.
+
+**Recomendación**: Solicitar al usuario acceso a phpMyAdmin o dump SQL para importar datos reales. (Actualización: Extracción de 120 clientes realizada vía scraping exitosamente).
+
+---
+
+## Checkpoint para Cambio de Modelo
+
+> [!TIP]
+> **Para el próximo modelo que continúe:**
+> 
+> 1. Leer `task.md`- [x] Documentación de flujos, roles y base de datos
+- [x] **Extracción de Datos**: Base de datos de 120 clientes migrada a JSON ✅
+- [x] Creación de `IMPGESV2_analysis.md` e `implementation_plan.md`
+er el sistema original
+> 3. Revisar este plan para la próxima fase
+> 4. Verificar archivos existentes en `luxius/`
+> 5. Actualizar `task.md` al terminar la sesión
+
+---
+
+## Archivos de Referencia
+
+| Documento | Propósito |
+|-----------|-----------|
+| [task.md](file:///C:/Users/Impresion/.gemini/antigravity/brain/46931fd1-15f6-4389-ad37-32705a9110b5/task.md) | Progreso del proyecto |
+| [IMPGESV2_analysis.md](file:///C:/Users/Impresion/.gemini/antigravity/brain/46931fd1-15f6-4389-ad37-32705a9110b5/IMPGESV2_analysis.md) | Documentación del sistema original |
+| [Screenshots](file:///C:/Users/Impresion/.gemini/antigravity/brain/46931fd1-15f6-4389-ad37-32705a9110b5/) | Referencias visuales |
+| [Luxius actual](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius/) | Código existente |

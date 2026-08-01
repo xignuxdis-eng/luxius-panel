@@ -1,0 +1,33 @@
+# Node modules & build
+node_modules/
+dist/
+build/
+.cache/
+
+# Environments & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Logs & temp
+*.log
+*.tmp
+*.zip
+*.apk
+hs_err_pid*.log
+replay_pid*.log
+BACKUP_FEBRERO_TEMP/
+luxius_backup_*.zip
+
+# IDEs & System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

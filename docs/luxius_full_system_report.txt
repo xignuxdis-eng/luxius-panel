@@ -1,0 +1,137 @@
+ESTADO ACTUAL DEL SISTEMA LUXIUS - REPORTE DE AUDITORÍA TÉCNICA
+FECHA: 19 de Febrero de 2026
+GENERADO POR: Luxius Helper Agent
+
+1. ESTRUCTURA DE ARCHIVOS Y RUTAS
+----------------------------------
+El sistema está dividido en un Frontend (Vite/React/TS) y un Backend (Node/Express).
+
+ARQUITECTURA DE DATOS (server/data/):
+- materiales.json: Maestro de sustratos y precios.
+- servicios.json: Catálogo de terminaciones y adicionales.
+- ordenes.json: Base de datos principal de pedidos.
+- usuarios.json: Credenciales y roles.
+- clientes.json: Base de datos de clientes corporativos y particulares.
+- calidades.json: Referencias de calidad de impresión.
+- maquinas.json: Registro de equipamiento físico.
+
+UBICACIONES CLAVE:
+- Frontend Core: f:\Backup sistema Imprima\luxius_project\src
+- Funciones de Cálculo: calculateItemPrice se encuentra en NuevoPedidoModal.tsx (línea 177).
+- Lógica de Stock: Implementada visualmente en src/pages/Stock/Stock.tsx.
+- Gestión de Usuarios/Roles: src/pages/Sistema/UsuariosView.tsx y src/store/authStore.ts.
+- API Backend: server/index.js (Gestiona persistencia y renombrado de archivos).
+
+FLUJO DE CONSUMO JSON:
+- materiales.json: Consumido por NuevoPedidoModal.tsx (para precios) y Stock.tsx (para inventario).
+- ordenes.json: Consumido por Entrada.tsx, Impresion.tsx, y Diseno.tsx.
+- Modificación: El backend (server/index.js) modifica ordenes.json mediante fs.writeFileSync. El frontend modifica materiales a través de API calls en db.ts.
+
+2. MODELO DE DATOS ACTUAL (SCHEMAS)
+------------------------------------
+Estructura detallada de objetos principales.
+
+* MATERIAL (materiales.json):
+  {
+    "id": number,
+    "codigo": string (ej: "VIN-BRI"),
+    "descripcion": string,
+    "tipo": "rollo" | "tinta" | "solvente" | "plancha",
+    "precioM2": number,
+    "tipoCobro": "m2" | "ml",
+    "ancho": number (ancho físico del rollo en metros),
+    "stockActual": number,
+    "stockMinimo": number,
+    "preciosPorAncho": [ { "maxAncho": number, "precio": number } ],
+    "habilitado": boolean
+  }
+
+* ORDEN (ordenes.json):
+  {
+    "id": number,
+    "ot": string (ej: "OT-520"),
+    "status": "preorden"|"orden"|"impreso"|"post"|"completo"|"entregado"|"finalizado"|"eliminado",
+    "clientId": number,
+    "clienteNombre": string,
+    "material": string (codigo del material),
+    "ancho": number,
+    "alto": number,
+    "copias": number,
+    "subtotal": number,
+    "servicios": { "id_servicio": boolean },
+    "archivos": string[] (nombres en servidor),
+    "archivosOriginales": string[] (nombres originales del cliente),
+    "fechaCreacion": string,
+    "fechaEntrega": string,
+    "category": "diseno" | "impresion"
+  }
+
+3. LÓGICA DE CÁLCULO DE PRECIOS
+--------------------------------
+Código exacto de calculateItemPrice (NuevoPedidoModal.tsx:177):
+
+const calculateItemPrice = (materialCode, w, h, c, services) => {
+    const mat = getMateriales().find(m => m.codigo === materialCode);
+    if (!mat || h <= 0) return 0;
+    let currentUnitPrice = mat.precioM2 || 0;
+
+    // Selector de Escala por Ancho
+    if (mat.preciosPorAncho && mat.preciosPorAncho.length > 0) {
+        const tier = mat.preciosPorAncho.find(t => w <= t.maxAncho);
+        if (tier) { currentUnitPrice = tier.precio; } 
+        else { currentUnitPrice = mat.preciosPorAncho[mat.preciosPorAncho.length - 1].precio; }
+    }
+
+    // Cálculo Base
+    let basePrice = (mat.tipoCobro === 'ml') 
+        ? Math.round(h * c * currentUnitPrice) 
+        : (w > 0 ? Math.round(w * h * c * currentUnitPrice) : 0);
+
+    // Aplicación de Servicios
+    let servicesTotal = 0;
+    if (services) {
+        Object.entries(services).forEach(([sId, active]) => {
+            if (active) {
+                const s = availableServices.find(serv => String(serv.id) === sId);
+                if (s) servicesTotal += (s.precioBase || 0) * c;
+            }
+        });
+    }
+    return basePrice + servicesTotal;
+}
+
+VALIDACIONES EXISTENTES: h > 0, material existente.
+CASOS LÍMITE NO CONTEMPLADOS: No hay redondeo por desperdicio (si usas 0.10m de un rollo de 1.60m, solo cobras 0.10m). No hay recargos por urgencia automáticos.
+
+4. LÓGICA DE STOCK
+-------------------
+- Descuento de Stock: NO ES AUTOMÁTICO. No hay trigger que descuente stock al imprimir o entregar.
+- Gestión: El usuario debe ir a la pestaña "Stock" y usar el botón "Ajustar" (Stock.tsx:38).
+- Tipos de Ajuste: "add" (Ingreso), "subtract" (Egreso), "set" (Fijar).
+- Sincronización: Está totalmente desacoplado del precio. Un cambio en Stock no afecta el precio unitario del material.
+- Inconsistencia Actual: Posibilidad de vender sin stock. No hay bloqueo de ordenes si el stockActual < cantidad solicitada.
+
+5. FLUJO DE CREACIÓN DE ORDEN
+------------------------------
+1. Subida de Archivo: NuevoPedidoModal.tsx maneja el upload vía uploadFile (db.ts).
+2. Metadata: Se extrae DPI, dimensiones y modo color del archivo (pdf-lib / custom parsers).
+3. Selección de Material: El usuario elige el código. Esto gatilla calculateItemPrice.
+4. Confirmación: onSubmit valida campos requeridos.
+5. Persistencia: El server (index.js) recibe el POST, asigna ID incremental, genera el código de OT, renombra los archivos físicamente en /uploads usando la fórmula ID_CLIENTE_MAT... y guarda en ordenes.json.
+
+6. LIMITACIONES TÉCNICAS ACTUALES
+----------------------------------
+- Frontend-Dependencia: El cálculo de precio ocurre en el cliente. Un usuario con conocimientos técnicos podría inyectar un subtotal arbitrario en el POST antes de que llegue al servidor.
+- Seguridad: No hay validación de precios en el backend (server/index.js). El servidor acepta el subtotal que envía el frontend sin recalcularlo.
+- Integridad: Si cambia un precioM2 en el maestro de materiales, las órdenes viejas mantienen su precio (lo cual es correcto), pero no hay histórico de cuándo cambió el precio.
+- Edición Manual: Editar el JSON manualmente es seguro mientras se respete el formato, pero si se corrompe el JSON, el sistema falla (getOrders devuelve [] en caso de error de parseo).
+
+7. PUNTOS DE EXPANSIÓN
+-----------------------
+- Backend Robusto: Estructurado para migrar a PostgreSQL/Prisma fácilmente ya que el db.ts centraliza las llamadas asíncronas.
+- Categorías: El modelo Cliente ya tiene "categoria", solo falta inyectarlo en calculateItemPrice.
+- Margen Inteligente: La lógica de preciosPorAncho ya provee la base para cobrar por el ancho del rollo entero si la pieza deja mucho desperdicio.
+- Auditoría: El sistema de logs actual lee los archivos de texto de las impresoras (logParser.js), lo que permitiría cruzar el "m2 impresos reales" contra el "m2 facturados" para detectar fugas.
+
+--------------------------------------------------
+REPORTE FINALIZADO - LUXIUS V2.0

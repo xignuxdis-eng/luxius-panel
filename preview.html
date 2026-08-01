@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxius | Sistema Gestor Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0a0b10;
+            --bg-sidebar: #12141d;
+            --bg-card: rgba(30, 34, 45, 0.7);
+            --accent: #ff6b00;
+            --accent-glow: rgba(255, 107, 0, 0.3);
+            --text-primary: #ffffff;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass: blur(12px) saturate(180%);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .glass {
+            background: var(--bg-card);
+            backdrop-filter: var(--glass);
+            border: 1px solid var(--border);
+        }
+
+        .accent-btn {
+            background: linear-gradient(135deg, var(--accent), #ff8c00);
+            transition: all 0.2s ease;
+        }
+
+        .accent-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .nav-item {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 107, 0, 0.08);
+            color: white;
+        }
+
+        .nav-item.active {
+            background: rgba(255, 107, 0, 0.12);
+            color: var(--accent);
+            border-right: 3px solid var(--accent);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 50px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .view-section {
+            display: none;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        /* IMPGES File Upload Specifics */
+        .btn-upload-impges {
+            background: #e6e6e6;
+            color: #333;
+            border: 1px solid #d3d3d3;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .upload-icon-impges {
+            color: #00aa00;
+            font-size: 16px;
+        }
+
+        .filename-box-impges {
+            background: #fdf5ce;
+            border: 1px solid #d3d3d3;
+            padding: 4px 10px;
+            border-radius: 4px;
+            color: #333;
+            font-size: 12px;
+            flex: 1;
+            min-height: 28px;
+            display: flex;
+            align-items: center;
+        }
+
+        .drop-zone-red {
+            background: #aa0000;
+            color: white;
+            padding: 40px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex h-screen">
+
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 flex flex-col p-6 gap-8 shrink-0">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl text-[#ff6b00] drop-shadow-[0_0_8px_rgba(255,107,0,0.5)]">✦</span>
+            <span class="text-2xl font-bold tracking-tight">Luxius</span>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto">
+            <ul class="flex flex-col gap-1" id="main-nav">
+                <li onclick="switchView('dashboard')"
+                    class="nav-item active flex items-center gap-3 p-3 rounded-lg text-sm font-medium"
+                    data-view="dashboard">
+                    <span>🏠</span> Inicio
+                </li>
+                <li onclick="switchView('entrada')"
+                    class="nav-item flex items-center gap-3 p-3 rounded-lg text-sm font-medium text-[#94a3b8]"
+                    data-view="entrada">
+                    <span>📥</span> Entrada
+                </li>
+                <li onclick="switchView('diseno')"
+                    class="nav-item flex items-center gap-3 p-3 rounded-lg text-sm font-medium text-[#94a3b8]"
+                    data-view="diseno">
+                    <span>🎨</span> Diseño
+                </li>
+                <li onclick="switchView('impresion')"
+                    class="nav-item flex items-center gap-3 p-3 rounded-lg text-sm font-medium text-[#94a3b8]"
+                    data-view="impresion">
+                    <span>🖨️</span> Impresión
+                </li>
+                <li onclick="switchView('abm')"
+                    class="nav-item flex items-center gap-3 p-3 rounded-lg text-sm font-medium text-[#94a3b8]"
+                    data-view="abm">
+                    <span>⚙️</span> ABM
+                </li>
+                <li onclick="switchView('reportes')"
+                    class="nav-item flex items-center gap-3 p-3 rounded-lg text-sm font-medium text-[#94a3b8]"
+                    data-view="reportes">
+                    <span>📊</span> Reportes
+                </li>
+                <li onclick="switchView('sistema')"
+                    class="nav-item flex items-center gap-3 p-3 rounded-lg text-sm font-medium text-[#94a3b8]"
+                    data-view="sistema">
+                    <span>🔧</span> Sistema
+                </li>
+            </ul>
+        </nav>
+
+        <div class="flex flex-col gap-4 border-t border-white/5 pt-6">
+            <div class="glass p-3 rounded-xl flex items-center gap-3">
+                <div class="w-9 h-9 bg-gradient-to-br from-[#ff6b00] to-blue-500 rounded-full"></div>
+                <div class="flex flex-col">
+                    <span class="text-[13px] font-semibold" id="current-user-name">SISTEMA</span>
+                    <span class="text-[11px] text-[#94a3b8]" id="current-user-role">Admin</span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="changeRole('paola')" title="Cambiar a Admin"
+                    class="flex-1 text-[10px] bg-white/5 hover:bg-white/10 p-1 rounded">P</button>
+                <button onclick="changeRole('adrian.dis')" title="Cambiar a Diseño"
+                    class="flex-1 text-[10px] bg-white/5 hover:bg-white/10 p-1 rounded">D</button>
+                <button onclick="changeRole('adrian.imp')" title="Cambiar a Impresión"
+                    class="flex-1 text-[10px] bg-white/5 hover:bg-white/10 p-1 rounded">I</button>
+            </div>
+            <button
+                class="w-full bg-red-500/10 text-red-500 py-2.5 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-all">Cerrar
+                Sesión</button>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <main
+        class="flex-1 relative flex flex-col overflow-hidden bg-gradient-to-br from-[#0a0b10] via-[#0d0f17] to-[#15110d]">
+
+        <!-- Header -->
+        <header class="flex justify-between items-center p-8 shrink-0">
+            <div>
+                <h1 class="text-3xl font-bold" id="view-title">Tablero Principal</h1>
+                <p class="text-sm text-[#94a3b8]" id="view-subtitle">Bienvenido al sistema de gestión Luxius.</p>
+            </div>
+            <div class="text-right">
+                <div class="text-lg font-semibold" id="live-time">12:15:00</div>
+                <div class="text-xs text-[#94a3b8]" id="live-date">Martes, 27 Ene 2026</div>
+            </div>
+        </header>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto px-8 pb-10">
+
+            <!-- VIEW: DASHBOARD -->
+            <section id="dashboard-view" class="view-section active">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                    <div class="glass p-6 rounded-2xl hover:border-white/20 transition-all">
+                        <div class="text-[13px] text-[#94a3b8] mb-2">Ordenes del Día</div>
+                        <div class="text-3xl font-bold">24</div>
+                    </div>
+                    <div class="glass p-6 rounded-2xl border-orange-500/30">
+                        <div class="text-[13px] text-[#94a3b8] mb-2">Pendientes Impresión</div>
+                        <div class="text-3xl font-bold text-[#ff6b00]" id="pending-print-count">3,219</div>
+                    </div>
+                    <div class="glass p-6 rounded-2xl">
+                        <div class="text-[13px] text-[#94a3b8] mb-2">Trabajos Completados</div>
+                        <div class="text-3xl font-bold">84,668</div>
+                    </div>
+                    <div class="glass p-6 rounded-2xl">
+                        <div class="text-[13px] text-[#94a3b8] mb-2">Entregas Hoy</div>
+                        <div class="text-3xl font-bold">91</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 glass rounded-2xl p-6 min-h-[400px]">
+                        <h3 class="text-lg font-semibold mb-6 flex justify-between items-center">
+                            Órdenes Recientes
+                            <button id="btn-nuevo-pedido-dash" onclick="openModal('pedido')"
+                                class="accent-btn py-2 px-4 rounded-lg text-sm font-semibold">+ Nuevo Pedido</button>
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead
+                                    class="text-[11px] text-[#94a3b8] uppercase tracking-wider border-b border-white/5">
+                                    <tr>
+                                        <th class="pb-4">OT</th>
+                                        <th class="pb-4">Estado</th>
+                                        <th class="pb-4">Cliente</th>
+                                        <th class="pb-4">Total</th>
+                                        <th class="pb-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orders-list-mini">
+                                    <!-- JS injected content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-6">
+                        <div class="glass p-6 rounded-2xl">
+                            <h3 class="text-orange-500 text-xs font-bold uppercase tracking-widest mb-4">Presupuestos
+                            </h3>
+                            <ul class="flex flex-col gap-3 text-sm">
+                                <li class="flex justify-between"><span>Carrito</span> <span class="font-bold">0</span>
+                                </li>
+                                <li class="flex justify-between"><span>Preordenes</span> <span
+                                        class="font-bold">0</span></li>
+                                <li class="flex justify-between"><span>Impresos</span> <span
+                                        class="font-bold text-orange-500">3,219</span></li>
+                                <li class="flex justify-between"><span>Finalizados</span> <span
+                                        class="font-bold">8,022</span></li>
+                            </ul>
+                        </div>
+                        <div class="glass p-6 rounded-2xl">
+                            <h3 class="text-blue-500 text-xs font-bold uppercase tracking-widest mb-4">Datos Útiles</h3>
+                            <div class="text-sm flex flex-col gap-2">
+                                <div><span class="text-[#94a3b8]">Dirección:</span><br>Av. Ejemplo 1234, CABA</div>
+                                <div><span class="text-[#94a3b8]">Teléfonos:</span><br>+54 11 1234-5678</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: ENTRADA -->
+            <section id="entrada-view" class="view-section">
+                <div class="glass p-6 rounded-2xl mb-8 flex flex-wrap gap-4 items-end">
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="text-xs text-[#94a3b8] mb-1 block">Búsqueda General</label>
+                        <input type="text" placeholder="Búsqueda..."
+                            class="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm">
+                    </div>
+                    <div class="w-40">
+                        <label class="text-xs text-[#94a3b8] mb-1 block">Estado</label>
+                        <select
+                            class="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm appearance-none">
+                            <option>Todos</option>
+                            <option>Orden</option>
+                            <option>Diseño</option>
+                            <option>Impreso</option>
+                        </select>
+                    </div>
+                    <div class="w-40">
+                        <label class="text-xs text-[#94a3b8] mb-1 block">Calidad</label>
+                        <select
+                            class="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm appearance-none">
+                            <option>Todas</option>
+                            <option>Plus Solvente</option>
+                            <option>Promocional</option>
+                        </select>
+                    </div>
+                    <button
+                        class="accent-btn shrink-0 py-2 px-6 rounded-lg font-semibold text-sm h-[38px]">Filtrar</button>
+                </div>
+
+                <div class="flex gap-4 mb-6">
+                    <button
+                        class="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10">Pendientes
+                        de Previa</button>
+                    <button id="btn-nuevo-pedido-entrada" onclick="openModal('pedido')"
+                        class="accent-btn px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-orange-500/20">+
+                        Agregar Pedido</button>
+                </div>
+
+                <div class="glass rounded-2xl overflow-hidden shadow-2xl">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-black/30 text-[11px] text-[#94a3b8] uppercase tracking-wider font-bold">
+                            <tr>
+                                <th class="p-4 border-b border-white/5">Id / OT</th>
+                                <th class="p-4 border-b border-white/5">Estado</th>
+                                <th class="p-4 border-b border-white/5">Origen / Fecha</th>
+                                <th class="p-4 border-b border-white/5">Entrega</th>
+                                <th class="p-4 border-b border-white/5">Cliente</th>
+                                <th class="p-4 border-b border-white/5">Material</th>
+                                <th class="p-4 border-b border-white/5">Medidas</th>
+                                <th class="p-4 border-b border-white/5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entrada-full-list" class="divide-y divide-white/5">
+                            <!-- JS injected content -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW: DISENO -->
+            <section id="diseno-view" class="view-section">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="diseno-cards-grid">
+                    <!-- JS injected cards -->
+                </div>
+            </section>
+
+            <!-- VIEW: IMPRESION -->
+            <section id="impresion-view" class="view-section">
+                <div class="flex gap-4 mb-8 overflow-x-auto pb-4">
+                    <div class="glass p-4 rounded-xl flex items-center gap-4 min-w-[200px]">
+                        <div class="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                        <div>
+                            <div class="text-sm font-bold">Maquina 1 (740)</div>
+                            <div class="text-[10px] text-[#94a3b8]">Online - Ancho: 3.2m</div>
+                        </div>
+                    </div>
+                    <div class="glass p-4 rounded-xl flex items-center gap-4 min-w-[200px]">
+                        <div class="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                        <div>
+                            <div class="text-sm font-bold">Anidado 4 axis</div>
+                            <div class="text-[10px] text-[#94a3b8]">Online - Ancho: 1.6m</div>
+                        </div>
+                    </div>
+                    <div class="glass p-4 rounded-xl flex items-center gap-4 min-w-[200px]">
+                        <div class="w-3 h-3 rounded-full bg-gray-500"></div>
+                        <div>
+                            <div class="text-sm font-bold">Maquina 3 (640)</div>
+                            <div class="text-[10px] text-[#94a3b8]">Offline</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl overflow-hidden">
+                    <div class="p-4 bg-black/40 flex justify-between items-center border-b border-white/5">
+                        <h3 class="font-bold text-sm uppercase tracking-widest text-[#94a3b8]">Cola de Producción</h3>
+                        <button class="text-xs bg-white/5 px-3 py-1.5 rounded-lg hover:bg-white/10">Reporte de
+                            Sala</button>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead class="text-[10px] text-[#94a3b8] uppercase tracking-widest border-b border-white/5">
+                            <tr>
+                                <th class="p-4">OT</th>
+                                <th class="p-4">Aprobado</th>
+                                <th class="p-4">Cliente / Material</th>
+                                <th class="p-4">Asignación</th>
+                                <th class="p-4 text-right">Producción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="impresion-table-body" class="text-sm divide-y divide-white/5">
+                            <!-- JS injected content -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW: ABM -->
+            <section id="abm-view" class="view-section">
+                <div class="flex gap-2 mb-6 overflow-x-auto pb-2" id="abm-tabs">
+                    <button onclick="switchAbmTab('clientes')"
+                        class="abm-tab px-4 py-2 rounded-lg text-sm font-bold bg-orange-500 text-white active"
+                        data-tab="clientes">Clientes</button>
+                    <button onclick="switchAbmTab('materiales')"
+                        class="abm-tab px-4 py-2 rounded-lg text-sm font-bold bg-white/5 text-[#94a3b8] hover:bg-white/10"
+                        data-tab="materiales">Materiales</button>
+                    <button onclick="switchAbmTab('maquinas')"
+                        class="abm-tab px-4 py-2 rounded-lg text-sm font-bold bg-white/5 text-[#94a3b8] hover:bg-white/10"
+                        data-tab="maquinas">Máquinas</button>
+                </div>
+                <div class="glass rounded-2xl p-6 min-h-[400px]" id="abm-container">
+                    <!-- Content injected here -->
+                </div>
+            </section>
+
+            <!-- VIEW: REPORTES -->
+            <section id="reportes-view" class="view-section">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="glass p-6 rounded-2xl border-white/5 h-fit">
+                        <h3 class="text-xs font-bold text-orange-500 uppercase tracking-widest mb-6">Categorías</h3>
+                        <div class="flex flex-col gap-1">
+                            <button onclick="setReport('ventas')"
+                                class="text-left p-3 rounded-lg text-sm hover:bg-orange-500/10 hover:text-orange-500 transition-all font-medium">Ventas</button>
+                            <button onclick="setReport('financiero')"
+                                class="text-left p-3 rounded-lg text-sm hover:bg-orange-500/10 hover:text-orange-500 transition-all font-medium">Financiero</button>
+                            <button onclick="setReport('stock')"
+                                class="text-left p-3 rounded-lg text-sm hover:bg-orange-500/10 hover:text-orange-500 transition-all font-medium">Stock</button>
+                            <button onclick="setReport('produccion')"
+                                class="text-left p-3 rounded-lg text-sm hover:bg-orange-500/10 hover:text-orange-500 transition-all font-medium">Producción</button>
+                        </div>
+                    </div>
+                    <div class="md:col-span-3 glass p-10 rounded-2xl flex flex-col items-center justify-center text-center gap-6"
+                        id="report-content">
+                        <div class="text-6xl opacity-20">📊</div>
+                        <div>
+                            <h2 class="text-2xl font-bold mb-2">Generador de Reportes</h2>
+                            <p class="text-[#94a3b8] max-w-sm">Seleccione una categoría del menú lateral para configurar
+                                e imprimir su informe personalizado.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: SISTEMA -->
+            <section id="sistema-view" class="view-section">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass p-6 rounded-2xl">
+                        <h3 class="text-lg font-bold mb-4">Roles de Usuario</h3>
+                        <div class="flex flex-col gap-3">
+                            <div
+                                class="flex justify-between items-center p-3 bg-black/30 rounded-lg border border-white/5">
+                                <span>Principal / Admin</span>
+                                <span class="text-[10px] bg-green-500/20 text-green-500 px-2 py-1 rounded">ACTIVO</span>
+                            </div>
+                            <div
+                                class="flex justify-between items-center p-3 bg-black/30 rounded-lg border border-white/5">
+                                <span>Vendedor</span>
+                                <span class="text-[10px] bg-green-500/20 text-green-500 px-2 py-1 rounded">ACTIVO</span>
+                            </div>
+                            <div
+                                class="flex justify-between items-center p-3 bg-black/30 rounded-lg border border-white/5">
+                                <span>Diseñador</span>
+                                <span class="text-[10px] bg-green-500/20 text-green-500 px-2 py-1 rounded">ACTIVO</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass p-6 rounded-2xl">
+                        <h3 class="text-lg font-bold mb-4">Utilidades DB</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button
+                                class="p-4 bg-white/5 rounded-xl text-center hover:bg-white/10 transition-all border border-white/5">
+                                <div class="text-xl mb-1">💾</div>
+                                <div class="text-xs">Backup Full</div>
+                            </button>
+                            <button
+                                class="p-4 bg-white/5 rounded-xl text-center hover:bg-white/10 transition-all border border-white/5">
+                                <div class="text-xl mb-1">🧹</div>
+                                <div class="text-xs">Limpiar DB</div>
+                            </button>
+                            <button
+                                class="p-4 bg-red-500/5 rounded-xl text-center hover:bg-red-500/10 transition-all border border-red-500/10 text-red-500">
+                                <div class="text-xl mb-1">🔄</div>
+                                <div class="text-xs">Reset Saldos</div>
+                            </button>
+                            <button
+                                class="p-4 bg-white/5 rounded-xl text-center hover:bg-white/10 transition-all border border-white/5">
+                                <div class="text-xl mb-1">🔠</div>
+                                <div class="text-xs">Mayúsculas</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- MODAL: NUEVO PEDIDO -->
+    <div id="modal-pedido" class="modal-overlay" onclick="closeModal('pedido')">
+        <div class="modal-content glass w-full max-w-4xl rounded-3xl p-8 flex flex-col gap-6 shadow-2xl"
+            onclick="event.stopPropagation()">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h2 class="text-2xl font-bold">Agregar Pedido Carrito Nuevo</h2>
+                    <p class="text-sm text-[#94a3b8]">Configure los detalles técnicos del nuevo trabajo.</p>
+                </div>
+                <button onclick="closeModal('pedido')" class="text-2xl opacity-50 hover:opacity-100">✕</button>
+            </div>
+
+            <div class="flex gap-4 border-b border-white/10 pb-2">
+                <button
+                    class="text-sm font-bold text-orange-500 border-b-2 border-orange-500 pb-2 px-4">Trabajos</button>
+                <button class="text-sm font-bold text-[#94a3b8] pb-2 px-4 hover:text-white">Promos</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-y-auto max-h-[60vh] pr-4">
+                <!-- Col 1: Cliente & General -->
+                <div class="flex flex-col gap-6">
+                    <div>
+                        <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Cliente</label>
+                        <select class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm">
+                            <option>Seleccione cliente...</option>
+                            <option>Impresionarte</option>
+                            <option>Grafica Gomez</option>
+                            <option>Juan Perez</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Calidad</label>
+                            <select class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm">
+                                <option>Plus Solvente</option>
+                                <option>Promocional</option>
+                                <option>Sublimado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Material</label>
+                            <select class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm">
+                                <option>Lona Front 13oz</option>
+                                <option>Vinilo Blanco</option>
+                                <option>Microperforado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Alto (m)</label>
+                            <input type="number" step="0.01"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm" value="1.00">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Ancho (m)</label>
+                            <input type="number" step="0.01"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm" value="1.00">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Copias</label>
+                            <input type="number"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm" value="1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Col 2: Info Adicional -->
+                <div class="flex flex-col gap-6">
+                    <div>
+                        <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Logística</label>
+                        <div class="flex gap-2">
+                            <button
+                                class="flex-1 py-3 px-4 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-orange-500 hover:border-orange-500 transition-all">Retira
+                                Cliente</button>
+                            <button
+                                class="flex-1 py-3 px-4 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-orange-500 hover:border-orange-500 transition-all">Moto</button>
+                            <button
+                                class="flex-1 py-3 px-4 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-orange-500 hover:border-orange-500 transition-all">Despacho</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex items-center gap-3 glass p-4 rounded-xl border-white/5">
+                            <input type="checkbox" id="urg-check" class="accent-orange-500 w-4 h-4">
+                            <label for="urg-check" class="text-sm font-bold cursor-pointer">Urgente? ⚡</label>
+                        </div>
+                        <div class="flex items-center gap-3 glass p-4 rounded-xl border-white/5">
+                            <input type="checkbox" id="lam-check" class="accent-orange-500 w-4 h-4">
+                            <label for="lam-check" class="text-sm font-bold cursor-pointer">Laminado</label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-[#94a3b8] uppercase mb-2 block">Observaciones</label>
+                        <textarea
+                            class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm h-20 resize-none"
+                            placeholder="Agregar detalles adicionales..."></textarea>
+                    </div>
+
+                    <!-- NUEVO: Campo de Archivo estilo IMPGES -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-[#94a3b8] uppercase block">Archivo:</label>
+                        <div class="flex gap-3 items-center">
+                            <button onclick="openSubModal('upload')"
+                                class="btn-upload-impges hover:bg-gray-300 transition-colors">
+                                <span class="upload-icon-impges">⬆</span> Subir Archivo
+                            </button>
+                            <div id="display-filename" class="filename-box-impges italic opacity-80">Archivo...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-4 pt-4 border-t border-white/10">
+                <button onclick="closeModal('pedido')"
+                    class="py-3 px-8 rounded-xl font-bold text-sm text-[#94a3b8] hover:text-white transition-all">Cancelar</button>
+                <button onclick="saveOrder()"
+                    class="accent-btn py-3 px-10 rounded-xl font-bold text-sm shadow-xl shadow-orange-500/30">Cargar a
+                    Carrito</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SECUNDARIO: SUBIENDO ARCHIVO -->
+    <div id="modal-upload" class="modal-overlay" style="z-index: 200;" onclick="closeSubModal('upload')">
+        <div class="modal-content glass w-96 rounded-2xl overflow-hidden" onclick="event.stopPropagation()">
+            <div class="bg-black text-white p-3 text-sm font-bold flex justify-between">
+                <span>Subiendo archivo...</span>
+                <button onclick="closeSubModal('upload')">✕</button>
+            </div>
+            <div class="drop-zone-red" onclick="simulateUpload()">
+                Click para AQUI subir archivo o Arroje aqui su archivo para subir
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE DE ORDEN -->
+    <div id="modal-orden-detalle" class="modal-overlay" onclick="closeModal('orden-detalle')">
+        <div class="modal-content glass w-full max-w-5xl rounded-3xl p-8 flex flex-col gap-6 shadow-2xl"
+            onclick="event.stopPropagation()">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="bg-orange-500/20 text-orange-500 px-3 py-1 rounded-lg text-sm font-bold"
+                            id="detail-ot">OT 57029</span>
+                        <span class="status-badge" id="detail-status">ORDEN</span>
+                        <span id="detail-urgente"
+                            class="hidden bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs font-bold">⚡
+                            URGENTE</span>
+                    </div>
+                    <h2 class="text-2xl font-bold" id="detail-client">STUDIO 7</h2>
+                    <p class="text-sm text-[#94a3b8]" id="detail-id">#106296</p>
+                </div>
+                <button onclick="closeModal('orden-detalle')" class="text-2xl opacity-50 hover:opacity-100">✕</button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Col 1: Detalles Técnicos -->
+                <div class="lg:col-span-2 flex flex-col gap-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="glass p-4 rounded-xl">
+                            <div class="text-[10px] text-[#94a3b8] uppercase mb-1">Material</div>
+                            <div class="font-bold text-sm" id="detail-material">SBA</div>
+                            <div class="text-[11px] text-[#94a3b8]" id="detail-material-desc">Bandera Sublimada
+                            </div>
+                        </div>
+                        <div class="glass p-4 rounded-xl">
+                            <div class="text-[10px] text-[#94a3b8] uppercase mb-1">Medidas</div>
+                            <div class="font-bold text-sm" id="detail-dims">2.11 x 1.45 m</div>
+                            <div class="text-[11px] text-[#94a3b8]" id="detail-m2">3.06 m²</div>
+                        </div>
+                        <div class="glass p-4 rounded-xl">
+                            <div class="text-[10px] text-[#94a3b8] uppercase mb-1">Copias</div>
+                            <div class="font-bold text-sm" id="detail-copias">1</div>
+                        </div>
+                        <div class="glass p-4 rounded-xl border-orange-500/30">
+                            <div class="text-[10px] text-[#94a3b8] uppercase mb-1">Total</div>
+                            <div class="font-bold text-lg text-orange-500" id="detail-total">$3,672.00</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="glass p-4 rounded-xl">
+                            <div class="text-[10px] text-[#94a3b8] uppercase mb-2">Fechas</div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-[#94a3b8]">Creación:</span>
+                                <span class="font-medium" id="detail-fecha-creacion">27/01 09:08</span>
+                            </div>
+                            <div class="flex justify-between text-sm mt-1">
+                                <span class="text-[#94a3b8]">Entrega:</span>
+                                <span class="font-bold text-orange-500" id="detail-fecha-entrega">29/01</span>
+                            </div>
+                        </div>
+                        <div class="glass p-4 rounded-xl">
+                            <div class="text-[10px] text-[#94a3b8] uppercase mb-2">Opciones</div>
+                            <div class="flex flex-wrap gap-2" id="detail-opciones">
+                                <span class="bg-white/5 px-2 py-1 rounded text-[11px]">Bordado</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass p-4 rounded-xl">
+                        <div class="text-[10px] text-[#94a3b8] uppercase mb-2">Observaciones</div>
+                        <p class="text-sm" id="detail-observaciones">Sin observaciones</p>
+                    </div>
+                </div>
+
+                <!-- Col 2: Archivo / Previa -->
+                <div class="flex flex-col gap-4">
+                    <div class="glass p-4 rounded-xl">
+                        <div class="text-[10px] text-[#94a3b8] uppercase mb-3">Archivo Adjunto</div>
+                        <div class="aspect-video bg-black/40 rounded-lg flex items-center justify-center mb-3 overflow-hidden"
+                            id="detail-preview-container">
+                            <img id="detail-preview-img" src="" alt="Preview"
+                                class="max-w-full max-h-full object-contain hidden">
+                            <div id="detail-preview-placeholder" class="text-center">
+                                <div class="text-4xl mb-2">📄</div>
+                                <div class="text-xs text-[#94a3b8]" id="detail-filename">p106296_bandera_v1.pdf
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="viewOrderFile()"
+                                class="flex-1 bg-white/5 hover:bg-white/10 p-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all">
+                                👁️ Ver Archivo
+                            </button>
+                            <button onclick="downloadOrderFile()"
+                                class="flex-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 p-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all">
+                                ⬇️ Descargar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="glass p-4 rounded-xl">
+                        <div class="text-[10px] text-[#94a3b8] uppercase mb-2">Historial</div>
+                        <div class="flex flex-col gap-2 text-[11px]" id="detail-historial">
+                            <div class="flex justify-between">
+                                <span class="text-[#94a3b8]">Creado por:</span>
+                                <span class="font-medium">SISTEMA</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-[#94a3b8]">Aprobado:</span>
+                                <span class="font-medium text-green-500">27/01 10:15</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t border-white/10">
+                <div class="flex gap-2">
+                    <button onclick="changeOrderStatus('diseno')"
+                        class="bg-purple-500/10 text-purple-500 py-2 px-4 rounded-lg text-xs font-bold hover:bg-purple-500/20">
+                        → Diseño
+                    </button>
+                    <button onclick="changeOrderStatus('impreso')"
+                        class="bg-emerald-500/10 text-emerald-500 py-2 px-4 rounded-lg text-xs font-bold hover:bg-emerald-500/20">
+                        → Impreso
+                    </button>
+                </div>
+                <button onclick="closeModal('orden-detalle')"
+                    class="py-2 px-6 rounded-xl font-bold text-sm text-[#94a3b8] hover:text-white transition-all">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // DATABASE - Matches src/data/db/*.json structure
+        // ============================================================
+
+        const DB = {
+            config: {
+                empresa: { nombre: "IMPRIMA", direccion: "Av. Ejemplo 1234, Córdoba", telefono: "+54 351 1234-5678" },
+                contadores: { ordenesHoy: 24, pendientesImpresion: 3219, trabajosCompletados: 84668, entregasHoy: 91 }
+            },
+            usuarios: [
+                { id: 1, nombre: "SISTEMA", username: "sistema", rol: "admin" },
+                { id: 8, nombre: "ADRIAN DISEÑO", username: "adrian.dis", rol: "disenador" },
+                { id: 9, nombre: "ADRIAN IMPRESION", username: "adrian.imp", rol: "impresor" }
+            ],
+            clientes: [
+                { id: 12, nombre: "JUAN SEBASTIAN RODRIGUEZ", empresa: "STUDIO 7", condVenta: "CTA CTE", vip: true },
+                { id: 32, nombre: "COSTA GRAFICA", empresa: "COSTA GRAFICA", condVenta: "CTA CTE", vip: true },
+                { id: 47, nombre: "IMAGINERIA PUBLICITARIA", empresa: "IMAGINERIA PUBLICITARIA", condVenta: "CTA CTE", vip: false },
+                { id: 54, nombre: "JUMP PUBLICIDAD GRAFICA", empresa: "JUMP PUBLICIDAD GRAFICA", condVenta: "CTA CTE", vip: true },
+                { id: 64, nombre: "MEGA IMAGEN", empresa: "MEGA IMAGEN", condVenta: "CTA CTE", vip: true },
+                { id: 103, nombre: "ZOOM GRAFICA (TOSELLO)", empresa: "ZOOM GRAFICA", condVenta: "CTA CTE", vip: true }
+            ],
+            materiales: [
+                { id: 1, codigo: "LF+13", calidad: "Plus Solvente", descripcion: "Lona Front 13oz Plus", precioM2: 850, ancho: 3.2 },
+                { id: 3, codigo: "VB", calidad: "Plus Solvente", descripcion: "Vinilo Blanco Brillante", precioM2: 600, ancho: 1.5 },
+                { id: 6, codigo: "MP", calidad: "Plus Solvente", descripcion: "Microperforado One Way Vision", precioM2: 950, ancho: 1.5 },
+                { id: 7, codigo: "SBA", calidad: "Sublimado", descripcion: "Bandera Sublimada Poliester", precioM2: 1200, ancho: 1.6 }
+            ],
+            calidades: [
+                { id: 1, nombre: "Promocional" },
+                { id: 2, nombre: "Plus Solvente" },
+                { id: 4, nombre: "Sublimado" }
+            ],
+            maquinas: [
+                { id: 1, nombre: "Maquina 1 (740)", ancho: 3200, estado: "online" },
+                { id: 2, nombre: "Maquina 2 (740)", ancho: 3200, estado: "online" },
+                { id: 3, nombre: "Maquina 3 (640)", ancho: 1600, estado: "offline" },
+                { id: 4, nombre: "Anidado 4 axis", ancho: 1600, estado: "online" }
+            ]
+        };
+
+        // ============================================================
+        // ORDERS - From ordenes.json
+        // ============================================================
+        let orders = [
+            { id: 106296, ot: '57029', status: 'orden', clienteId: 12, client: 'STUDIO 7', material: 'SBA', materialDesc: 'Bandera Sublimada', alto: 2.11, ancho: 1.45, copias: 1, total: 3672, date: '27/01 09:08', entreg: '29/01', urg: false },
+            { id: 106295, ot: '57028', status: 'diseno', clienteId: 32, client: 'COSTA GRAFICA', material: 'LF+13', materialDesc: 'Lona Front 13oz', alto: 0.80, ancho: 0.90, copias: 1, total: 612, date: '27/01 07:23', entreg: '29/01', urg: true },
+            { id: 106294, ot: '57027', status: 'previa', clienteId: 47, client: 'IMAGINERIA PUBLICITARIA', material: 'VB', materialDesc: 'Vinilo Blanco', alto: 1.00, ancho: 2.00, copias: 2, total: 2400, date: '26/01 15:40', entreg: '28/01', urg: false },
+            { id: 106293, ot: '57026', status: 'impreso', clienteId: 54, client: 'JUMP PUBLICIDAD', material: 'LF+13', materialDesc: 'Lona Front 13oz', alto: 3.00, ancho: 6.00, copias: 1, total: 15300, date: '26/01 11:20', entreg: '30/01', urg: false },
+            { id: 106292, ot: '57025', status: 'finalizado', clienteId: 103, client: 'ZOOM GRAFICA', material: 'MP', materialDesc: 'Microperforado', alto: 1.20, ancho: 1.50, copias: 4, total: 6840, date: '25/01 14:00', entreg: '27/01', urg: false }
+        ];
+
+        // ============================================================
+        // UI State
+        // ============================================================
+        const users = {
+            'paola': { name: 'SISTEMA', role: 'Admin', color: 'orange' },
+            'adrian.dis': { name: 'Adrian Diseño', role: 'Diseñador', color: 'blue' },
+            'adrian.imp': { name: 'Adrian Impresión', role: 'Impresor', color: 'green' }
+        };
+
+        const statusColors = {
+            'carrito': 'gray',
+            'preorden': 'amber',
+            'orden': 'blue',
+            'diseno': 'purple',
+            'previa': 'pink',
+            'impreso': 'emerald',
+            'completo': 'teal',
+            'entregado': 'cyan',
+            'finalizado': 'green'
+        };
+
+        const statusLabels = {
+            'carrito': 'CARRITO',
+            'preorden': 'PREORDEN',
+            'orden': 'ORDEN',
+            'diseno': 'DISEÑO',
+            'previa': 'PREVIA',
+            'impreso': 'IMPRESO',
+            'completo': 'COMPLETO',
+            'entregado': 'ENTREGADO',
+            'finalizado': 'FINALIZADO'
+        };
+
+        // --- Core Logic ---
+        function switchView(viewId) {
+            // Nav active state
+            document.querySelectorAll('#main-nav li').forEach(li => {
+                li.classList.remove('active', 'text-white');
+                li.classList.add('text-[#94a3b8]');
+            });
+            document.querySelector(`[data-view="${viewId}"]`).classList.add('active', 'text-white');
+
+            // View sections visibility
+            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(`${viewId}-view`).classList.add('active');
+
+            // Titles & Context
+            const titles = {
+                'dashboard': ['Tablero Principal', 'Resumen general de actividad y métricas.'],
+                'entrada': ['Módulo Entrada', 'Administración de presupuestos y carga de órdenes.'],
+                'diseno': ['Cola de Diseño', 'Gestión de trabajos pendientes para diseñadores.'],
+                'impresion': ['Cola de Impresión', 'Monitoreo de producción y máquinas.'],
+                'abm': ['Administración (ABM)', 'Alta, baja y modificación de entidades.'],
+                'reportes': ['Reportes', 'Generación de informes personalizados.'],
+                'sistema': ['Sistema', 'Configuraciones avanzadas y mantenimiento.']
+            };
+
+            document.getElementById('view-title').innerText = titles[viewId][0];
+            document.getElementById('view-subtitle').innerText = titles[viewId][1];
+
+            // Re-render specific view content if needed
+            renderData();
+        }
+
+        let currentUserRole = 'Admin';
+
+        function changeRole(userId) {
+            const user = users[userId];
+            document.getElementById('current-user-name').innerText = user.name;
+            document.getElementById('current-user-role').innerText = user.role;
+            currentUserRole = user.role;
+
+            // Apply permissions
+            updatePermissions();
+
+            // Animate transition
+            const content = document.querySelector('main');
+            content.style.opacity = '0.5';
+            setTimeout(() => {
+                content.style.opacity = '1';
+                switchView('dashboard');
+            }, 300);
+        }
+
+        function updatePermissions() {
+            const createOrderButtons = [
+                document.getElementById('btn-nuevo-pedido-dash'),
+                document.getElementById('btn-nuevo-pedido-entrada')
+            ];
+
+            const canCreateOrder = currentUserRole !== 'Impresor';
+
+            createOrderButtons.forEach(btn => {
+                if (btn) {
+                    btn.style.display = canCreateOrder ? 'block' : 'none';
+                }
+            });
+        }
+
+        function openModal(id) {
+            document.getElementById(`modal-${id}`).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(`modal-${id}`).classList.remove('active');
+        }
+
+        function openSubModal(id) {
+            document.getElementById(`modal-${id}`).classList.add('active');
+        }
+
+        function closeSubModal(id) {
+            document.getElementById(`modal-${id}`).classList.remove('active');
+        }
+
+        function simulateUpload() {
+            const names = ['p106300_LOGO_V1.cdr', 'p106301_BANNER_M7.ai', 'p106302_STICKERS.pdf'];
+            const randomName = names[Math.floor(Math.random() * names.length)];
+            document.getElementById('display-filename').innerText = randomName;
+            document.getElementById('display-filename').classList.remove('italic', 'opacity-80');
+            closeSubModal('upload');
+        }
+
+        function saveOrder() {
+            const newOrder = {
+                id: Math.floor(Math.random() * 1000 + 106300),
+                ot: Math.floor(Math.random() * 1000 + 57100).toString(),
+                status: 'orden',
+                clienteId: 12,
+                client: 'NUEVO CLIENTE',
+                material: 'LF+13',
+                materialDesc: 'Lona Front 13oz',
+                alto: 1.00,
+                ancho: 1.00,
+                total: 850.00,
+                date: new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                entreg: '29/01',
+                copias: 1,
+                urg: false
+            };
+            orders.unshift(newOrder);
+            closeModal('pedido');
+            renderData();
+        }
+
+        // ============================================================
+        // ORDER DETAIL MODAL
+        // ============================================================
+        let currentOrderId = null;
+
+        function openOrderDetail(orderId) {
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+
+            currentOrderId = orderId;
+
+            // Populate header
+            document.getElementById('detail-ot').innerText = `OT ${order.ot}`;
+            document.getElementById('detail-status').innerText = statusLabels[order.status] || order.status.toUpperCase();
+            document.getElementById('detail-status').className = `status-badge bg-${statusColors[order.status]}-500/10 text-${statusColors[order.status]}-500 text-[10px] font-bold`;
+            document.getElementById('detail-urgente').classList.toggle('hidden', !order.urg);
+            document.getElementById('detail-client').innerText = order.client;
+            document.getElementById('detail-id').innerText = `#${order.id}`;
+
+            // Populate details
+            document.getElementById('detail-material').innerText = order.material;
+            document.getElementById('detail-material-desc').innerText = order.materialDesc || '';
+            document.getElementById('detail-dims').innerText = `${order.alto} x ${order.ancho} m`;
+            const m2 = (order.alto * order.ancho * order.copias).toFixed(2);
+            document.getElementById('detail-m2').innerText = `${m2} m²`;
+            document.getElementById('detail-copias').innerText = order.copias;
+            document.getElementById('detail-total').innerText = `$${order.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+
+            // Populate dates
+            document.getElementById('detail-fecha-creacion').innerText = order.date;
+            document.getElementById('detail-fecha-entrega').innerText = order.entreg;
+
+            // Populate options
+            const opciones = [];
+            if (order.urg) opciones.push('⚡ Urgente');
+            if (order.laminado) opciones.push('Laminado');
+            if (order.bordado) opciones.push('Bordado');
+            document.getElementById('detail-opciones').innerHTML = opciones.length > 0
+                ? opciones.map(op => `<span class="bg-white/5 px-2 py-1 rounded text-[11px]">${op}</span>`).join('')
+                : '<span class="text-[#94a3b8] italic text-[11px]">Sin opciones adicionales</span>';
+
+            // Populate observaciones
+            document.getElementById('detail-observaciones').innerText = order.observaciones || 'Sin observaciones';
+
+            // Populate file info
+            const filename = `p${order.id}_archivo.pdf`;
+            document.getElementById('detail-filename').innerText = filename;
+
+            // Show preview image for demo (using a placeholder)
+            const previewImg = document.getElementById('detail-preview-img');
+            const previewPlaceholder = document.getElementById('detail-preview-placeholder');
+
+            // Simulate image preview for certain orders
+            if (order.id === 106296 || order.id === 106294) {
+                previewImg.src = 'https://via.placeholder.com/400x300/1a1a2e/ff6b00?text=' + encodeURIComponent(order.client);
+                previewImg.classList.remove('hidden');
+                previewPlaceholder.classList.add('hidden');
+            } else {
+                previewImg.classList.add('hidden');
+                previewPlaceholder.classList.remove('hidden');
+            }
+
+            openModal('orden-detalle');
+        }
+
+        function viewOrderFile() {
+            if (!currentOrderId) return;
+            const order = orders.find(o => o.id === currentOrderId);
+            if (!order) return;
+
+            // Simulate opening file viewer
+            alert(`Abriendo archivo: p${order.id}_archivo.pdf\n\nEn producción, esto abriría el visor de archivos.`);
+        }
+
+        function downloadOrderFile() {
+            if (!currentOrderId) return;
+            const order = orders.find(o => o.id === currentOrderId);
+            if (!order) return;
+
+            // Simulate download
+            alert(`Descargando: p${order.id}_archivo.pdf\n\nEn producción, esto iniciaría la descarga del archivo.`);
+        }
+
+        function changeOrderStatus(newStatus) {
+            if (!currentOrderId) return;
+
+            orders = orders.map(o =>
+                o.id === currentOrderId ? { ...o, status: newStatus } : o
+            );
+
+            // Update modal display
+            document.getElementById('detail-status').innerText = statusLabels[newStatus] || newStatus.toUpperCase();
+            document.getElementById('detail-status').className = `status-badge bg-${statusColors[newStatus]}-500/10 text-${statusColors[newStatus]}-500 text-[10px] font-bold`;
+
+            renderData();
+        }
+
+
+        function renderData() {
+            // Dashboard Mini List
+            const miniList = document.getElementById('orders-list-mini');
+            miniList.innerHTML = orders.slice(0, 5).map(o => `
+        <tr class="border-b border-white/5 hover:bg-white/5 transition-all cursor-pointer" onclick="openOrderDetail(${o.id})">
+          <td class="py-4">
+            <div class="font-bold">#${o.id}</div>
+            <div class="text-[10px] text-[#94a3b8]">OT: ${o.ot} ${o.urg ? '⚡' : ''}</div>
+          </td>
+          <td><span class="status-badge bg-${statusColors[o.status]}-500/10 text-${statusColors[o.status]}-500 text-[10px] font-bold">${statusLabels[o.status]}</span></td>
+          <td class="text-orange-500 font-semibold text-xs">${o.client}</td>
+          <td class="font-bold text-xs">$${o.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          <td class="text-right text-lg">📄</td>
+        </tr>
+      `).join('');
+
+            // Entrada Full List
+            const fullList = document.getElementById('entrada-full-list');
+            if (fullList) {
+                fullList.innerHTML = orders.map(o => `
+          <tr class="hover:bg-white/5">
+            <td class="p-4"><div class="font-bold">#${o.id}</div><div class="text-[10px] text-[#94a3b8]">OT: ${o.ot}</div></td>
+            <td class="p-4"><span class="status-badge bg-${statusColors[o.status]}-500/10 text-${statusColors[o.status]}-500 text-[10px] font-bold">${statusLabels[o.status]}</span></td>
+            <td class="p-4 text-xs">P. Venta<br><span class="text-[#94a3b8]">${o.date}</span></td>
+            <td class="p-4 text-xs font-medium">${o.entreg}</td>
+            <td class="p-4 text-orange-500 font-bold">${o.client}</td>
+            <td class="p-4 text-xs">${o.material}</td>
+            <td class="p-4 font-mono text-xs">${o.dims} x ${o.copias}</td>
+            <td class="p-4 text-right">
+              <div class="flex justify-end gap-2 text-base opacity-70">
+                <button class="hover:text-white">🔑</button> <button class="hover:text-white">📥</button> <button class="hover:text-white">📄</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+            }
+
+            // Diseño Cards
+            const designGrid = document.getElementById('diseno-cards-grid');
+            if (designGrid) {
+                designGrid.innerHTML = orders.filter(o => ['orden', 'diseno', 'previa'].includes(o.status)).map(o => `
+          <div class="glass p-5 rounded-2xl flex flex-col gap-4 group">
+            <div class="flex justify-between items-start">
+              <div class="flex flex-col">
+                <span class="bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded text-[11px] font-bold w-fit mb-1">OT ${o.ot}</span>
+                <span class="text-[10px] text-[#94a3b8]">#${o.id}</span>
+              </div>
+              <div class="w-3 h-3 rounded-full bg-${statusColors[o.status]}-500 shadow-[0_0_8px_var(--accent-glow)]"></div>
+            </div>
+            <div>
+              <h4 class="font-bold text-lg mb-1">${o.client}</h4>
+              <p class="text-[11px] text-[#94a3b8] uppercase tracking-wide border-l-2 border-white/20 pl-2">
+                ${o.material} • ${o.alto}x${o.ancho}m • ${o.copias} Un.
+              </p>
+            </div>
+            <div class="flex justify-between items-end border-t border-white/5 pt-4">
+              <div class="flex flex-col">
+                <span class="text-[9px] text-[#94a3b8] uppercase">Entrega</span>
+                <span class="text-xs font-bold ${o.urg ? 'text-red-500' : ''}">${o.entreg}</span>
+              </div>
+              <button class="accent-btn py-1.5 px-3 rounded text-[10px] font-bold">Subir Previa</button>
+            </div>
+          </div>
+        `).join('');
+            }
+
+            // Impresión Table
+            const printTable = document.getElementById('impresion-table-body');
+            if (printTable) {
+                printTable.innerHTML = orders.filter(o => o.status === 'orden' || o.status === 'impreso').map(o => `
+          <tr>
+            <td class="p-4"><div class="font-bold">#${o.id}</div><div class="text-[10px] text-[#94a3b8]">OT: ${o.ot}</div></td>
+            <td class="p-4 text-xs"><span class="text-green-500 font-bold">PAOLA</span><br>${o.date}</td>
+            <td class="p-4">
+              <div class="font-bold text-orange-500">${o.client}</div>
+              <div class="text-[11px] text-[#94a3b8]">${o.materialDesc} • ${o.alto}x${o.ancho}m</div>
+            </td>
+            <td class="p-4">
+              <select class="bg-black/50 border border-white/10 rounded p-1 text-[11px] w-full">
+                <option>Sin Asignar</option>
+                <option>Maquina 1</option>
+                <option>Anidado 4 axis</option>
+              </select>
+            </td>
+            <td class="p-4 text-right">
+              <button onclick="markReady(${o.id})" class="bg-green-500/10 text-green-500 p-2 rounded hover:bg-green-500/20">✓ OK</button>
+            </td>
+          </tr>
+        `).join('');
+            }
+        }
+
+        function markReady(id) {
+            orders = orders.map(o => o.id === id ? { ...o, status: 'impreso' } : o);
+            renderData();
+        }
+
+        function switchAbmTab(tab) {
+            document.querySelectorAll('.abm-tab').forEach(t => {
+                t.classList.remove('bg-orange-500', 'text-white', 'active');
+                t.classList.add('bg-white/5', 'text-[#94a3b8]');
+            });
+            const activeTab = document.querySelector(`[data-tab="${tab}"]`);
+            activeTab.classList.add('bg-orange-500', 'text-white', 'active');
+            activeTab.classList.remove('bg-white/5', 'text-[#94a3b8]');
+
+            const container = document.getElementById('abm-container');
+            const contents = {
+                'clientes': `
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold">Listado de Clientes</h3>
+            <button class="text-xs bg-orange-500 px-3 py-1.5 rounded-lg text-white">+ Nuevo Cliente</button>
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead class="text-[#94a3b8] uppercase text-[10px] border-b border-white/5">
+              <tr><th class="p-3">Nombre</th><th class="p-3">CUIT</th><th class="p-3">Tipo</th><th class="p-3 text-right">Ops</th></tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              <tr><td class="p-3 font-bold">Impresionarte</td><td class="p-3">20-12345678-9</td><td class="p-3">CTA CTE</td><td class="p-3 text-right">✏️</td></tr>
+              <tr><td class="p-3 font-bold">Maria Lopez</td><td class="p-3">27-87654321-0</td><td class="p-3">CONTADO</td><td class="p-3 text-right">✏️</td></tr>
+            </tbody>
+          </table>
+        `,
+                'materiales': `
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold">Sustratos y Materiales</h3>
+            <button class="text-xs bg-orange-500 px-3 py-1.5 rounded-lg text-white">+ Nuevo Material</button>
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead class="text-[#94a3b8] uppercase text-[10px] border-b border-white/5">
+              <tr><th class="p-3">Cod</th><th class="p-3">Descripción</th><th class="p-3">Precio M2</th><th class="p-3 text-right">Ops</th></tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              <tr><td class="p-3 font-mono font-bold">LF+13</td><td class="p-3">Lona Front 13oz Plus</td><td class="p-3">$850.00</td><td class="p-3 text-right">✏️</td></tr>
+            </tbody>
+          </table>
+        `,
+                'maquinas': `<div class="p-20 text-center opacity-30 italic">Configuración de colas de anidado y anchos máximos...</div>`
+            };
+            container.innerHTML = contents[tab];
+        }
+
+        function setReport(type) {
+            const panel = document.getElementById('report-content');
+            panel.innerHTML = `
+        <div class="flex flex-col gap-6 w-full max-w-md animate-fadeIn">
+          <h2 class="text-2xl font-bold border-b border-white/10 pb-4">Reporte: ${type.toUpperCase()}</h2>
+          <div class="grid grid-cols-2 gap-4 text-left">
+            <div><label class="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Desde</label><input type="date" class="w-full bg-black/40 border border-white/10 p-2 rounded text-xs" value="2026-01-01"></div>
+            <div><label class="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Hasta</label><input type="date" class="w-full bg-black/40 border border-white/10 p-2 rounded text-xs" value="2026-01-27"></div>
+          </div>
+          <div class="text-left">
+            <label class="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Formato</label>
+            <select class="w-full bg-black/40 border border-white/10 p-2 rounded text-xs"><option>Listado en Pantalla</option><option>Exportar a Excel</option><option>Generar PDF</option></select>
+          </div>
+          <button class="accent-btn py-3 rounded-xl font-bold mt-4">Generar Informe</button>
+        </div>
+      `;
+        }
+
+        // --- Inits ---
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('live-time').innerText = d.toLocaleTimeString('es-AR');
+        }, 1000);
+
+        // Initial render
+        renderData();
+        switchAbmTab('clientes');
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,63 @@
+[
+  {
+    "id": 1,
+    "nombre": "Adrian (Principal)",
+    "username": "adrian",
+    "email": "adrian@luxius.com",
+    "rol": "principal",
+    "role": "principal",
+    "habilitado": true,
+    "password": "nueva98261"
+  },
+  {
+    "id": 2,
+    "nombre": "Admin (Administrador)",
+    "username": "admin",
+    "email": "admin@luxius.com",
+    "rol": "administrador",
+    "role": "administrador",
+    "habilitado": true,
+    "password": "admin123"
+  },
+  {
+    "id": 3,
+    "nombre": "Vendedor (Ventas)",
+    "username": "vendedor",
+    "email": "vendedor@luxius.com",
+    "rol": "vendedor",
+    "role": "vendedor",
+    "habilitado": true,
+    "password": "vendedor123"
+  },
+  {
+    "id": 4,
+    "nombre": "Impresion (Taller)",
+    "username": "impresion",
+    "email": "impresion@luxius.com",
+    "rol": "impresion",
+    "role": "impresion",
+    "habilitado": true,
+    "password": "impresion123"
+  },
+  {
+    "id": 5,
+    "nombre": "Diseño (Artista)",
+    "username": "diseno",
+    "email": "diseno@luxius.com",
+    "rol": "artista",
+    "role": "artista",
+    "habilitado": true,
+    "password": "diseno123"
+  },
+  {
+    "id": 6,
+    "nombre": "Cliente (Externo)",
+    "username": "cliente",
+    "email": "cliente@luxius.com",
+    "rol": "cliente",
+    "role": "cliente",
+    "clientId": 826300,
+    "habilitado": true,
+    "password": "cliente123"
+  }
+]

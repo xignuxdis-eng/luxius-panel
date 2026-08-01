@@ -1,0 +1,288 @@
+/* ==========================================================================
+   LUXIUS 16-BIT RETRO ARCADE / PIXEL ART UI DESIGN SYSTEM (FORCED OVERRIDES)
+   ========================================================================== */
+
+:root {
+  /* 16-Bit Arcade Color Tokens */
+  --pixel-bg-dark: #090714;
+  --pixel-bg-card: #161228;
+  --pixel-bg-input: #0e0b1a;
+  
+  --pixel-border-color: #000000;
+  --pixel-border-light: #3d346b;
+  
+  --pixel-neon-cyan: #00f0ff;
+  --pixel-neon-pink: #ff2a8d;
+  --pixel-gold-coin: #ffc700;
+  --pixel-hp-green: #00e676;
+  --pixel-mp-blue: #3d5afe;
+  --pixel-danger-red: #ff3366;
+  --pixel-orange: #ff7700;
+
+  --pixel-text: #ffffff;
+  --pixel-text-dim: #9b8ec4;
+
+  /* Fonts */
+  --font-pixel-title: 'Press Start 2P', 'Silkscreen', cursive, monospace;
+  --font-pixel-ui: 'Silkscreen', 'Pixelify Sans', monospace;
+  --font-pixel-body: 'Pixelify Sans', 'VT323', monospace;
+}
+
+/* --------------------------------------------------------------------------
+   Global Theme Scope: [data-theme='pixel'] and .pixel-theme
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'],
+body.pixel-theme {
+  --bg-main: var(--pixel-bg-dark);
+  --bg-sidebar: #0e0a1f;
+  --bg-card: var(--pixel-bg-card);
+  --bg-input: var(--pixel-bg-input);
+
+  --accent: var(--pixel-neon-cyan);
+  --accent-glow: rgba(0, 240, 255, 0.4);
+  --accent-light: rgba(0, 240, 255, 0.15);
+  
+  --secondary: var(--pixel-neon-pink);
+  --success: var(--pixel-hp-green);
+  --warning: var(--pixel-gold-coin);
+  --danger: var(--pixel-danger-red);
+
+  --text-primary: #ffffff;
+  --text-secondary: var(--pixel-neon-cyan);
+  --text-muted: var(--pixel-text-dim);
+
+  --border: var(--pixel-neon-cyan);
+  --border-focus: var(--pixel-gold-coin);
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  background-color: var(--pixel-bg-dark) !important;
+  color: #ffffff !important;
+  font-family: var(--font-pixel-body) !important;
+  letter-spacing: 0.5px;
+}
+
+[data-theme='pixel'] body,
+body.pixel-theme {
+  font-family: var(--font-pixel-body) !important;
+  background-color: var(--pixel-bg-dark) !important;
+}
+
+/* Headings */
+[data-theme='pixel'] h1,
+[data-theme='pixel'] h2,
+[data-theme='pixel'] h3,
+body.pixel-theme h1,
+body.pixel-theme h2,
+body.pixel-theme h3 {
+  font-family: var(--font-pixel-title) !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  color: var(--pixel-gold-coin) !important;
+  text-shadow: 3px 3px 0px #000 !important;
+}
+
+[data-theme='pixel'] h4,
+[data-theme='pixel'] h5,
+[data-theme='pixel'] h6,
+[data-theme='pixel'] th,
+[data-theme='pixel'] label,
+body.pixel-theme h4,
+body.pixel-theme h5,
+body.pixel-theme h6,
+body.pixel-theme th,
+body.pixel-theme label {
+  font-family: var(--font-pixel-ui) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+  color: var(--pixel-neon-cyan) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Pixel Art Cards, Modals & Containers
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'] .card,
+[data-theme='pixel'] .stat-card,
+[data-theme='pixel'] .modal-content,
+[data-theme='pixel'] .table-container,
+[data-theme='pixel'] .ordenes-table,
+[data-theme='pixel'] .filter-bar,
+[data-theme='pixel'] .hud-container,
+[data-theme='pixel'] .login-card,
+[data-theme='pixel'] .abm-section,
+body.pixel-theme .card,
+body.pixel-theme .stat-card,
+body.pixel-theme .modal-content,
+body.pixel-theme .table-container,
+body.pixel-theme .filter-bar {
+  border: 4px solid #000 !important;
+  border-radius: 0 !important;
+  background-color: var(--pixel-bg-card) !important;
+  box-shadow:
+    inset -4px -4px 0px 0px rgba(0, 0, 0, 0.7),
+    inset 4px 4px 0px 0px rgba(255, 255, 255, 0.15),
+    5px 5px 0px 0px #000000 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Pixel Art Buttons
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'] button,
+[data-theme='pixel'] .btn,
+[data-theme='pixel'] .tab-btn,
+[data-theme='pixel'] .filter-btn,
+body.pixel-theme button,
+body.pixel-theme .btn,
+body.pixel-theme .tab-btn {
+  font-family: var(--font-pixel-ui) !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  border: 3px solid #000 !important;
+  border-radius: 0 !important;
+  background: #231c3d !important;
+  color: #ffffff !important;
+  padding: 8px 16px !important;
+  cursor: pointer !important;
+  user-select: none;
+  box-shadow:
+    inset -3px -3px 0px 0px rgba(0, 0, 0, 0.7),
+    inset 3px 3px 0px 0px rgba(255, 255, 255, 0.25),
+    3px 3px 0px 0px #000000 !important;
+  transition: transform 0.05s ease, box-shadow 0.05s ease !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+[data-theme='pixel'] button:hover,
+[data-theme='pixel'] .btn:hover,
+body.pixel-theme button:hover {
+  background: #312854 !important;
+  color: var(--pixel-gold-coin) !important;
+  box-shadow:
+    inset -3px -3px 0px 0px rgba(0, 0, 0, 0.7),
+    inset 3px 3px 0px 0px rgba(255, 255, 255, 0.4),
+    4px 4px 0px 0px #000000 !important;
+}
+
+[data-theme='pixel'] button:active,
+[data-theme='pixel'] .btn:active,
+body.pixel-theme button:active {
+  transform: translate(3px, 3px) !important;
+  box-shadow:
+    inset 3px 3px 0px 0px rgba(0, 0, 0, 0.8),
+    0px 0px 0px 0px #000000 !important;
+}
+
+/* Active Tabs / Primary Buttons */
+[data-theme='pixel'] .tab-btn.active,
+[data-theme='pixel'] .btn-primary,
+body.pixel-theme .btn-primary {
+  background: var(--pixel-neon-cyan) !important;
+  color: #000000 !important;
+  font-weight: bold !important;
+  box-shadow:
+    inset -3px -3px 0px 0px rgba(0, 0, 0, 0.5),
+    inset 3px 3px 0px 0px rgba(255, 255, 255, 0.4),
+    3px 3px 0px 0px #000000 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Pixel Art Tables
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'] table,
+body.pixel-theme table {
+  border-collapse: collapse !important;
+  width: 100%;
+}
+
+[data-theme='pixel'] th,
+body.pixel-theme th {
+  background: #0f0a21 !important;
+  border-bottom: 3px solid #000 !important;
+  padding: 10px 14px !important;
+  font-family: var(--font-pixel-ui) !important;
+  color: var(--pixel-neon-cyan) !important;
+  font-size: 12px !important;
+}
+
+[data-theme='pixel'] td,
+body.pixel-theme td {
+  border-bottom: 2px solid #1c1538 !important;
+  padding: 10px 14px !important;
+  font-family: var(--font-pixel-body) !important;
+  font-size: 14px !important;
+  color: #ffffff !important;
+}
+
+[data-theme='pixel'] tr:hover td,
+body.pixel-theme tr:hover td {
+  background-color: rgba(0, 240, 255, 0.08) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Pixel Art Form Inputs
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'] input,
+[data-theme='pixel'] select,
+[data-theme='pixel'] textarea,
+body.pixel-theme input,
+body.pixel-theme select,
+body.pixel-theme textarea {
+  font-family: var(--font-pixel-body) !important;
+  font-size: 15px !important;
+  border: 3px solid #000 !important;
+  border-radius: 0 !important;
+  background-color: var(--pixel-bg-input) !important;
+  color: var(--pixel-neon-cyan) !important;
+  padding: 8px 12px !important;
+  box-shadow:
+    inset 3px 3px 0px 0px #000000,
+    inset -1px -1px 0px 0px rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme='pixel'] input:focus,
+[data-theme='pixel'] select:focus,
+[data-theme='pixel'] textarea:focus,
+body.pixel-theme input:focus {
+  outline: none !important;
+  border-color: #000 !important;
+  box-shadow:
+    inset 3px 3px 0px 0px #000000,
+    0 0 0 2px var(--pixel-gold-coin) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Badges / Status Tags
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'] .status-tag,
+[data-theme='pixel'] .badge,
+body.pixel-theme .status-tag {
+  font-family: var(--font-pixel-ui) !important;
+  font-size: 11px !important;
+  border: 2px solid #000 !important;
+  border-radius: 0 !important;
+  padding: 2px 8px !important;
+  box-shadow: 2px 2px 0px 0px #000000 !important;
+  text-transform: uppercase !important;
+}
+
+/* --------------------------------------------------------------------------
+   CRT Scanlines Overlay (Subtle Retro Effect)
+   -------------------------------------------------------------------------- */
+[data-theme='pixel'] body::after,
+body.pixel-theme::after {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+  background-size: 100% 4px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0.2;
+}

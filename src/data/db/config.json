@@ -1,0 +1,33 @@
+{
+  "empresa": {
+    "nombre": "XignuX Print Den",
+    "direccion": "Av. Ejemplo 1234, Córdoba",
+    "telefono": "+54 351 1234-5678",
+    "email": "info@luxius.com",
+    "cuit": "30-12345678-9",
+    "logo": "/assets/logo.png"
+  },
+  "sistema": {
+    "version": "1.0.0",
+    "nombre": "Luxius",
+    "nombreAnterior": "IMPGESV2",
+    "ultimaActualizacion": "2026-01-28"
+  },
+  "ordenes": {
+    "proximoId": 106297,
+    "proximaOT": 57030,
+    "prefijo": "p"
+  },
+  "defaults": {
+    "demasias": 5,
+    "envio": "Retira el Cliente",
+    "calidadId": 2,
+    "materialId": 1
+  },
+  "contadores": {
+    "ordenesHoy": 24,
+    "pendientesImpresion": 3219,
+    "trabajosCompletados": 84668,
+    "entregasHoy": 91
+  }
+}

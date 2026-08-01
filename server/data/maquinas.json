@@ -1,0 +1,10 @@
+[
+  {
+    "id": 3,
+    "nombre": "ROLAND RS-640",
+    "tipo": "Ecosolvente",
+    "anchoMaximo": 1.6,
+    "estado": "online",
+    "habilitada": true
+  }
+]

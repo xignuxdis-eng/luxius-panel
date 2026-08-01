@@ -1,0 +1,153 @@
+@import '../../styles/pages.css';
+
+.diseno-page {
+    animation: fadeIn 0.5s ease;
+}
+
+/* Filters */
+.filters-bar {
+    background: var(--bg-card);
+    backdrop-filter: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-group {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+}
+
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.results-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+/* Orders Table */
+.orders-table-container {
+    background: var(--bg-card);
+    backdrop-filter: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow-x: auto;
+    box-shadow: var(--shadow-md);
+}
+
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.orders-table th {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 6px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+}
+
+.orders-table td {
+    padding: 8px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.orders-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Cell Components */
+.order-id {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.id-text {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.ot-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.emerg-badge {
+    color: var(--warning);
+    margin-left: 4px;
+}
+
+.status-badge {
+    display: inline-flex;
+    padding: 4px 10px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 700;
+    background: color-mix(in srgb, var(--status-color), transparent 85%);
+    color: var(--status-color);
+    border: 1px solid color-mix(in srgb, var(--status-color), transparent 70%);
+}
+
+.order-date,
+.order-client {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.client-name {
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.order-dims {
+    font-family: monospace;
+    color: var(--text-secondary);
+}
+
+.order-ops {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.op-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.op-btn:hover {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    color: white;
+}

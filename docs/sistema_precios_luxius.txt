@@ -1,0 +1,48 @@
+REPORTE TÉCNICO: SISTEMA DE MATERIALES Y PRECIOS LUXIUS
+
+1. ARQUITECTURA DE DATOS (JSON)
+-------------------------------
+El sistema utiliza archivos JSON en el servidor (ubicados en server/db/) que funcionan como bases de datos NoSQL persistidas.
+
+* MATERIALES (materiales.json):
+  - codigo: Identificador único (ej: "VIN-BRI").
+  - precioM2: Precio base por unidad de medida.
+  - tipoCobro: "m2" (metro cuadrado) o "ml" (metro lineal).
+  - preciosPorAncho: Array de objetos [{ maxAncho: number, precio: number }]. Permite cobrar distinto según el ancho del rollo físico utilizado para la impresión.
+
+* SERVICIOS (servicios.json):
+  - precioBase: Costo fijo por unidad (copia) que se suma al total del ítem (ej: Ojales, Laminado).
+
+* ORDENES (ordenes.json):
+  - ancho/alto: Dimensiones en metros (con 3 decimales, precisión milimétrica).
+  - copias: Cantidad de unidades.
+  - subtotal: El precio final calculado y persistido en el momento de creación (para evitar cambios retrospectivos por actualización de listas).
+  - servicios: Objeto { [serviceId]: boolean } que indica qué adicionales fueron aplicados.
+
+2. LOGICA DE CALCULO (calculateItemPrice)
+-----------------------------------------
+La lógica principal reside en el frontend para permitir cálculos dinámicos mientras el usuario edita el pedido.
+
+- Función: calculateItemPrice(materialCode, w, h, c, services)
+
+1. SELECCIÓN DE ESCALA:
+   Busca en material.preciosPorAncho la primera franja donde el ancho del pedido (w) sea menor o igual al maxAncho del rollo. Si no hay franjas, usa precioM2.
+
+2. CÁLCULO BASE:
+   - Si tipoCobro es 'ml' (lineal): subtotal = alto * copias * precioUnitario (ignora el ancho).
+   - Si tipoCobro es 'm2' (cuadrado): subtotal = ancho * alto * copias * precioUnitario.
+
+3. ADICIONALES:
+   Se suma (servicio.precioBase * copias) por cada servicio marcado como activo.
+
+3. PUNTOS PARA DESARROLLO FUTURO (PROMPT PARA GPT)
+--------------------------------------------------
+Áreas donde el sistema puede evolucionar mediante el rediseño de la lógica:
+
+- CATEGORÍAS DE CLIENTE: Mapear el campo 'categoria' del cliente (Vip, Gremio, Particular) a multiplicadores de precio.
+- ESCALABILIDAD POR VOLUMEN: Implementar "Scalability Pricing" donde el precioUnitario baje automáticamente si el área total (ancho * alto * copias) supera ciertos umbrales (ej: >10m2, >50m2).
+- CÁLCULOS PERIMETRALES: Rediseñar servicios para que puedan cobrarse por metro lineal de perímetro (2 * (ancho + alto)) en lugar de solo costo fijo por unidad.
+- NESTING Y DESPERDICIO (WASTE): Calcular el costo real basado en el ancho del rollo (maxAncho) vs el ancho de la pieza, cobrando el material excedente si el desperdicio es muy alto.
+
+--------------------------------------------------
+GENERADO POR LUXIUS HELPER - FEBRERO 2026

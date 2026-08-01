@@ -1,0 +1,114 @@
+# Luxius - Replicación Completa de IMPGESV2
+
+## Estado General
+- **Proyecto**: Luxius (Gestión de Impresión)
+- **Objetivo**: Replicar IMPGESV2 como aplicación web moderna
+- **Stack**: React 18 + Vite + TypeScript + Zustand
+- **Última Actualización**: 2026-01-27 11:35
+
+---
+
+## Fase 1: Investigación y Planificación ✅
+- [x] Explorar estructura actual de Luxius
+- [x] Navegar IMPGESV2 original y documentar todos los módulos
+- [x] Documentar API endpoints y estructuras de datos
+- [x] Crear plan de implementación detallado
+
+---
+
+## Fase 2: Infraestructura Base ✅
+- [x] Crear package.json con dependencias
+- [x] Configurar TypeScript (tsconfig.json)
+- [x] Configurar Vite (vite.config.ts)
+- [x] Crear estructura de carpetas src/
+- [x] Configurar React Router (App.tsx)
+- [x] Crear layout base (Sidebar + Header + MainLayout)
+- [x] Configurar Zustand para autenticación
+
+### Archivos Creados
+```
+luxius/
+├── package.json
+├── tsconfig.json
+├── tsconfig.node.json
+├── vite.config.ts
+├── index.html
+└── src/
+    ├── main.tsx
+    ├── App.tsx
+    ├── vite-env.d.ts
+    ├── styles/
+    │   ├── index.css
+    │   └── pages.css
+    ├── types/
+    │   ├── index.ts
+    │   ├── auth.ts
+    │   ├── orden.ts
+    │   └── entities.ts
+    ├── store/
+    │   └── authStore.ts
+    ├── components/layout/
+    │   ├── Sidebar.tsx + .css
+    │   ├── Header.tsx + .css
+    │   └── MainLayout.tsx + .css
+    └── pages/
+        ├── Login/Login.tsx + .css
+        ├── Dashboard/Dashboard.tsx + .css
+        ├── Entrada/Entrada.tsx + .css
+        ├── Diseno/Diseno.tsx
+        ├── Impresion/Impresion.tsx
+        ├── ABM/ABM.tsx
+        ├── Reportes/Reportes.tsx
+        └── Sistema/Sistema.tsx
+```
+
+---
+
+## Fase 3: Módulos Principales
+- [ ] Completar módulo Entrada (formulario nuevo pedido)
+- [ ] Completar módulo Diseño (cola de diseñadores)
+- [ ] Completar módulo Impresión (cola de producción)
+
+---
+
+## Fase 4: Módulos de Soporte
+- [ ] Módulo ABM (CRUD de entidades)
+- [ ] Módulo Reportes (generador)
+- [ ] Módulo Sistema (permisos, backup)
+
+---
+
+## Fase 5: Verificación y Pulido
+- [ ] Importar datos mock
+- [ ] Testing de flujos principales
+- [ ] Documentación final
+
+---
+
+## Para Ejecutar en Nueva Máquina
+
+```powershell
+# 1. Navegar al proyecto
+cd C:\ruta\a\luxius
+
+# 2. Instalar dependencias
+npm install
+
+# 3. Iniciar servidor de desarrollo
+npm run dev
+```
+
+---
+
+## Credenciales de Prueba
+| Usuario | Password | Rol |
+|---------|----------|-----|
+| paola | pgof123 | Admin |
+| adrian.dis | mejico | Diseño |
+| adrian.imp | mejico | Impresión |
+
+---
+
+## Documentos de Referencia
+- [IMPGESV2_analysis.md](file:///C:/Users/Impresion/.gemini/antigravity/brain/46931fd1-15f6-4389-ad37-32705a9110b5/IMPGESV2_analysis.md) - Análisis del sistema original
+- [implementation_plan.md](file:///C:/Users/Impresion/.gemini/antigravity/brain/46931fd1-15f6-4389-ad37-32705a9110b5/implementation_plan.md) - Plan técnico completo

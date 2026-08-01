@@ -1,0 +1,141 @@
+[
+  {
+    "id": 1,
+    "codigo": "LF+13",
+    "calidadId": 2,
+    "calidad": "",
+    "descripcion": "Lona Front 13oz Plus",
+    "tipo": "Sustrato",
+    "tipoCobro": "m2",
+    "precioM2": 14000,
+    "ancho": 3.2,
+    "habilitado": true,
+    "unidad": "M Lineal",
+    "updatedAt": "2026-02-19T21:19:50.482Z"
+  },
+  {
+    "id": 3,
+    "codigo": "VBB",
+    "calidadId": 2,
+    "calidad": "Plus Solvente",
+    "descripcion": "Vinilo Blanco Brillante",
+    "tipo": "rollo",
+    "tipoCobro": "m2",
+    "precioM2": 14000,
+    "ancho": 1.5,
+    "habilitado": true,
+    "unidad": "M Lineal",
+    "updatedAt": "2026-02-19T22:15:11.548Z"
+  },
+  {
+    "id": 6,
+    "codigo": "MP",
+    "calidadId": 2,
+    "calidad": "Plus Solvente",
+    "descripcion": "Vinilo Microperforado",
+    "tipo": "rollo",
+    "tipoCobro": "ml",
+    "precioM2": 15000,
+    "ancho": 1.5,
+    "habilitado": true,
+    "unidad": "M Lineal",
+    "updatedAt": "2026-02-20T03:24:04.292Z",
+    "bobinas": [
+      {
+        "ancho": 1.52,
+        "precioML": 15000
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "codigo": "VV",
+    "calidadId": 2,
+    "calidad": "Plus Solvente",
+    "descripcion": "Vinilo Vehicular Orajet",
+    "tipo": "rollo",
+    "tipoCobro": "ml",
+    "precioM2": 1100,
+    "ancho": 1.52,
+    "habilitado": true,
+    "bobinas": [
+      {
+        "ancho": 1.37,
+        "precioML": 22000
+      },
+      {
+        "ancho": 1.52,
+        "precioML": 24000
+      }
+    ],
+    "unidad": "M Lineal",
+    "updatedAt": "2026-02-20T03:22:38.285Z"
+  },
+  {
+    "id": 905,
+    "codigo": "FLS-01",
+    "descripcion": "SOLVENTE FLUSH (LIMPIEZA)",
+    "calidad": "GENERAL",
+    "tipo": "SOLVENTE",
+    "tipoCobro": "m2",
+    "precioM2": 0,
+    "ancho": 1,
+    "habilitado": true,
+    "stockActual": 1.5,
+    "stockMinimo": 8
+  },
+  {
+    "id": 904,
+    "codigo": "INK-K",
+    "descripcion": "TINTA BLACK",
+    "calidad": "SOLVENTE",
+    "tipo": "TINTA",
+    "tipoCobro": "m2",
+    "precioM2": 0,
+    "ancho": 1,
+    "habilitado": true,
+    "stockActual": 0.5,
+    "stockMinimo": 5
+  },
+  {
+    "id": 902,
+    "codigo": "INK-M",
+    "descripcion": "TINTA MAGENTA",
+    "calidad": "SOLVENTE",
+    "tipo": "TINTA",
+    "tipoCobro": "m2",
+    "precioM2": 0,
+    "ancho": 1,
+    "habilitado": true,
+    "stockActual": 0.5,
+    "stockMinimo": 5,
+    "color": "#ff00ff",
+    "unidad": "Litros"
+  },
+  {
+    "id": 903,
+    "codigo": "INK-Y",
+    "descripcion": "TINTA YELLOW",
+    "calidad": "SOLVENTE",
+    "tipo": "TINTA",
+    "tipoCobro": "m2",
+    "precioM2": 0,
+    "ancho": 1,
+    "habilitado": true,
+    "stockActual": 0.5,
+    "stockMinimo": 5
+  },
+  {
+    "id": 901,
+    "codigo": "INK-C",
+    "descripcion": "TINTA CYAN",
+    "calidad": "SOLVENTE",
+    "tipo": "TINTA",
+    "tipoCobro": "m2",
+    "precioM2": 0,
+    "ancho": 1,
+    "habilitado": true,
+    "stockActual": 0.5,
+    "stockMinimo": 5
+  }
+]
