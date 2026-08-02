@@ -123,6 +123,7 @@ def create_task():
 
 
 @tasks_bp.patch('/<presupuesto_id>')
+@tasks_bp.put('/<presupuesto_id>')
 @operator_required
 def update_task(presupuesto_id):
     from routes.orders import _find_presupuesto

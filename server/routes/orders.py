@@ -118,6 +118,8 @@ def _presupuesto_to_order(p):
     cliente_nombre = ''
     if p.cliente:
         cliente_nombre = p.cliente.nombre or ''
+    else:
+        cliente_nombre = esp.get('clienteNombre') or p.descripcion or 'Cliente General'
 
     archivos = []
     archivos_originales = []

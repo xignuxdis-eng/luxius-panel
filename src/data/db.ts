@@ -9,6 +9,7 @@
 
 // Types
 import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica } from '@/types'
+import { INITIAL_CLIENTES } from './initialClientes'
 
 // API Configuration
 // API Configuration
@@ -264,10 +265,10 @@ export async function getOrdenesPendientes(): Promise<Order[]> {
 // ============================================================
 
 export function getClientes(): Cliente[] {
-    const versionKey = 'luxius_db_clientes_v2';
-    if (localStorage.getItem(versionKey) !== 'v2') {
+    const versionKey = 'luxius_db_clientes_v4';
+    if (localStorage.getItem(versionKey) !== 'v4') {
         localStorage.removeItem(SESSION_CLIENTES_KEY);
-        localStorage.setItem(versionKey, 'v2');
+        localStorage.setItem(versionKey, 'v4');
     }
 
     const sessionItemsJson = localStorage.getItem(SESSION_CLIENTES_KEY)
@@ -275,13 +276,14 @@ export function getClientes(): Cliente[] {
     if (sessionItemsJson) {
         try {
             const list = JSON.parse(sessionItemsJson) as Cliente[];
-            if (Array.isArray(list)) {
+            if (Array.isArray(list) && list.length > 0) {
                 return list;
             }
         } catch (e) { }
     }
 
-    return []
+    localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(INITIAL_CLIENTES));
+    return INITIAL_CLIENTES;
 }
 
 export function saveCliente(cliente: Partial<Cliente>): Cliente {
