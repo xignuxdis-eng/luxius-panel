@@ -81,12 +81,20 @@ class Maquina(db.Model):
     cliente = relationship('Cliente', back_populates='maquinas')
 
     def to_dict(self):
+        extra = self.extra or {}
         return {
-            'id': self.id, 'cliente_id': self.cliente_id,
-            'nombre': self.nombre, 'nombre_maquina': self.nombre_maquina or self.nombre,
-            'marca': self.marca, 'modelo': self.modelo,
-            'nickName': self.nickName, 'nro_serie': self.nro_serie,
-            'estado': self.estado,
+            'id': self.id,
+            'cliente_id': self.cliente_id,
+            'nombre': self.nombre,
+            'nombre_maquina': self.nombre_maquina or self.nombre,
+            'marca': self.marca,
+            'modelo': self.modelo,
+            'nickName': self.nickName,
+            'nro_serie': self.nro_serie,
+            'estado': self.estado or extra.get('estado', 'online'),
+            'tipo': extra.get('tipo', 'Eco-Solvente Gran Formato'),
+            'anchoMaximo': float(extra.get('anchoMaximo') or 1.6),
+            'habilitada': bool(extra.get('habilitada', True)),
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
         }

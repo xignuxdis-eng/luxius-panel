@@ -262,6 +262,30 @@ def delete_clientes(id: int):
     db.session.commit()
     return jsonify({'success': True})
 
+def _apply_maquina_fields(maquina, item):
+    if 'nombre' in item:
+        maquina.nombre = item['nombre']
+    if 'marca' in item:
+        maquina.marca = item['marca']
+    if 'modelo' in item:
+        maquina.modelo = item['modelo']
+    if 'estado' in item:
+        maquina.estado = item['estado']
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    extra = dict(maquina.extra or {})
+    if 'tipo' in item:
+        extra['tipo'] = item['tipo']
+    if 'anchoMaximo' in item:
+        extra['anchoMaximo'] = item['anchoMaximo']
+    if 'habilitada' in item:
+        extra['habilitada'] = item['habilitada']
+    if 'estado' in item:
+        extra['estado'] = item['estado']
+    
+    maquina.extra = extra
+    flag_modified(maquina, 'extra')
+
 # ================================================================
 # MAQUINAS — POST (Create / Upsert)
 # ================================================================
