@@ -5,28 +5,28 @@ from middleware.auth import operator_required
 from routes import tasks_bp
 
 
-ESTADOS_ACTIVOS = [
-    'RECIBIDO',
-    'recibido',
-    'borrador',
-    'en_progreso',
-    'EN_PROGRESO',
-    'PENDIENTE_RELEVAMIENTO',
-    'ORDEN_DE_TRABAJO',
+ESTADOS_EXCLUIDOS = [
+    'cancelado',
+    'anulado',
+    'eliminado',
+    'CANCELADO',
+    'ANULADO',
 ]
 
 
 def _presupuesto_to_dict(p):
     especs = p.especificaciones or {}
     dir_sugerida = p.cliente.direccion if p.cliente and p.cliente.direccion else especs.get('clienteDireccion') or especs.get('direccion') or ''
+    cliente_nombre = p.cliente.nombre if p.cliente else especs.get('clienteNombre') or p.descripcion or 'Cliente General'
     return {
         'id': str(p.id),
         'titulo': p.descripcion or 'Relevamiento en sitio',
         'descripcion': p.descripcion or 'Relevamiento en sitio',
         'estado': p.estado,
         'clienteId': p.cliente_id,
-        'clienteNombre': p.cliente.nombre if p.cliente else especs.get('clienteNombre', 'Cliente General'),
+        'clienteNombre': cliente_nombre,
         'clienteDireccion': dir_sugerida,
+        'coordenadas': especs.get('coordenadas'),
         'vendedorId': p.vendedor_id,
         'especificaciones': especs,
         'subtotal': float(p.subtotal or 0),
@@ -53,7 +53,7 @@ def _deep_merge(base, override):
             base[key] = value
 
 def _resolver_vendedor_id(user_id, rol):
-    if rol in ('administrador', 'principal', 'jefe_produccion', 'operario'):
+    if rol in ('administrador', 'principal', 'jefe_produccion', 'operario', 'tecnico'):
         return None
     vendedor = Vendedor.query.filter_by(usuario_id=user_id).first()
     if not vendedor:
@@ -64,13 +64,8 @@ def _resolver_vendedor_id(user_id, rol):
 @tasks_bp.get('')
 @operator_required
 def list_tasks():
-    vendedor_id = _resolver_vendedor_id(g.user_id, g.user_rol)
     query = Presupuesto.query.filter(Presupuesto.deleted_at.is_(None))
-
-    if vendedor_id and g.user_rol not in ('administrador', 'principal', 'jefe_produccion'):
-        query = query.filter(Presupuesto.vendedor_id == vendedor_id)
-
-    query = query.filter(Presupuesto.estado.in_(ESTADOS_ACTIVOS))
+    query = query.filter(Presupuesto.estado.notin_(ESTADOS_EXCLUIDOS))
     presupuestos = query.order_by(Presupuesto.updated_at.desc()).all()
 
     return jsonify([_presupuesto_to_dict(p) for p in presupuestos])
@@ -83,10 +78,6 @@ def get_task(presupuesto_id):
     presupuesto = _find_presupuesto(presupuesto_id)
     if not presupuesto or presupuesto.deleted_at:
         return jsonify({'error': 'Presupuesto no encontrado'}), 404
-
-    vendedor_id = _resolver_vendedor_id(g.user_id, g.user_rol)
-    if vendedor_id and presupuesto.vendedor_id != vendedor_id and g.user_rol not in ('administrador', 'principal', 'jefe_produccion'):
-        return jsonify({'error': 'No autorizado para ver este presupuesto'}), 403
 
     return jsonify(_presupuesto_to_dict(presupuesto))
 
@@ -106,10 +97,12 @@ def create_task():
     especs = data.get('especificaciones', {})
     if 'clienteDireccion' in data and not especs.get('clienteDireccion'):
         especs['clienteDireccion'] = data['clienteDireccion']
+    if 'clienteNombre' in data and not especs.get('clienteNombre'):
+        especs['clienteNombre'] = data['clienteNombre']
     if 'coordenadas' in data and not especs.get('coordenadas'):
         especs['coordenadas'] = data['coordenadas']
 
-    titulo = data.get('titulo') or data.get('descripcion') or 'Relevamiento en sitio'
+    titulo = data.get('titulo') or data.get('descripcion') or data.get('clienteNombre') or 'Relevamiento en sitio'
 
     presupuesto = Presupuesto(
         vendedor_id=vendedor_id,
@@ -137,10 +130,6 @@ def update_task(presupuesto_id):
     if not presupuesto or presupuesto.deleted_at:
         return jsonify({'error': 'Presupuesto no encontrado'}), 404
 
-    vendedor_id = _resolver_vendedor_id(g.user_id, g.user_rol)
-    if vendedor_id and presupuesto.vendedor_id != vendedor_id and g.user_rol not in ('administrador', 'principal', 'jefe_produccion'):
-        return jsonify({'error': 'No autorizado para modificar este presupuesto'}), 403
-
     data = request.get_json(force=True)
 
     if 'estado' in data:
@@ -157,6 +146,13 @@ def update_task(presupuesto_id):
         from sqlalchemy.orm.attributes import flag_modified
         current = presupuesto.especificaciones or {}
         current['clienteDireccion'] = data['clienteDireccion']
+        presupuesto.especificaciones = current
+        flag_modified(presupuesto, 'especificaciones')
+
+    if 'clienteNombre' in data:
+        from sqlalchemy.orm.attributes import flag_modified
+        current = presupuesto.especificaciones or {}
+        current['clienteNombre'] = data['clienteNombre']
         presupuesto.especificaciones = current
         flag_modified(presupuesto, 'especificaciones')
 

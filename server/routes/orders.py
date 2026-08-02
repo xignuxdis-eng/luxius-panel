@@ -52,19 +52,23 @@ ESTADO_TO_STATUS = {
 }
 
 STATUS_TO_ESTADO = {
-    'relevamiento': 'RECIBIDO',
-    'diseno':       'borrador',
-    'preorden':     'borrador',
-    'orden':        'ORDEN_DE_TRABAJO',
-    'impreso':      'impreso',
-    'post':         'post',
-    'completo':     'completo',
-    'entregado':    'entregado',
-    'finalizado':   'entregado',
-    'standby':      'standby',
-    'anulado':      'cancelado',
-    'rebotado':     'rebotado',
-    'eliminado':    'cancelado',
+    'relevamiento':     'RECIBIDO',
+    'RECIBIDO':         'RECIBIDO',
+    'recibido':         'RECIBIDO',
+    'diseno':           'borrador',
+    'borrador':         'borrador',
+    'preorden':         'borrador',
+    'orden':            'ORDEN_DE_TRABAJO',
+    'ORDEN_DE_TRABAJO': 'ORDEN_DE_TRABAJO',
+    'impreso':          'impreso',
+    'post':             'post',
+    'completo':         'completo',
+    'entregado':        'entregado',
+    'finalizado':       'entregado',
+    'standby':          'standby',
+    'anulado':          'cancelado',
+    'rebotado':         'rebotado',
+    'eliminado':        'cancelado',
 }
 
 
