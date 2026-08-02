@@ -6,7 +6,6 @@ interface GameProps {
     onGameOver: (score: number, level: number) => void
 }
 
-// 19x19 Maze Layout: 1=Wall, 0=Pellet, 2=PowerPellet, 3=Empty, 4=GhostHouse
 const MAZE = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
     [1,2,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,1],
@@ -36,7 +35,7 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const [score, setScore] = useState(0)
     const [lives, setLives] = useState(3)
-    const [level] = useState(1)
+    const [level, setLevel] = useState(1)
     const [isGameOver, setIsGameOver] = useState(false)
 
     useEffect(() => {
@@ -50,12 +49,27 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
         let localLives = 3
         let localLevel = 1
         let frightenedTimer = 0
+        let invulnerableTimer = 0
 
-        // Map state copy
-        const grid = MAZE.map(row => [...row])
+        // Map copy
+        let grid = MAZE.map(row => [...row])
+
+        const resetPositions = () => {
+            pacman.x = 9 * TILE_SIZE + TILE_SIZE / 2
+            pacman.y = 14 * TILE_SIZE + TILE_SIZE / 2
+            pacman.dx = 0
+            pacman.dy = 0
+            pacman.nextDx = 0
+            pacman.nextDy = 0
+
+            ghosts[0].x = 9 * TILE_SIZE + TILE_SIZE / 2; ghosts[0].y = 8 * TILE_SIZE + TILE_SIZE / 2; ghosts[0].dx = 2; ghosts[0].dy = 0
+            ghosts[1].x = 8 * TILE_SIZE + TILE_SIZE / 2; ghosts[1].y = 10 * TILE_SIZE + TILE_SIZE / 2; ghosts[1].dx = -2; ghosts[1].dy = 0
+            ghosts[2].x = 9 * TILE_SIZE + TILE_SIZE / 2; ghosts[2].y = 10 * TILE_SIZE + TILE_SIZE / 2; ghosts[2].dx = 0; ghosts[2].dy = -2
+            ghosts[3].x = 10 * TILE_SIZE + TILE_SIZE / 2; ghosts[3].y = 10 * TILE_SIZE + TILE_SIZE / 2; ghosts[3].dx = 2; ghosts[3].dy = 0
+        }
 
         // Player
-        let pacman = { x: 9 * TILE_SIZE + TILE_SIZE / 2, y: 14 * TILE_SIZE + TILE_SIZE / 2, dx: 0, dy: 0, nextDx: 0, nextDy: 0, radius: 9, mouthAngle: 0.2 }
+        let pacman = { x: 9 * TILE_SIZE + TILE_SIZE / 2, y: 14 * TILE_SIZE + TILE_SIZE / 2, dx: 0, dy: 0, nextDx: 0, nextDy: 0, radius: 9 }
 
         // Ghosts
         const ghosts = [
@@ -74,32 +88,39 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
 
         window.addEventListener('keydown', handleKeyDown)
 
-        const canMove = (x: number, y: number) => {
-            const tileX = Math.floor(x / TILE_SIZE)
-            const tileY = Math.floor(y / TILE_SIZE)
-            if (tileY < 0 || tileY >= grid.length || tileX < 0 || tileX >= grid[0].length) return false
-            return grid[tileY][tileX] !== 1
+        const canMove = (x: number, y: number, r: number = 8) => {
+            const points = [
+                { x: x - r, y: y - r },
+                { x: x + r, y: y - r },
+                { x: x - r, y: y + r },
+                { x: x + r, y: y + r }
+            ]
+            for (const p of points) {
+                const tx = Math.floor(p.x / TILE_SIZE)
+                const ty = Math.floor(p.y / TILE_SIZE)
+                if (ty < 0 || ty >= grid.length || tx < 0 || tx >= grid[0].length) continue
+                if (grid[ty][tx] === 1) return false
+            }
+            return true
         }
 
         const update = () => {
             if (isGameOver) return
 
+            if (invulnerableTimer > 0) invulnerableTimer--
+
             // Try change direction
             if (pacman.nextDx !== 0 || pacman.nextDy !== 0) {
-                const nextX = pacman.x + pacman.nextDx * 2
-                const nextY = pacman.y + pacman.nextDy * 2
-                if (canMove(nextX, nextY)) {
+                if (canMove(pacman.x + pacman.nextDx, pacman.y + pacman.nextDy, pacman.radius - 1)) {
                     pacman.dx = pacman.nextDx
                     pacman.dy = pacman.nextDy
                 }
             }
 
             // Move pacman
-            const newX = pacman.x + pacman.dx
-            const newY = pacman.y + pacman.dy
-            if (canMove(newX, newY)) {
-                pacman.x = newX
-                pacman.y = newY
+            if (canMove(pacman.x + pacman.dx, pacman.y + pacman.dy, pacman.radius - 1)) {
+                pacman.x += pacman.dx
+                pacman.y += pacman.dy
             }
 
             // Tunnel wraparound
@@ -122,21 +143,41 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
                 }
             }
 
+            // Check Stage Clear (All pellets eaten)
+            let pelletsLeft = 0
+            for (let r = 0; r < grid.length; r++) {
+                for (let c = 0; c < grid[r].length; c++) {
+                    if (grid[r][c] === 0 || grid[r][c] === 2) pelletsLeft++
+                }
+            }
+
+            if (pelletsLeft === 0) {
+                localLevel++
+                setLevel(localLevel)
+                localScore += 500
+                setScore(localScore)
+                grid = MAZE.map(row => [...row])
+                resetPositions()
+                invulnerableTimer = 60
+                return
+            }
+
             if (frightenedTimer > 0) frightenedTimer--
 
             // Update Ghosts
             ghosts.forEach(ghost => {
-                const nextX = ghost.x + ghost.dx
-                const nextY = ghost.y + ghost.dy
+                const gSpeed = frightenedTimer > 0 ? 1 : 2
+                const nextX = ghost.x + (ghost.dx > 0 ? gSpeed : ghost.dx < 0 ? -gSpeed : 0)
+                const nextY = ghost.y + (ghost.dy > 0 ? gSpeed : ghost.dy < 0 ? -gSpeed : 0)
 
-                if (!canMove(nextX, nextY) || Math.random() < 0.05) {
+                if (!canMove(nextX, nextY, 7) || Math.random() < 0.03) {
                     const dirs = [
                         { dx: 2, dy: 0 },
                         { dx: -2, dy: 0 },
                         { dx: 0, dy: 2 },
                         { dx: 0, dy: -2 }
                     ]
-                    const validDirs = dirs.filter(d => canMove(ghost.x + d.dx * 3, ghost.y + d.dy * 3))
+                    const validDirs = dirs.filter(d => canMove(ghost.x + d.dx * 3, ghost.y + d.dy * 3, 7))
                     if (validDirs.length > 0) {
                         const randomDir = validDirs[Math.floor(Math.random() * validDirs.length)]
                         ghost.dx = randomDir.dx
@@ -148,25 +189,24 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
                 }
 
                 // Collision with Pacman
-                const dist = Math.hypot(pacman.x - ghost.x, pacman.y - ghost.y)
-                if (dist < pacman.radius + 8) {
-                    if (frightenedTimer > 0) {
-                        // Eat ghost
-                        localScore += 200
-                        setScore(localScore)
-                        ghost.x = 9 * TILE_SIZE + TILE_SIZE / 2
-                        ghost.y = 9 * TILE_SIZE + TILE_SIZE / 2
-                    } else {
-                        // Pacman dies
-                        localLives--
-                        setLives(localLives)
-                        if (localLives <= 0) {
-                            setIsGameOver(true)
-                            onGameOver(localScore, localLevel)
+                if (invulnerableTimer <= 0) {
+                    const dist = Math.hypot(pacman.x - ghost.x, pacman.y - ghost.y)
+                    if (dist < pacman.radius + 7) {
+                        if (frightenedTimer > 0) {
+                            localScore += 200
+                            setScore(localScore)
+                            ghost.x = 9 * TILE_SIZE + TILE_SIZE / 2
+                            ghost.y = 9 * TILE_SIZE + TILE_SIZE / 2
                         } else {
-                            pacman.x = 9 * TILE_SIZE + TILE_SIZE / 2
-                            pacman.y = 14 * TILE_SIZE + TILE_SIZE / 2
-                            pacman.dx = 0; pacman.dy = 0
+                            localLives--
+                            setLives(localLives)
+                            invulnerableTimer = 90
+                            if (localLives <= 0) {
+                                setIsGameOver(true)
+                                onGameOver(localScore, localLevel)
+                            } else {
+                                resetPositions()
+                            }
                         }
                     }
                 }
@@ -200,23 +240,25 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
                 }
             }
 
-            // Draw Pacman
-            ctx.fillStyle = '#ffff00'
-            ctx.beginPath()
-            const angle = (Math.sin(Date.now() / 100) + 1) * 0.15
-            let rotation = 0
-            if (pacman.dx > 0) rotation = 0
-            if (pacman.dx < 0) rotation = Math.PI
-            if (pacman.dy > 0) rotation = Math.PI / 2
-            if (pacman.dy < 0) rotation = -Math.PI / 2
+            // Draw Pacman (Flashing if invulnerable)
+            if (invulnerableTimer === 0 || Math.floor(invulnerableTimer / 4) % 2 === 0) {
+                ctx.fillStyle = '#ffff00'
+                ctx.beginPath()
+                const angle = (Math.sin(Date.now() / 80) + 1) * 0.15
+                let rotation = 0
+                if (pacman.dx > 0) rotation = 0
+                if (pacman.dx < 0) rotation = Math.PI
+                if (pacman.dy > 0) rotation = Math.PI / 2
+                if (pacman.dy < 0) rotation = -Math.PI / 2
 
-            ctx.arc(pacman.x, pacman.y, pacman.radius, rotation + angle, rotation + Math.PI * 2 - angle)
-            ctx.lineTo(pacman.x, pacman.y)
-            ctx.fill()
+                ctx.arc(pacman.x, pacman.y, pacman.radius, rotation + angle, rotation + Math.PI * 2 - angle)
+                ctx.lineTo(pacman.x, pacman.y)
+                ctx.fill()
+            }
 
             // Draw Ghosts
             ghosts.forEach(ghost => {
-                ctx.fillStyle = frightenedTimer > 0 ? '#0000ff' : ghost.color
+                ctx.fillStyle = frightenedTimer > 0 ? (frightenedTimer < 60 && Math.floor(frightenedTimer / 6) % 2 === 0 ? '#ffffff' : '#0000ff') : ghost.color
                 ctx.beginPath()
                 ctx.arc(ghost.x, ghost.y - 2, 8, Math.PI, 0, false)
                 ctx.lineTo(ghost.x + 8, ghost.y + 8)
@@ -224,7 +266,6 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
                 ctx.closePath()
                 ctx.fill()
 
-                // Ghost eyes
                 ctx.fillStyle = '#fff'
                 ctx.beginPath()
                 ctx.arc(ghost.x - 3, ghost.y - 3, 2.5, 0, Math.PI * 2)
