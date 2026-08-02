@@ -772,9 +772,60 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         let val = raw.includes('/') ? (parseFloat(raw.split('/')[0]) / parseFloat(raw.split('/')[1])) : parseFloat(raw);
                         dpi = Math.round(val < 100 ? val * 2.54 : val);
                     }
-                    if (fullText.includes('ColorMode>3')) colorMode = 'RGB';
-                    else if (fullText.includes('ColorMode>4')) colorMode = 'CMYK';
+                    if (fullText.includes('ColorMode>3') || fullText.includes('/DeviceRGB')) colorMode = 'RGB';
+                    else if (fullText.includes('ColorMode>4') || fullText.includes('/DeviceCMYK')) colorMode = 'CMYK';
                 } catch (e) { }
+
+                // 2b. PDFJS Image Object & Viewport Effective DPI calculation
+                try {
+                    await workerReady;
+                    const pdfJsDoc = await Promise.race([
+                        pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise,
+                        new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 5000))
+                    ]);
+                    if (pdfJsDoc) {
+                        const pdfPage = await pdfJsDoc.getPage(Math.min(pageNum, pdfJsDoc.numPages));
+                        const viewport = pdfPage.getViewport({ scale: 1.0 });
+
+                        let detectedDpi = 0;
+                        const ops = await pdfPage.getOperatorList();
+                        for (let k = 0; k < ops.fnArray.length; k++) {
+                            const fn = ops.fnArray[k];
+                            if (
+                                fn === pdfjsLib.OPS.paintImageXObject ||
+                                fn === pdfjsLib.OPS.paintInlineImageXObject ||
+                                fn === pdfjsLib.OPS.paintImageXObjectRepeat
+                            ) {
+                                const imgName = ops.argsArray[k][0];
+                                try {
+                                    let imgObj = null;
+                                    if (pdfPage.objs.has(imgName)) imgObj = pdfPage.objs.get(imgName);
+                                    else if (pdfPage.commonObjs.has(imgName)) imgObj = pdfPage.commonObjs.get(imgName);
+
+                                    if (imgObj && imgObj.width && imgObj.height) {
+                                        const pageWidthInches = viewport.width / 72;
+                                        const pageHeightInches = viewport.height / 72;
+                                        const dpiX = Math.round(imgObj.width / pageWidthInches);
+                                        const dpiY = Math.round(imgObj.height / pageHeightInches);
+                                        const calcDpi = Math.max(dpiX, dpiY);
+                                        if (calcDpi > detectedDpi) detectedDpi = calcDpi;
+                                    }
+                                } catch (e) { }
+                            }
+                        }
+
+                        if (detectedDpi > 0) {
+                            dpi = detectedDpi;
+                            console.log(`[Luxius-Meta] DPI de imagen incrustada en PDF detectado: ${dpi} DPI`);
+                        } else if (dpi === 72) {
+                            dpi = 300;
+                            console.log(`[Luxius-Meta] PDF Vectorial detectado -> Asignando 300 DPI por defecto para imprenta`);
+                        }
+                    }
+                } catch (pdfJsErr) {
+                    console.warn("[Luxius-Meta] Cálculo de DPI con PDFJS omitido/timeout, manteniendo fallback", pdfJsErr);
+                    if (dpi === 72) dpi = 300;
+                }
 
                 // 3. Page Thumbnail (Lazy call)
                 try {
