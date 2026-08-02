@@ -134,13 +134,14 @@ export const StationModal: React.FC<StationModalProps> = ({
                             border: '1px solid #ffffff',
                             color: '#ffffff',
                             fontWeight: 'bold',
-                            fontSize: '11px',
+                            fontSize: '12px',
                             padding: '4px 8px',
                             cursor: 'pointer',
-                            borderRadius: '4px'
+                            borderRadius: '4px',
+                            lineHeight: 1
                         }}
                     >
-                        ✖ X
+                        ✖
                     </button>
                 </div>
 
