@@ -796,26 +796,45 @@ const DEFAULT_USUARIOS: Usuario[] = [
         clientId: 826300,
         habilitado: true,
         password: "cliente123"
+    },
+    {
+        id: 830011,
+        nombre: "Carlos Flores",
+        username: "carlos",
+        email: "carlos@luxius.com",
+        rol: "impresion",
+        role: "impresion",
+        habilitado: true,
+        password: "carlos123"
     }
 ];
 
 export function getUsuarios(): Usuario[] {
-    const versionKey = 'luxius_db_users_v6';
-    if (localStorage.getItem(versionKey) !== 'v6') {
-        localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(DEFAULT_USUARIOS));
-        localStorage.setItem(versionKey, 'v6');
-        return DEFAULT_USUARIOS;
-    }
-
-    const sessionItemsJson = localStorage.getItem(SESSION_USUARIOS_KEY)
+    const versionKey = 'luxius_db_users_v7';
+    const sessionItemsJson = localStorage.getItem(SESSION_USUARIOS_KEY);
+    let sessionItems: Usuario[] = [];
 
     if (sessionItemsJson) {
         try {
-            const parsed = JSON.parse(sessionItemsJson) as Usuario[];
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed;
-            }
+            sessionItems = JSON.parse(sessionItemsJson) as Usuario[];
         } catch (e) { }
+    }
+
+    if (localStorage.getItem(versionKey) !== 'v7') {
+        const sessionIds = new Set(sessionItems.map(u => u.id));
+        const sessionUsernames = new Set(sessionItems.map(u => (u.username || '').toLowerCase()));
+
+        for (const defUser of DEFAULT_USUARIOS) {
+            if (!sessionIds.has(defUser.id) && !sessionUsernames.has((defUser.username || '').toLowerCase())) {
+                sessionItems.push(defUser);
+            }
+        }
+        localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
+        localStorage.setItem(versionKey, 'v7');
+    }
+
+    if (sessionItems.length > 0) {
+        return sessionItems;
     }
 
     localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(DEFAULT_USUARIOS));

@@ -95,29 +95,7 @@ export default function Login() {
                         </button>
                     </form>
 
-                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '2px dashed rgba(255,255,255,0.15)' }}>
-                        <p style={{ fontSize: '11px', color: 'var(--pixel-gold-coin)', textAlign: 'center', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            ⚡ Acceso Rápido Demo
-                        </p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                            <button
-                                type="button"
-                                className="pixel-btn pixel-btn-primary"
-                                onClick={() => onSubmit({ username: 'sistema', password: 'sistema123' })}
-                                style={{ fontSize: '10px', padding: '8px 4px' }}
-                            >
-                                👑 Admin
-                            </button>
-                            <button
-                                type="button"
-                                className="pixel-btn pixel-btn-warning"
-                                onClick={() => onSubmit({ username: 'impresion', password: 'impresion123' })}
-                                style={{ fontSize: '10px', padding: '8px 4px' }}
-                            >
-                                🖨️ Impresión
-                            </button>
-                        </div>
-                    </div>
+
 
                     <div className="login-footer">
                         <p>Sistema de Gestión de Impresión</p>
