@@ -1,0 +1,18 @@
+
+> luxius-panel@0.0.1 build
+> vite build
+
+[36mvite v4.5.14 [32mbuilding for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 1728 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.59 kB[22m[1m[22m[2m Γöé gzip:   0.38 kB[22m
+[2mdist/[22m[35massets/index-f68ab6c5.css  [39m[1m[2m 40.52 kB[22m[1m[22m[2m Γöé gzip:   6.90 kB[22m
+[2mdist/[22m[36massets/index-08056e38.js   [39m[1m[33m574.81 kB[39m[22m[2m Γöé gzip: 132.59 kB[22m
+
+(!) Some chunks are larger than 500 kBs after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[32mΓ£ô built in 4.32s[39m

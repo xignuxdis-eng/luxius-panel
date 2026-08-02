@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test EXIFr</title>
+    <script src="https://unpkg.com/exifr@7.1.3/dist/exifr.min.js"></script>
+</head>
+<body>
+    <h1>Test EXIFr</h1>
+    <input type="file" id="fileInput" accept="image/*">
+    <div id="output"></div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>Analizando archivo...</p>';
+
+            try {
+                // Probar exifr
+                const exifData = await exifr.parse(file, ['XResolution', 'YResolution', 'ResolutionUnit']);
+                console.log('EXIF data:', exifData);
+                
+                output.innerHTML = `
+                    <h3>Resultados EXIFr:</h3>
+                    <pre>${JSON.stringify(exifData, null, 2)}</pre>
+                    <p>DPI encontrado: ${exifData?.XResolution || exifData?.YResolution || 'No encontrado'}</p>
+                `;
+            } catch (error) {
+                output.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html> 

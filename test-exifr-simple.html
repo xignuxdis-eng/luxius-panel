@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test EXIFR Simple</title>
+    <script src="https://unpkg.com/exifr@7.1.3/dist/lite.umd.js"></script>
+</head>
+<body>
+    <h1>Test EXIFR Simple</h1>
+    <input type="file" id="fileInput" accept="image/*">
+    <div id="results"></div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Analizando archivo...</p>';
+
+            try {
+                // Probar exifr
+                const exifData = await exifr.parse(file, ['XResolution', 'YResolution', 'ResolutionUnit']);
+                console.log('EXIF data:', exifData);
+
+                // Crear imagen para obtener dimensiones
+                const img = document.createElement('img');
+                const url = URL.createObjectURL(file);
+                
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = url;
+                });
+
+                const dimensions = {
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                };
+
+                // Calcular heurísticas
+                const fileSizeMB = file.size / (1024 * 1024);
+                const totalPixels = dimensions.width * dimensions.height;
+                const pixelsPerMB = totalPixels / fileSizeMB;
+
+                let dpi = null;
+                let source = 'none';
+
+                // Método 1: EXIF
+                if (exifData && (exifData.XResolution || exifData.YResolution)) {
+                    dpi = exifData.XResolution || exifData.YResolution;
+                    source = 'exif';
+                }
+                // Método 2: Heurísticas
+                else if (pixelsPerMB > 600000) {
+                    dpi = 300;
+                    source = 'heuristics_high';
+                } else if (pixelsPerMB > 300000) {
+                    dpi = 150;
+                    source = 'heuristics_medium';
+                } else if (pixelsPerMB > 80000) {
+                    dpi = 96;
+                    source = 'heuristics_web';
+                } else {
+                    dpi = 72;
+                    source = 'heuristics_low';
+                }
+
+                // Calcular tamaño físico
+                const widthCm = (dimensions.width / dpi) * 2.54;
+                const heightCm = (dimensions.height / dpi) * 2.54;
+
+                results.innerHTML = `
+                    <h3>Resultados del análisis:</h3>
+                    <p><strong>Archivo:</strong> ${file.name}</p>
+                    <p><strong>Tamaño:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>Dimensiones:</strong> ${dimensions.width} × ${dimensions.height} px</p>
+                    <p><strong>Píxeles por MB:</strong> ${Math.round(pixelsPerMB)}</p>
+                    <p><strong>DPI detectado:</strong> ${dpi} (fuente: ${source})</p>
+                    <p><strong>Tamaño físico calculado:</strong> ${widthCm.toFixed(1)} × ${heightCm.toFixed(1)} cm</p>
+                    <p><strong>EXIF data:</strong> ${JSON.stringify(exifData, null, 2)}</p>
+                `;
+
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                results.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html> 
