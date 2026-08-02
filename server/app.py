@@ -52,10 +52,38 @@ with app.app_context():
                     db.session.add(v)
                     db.session.commit()
 
+    def _seed_default_clientes():
+        try:
+            import os
+            json_file = os.path.join(os.path.dirname(__file__), 'data', 'clientes.json')
+            if os.path.exists(json_file):
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                for item in data:
+                    cid = item.get('id')
+                    if not cid:
+                        continue
+                    existing = db.session.get(Cliente, cid)
+                    if not existing:
+                        c = Cliente(
+                            id=cid,
+                            nombre=item.get('nombre', ''),
+                            empresa=item.get('empresa', ''),
+                            direccion=item.get('direccion', ''),
+                            categoria=item.get('categoria', 'Consumidor Final'),
+                            responsable=item.get('responsable', 'Mostrador'),
+                            username=item.get('username', '')
+                        )
+                        db.session.add(c)
+                db.session.commit()
+        except Exception as e:
+            print(f"[Seed] Error seeding clientes: {e}")
+
     try:
         _seed_default_users()
+        _seed_default_clientes()
     except Exception as e:
-        print(f"[Seed] Error seeding users: {e}")
+        print(f"[Seed] Error seeding: {e}")
 
 
 def _apply_usuario_fields(user, item):

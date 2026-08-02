@@ -276,10 +276,7 @@ export function getClientes(): Cliente[] {
         try {
             const list = JSON.parse(sessionItemsJson) as Cliente[];
             if (Array.isArray(list)) {
-                return list.filter(c => {
-                    const str = JSON.stringify(c).toUpperCase();
-                    return !str.includes('IMPRIMA') && !str.includes('ZACCO');
-                });
+                return list;
             }
         } catch (e) { }
     }
