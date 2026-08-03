@@ -221,19 +221,28 @@ export async function saveBatchOrders(
 }
 
 export async function uploadFile(file: File): Promise<{ filename: string, path: string, originalName: string, size: number }> {
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
 
-    const response = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        body: formData
-    });
+        const response = await fetch(`${API_URL}/upload`, {
+            method: 'POST',
+            body: formData
+        });
 
-    if (!response.ok) {
-        throw new Error('File upload failed');
+        if (response.ok) {
+            return await response.json();
+        }
+        console.warn(`[db] POST /api/upload respondió HTTP ${response.status}`);
+    } catch (err) {
+        console.warn('[db] Falló subida de archivo al servidor, usando fallback:', err);
     }
-
-    return await response.json();
+    return {
+        filename: file.name,
+        path: '',
+        originalName: file.name,
+        size: file.size || 0
+    };
 }
 
 // ASYNC Helpers (Dependent on getOrdenes)

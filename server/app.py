@@ -8,7 +8,12 @@ from routes.auth import auth_bp
 from routes.operators import operators_bp
 from routes.tasks import tasks_bp
 from routes.orders import orders_bp
-import io, json
+import io, json, os
+from werkzeug.utils import secure_filename
+from flask import send_from_directory
+
+UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -19,6 +24,35 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(operators_bp)
 app.register_blueprint(tasks_bp)
 app.register_blueprint(orders_bp)
+
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    return send_from_directory(UPLOADS_DIR, filename)
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file_endpoint():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    original_name = file.filename
+    ext = os.path.splitext(original_name)[1]
+    unique_filename = f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{secure_filename(original_name)}"
+    if ext and not unique_filename.lower().endswith(ext.lower()):
+        unique_filename += ext
+
+    file_path = os.path.join(UPLOADS_DIR, unique_filename)
+    file.save(file_path)
+    file_size = os.path.getsize(file_path)
+
+    return jsonify({
+        'filename': unique_filename,
+        'path': f'/uploads/{unique_filename}',
+        'originalName': original_name,
+        'size': file_size
+    }), 200
 
 with app.app_context():
     db.create_all()

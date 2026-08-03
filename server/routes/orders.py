@@ -241,6 +241,8 @@ def _apply_order_to_presupuesto(p, data):
 
     if 'observaciones' in data:
         p.descripcion = data['observaciones']
+    elif 'nombreTarea' in data and not p.descripcion:
+        p.descripcion = data['nombreTarea']
 
     if 'comments' in data:
         p.notas = data['comments']
@@ -251,11 +253,23 @@ def _apply_order_to_presupuesto(p, data):
     if 'subtotal' in data:
         p.subtotal = data['subtotal']
 
-    if 'clientId' in data and data['clientId']:
-        p.cliente_id = data['clientId']
+    cid = data.get('clientId') or data.get('clienteId')
+    if cid:
+        try:
+            cid_int = int(cid)
+            if cid_int > 0 and db.session.get(Cliente, cid_int):
+                p.cliente_id = cid_int
+        except (ValueError, TypeError):
+            pass
 
-    if 'vendedorId' in data:
-        p.vendedor_id = data['vendedorId']
+    vid = data.get('vendedorId') or data.get('vendedor_id')
+    if vid:
+        try:
+            vid_int = int(vid)
+            if vid_int > 0 and db.session.get(Vendedor, vid_int):
+                p.vendedor_id = vid_int
+        except (ValueError, TypeError):
+            pass
 
     if 'fechaEntrega' in data and data['fechaEntrega']:
         try:
@@ -263,7 +277,20 @@ def _apply_order_to_presupuesto(p, data):
                 data['fechaEntrega'], '%d/%m/%Y'
             ).date()
         except (ValueError, TypeError):
-            pass
+            try:
+                p.fecha_entrega_estimada = datetime.strptime(
+                    data['fechaEntrega'], '%Y-%m-%d'
+                ).date()
+            except (ValueError, TypeError):
+                pass
+
+    from sqlalchemy.orm.attributes import flag_modified
+    current_especs = p.especificaciones or {}
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig'):
+        if k in data:
+            current_especs[k] = data[k]
+    p.especificaciones = current_especs
+    flag_modified(p, 'especificaciones')
 
     p.updated_at = datetime.now(timezone.utc)
 
@@ -319,29 +346,67 @@ def create_order():
         db.session.commit()
         return jsonify(_presupuesto_to_order(p)), 200
 
+    # Validar vendedor_id
+    vendedor_id = data.get('vendedorId') or data.get('vendedor_id')
+    if vendedor_id:
+        try:
+            vendedor_id = int(vendedor_id)
+            if not db.session.get(Vendedor, vendedor_id):
+                v = Vendedor.query.first()
+                vendedor_id = v.id if v else 1
+        except (ValueError, TypeError):
+            v = Vendedor.query.first()
+            vendedor_id = v.id if v else 1
+    else:
+        v = Vendedor.query.first()
+        vendedor_id = v.id if v else 1
+
+    # Validar cliente_id
+    cliente_id = data.get('clientId') or data.get('clienteId')
+    if cliente_id:
+        try:
+            cliente_id = int(cliente_id)
+            if cliente_id <= 0 or not db.session.get(Cliente, cliente_id):
+                cliente_id = None
+        except (ValueError, TypeError):
+            cliente_id = None
+    else:
+        cliente_id = None
+
+    desc = data.get('observaciones') or data.get('nombreTarea') or data.get('titulo') or 'Nuevo Pedido'
+
     p = Presupuesto(
-        vendedor_id=data.get('vendedorId', 1),  # Soporta vendedorId enviado del FE, fallback a 1
-        cliente_id=data.get('clientId'),
+        vendedor_id=vendedor_id,
+        cliente_id=cliente_id,
         estado=STATUS_TO_ESTADO.get(data.get('status', 'preorden'), 'borrador'),
-        descripcion=data.get('observaciones', ''),
+        descripcion=desc,
         notas=data.get('comments', ''),
         subtotal=data.get('subtotal', 0),
         total=data.get('total', 0),
-        origen='web',
+        origen=data.get('origen', 'web'),
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
 
+    especs = data.get('especificaciones') or {}
     if data.get('material') or data.get('alto') or data.get('ancho'):
-        p.especificaciones = {
-            'carteles': [{
-                'tipo': data.get('material', ''),
-                'medidas': {
-                    'ancho': data.get('ancho', 0),
-                    'alto': data.get('alto', 0),
-                },
-            }],
-        }
+        carteles = especs.get('carteles') or [{
+            'tipo': data.get('material', ''),
+            'medidas': {
+                'ancho': data.get('ancho', 0),
+                'alto': data.get('alto', 0),
+            },
+            'copias': data.get('copias', 1),
+            'servicios': data.get('servicios', {}),
+            'demasiasConfig': data.get('demasiasConfig', {})
+        }]
+        especs['carteles'] = carteles
+
+    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig'):
+        if k in data:
+            especs[k] = data[k]
+
+    p.especificaciones = especs
 
     db.session.add(p)
     db.session.commit()
