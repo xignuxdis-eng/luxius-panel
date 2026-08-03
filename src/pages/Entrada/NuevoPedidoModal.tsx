@@ -74,6 +74,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [saving, setSaving] = useState(false)
     const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0, errorCount: 0 })
     const [vendedores, setVendedores] = useState<any[]>([])
+    const [uploadProgress, setUploadProgress] = useState<{ percent: number; loaded: string; total: string; fileName: string } | null>(null);
 
     // REF for async access to latest batch state
     const batchItemsRef = useRef(batchItems);
@@ -1269,7 +1270,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             let remoteFileName = item.fileName;
                             if (item.file && item.file.size > 0) {
                                 try {
-                                    const uploadRes = await uploadFile(item.file);
+                                    const uploadRes = await uploadFile(item.file, (percent, loaded, total) => {
+                                        setUploadProgress({
+                                            percent,
+                                            loaded: (loaded / (1024 * 1024)).toFixed(1),
+                                            total: (total / (1024 * 1024)).toFixed(1),
+                                            fileName: item.fileName
+                                        });
+                                    });
                                     remoteFileName = uploadRes.filename;
                                 } catch (uErr) {
                                     console.error(`[Luxius-Save] Upload falló para ${item.fileName}`, uErr)
@@ -1344,7 +1352,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     let finalArchivosOriginales = order?.archivosOriginales || [];
 
                     if (selectedFile) {
-                        const uploadRes = await uploadFile(selectedFile);
+                        const uploadRes = await uploadFile(selectedFile, (percent, loaded, total) => {
+                            setUploadProgress({
+                                percent,
+                                loaded: (loaded / (1024 * 1024)).toFixed(1),
+                                total: (total / (1024 * 1024)).toFixed(1),
+                                fileName: selectedFile.name
+                            });
+                        });
                         finalArchivos = [uploadRes.filename];
                         finalArchivosOriginales = [uploadRes.originalName];
                     }
@@ -1849,7 +1864,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 </form>
             </Modal>
 
-            {/* Robust Saving Overlay */}
+            {/* Visual Progress & Saving Overlay */}
             {saving && (
                 <div className="saving-overlay" style={{
                     position: 'fixed',
@@ -1857,46 +1872,75 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.85)',
+                    background: 'rgba(10, 10, 18, 0.88)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 9999,
-                    backdropFilter: 'blur(5px)'
+                    backdropFilter: 'blur(8px)'
                 }}>
                     <div style={{
-                        border: '4px solid rgba(255,255,255,0.1)',
-                        borderTop: '4px solid var(--accent)',
-                        borderRadius: '50%',
-                        width: '60px',
-                        height: '60px',
-                        animation: 'spin 1s linear infinite',
-                        marginBottom: '20px'
-                    }}></div>
-                    <h2 style={{ color: '#fff', marginBottom: '10px' }}>Guardando Pedido...</h2>
-                    <div style={{ color: 'var(--accent)', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                        {saveProgress.current} / {saveProgress.total}
-                    </div>
-                    {saveProgress.errorCount > 0 && (
-                        <div style={{ color: '#ef4444', marginTop: '10px', fontSize: '0.9rem' }}>
-                            ⚠️ {saveProgress.errorCount} errores detectados
-                        </div>
-                    )}
-                    <div style={{
-                        width: '200px',
-                        height: '6px',
-                        background: 'rgba(255,255,255,0.1)',
-                        borderRadius: '10px',
-                        marginTop: '20px',
-                        overflow: 'hidden'
+                        background: 'rgba(30, 30, 45, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '20px',
+                        padding: '30px 40px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        maxWidth: '480px',
+                        width: '90%',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
                     }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🚀</div>
+                        <h2 style={{ color: '#fff', margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 800 }}>
+                            {uploadProgress ? 'Subiendo Archivo al Servidor...' : 'Procesando Pedido...'}
+                        </h2>
+
+                        {uploadProgress && (
+                            <p style={{ color: 'var(--text-muted, #aaa)', fontSize: '0.9rem', margin: '0 0 20px 0', textAlign: 'center', wordBreak: 'break-all' }}>
+                                📄 {uploadProgress.fileName}
+                            </p>
+                        )}
+
+                        {/* Progress Bar Container */}
                         <div style={{
-                            width: `${(saveProgress.current / (saveProgress.total || 1)) * 100}%`,
-                            height: '100%',
-                            background: 'var(--accent)',
-                            transition: 'width 0.3s ease'
-                        }}></div>
+                            width: '100%',
+                            height: '14px',
+                            background: 'rgba(255,255,255,0.08)',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            position: 'relative',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            marginBottom: '15px'
+                        }}>
+                            <div style={{
+                                width: `${uploadProgress ? uploadProgress.percent : Math.min(100, Math.round((saveProgress.current / (saveProgress.total || 1)) * 100))}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #2563eb, #7c3aed, #ec4899)',
+                                borderRadius: '10px',
+                                transition: 'width 0.2s ease-out',
+                                boxShadow: '0 0 15px rgba(124, 58, 237, 0.6)'
+                            }}></div>
+                        </div>
+
+                        {/* Percentage and Bytes Info */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', color: '#fff', fontWeight: 700, fontSize: '0.95rem' }}>
+                            <span style={{ color: '#60a5fa' }}>
+                                {uploadProgress ? `${uploadProgress.percent}%` : `${saveProgress.current} de ${saveProgress.total} ítems`}
+                            </span>
+                            {uploadProgress && (
+                                <span style={{ color: 'var(--text-muted, #aaa)', fontWeight: 500 }}>
+                                    {uploadProgress.loaded} MB de {uploadProgress.total} MB
+                                </span>
+                            )}
+                        </div>
+
+                        {saveProgress.errorCount > 0 && (
+                            <div style={{ color: '#ef4444', marginTop: '15px', fontSize: '0.85rem' }}>
+                                ⚠️ {saveProgress.errorCount} error(es) detectado(s)
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

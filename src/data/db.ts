@@ -271,24 +271,50 @@ export async function saveBatchOrders(
     return { success: true, count: ids.length };
 }
 
-export async function uploadFile(file: File): Promise<{ filename: string, path: string, originalName: string, size: number }> {
+export async function uploadFile(
+    file: File,
+    onProgress?: (percent: number, loaded: number, total: number) => void
+): Promise<{ filename: string, path: string, originalName: string, size: number }> {
     try {
         const formData = new FormData();
         formData.append('file', file);
 
-        // 60 seconds timeout for large EPS/PDF files up to 100MB
-        const response = await fetchWithTimeout(`${API_URL}/upload`, {
-            method: 'POST',
-            body: formData
-        }, 60000);
+        const uploadResult = await new Promise<{ filename: string, path: string, originalName: string, size: number }>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${API_URL}/upload`, true);
+            xhr.timeout = 60000; // 60 seconds
 
-        if (response.ok) {
-            const data = await response.json();
-            return data;
-        }
-        console.warn(`[db] POST /api/upload respondió HTTP ${response.status}`);
+            if (xhr.upload && onProgress) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable && e.total > 0) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        onProgress(percent, e.loaded, e.total);
+                    }
+                };
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const res = JSON.parse(xhr.responseText);
+                        resolve(res);
+                    } catch (e) {
+                        reject(new Error('Invalid JSON response'));
+                    }
+                } else {
+                    reject(new Error(`HTTP ${xhr.status}`));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.ontimeout = () => reject(new Error('Upload timeout'));
+
+            xhr.send(formData);
+        });
+
+        if (uploadResult) return uploadResult;
     } catch (err) {
-        console.warn('[db] Falló subida de archivo al servidor, creando respaldo local:', err);
+        console.warn('[db] Falló subida de archivo con XHR, intentando respaldo local:', err);
     }
 
     // Only store dataURL for small files < 2MB to avoid localStorage QuotaExceededError
