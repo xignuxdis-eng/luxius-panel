@@ -16,7 +16,9 @@ import { INITIAL_CLIENTES } from './initialClientes'
 const isDev = window.location.port === "3005" || window.location.port === "5173";
 export const API_URL = isDev
     ? `http://${window.location.hostname}:5000/api`
-    : '/api';
+    : (typeof window !== 'undefined' && window.location.hostname.includes('github.io')
+        ? 'https://luxius-backend.onrender.com/api'
+        : '/api');
 
 const COLLECTIONS_CONFIG = [
     { key: 'luxius_session_clientes', endpoint: 'clientes' },
