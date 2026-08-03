@@ -197,7 +197,21 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     } else {
         localOrders.unshift(newOrder);
     }
-    localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+    
+    try {
+        localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+    } catch (e) {
+        console.warn('[db] QuotaExceededError en localStorage. Sanitizando DataURLs pesados:', e);
+        const sanitized = localOrders.map(o => ({
+            ...o,
+            archivos: (o.archivos || []).map((f, i) => f.startsWith('data:') && f.length > 50000 ? (o.archivosOriginales?.[i] || 'archivo.eps') : f)
+        }));
+        try {
+            localStorage.setItem('luxius_session_ordenes', JSON.stringify(sanitized));
+        } catch (e2) {
+            console.error('[db] Error crítico en localStorage setItem:', e2);
+        }
+    }
 
     try {
         const method = order.id ? 'PUT' : 'POST';
@@ -262,10 +276,11 @@ export async function uploadFile(file: File): Promise<{ filename: string, path: 
         const formData = new FormData();
         formData.append('file', file);
 
+        // 60 seconds timeout for large EPS/PDF files up to 100MB
         const response = await fetchWithTimeout(`${API_URL}/upload`, {
             method: 'POST',
             body: formData
-        }, 30000);
+        }, 60000);
 
         if (response.ok) {
             const data = await response.json();
@@ -276,7 +291,8 @@ export async function uploadFile(file: File): Promise<{ filename: string, path: 
         console.warn('[db] Falló subida de archivo al servidor, creando respaldo local:', err);
     }
 
-    if (file && file.size < 15 * 1024 * 1024) {
+    // Only store dataURL for small files < 2MB to avoid localStorage QuotaExceededError
+    if (file && file.size < 2 * 1024 * 1024) {
         try {
             const dataUrl = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();

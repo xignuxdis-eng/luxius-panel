@@ -17,6 +17,7 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB limit
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 db.init_app(app)
 app.register_blueprint(sync_bp)
