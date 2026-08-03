@@ -141,37 +141,83 @@ export async function refreshCollection(endpoint: string) {
 
 
 export async function getOrdenes(): Promise<Order[]> {
+    const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
+    let localOrders: Order[] = [];
+    try { localOrders = JSON.parse(localOrdersJson); } catch (e) { }
+
     try {
-        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 800);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 3000);
+        if (response.ok) {
+            const apiOrders = await response.json();
+            if (Array.isArray(apiOrders)) {
+                const apiIds = new Set(apiOrders.map((o: any) => o.id));
+                const uniqueLocal = localOrders.filter(o => !apiIds.has(o.id));
+                const merged = [...apiOrders, ...uniqueLocal];
+                localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
+                return merged;
+            }
+        }
     } catch (error) {
-        return [];
+        console.warn('[db] Falló la obtención de órdenes remotas, usando locales:', error);
     }
+    return localOrders;
 }
 
 
 export async function saveOrden(order: Partial<Order>): Promise<Order> {
+    const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
+    let localOrders: Order[] = [];
+    try { localOrders = JSON.parse(localOrdersJson); } catch (e) { }
+
+    const now = new Date();
+    const formattedId = order.id || (Math.floor(Math.random() * 900000) + 100000);
+    const newOrder: Order = {
+        id: Number(formattedId),
+        ot: order.ot || `OT-${formattedId}`,
+        clientId: Number(order.clientId) || 1,
+        clienteNombre: order.clienteNombre || 'Cliente',
+        material: order.material || 'Lona Front',
+        calidad: order.calidad || 'Standard',
+        ancho: Number(order.ancho) || 1.0,
+        alto: Number(order.alto) || 1.0,
+        copias: Number(order.copias) || 1,
+        subtotal: Number(order.subtotal) || 0,
+        status: (order.status || 'orden') as any,
+        category: (order.category || 'impresion') as any,
+        archivos: order.archivos || [],
+        archivosOriginales: order.archivosOriginales || [],
+        fechaCreacion: order.fechaCreacion || now.toISOString(),
+        fechaEntrega: order.fechaEntrega || now.toISOString().split('T')[0],
+        ...order,
+    } as Order;
+
+    const idx = localOrders.findIndex(o => String(o.id) === String(newOrder.id));
+    if (idx >= 0) {
+        localOrders[idx] = { ...localOrders[idx], ...newOrder };
+    } else {
+        localOrders.unshift(newOrder);
+    }
+    localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+
     try {
         const method = order.id ? 'PUT' : 'POST';
         const url = order.id ? `${API_URL}/orders/${order.id}` : `${API_URL}/orders`;
 
-        const response = await fetch(url, {
+        const response = await fetchWithTimeout(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(order),
-        });
+            body: JSON.stringify(newOrder),
+        }, 5000);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server Error (${response.status}): ${errorText || response.statusText}`);
+        if (response.ok) {
+            const serverOrder = await response.json();
+            return serverOrder;
         }
-        return await response.json();
     } catch (error) {
-        console.error('Error saving order:', error);
-        throw error;
+        console.warn('[db] API saveOrden falló o timeout, la orden se conservará localmente:', error);
     }
+
+    return newOrder;
 }
 
 export async function deleteOrden(id: number | string): Promise<boolean> {
