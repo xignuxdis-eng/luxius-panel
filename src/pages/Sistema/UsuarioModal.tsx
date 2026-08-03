@@ -46,8 +46,8 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
         // Enforce lowercase roles and usernames as per requirements
         const cleanedData = {
             ...data,
-            username: data.username.toLowerCase(),
-            rol: data.rol.toLowerCase()
+            username: (data.username || '').toLowerCase(),
+            rol: (data.rol || 'vendedor').toLowerCase()
         }
         console.log('Saving user:', cleanedData)
         saveUsuario(cleanedData)

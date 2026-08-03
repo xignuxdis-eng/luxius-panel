@@ -31,3 +31,5 @@ luxius_backup_*.zip
 .idea/
 .DS_Store
 Thumbs.db
+
+CLOUDFLARE_R2_CREDENTIALS.txt
