@@ -25,18 +25,29 @@ export default function SharedFileViewerModal({
     if (!isOpen || !order) return null
 
     const isStandardized = (filename: string) => {
+        if (!filename) return true
         return filename.startsWith('data:') || filename.startsWith(`${order.id}_`)
     }
 
     const handleStandardize = async () => {
-        if (!onUpdate) return
+        if (!onUpdate || !order || !order.archivos) return
         setRenaming(true)
         try {
             const { saveOrden } = await import('@data/db')
-            await saveOrden({ ...order })
+            const updatedArchivos = order.archivos.map((file, i) => {
+                if (isStandardized(file)) return file
+                const origName = order.archivosOriginales?.[i] || file
+                const cleanName = origName.replace(/\s+/g, '_')
+                return `${order.id}_${cleanName}`
+            })
+
+            await saveOrden({
+                ...order,
+                archivos: updatedArchivos
+            })
             onUpdate()
         } catch (e) {
-            console.error(e)
+            console.error('Error al estandarizar nombres:', e)
             alert('Error al renombrar archivos.')
         } finally {
             setRenaming(false)

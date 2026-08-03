@@ -265,15 +265,36 @@ export async function uploadFile(file: File): Promise<{ filename: string, path: 
         const response = await fetchWithTimeout(`${API_URL}/upload`, {
             method: 'POST',
             body: formData
-        }, 4000);
+        }, 30000);
 
         if (response.ok) {
-            return await response.json();
+            const data = await response.json();
+            return data;
         }
         console.warn(`[db] POST /api/upload respondió HTTP ${response.status}`);
     } catch (err) {
-        console.warn('[db] Falló subida de archivo al servidor, usando fallback:', err);
+        console.warn('[db] Falló subida de archivo al servidor, creando respaldo local:', err);
     }
+
+    if (file && file.size < 15 * 1024 * 1024) {
+        try {
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            return {
+                filename: dataUrl,
+                path: dataUrl,
+                originalName: file.name,
+                size: file.size || 0
+            };
+        } catch (e) {
+            console.error('[db] Error convirtiendo archivo a DataURL:', e);
+        }
+    }
+
     return {
         filename: file.name,
         path: '',
