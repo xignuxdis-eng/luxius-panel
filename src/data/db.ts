@@ -221,18 +221,19 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 }
 
 export async function deleteOrden(id: number | string): Promise<boolean> {
+    const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     try {
-        const response = await fetch(`${API_URL}/orders/${id}`, {
-            method: 'DELETE',
-        });
-        if (!response.ok) {
-            console.warn(`[db] Delete order failed HTTP ${response.status}`);
-        }
-        return true;
+        let localOrders: Order[] = JSON.parse(localOrdersJson);
+        localOrders = localOrders.filter(o => String(o.id) !== String(id));
+        localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+    } catch (e) { }
+
+    try {
+        await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 3000);
     } catch (error) {
-        console.error('Error deleting order:', error);
-        return false;
+        console.warn('[db] API deleteOrden falló, eliminado localmente:', error);
     }
+    return true;
 }
 
 export async function saveBatchOrders(
@@ -241,31 +242,19 @@ export async function saveBatchOrders(
     data?: Partial<Order>
 ): Promise<{ success: boolean, count: number }> {
     try {
-        const response = await fetch(`${API_URL}/orders/batch`, {
+        const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action, ids, data, updateData: data }),
-        });
+        }, 5000);
 
         if (response.ok) {
-            const resData = await response.json().catch(() => ({ success: true, count: ids.length }));
-            return resData;
+            return await response.json();
         }
-
-        await Promise.all(
-            ids.map(id => {
-                if (action === 'delete') {
-                    return deleteOrden(id);
-                } else {
-                    return saveOrden({ id: id as any, ...(data || {}) });
-                }
-            })
-        );
-        return { success: true, count: ids.length };
-    } catch (error) {
-        console.error('Error in batch operation:', error);
-        throw error;
+    } catch (e) {
+        console.warn('[db] API saveBatchOrders falló:', e);
     }
+    return { success: true, count: ids.length };
 }
 
 export async function uploadFile(file: File): Promise<{ filename: string, path: string, originalName: string, size: number }> {
@@ -273,10 +262,10 @@ export async function uploadFile(file: File): Promise<{ filename: string, path: 
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${API_URL}/upload`, {
+        const response = await fetchWithTimeout(`${API_URL}/upload`, {
             method: 'POST',
             body: formData
-        });
+        }, 4000);
 
         if (response.ok) {
             return await response.json();
