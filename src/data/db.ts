@@ -274,75 +274,89 @@ export async function saveBatchOrders(
 export async function uploadFile(
     file: File,
     onProgress?: (percent: number, loaded: number, total: number) => void
-): Promise<{ filename: string, path: string, originalName: string, size: number }> {
+): Promise<{ filename: string, path: string, originalName: string, size: number, thumbnailUrl?: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Timeout dinámico: mínimo 120s, +30s por cada 10MB adicional, máximo 600s
+    const fileSizeMB = file.size / (1024 * 1024);
+    const timeoutMs = Math.min(600000, Math.max(120000, 120000 + Math.ceil(fileSizeMB / 10) * 30000));
+
+    // Get auth token
+    let authToken = '';
     try {
-        const formData = new FormData();
-        formData.append('file', file);
+        const stored = localStorage.getItem('luxius_auth');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            authToken = parsed?.state?.token || '';
+        }
+    } catch (_) { /* no-op */ }
 
-        const uploadResult = await new Promise<{ filename: string, path: string, originalName: string, size: number }>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${API_URL}/upload`, true);
-            xhr.timeout = 60000; // 60 seconds
+    console.log(`[Upload] Iniciando subida: ${file.name} (${fileSizeMB.toFixed(1)} MB) timeout: ${timeoutMs / 1000}s`);
 
-            if (xhr.upload && onProgress) {
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable && e.total > 0) {
-                        const percent = Math.round((e.loaded / e.total) * 100);
+    const uploadResult = await new Promise<{ filename: string, path: string, originalName: string, size: number, thumbnailUrl?: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_URL}/upload`, true);
+        xhr.timeout = timeoutMs;
+
+        // Auth header
+        if (authToken) {
+            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+        }
+
+        // Progress tracking
+        if (xhr.upload && onProgress) {
+            let lastReported = 0;
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && e.total > 0) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    // Debounce: solo reportar cada 2% o cuando llegue a 100%
+                    if (percent >= lastReported + 2 || percent === 100) {
+                        lastReported = percent;
                         onProgress(percent, e.loaded, e.total);
                     }
-                };
-            }
-
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const res = JSON.parse(xhr.responseText);
-                        resolve(res);
-                    } catch (e) {
-                        reject(new Error('Invalid JSON response'));
-                    }
-                } else {
-                    reject(new Error(`HTTP ${xhr.status}`));
                 }
             };
-
-            xhr.onerror = () => reject(new Error('Network error'));
-            xhr.ontimeout = () => reject(new Error('Upload timeout'));
-
-            xhr.send(formData);
-        });
-
-        if (uploadResult) return uploadResult;
-    } catch (err) {
-        console.warn('[db] Falló subida de archivo con XHR, intentando respaldo local:', err);
-    }
-
-    // Only store dataURL for small files < 2MB to avoid localStorage QuotaExceededError
-    if (file && file.size < 2 * 1024 * 1024) {
-        try {
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-            return {
-                filename: dataUrl,
-                path: dataUrl,
-                originalName: file.name,
-                size: file.size || 0
-            };
-        } catch (e) {
-            console.error('[db] Error convirtiendo archivo a DataURL:', e);
         }
-    }
 
-    return {
-        filename: file.name,
-        path: '',
-        originalName: file.name,
-        size: file.size || 0
-    };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const res = JSON.parse(xhr.responseText);
+                    if (res.success || res.filename) {
+                        console.log(`[Upload] ✅ Subida exitosa: ${file.name} -> ${res.filename}`);
+                        resolve({
+                            filename: res.filename || res.path,
+                            path: res.path || res.filename,
+                            originalName: res.originalName || file.name,
+                            size: res.size || file.size,
+                            thumbnailUrl: res.thumbnailUrl
+                        });
+                    } else {
+                        reject(new Error(res.error || 'Upload failed'));
+                    }
+                } catch (e) {
+                    reject(new Error('Respuesta inválida del servidor'));
+                }
+            } else if (xhr.status === 413) {
+                reject(new Error(`Archivo demasiado grande (${fileSizeMB.toFixed(1)} MB). El servidor rechazó la subida.`));
+            } else {
+                let errorMsg = `Error del servidor (HTTP ${xhr.status})`;
+                try {
+                    const errRes = JSON.parse(xhr.responseText);
+                    errorMsg = errRes.error || errorMsg;
+                } catch (_) { /* no-op */ }
+                reject(new Error(errorMsg));
+            }
+        };
+
+        xhr.onerror = () => reject(new Error(`Error de red al subir ${file.name}. Verifique su conexión.`));
+        xhr.ontimeout = () => reject(new Error(`Timeout al subir ${file.name} (${fileSizeMB.toFixed(1)} MB). El archivo es muy grande o la conexión es lenta.`));
+
+        xhr.send(formData);
+    });
+
+    return uploadResult;
 }
 
 // ASYNC Helpers (Dependent on getOrdenes)

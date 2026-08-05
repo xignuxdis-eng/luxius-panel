@@ -1278,8 +1278,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             fileName: item.fileName
                                         });
                                     });
+                                    setUploadProgress(null);
                                     remoteFileName = uploadRes.filename;
                                 } catch (uErr) {
+                                    setUploadProgress(null);
                                     console.error(`[Luxius-Save] Upload falló para ${item.fileName}`, uErr)
                                     throw new Error(`Error subiendo archivo: ${item.fileName}`)
                                 }
@@ -1333,6 +1335,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     alert("Ocurrió un error crítico al procesar el lote.")
                 } finally {
                     setSaving(false)
+                    setUploadProgress(null)
                 }
             } else {
                 // Unitario - Legacy logic remains but wrapped in safety
@@ -1384,6 +1387,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     alert("Error al guardar pedido unitario.")
                 } finally {
                     setSaving(false)
+                    setUploadProgress(null)
                 }
             }
         } catch (error) {
