@@ -773,13 +773,8 @@ export function getMaquinas(): Maquina[] {
         } catch (e) { }
     }
 
-    const defaultMaquinas: Maquina[] = [
-        { id: 1, nombre: 'Plotter Roland TrueVIS 1', tipo: 'Eco-Solvente Gran Formato', anchoMaximo: 1.60, estado: 'online' as const, habilitada: true },
-        { id: 2, nombre: 'Plotter Flora UV Flatbed', tipo: 'Impresora UV Alta Velocidad', anchoMaximo: 2.50, estado: 'online' as const, habilitada: true }
-    ].filter(m => !hiddenIds.includes(m.id))
-
-    localStorage.setItem(SESSION_MAQUINAS_KEY, JSON.stringify(defaultMaquinas))
-    return defaultMaquinas
+    // Sin datos mock — devolver vacío. El usuario agrega máquinas manualmente.
+    return []
 }
 
 export function getMaquinaById(id: number): Maquina | undefined {
