@@ -329,6 +329,76 @@ export async function saveBatchOrders(
     ids: (number | string)[],
     data?: Partial<Order>
 ): Promise<{ success: boolean, count: number }> {
+    const stringIds = ids.map(String);
+
+    if (action === 'delete') {
+        const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+        let hiddenIds: (number | string)[] = [];
+        try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
+        const existingStr = new Set(hiddenIds.map(String));
+        stringIds.forEach(sId => {
+            if (!existingStr.has(sId)) {
+                hiddenIds.push(sId);
+                existingStr.add(sId);
+            }
+        });
+        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
+
+        const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
+        try {
+            let localOrders: Order[] = JSON.parse(localOrdersJson);
+            localOrders = localOrders.filter(o => !existingStr.has(String(o.id)) && !existingStr.has(String(o.ot)));
+            localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+        } catch (e) { }
+
+    } else if (action === 'update' && data) {
+        if (data.status === 'eliminado') {
+            const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+            let hiddenIds: (number | string)[] = [];
+            try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
+            const existingStr = new Set(hiddenIds.map(String));
+            stringIds.forEach(sId => {
+                if (!existingStr.has(sId)) {
+                    hiddenIds.push(sId);
+                    existingStr.add(sId);
+                }
+            });
+            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
+        }
+
+        const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
+        try {
+            let localOrders: Order[] = JSON.parse(localOrdersJson);
+            localOrders = localOrders.map(o => {
+                if (stringIds.includes(String(o.id)) || stringIds.includes(String(o.ot))) {
+                    return { ...o, ...data };
+                }
+                return o;
+            });
+            localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+        } catch (e) { }
+
+    } else if (action === 'restore') {
+        const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+        try {
+            let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
+            hiddenIds = hiddenIds.filter(id => !stringIds.includes(String(id)));
+            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
+        } catch (e) { }
+
+        const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
+        try {
+            let localOrders: Order[] = JSON.parse(localOrdersJson);
+            localOrders = localOrders.map(o => {
+                if (stringIds.includes(String(o.id)) || stringIds.includes(String(o.ot))) {
+                    return { ...o, status: (o.category === 'diseno' ? 'diseno' : 'orden') as any };
+                }
+                return o;
+            });
+            localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+        } catch (e) { }
+    }
+
     try {
         const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
             method: 'POST',
@@ -340,7 +410,7 @@ export async function saveBatchOrders(
             return await response.json();
         }
     } catch (e) {
-        console.warn('[db] API saveBatchOrders falló:', e);
+        console.warn('[db] API saveBatchOrders falló, procesado localmente:', e);
     }
     return { success: true, count: ids.length };
 }

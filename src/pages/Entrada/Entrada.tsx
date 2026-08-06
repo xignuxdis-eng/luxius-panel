@@ -513,9 +513,11 @@ export default function Entrada() {
                         <tbody>
                             {displayedOrders.map(order => {
                                 const consumption = getConsumption(order);
-                                const isMobile = order.origen === 'mobile';
-                                const otClean = order.ot ? order.ot.replace(/^OT-/i, '') : order.id;
-                                const nombreTarea = order.nombreTarea || order.observaciones || `Proyecto OT-${otClean}`;
+                                const otDisplay = order.ot || `OT-${order.id}`;
+                                let cleanDesc = (order.nombreTarea || order.observaciones || '').trim();
+                                if (!cleanDesc || cleanDesc.startsWith('Proyecto #') || cleanDesc.startsWith('Proyecto OT-')) {
+                                    cleanDesc = order.observaciones || order.material || 'Trabajo de Impresión';
+                                }
 
                                 return (
                                     <tr key={order.id} className={`fade-in hover-row ${selectedIds.has(order.id) ? 'selected-row' : ''}`} style={selectedIds.has(order.id) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
@@ -537,8 +539,7 @@ export default function Entrada() {
                                         </td>
                                         <td>
                                             <div className="order-id">
-                                                <span className="id-text">#{order.id}</span>
-                                                <span className="ot-text">{order.ot || '-'}</span>
+                                                <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.95rem' }}>{otDisplay}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -575,9 +576,9 @@ export default function Entrada() {
                                             )}
                                         </td>
                                         <td>
-                                            <div style={{ maxWidth: '200px' }} title={nombreTarea}>
+                                            <div style={{ maxWidth: '220px' }} title={cleanDesc}>
                                                 <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {nombreTarea}
+                                                    {cleanDesc}
                                                 </span>
                                             </div>
                                         </td>

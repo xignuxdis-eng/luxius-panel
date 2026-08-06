@@ -150,8 +150,7 @@ export default function Impresion() {
                                 <tr key={order.id} className="hover-row">
                                     <td>
                                         <div className="order-id">
-                                            <span className="id-text">#{order.id}</span>
-                                            <span className="ot-text">{order.ot || '-'}</span>
+                                            <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.95rem' }}>{order.ot || `OT-${order.id}`}</span>
                                         </div>
                                     </td>
                                     <td>
