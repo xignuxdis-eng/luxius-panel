@@ -9,6 +9,7 @@ import ServicesView from './ServicesView'
 import MaquinasView from './MaquinasView'
 import LogisticsView from './LogisticsView'
 import TarifasXignuxView from './TarifasXignuxView'
+import CombosView from './CombosView'
 import './ABM.css'
 
 export default function ABM() {
@@ -28,7 +29,7 @@ export default function ABM() {
                 <NavLink to="/abm/servicios" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Servicios</NavLink>
                 <NavLink to="/abm/materiales" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Materiales</NavLink>
                 <NavLink to="/abm/calidades" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Calidades</NavLink>
-                <NavLink to="/abm/productos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Productos</NavLink>
+                <NavLink to="/abm/productos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Productos y Combos</NavLink>
                 <NavLink to="/abm/combos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Combos</NavLink>
                 <NavLink to="/abm/monedas" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Monedas</NavLink>
                 <NavLink to="/abm/cajas" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Cajas</NavLink>
@@ -46,8 +47,8 @@ export default function ABM() {
                     <Route path="maquinas" element={<MaquinasView />} />
                     <Route path="calidades" element={<CalidadesView />} />
                     <Route path="logistica" element={<LogisticsView />} />
-                    <Route path="productos" element={<div className="p-20">Gestión de productos próximamente...</div>} />
-                    <Route path="combos" element={<div className="p-20">Gestión de combos próximamente...</div>} />
+                    <Route path="productos" element={<CombosView />} />
+                    <Route path="combos" element={<CombosView />} />
                     <Route path="monedas" element={<div className="p-20">Gestión de monedas próximamente...</div>} />
                     <Route path="cajas" element={<div className="p-20">Gestión de cajas próximamente...</div>} />
                     <Route path="bancos" element={<div className="p-20">Gestión de bancos próximamente...</div>} />

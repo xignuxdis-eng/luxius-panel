@@ -1881,3 +1881,196 @@ export async function saveTarifasXignux(tarifas: TarifasXignux): Promise<boolean
         return true
     }
 }
+
+// ============================================================
+// COMBOS Y PRODUCTOS COMBINADOS
+// ============================================================
+
+export const SESSION_COMBOS_KEY = 'luxius_combos';
+export const HIDDEN_COMBOS_KEY = 'luxius_deleted_combos';
+
+export interface ComboItemComponent {
+    id?: number | string;
+    tipo: 'material' | 'servicio' | 'producto';
+    nombre: string;
+    cantidad: number;
+    precioUnitario: number;
+}
+
+export interface ComboData {
+    id: number;
+    codigo: string;
+    nombre: string;
+    categoria: string;
+    descripcion: string;
+    materialCodigo?: string;
+    ancho?: number;
+    alto?: number;
+    componentes: ComboItemComponent[];
+    precioSugerido: number;
+    precioFinal: number;
+    habilitado: boolean;
+    destacado?: boolean;
+}
+
+export function getCombos(): ComboData[] {
+    const staticCombos: ComboData[] = [
+        {
+            id: 1,
+            codigo: 'COMBO-ROLLUP',
+            nombre: 'Combo Roll Banner Promocional (85x200cm)',
+            categoria: 'Banners y Rollups',
+            descripcion: 'Estructura de aluminio autoenrollable con impresión en lona front_light 13oz de alta resolución',
+            materialCodigo: 'LF',
+            ancho: 0.85,
+            alto: 2.00,
+            componentes: [
+                { tipo: 'material', nombre: 'Lona Front light 13oz (0.85x2.0m)', cantidad: 1, precioUnitario: 13500 },
+                { tipo: 'servicio', nombre: 'Montaje en Estructura Rollup', cantidad: 1, precioUnitario: 3500 },
+                { tipo: 'producto', nombre: 'Estructura de Aluminio Rollup 85cm', cantidad: 1, precioUnitario: 11500 }
+            ],
+            precioSugerido: 28500,
+            precioFinal: 27000,
+            habilitado: true,
+            destacado: true
+        },
+        {
+            id: 2,
+            codigo: 'COMBO-CARTEL-FRONT',
+            nombre: 'Cartel Completo Lona Front con Bastidor de Caño (2x1m)',
+            categoria: 'Cartelería Comercial',
+            descripcion: 'Cartel frontal completo con estructura metálica electro-soldada, tensado de lona y perfilado',
+            materialCodigo: 'LF',
+            ancho: 2.00,
+            alto: 1.00,
+            componentes: [
+                { tipo: 'material', nombre: 'Lona Front light 13oz (2x1m)', cantidad: 2, precioUnitario: 9500 },
+                { tipo: 'servicio', nombre: 'Estructura y Soldadura de Caño 20x20', cantidad: 1, precioUnitario: 18000 },
+                { tipo: 'servicio', nombre: 'Confección de Vainas y Tensado', cantidad: 1, precioUnitario: 7500 }
+            ],
+            precioSugerido: 44500,
+            precioFinal: 42000,
+            habilitado: true,
+            destacado: true
+        },
+        {
+            id: 3,
+            codigo: 'COMBO-SALIENTE-DF',
+            nombre: 'Letrero Saliente Doble Faz con Luz (1.5x0.8m)',
+            categoria: 'Cartelería Comercial',
+            descripcion: 'Cajón metálico saliente doble faz con iluminación LED interior y lona backlight traslúcida',
+            materialCodigo: 'BL',
+            ancho: 1.50,
+            alto: 0.80,
+            componentes: [
+                { tipo: 'material', nombre: 'Lona Backlight Traslúcida 15oz', cantidad: 2.4, precioUnitario: 14000 },
+                { tipo: 'servicio', nombre: 'Cajón de Caño Doble Faz con Iluminación LED', cantidad: 1, precioUnitario: 38000 },
+                { tipo: 'servicio', nombre: 'Confección y Montaje Doble Faz', cantidad: 1, precioUnitario: 12000 }
+            ],
+            precioSugerido: 83600,
+            precioFinal: 79000,
+            habilitado: true,
+            destacado: false
+        },
+        {
+            id: 4,
+            codigo: 'COMBO-VINILO-LAM',
+            nombre: 'Combo Vinilo Impreso + Laminado UV Mate (2x1m)',
+            categoria: 'Vinilos y Películas',
+            descripcion: 'Vinilo autoadhesivo Ritrama impreso en alta calidad con película de laminado mate protector UV antigrafiti',
+            materialCodigo: 'VILM',
+            ancho: 2.00,
+            alto: 1.00,
+            componentes: [
+                { tipo: 'material', nombre: 'Vinilo Autoadhesivo Ritrama 2m²', cantidad: 2, precioUnitario: 8500 },
+                { tipo: 'servicio', nombre: 'Laminado Mate UV Protector', cantidad: 2, precioUnitario: 4500 }
+            ],
+            precioSugerido: 26000,
+            precioFinal: 24500,
+            habilitado: true,
+            destacado: false
+        }
+    ];
+
+    const sessionItemsJson = localStorage.getItem(SESSION_COMBOS_KEY);
+    const hiddenItemsJson = localStorage.getItem(HIDDEN_COMBOS_KEY);
+
+    let sessionItems: ComboData[] = [];
+    let hiddenIds: number[] = [];
+
+    if (sessionItemsJson) {
+        try { sessionItems = JSON.parse(sessionItemsJson); } catch (e) { }
+    }
+    if (hiddenItemsJson) {
+        try { hiddenIds = JSON.parse(hiddenItemsJson); } catch (e) { }
+    }
+
+    const sessionIds = new Set(sessionItems.map(c => c.id));
+    const hiddenSet = new Set(hiddenIds);
+
+    const filteredStatic = staticCombos.filter(c => !sessionIds.has(c.id) && !hiddenSet.has(c.id));
+    const filteredSession = sessionItems.filter(c => !hiddenSet.has(c.id));
+
+    return [...filteredSession, ...filteredStatic];
+}
+
+export function saveCombo(combo: Partial<ComboData>): ComboData {
+    const sessionItemsJson = localStorage.getItem(SESSION_COMBOS_KEY);
+    let sessionItems: ComboData[] = [];
+    if (sessionItemsJson) {
+        try { sessionItems = JSON.parse(sessionItemsJson); } catch (e) { }
+    }
+
+    const existingIndex = sessionItems.findIndex(c => c.id === combo.id);
+    let result: ComboData;
+
+    if (existingIndex !== -1) {
+        sessionItems[existingIndex] = { ...sessionItems[existingIndex], ...combo } as ComboData;
+        result = sessionItems[existingIndex];
+    } else {
+        const nextId = combo.id || Math.floor(Math.random() * 900000) + 100000;
+        const newCombo: ComboData = {
+            id: nextId,
+            codigo: combo.codigo || `COMBO-${nextId}`,
+            nombre: combo.nombre || 'Nuevo Combo',
+            categoria: combo.categoria || 'Generales',
+            descripcion: combo.descripcion || '',
+            materialCodigo: combo.materialCodigo || '',
+            ancho: Number(combo.ancho) || 1.0,
+            alto: Number(combo.alto) || 1.0,
+            componentes: combo.componentes || [],
+            precioSugerido: Number(combo.precioSugerido) || 0,
+            precioFinal: Number(combo.precioFinal) || 0,
+            habilitado: combo.habilitado !== undefined ? combo.habilitado : true,
+            destacado: combo.destacado || false
+        };
+        sessionItems.unshift(newCombo);
+        result = newCombo;
+    }
+
+    localStorage.setItem(SESSION_COMBOS_KEY, JSON.stringify(sessionItems));
+    syncSave('combos', result);
+    return result;
+}
+
+export function deleteCombo(id: number) {
+    const sessionItemsJson = localStorage.getItem(SESSION_COMBOS_KEY);
+    if (sessionItemsJson) {
+        try {
+            let sessionItems = JSON.parse(sessionItemsJson) as ComboData[];
+            sessionItems = sessionItems.filter(c => c.id !== id);
+            localStorage.setItem(SESSION_COMBOS_KEY, JSON.stringify(sessionItems));
+        } catch (e) { }
+    }
+
+    const hiddenJson = localStorage.getItem(HIDDEN_COMBOS_KEY) || '[]';
+    try {
+        let hiddenIds: number[] = JSON.parse(hiddenJson);
+        if (!hiddenIds.includes(id)) {
+            hiddenIds.push(id);
+            localStorage.setItem(HIDDEN_COMBOS_KEY, JSON.stringify(hiddenIds));
+        }
+    } catch (e) { }
+
+    syncDelete('combos', id);
+}

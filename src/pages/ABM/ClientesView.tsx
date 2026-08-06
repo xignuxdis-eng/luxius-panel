@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { getClientes, deleteCliente } from '@data/db'
 import Button from '@components/ui/Button'
 import NuevoClienteModal from './NuevoClienteModal'
+import ClienteReporteModal from './ClienteReporteModal'
 import type { Cliente } from '@/types'
 import './ABM.css'
 
 export default function ClientesView() {
     const [searchTerm, setSearchTerm] = useState('')
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false)
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
 
     // Load clients
@@ -26,6 +28,11 @@ export default function ClientesView() {
     const handleEdit = (cliente: Cliente) => {
         setSelectedCliente(cliente)
         setIsModalOpen(true)
+    }
+
+    const handleReport = (cliente: Cliente) => {
+        setSelectedCliente(cliente)
+        setIsReportModalOpen(true)
     }
 
     const handleDelete = (id: number) => {
@@ -53,7 +60,7 @@ export default function ClientesView() {
                 <input
                     className="input-field sm"
                     type="text"
-                    placeholder="Buscar clientes..."
+                    placeholder="Buscar clientes por nombre, empresa o CUIT..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -93,6 +100,9 @@ export default function ClientesView() {
                             </td>
                             <td style={{ textAlign: 'right' }}>
                                 <div className="table-ops">
+                                    <button className="op-btn-sm" title="Generar Reporte / Estado de Cuenta PDF" onClick={() => handleReport(c)} style={{ background: 'rgba(37, 99, 235, 0.15)', color: '#60a5fa', border: '1px solid rgba(37, 99, 235, 0.3)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        📄 Reporte PDF
+                                    </button>
                                     <button className="op-btn-sm" title="Editar" onClick={() => handleEdit(c)}>✏️</button>
                                     <button className="op-btn-sm" title="Eliminar" onClick={() => handleDelete(c.id)}>🗑️</button>
                                 </div>
@@ -102,18 +112,18 @@ export default function ClientesView() {
                 </tbody>
             </table>
 
-            {isModalOpen && (
-                <NuevoClienteModal
-                    isOpen={isModalOpen}
-                    onClose={() => { setIsModalOpen(false); setSelectedCliente(null); }}
-                    onSave={() => {
-                        handleRefresh()
-                        setIsModalOpen(false)
-                        setSelectedCliente(null)
-                    }}
-                    cliente={selectedCliente}
-                />
-            )}
+            <NuevoClienteModal
+                cliente={selectedCliente}
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={handleRefresh}
+            />
+
+            <ClienteReporteModal
+                cliente={selectedCliente}
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+            />
         </div>
     )
 }

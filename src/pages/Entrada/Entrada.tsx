@@ -785,7 +785,7 @@ export default function Entrada() {
                         onClose={(created) => {
                             setIsModalOpen(false)
                             setEditingOrder(null)
-                            if (created) refreshOrders()
+                            if (created) loadOrders()
                         }}
                     />
                 )

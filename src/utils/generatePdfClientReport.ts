@@ -331,7 +331,7 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                             </div>
                         </div>
                         <div class="header-doc-info">
-                            <div class="doc-type">ESTADO DE CUENTA</div>
+                            <div class="doc-type">${tituloReporte}</div>
                             <div class="doc-date">Fecha de emisión: ${fechaEmision}</div>
                         </div>
                     </div>
