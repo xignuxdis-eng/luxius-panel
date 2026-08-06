@@ -104,7 +104,7 @@ export default function TarifasXignuxView() {
             title: '🔧 Servicios de Campo (ABM Servicios)',
             subtitle: 'Costos de servicios sincronizados con ABM Servicios',
             items: serviciosAbm.map(s => ({
-                key: (s as any).codigo?.toLowerCase() || s.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                key: s.codigo?.toLowerCase() || s.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                 label: s.nombre,
                 unit: `/${s.unidad || 'unidad'}`
             }))
@@ -278,7 +278,10 @@ export default function TarifasXignuxView() {
                                 <tr key={s.id}>
                                     <td>
                                         <div className="name-cell">
-                                            <span className="name">{s.nombre}</span>
+                                            <span className="name">
+                                                {s.codigo && <span style={{ fontWeight: 800, fontFamily: 'monospace', color: 'var(--accent)', marginRight: '6px', letterSpacing: '1px' }}>[{s.codigo}]</span>}
+                                                {s.nombre}
+                                            </span>
                                             <span className="sub">{s.descripcion}</span>
                                         </div>
                                     </td>

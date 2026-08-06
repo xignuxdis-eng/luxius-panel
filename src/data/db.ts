@@ -1606,54 +1606,73 @@ export interface TarifaEntry {
 export type TarifasXignux = Record<string, TarifaEntry>
 
 export async function getTarifasXignux(): Promise<TarifasXignux> {
+    // 1. Intentar desde API
     try {
         const res = await fetch(`${API_URL}/tarifas`, { cache: 'no-store' })
         if (res.ok) {
-            return await res.json()
+            const data = await res.json()
+            // Guardar en localStorage como cache
+            localStorage.setItem('luxius_tarifas_xignux', JSON.stringify(data))
+            return data
         }
     } catch (e) {
-        console.warn('[Tarifas] Error al obtener tarifas:', e)
+        console.warn('[Tarifas] API offline, usando localStorage')
     }
+
+    // 2. Fallback: localStorage
+    const stored = localStorage.getItem('luxius_tarifas_xignux')
+    if (stored) {
+        try {
+            return JSON.parse(stored) as TarifasXignux
+        } catch (e) { }
+    }
+
     return {}
 }
 
 export async function saveTarifasXignux(tarifas: TarifasXignux): Promise<boolean> {
+    // Siempre guardar en localStorage primero
+    localStorage.setItem('luxius_tarifas_xignux', JSON.stringify(tarifas))
+
+    // Sincronizar materiales locales con precios del tarifario
+    const mats = getMateriales()
+    let matsUpdated = false
+    mats.forEach(m => {
+        const key = m.codigo?.toLowerCase() || m.descripcion.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+        if (tarifas[key] && typeof tarifas[key].precio === 'number') {
+            m.precioM2 = tarifas[key].precio
+            matsUpdated = true
+        }
+    })
+    if (matsUpdated) {
+        localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(mats))
+    }
+
+    // Sincronizar servicios locales con precios del tarifario
+    const servs = getServicios()
+    let servsUpdated = false
+    servs.forEach(s => {
+        const key = s.codigo?.toLowerCase() || s.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+        if (tarifas[key] && typeof tarifas[key].precio === 'number') {
+            s.precioBase = tarifas[key].precio
+            servsUpdated = true
+        }
+    })
+    if (servsUpdated) {
+        localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(servs))
+    }
+
+    // Intentar guardar en backend también
     try {
         const res = await fetch(`${API_URL}/tarifas`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(tarifas),
         })
-        if (res.ok) {
-            const mats = getMateriales()
-            let matsUpdated = false
-            mats.forEach(m => {
-                const key = m.codigo?.toLowerCase() || m.descripcion.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                if (tarifas[key] && typeof tarifas[key].precio === 'number') {
-                    m.precioM2 = tarifas[key].precio
-                    matsUpdated = true
-                }
-            })
-            if (matsUpdated) {
-                localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(mats))
-            }
-
-            const servs = getServicios()
-            let servsUpdated = false
-            servs.forEach(s => {
-                const key = (s as any).codigo?.toLowerCase() || s.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                if (tarifas[key] && typeof tarifas[key].precio === 'number') {
-                    s.precioBase = tarifas[key].precio
-                    servsUpdated = true
-                }
-            })
-            if (servsUpdated) {
-                localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(servs))
-            }
-        }
         return res.ok
     } catch (e) {
-        console.error('[Tarifas] Error al guardar tarifas:', e)
-        return false
+        console.warn('[Tarifas] API offline, guardado solo en localStorage')
+        // Retornamos true porque localStorage sí se guardó
+        return true
     }
 }
