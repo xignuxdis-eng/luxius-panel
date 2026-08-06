@@ -20,6 +20,7 @@ export default function ServiceModal({ isOpen, onClose, onSave, service }: Servi
             reset(service)
         } else {
             reset({
+                codigo: '',
                 nombre: '',
                 descripcion: '',
                 precioBase: 0,
@@ -30,6 +31,8 @@ export default function ServiceModal({ isOpen, onClose, onSave, service }: Servi
     }, [service, reset, isOpen])
 
     const onSubmit = (data: Partial<Servicio>) => {
+        // Auto-uppercase el código
+        if (data.codigo) data.codigo = data.codigo.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
         saveServicio({ ...service, ...data })
         onSave()
         onClose()
@@ -42,14 +45,28 @@ export default function ServiceModal({ isOpen, onClose, onSave, service }: Servi
             title={service ? 'Editar Servicio' : 'Nuevo Servicio'}
         >
             <form onSubmit={handleSubmit(onSubmit)} className="modal-form">
-                <div className="form-group">
-                    <label>Nombre del Servicio</label>
-                    <input
-                        type="text"
-                        className="input-field"
-                        {...register('nombre', { required: true })}
-                        placeholder="Ej: Laminado Mate"
-                    />
+                <div className="form-grid">
+                    <div className="form-group">
+                        <label>Código (etiqueta corta)</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            {...register('codigo', { required: true })}
+                            placeholder="Ej: LAM, DEM, ROT, TEN"
+                            maxLength={4}
+                            style={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}
+                        />
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Se usa en el nombre de producción del archivo</span>
+                    </div>
+                    <div className="form-group">
+                        <label>Nombre del Servicio</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            {...register('nombre', { required: true })}
+                            placeholder="Ej: Laminado Mate"
+                        />
+                    </div>
                 </div>
 
                 <div className="form-group">

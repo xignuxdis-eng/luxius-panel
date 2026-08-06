@@ -56,6 +56,7 @@ export default function ServicesView() {
             <table className="abm-table">
                 <thead>
                     <tr>
+                        <th>Código</th>
                         <th>Nombre</th>
                         <th>Descripción</th>
                         <th>Precio Base</th>
@@ -67,6 +68,7 @@ export default function ServicesView() {
                 <tbody>
                     {filteredServicios.map(s => (
                         <tr key={s.id}>
+                            <td><span style={{ fontWeight: 800, fontFamily: 'monospace', fontSize: '0.95rem', color: 'var(--accent)', letterSpacing: '1px' }}>{s.codigo || '—'}</span></td>
                             <td style={{ fontWeight: 600 }}>{s.nombre}</td>
                             <td>{s.descripcion}</td>
                             <td>${s.precioBase}</td>

@@ -78,6 +78,7 @@ export interface Combo {
 
 export interface Servicio {
     id: number
+    codigo: string
     nombre: string
     descripcion: string
     precioBase: number
