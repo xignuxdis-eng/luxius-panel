@@ -514,8 +514,8 @@ export default function Entrada() {
                             {displayedOrders.map(order => {
                                 const consumption = getConsumption(order);
                                 const isMobile = order.origen === 'mobile';
-                                const operarioNombre = order.operarioNombre || order.vendedorNombre || (order as any).vendedor?.nombre || (order as any).vendedorName || '';
-                                const nombreTarea = order.nombreTarea || order.observaciones || `Proyecto #${order.id}`;
+                                const otClean = order.ot ? order.ot.replace(/^OT-/i, '') : order.id;
+                                const nombreTarea = order.nombreTarea || order.observaciones || `Proyecto OT-${otClean}`;
 
                                 return (
                                     <tr key={order.id} className={`fade-in hover-row ${selectedIds.has(order.id) ? 'selected-row' : ''}`} style={selectedIds.has(order.id) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>

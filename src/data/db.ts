@@ -197,16 +197,36 @@ export async function getOrdenes(): Promise<Order[]> {
 }
 
 
+export function getNextSequentialId(existingOrders: Order[]): number {
+    let maxId = 0
+    if (Array.isArray(existingOrders)) {
+        for (const o of existingOrders) {
+            const idNum = Number(o.id) || 0
+            let otNum = 0
+            if (o.ot) {
+                const match = String(o.ot).match(/\d+/)
+                if (match) otNum = parseInt(match[0], 10)
+            }
+            if (idNum > 0 && idNum < 500000) maxId = Math.max(maxId, idNum)
+            if (otNum > 0 && otNum < 500000) maxId = Math.max(maxId, otNum)
+        }
+    }
+    return maxId > 0 ? maxId + 1 : 1
+}
+
 export async function saveOrden(order: Partial<Order>): Promise<Order> {
-    const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
-    let localOrders: Order[] = [];
+    const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]'
+    let localOrders: Order[] = []
     try { localOrders = JSON.parse(localOrdersJson); } catch (e) { }
 
-    const now = new Date();
-    const formattedId = order.id || (Math.floor(Math.random() * 900000) + 100000);
+    const now = new Date()
+    const nextSeqId = order.id || getNextSequentialId(localOrders)
+    const otCode = order.ot || `OT-${nextSeqId}`
+
     const newOrder: Order = {
-        id: Number(formattedId),
-        ot: order.ot || `OT-${formattedId}`,
+        id: Number(nextSeqId),
+        ot: otCode,
+        nombreTarea: order.nombreTarea || (order as any).observaciones || `Proyecto ${otCode}`,
         clientId: Number(order.clientId) || 1,
         clienteNombre: order.clienteNombre || 'Cliente',
         material: order.material || 'Lona Front',
@@ -222,7 +242,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         fechaCreacion: order.fechaCreacion || now.toISOString(),
         fechaEntrega: order.fechaEntrega || now.toISOString().split('T')[0],
         ...order,
-    } as Order;
+    } as Order
 
     // Clear from HIDDEN_ORDENES_KEY if it was deleted before (restored order)
     const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
