@@ -163,19 +163,29 @@ export async function refreshCollection(endpoint: string) {
 
 
 
+export const HIDDEN_ORDENES_KEY = 'luxius_deleted_ordenes';
+
 export async function getOrdenes(): Promise<Order[]> {
+    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+    let hiddenIds: string[] = [];
+    try { hiddenIds = (JSON.parse(hiddenJson) as any[]).map(String); } catch (e) { }
+
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     let localOrders: Order[] = [];
-    try { localOrders = JSON.parse(localOrdersJson); } catch (e) { }
+    try {
+        localOrders = JSON.parse(localOrdersJson);
+        localOrders = localOrders.filter(o => !hiddenIds.includes(String(o.id)) && !hiddenIds.includes(String(o.ot)));
+    } catch (e) { }
 
     try {
         const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 3000);
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
-                const apiIds = new Set(apiOrders.map((o: any) => o.id));
-                const uniqueLocal = localOrders.filter(o => !apiIds.has(o.id));
-                const merged = [...apiOrders, ...uniqueLocal];
+                const activeApiOrders = apiOrders.filter((o: any) => !hiddenIds.includes(String(o.id)) && !hiddenIds.includes(String(o.ot)));
+                const apiIds = new Set(activeApiOrders.map((o: any) => String(o.id)));
+                const uniqueLocal = localOrders.filter(o => !apiIds.has(String(o.id)));
+                const merged = [...activeApiOrders, ...uniqueLocal];
                 localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
                 return merged;
             }
@@ -213,6 +223,14 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         fechaEntrega: order.fechaEntrega || now.toISOString().split('T')[0],
         ...order,
     } as Order;
+
+    // Clear from HIDDEN_ORDENES_KEY if it was deleted before (restored order)
+    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+    try {
+        let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
+        hiddenIds = hiddenIds.filter(id => String(id) !== String(newOrder.id) && String(id) !== String(newOrder.ot));
+        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
+    } catch (e) { }
 
     const idx = localOrders.findIndex(o => String(o.id) === String(newOrder.id));
     if (idx >= 0) {
@@ -258,13 +276,26 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 }
 
 export async function deleteOrden(id: number | string): Promise<boolean> {
+    const stringId = String(id);
+
+    // 1. Add to HIDDEN_ORDENES_KEY
+    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+    let hiddenIds: (number | string)[] = [];
+    try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
+    if (!hiddenIds.map(String).includes(stringId)) {
+        hiddenIds.push(id);
+        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
+    }
+
+    // 2. Remove from local storage session orders
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     try {
         let localOrders: Order[] = JSON.parse(localOrdersJson);
-        localOrders = localOrders.filter(o => String(o.id) !== String(id));
+        localOrders = localOrders.filter(o => String(o.id) !== stringId && String(o.ot) !== stringId);
         localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
     } catch (e) { }
 
+    // 3. Delete from remote backend API
     try {
         await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 3000);
     } catch (error) {
