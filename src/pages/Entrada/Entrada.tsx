@@ -10,6 +10,7 @@ import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
 import OrderChatModal from '@components/shared/OrderChatModal'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
+import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import './Entrada.css'
 
 export default function Entrada() {
@@ -280,6 +281,21 @@ export default function Entrada() {
         }
     }
 
+    const handleExportClientReportPdf = () => {
+        const selectedList = displayedOrders.filter(o => (selectedIds as any).has(o.id) || (selectedIds as any).has(String(o.id)));
+        const ordersToExport = selectedList.length > 0 ? selectedList : displayedOrders;
+
+        if (ordersToExport.length === 0) {
+            alert('No hay órdenes disponibles para generar el reporte PDF.');
+            return;
+        }
+
+        const firstClient = ordersToExport[0]?.clienteNombre || 'Cliente';
+        generatePdfClientReport(ordersToExport, {
+            clienteNombre: selectedList.length > 0 && selectedList.every(o => o.clienteNombre === firstClient) ? firstClient : 'Resumen de Clientes',
+        });
+    }
+
     const handleBatchDelete = async () => {
         const isTrash = viewTab === 'trash';
 
@@ -435,6 +451,14 @@ export default function Entrada() {
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleExportClientReportPdf}
+                            style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none' }}
+                        >
+                            📄 Exportar PDF Cliente
+                        </Button>
                         {viewTab !== 'trash' ? (
                             <>
                                 <Button
