@@ -30,6 +30,45 @@ app.register_blueprint(orders_bp)
 def serve_upload(filename):
     return send_from_directory(UPLOADS_DIR, filename)
 
+@app.route('/api/download', methods=['GET'])
+def proxy_download():
+    file_url = request.args.get('url')
+    custom_filename = request.args.get('filename', 'archivo_descargado')
+    if not file_url:
+        return jsonify({'error': 'Missing url parameter'}), 400
+
+    safe_name = custom_filename.replace('"', '').replace('\n', '').replace('\r', '')
+
+    if file_url.startswith('/uploads/') or file_url.startswith('uploads/'):
+        clean_name = file_url.replace('/uploads/', '').replace('uploads/', '')
+        return send_from_directory(
+            UPLOADS_DIR,
+            clean_name,
+            as_attachment=True,
+            download_name=safe_name
+        )
+
+    import requests
+    from flask import Response
+    try:
+        resp = requests.get(file_url, stream=True, timeout=30)
+        if resp.status_code != 200:
+            return jsonify({'error': f'Failed to fetch remote file: HTTP {resp.status_code}'}), 400
+
+        def generate():
+            for chunk in resp.iter_content(chunk_size=65536):
+                yield chunk
+
+        content_type = resp.headers.get('Content-Type', 'application/octet-stream')
+        headers = {
+            'Content-Disposition': f'attachment; filename="{safe_name}"',
+            'Content-Type': content_type,
+            'Access-Control-Allow-Origin': '*'
+        }
+        return Response(generate(), headers=headers)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/upload', methods=['POST'])
 def upload_file_endpoint():
     if 'file' not in request.files:

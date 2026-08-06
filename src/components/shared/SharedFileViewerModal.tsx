@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Modal from '@components/ui/Modal'
-import { API_URL } from '@data/db'
+import { API_URL, getServicios } from '@data/db'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
 import './FileViewerModal.css'
@@ -11,6 +11,45 @@ interface FileViewerModalProps {
     order: Order | null
     onUpdate?: () => void
     showStandardize?: boolean
+}
+
+function buildProductionFilename(order: Order, index: number, originalName: string): string {
+    const otNumber = order.ot || order.id || '0'
+    const copias = order.copias || 1
+    const materialCode = (order.material || 'MAT').trim()
+    const calidad = (order.calidad || 'STD').trim()
+
+    const serviceCodes: string[] = []
+    if (order.servicios && typeof order.servicios === 'object') {
+        try {
+            const allServices = getServicios()
+            Object.entries(order.servicios).forEach(([sId, active]) => {
+                if (active) {
+                    const s = allServices.find((serv) => String(serv.id) === String(sId))
+                    if (s && s.codigo) {
+                        serviceCodes.push(s.codigo)
+                    }
+                }
+            })
+        } catch (e) { }
+    }
+
+    const hasDimensionsRegex = /\d+[.,]?\d*\s*[xX]\s*\d+[.,]?\d*/
+    const alreadyHasDimensions = hasDimensionsRegex.test(originalName)
+
+    let dimString = ''
+    if (!alreadyHasDimensions && order.ancho && order.alto) {
+        dimString = `_${Number(order.ancho).toFixed(2)}x${Number(order.alto).toFixed(2)}`
+    }
+
+    const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
+    const prefix = `OT-${otNumber}_x${copias}_${materialCode}_${calidad}${servicesStr}${dimString}`
+
+    if (originalName.startsWith(`OT-${otNumber}`)) {
+        return originalName
+    }
+
+    return `${prefix} --- ${originalName}`
 }
 
 export default function SharedFileViewerModal({
@@ -59,27 +98,85 @@ export default function SharedFileViewerModal({
         generatePdfBudget(order)
     }
 
+    const downloadImageViaCanvas = (imageUrl: string, filename: string): Promise<boolean> => {
+        return new Promise((resolve) => {
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas')
+                    canvas.width = img.naturalWidth || img.width
+                    canvas.height = img.naturalHeight || img.height
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) return resolve(false)
+                    ctx.drawImage(img, 0, 0)
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
+                    const a = document.createElement('a')
+                    a.href = dataUrl
+                    a.download = filename
+                    a.style.display = 'none'
+                    document.body.appendChild(a)
+                    a.click()
+                    setTimeout(() => {
+                        try { document.body.removeChild(a) } catch (e) { }
+                    }, 300)
+                    resolve(true)
+                } catch (e) {
+                    console.warn('[Canvas Download] Canvas conversion fallback error:', e)
+                    resolve(false)
+                }
+            }
+            img.onerror = () => resolve(false)
+            img.src = imageUrl
+        })
+    }
+
     const forceDownload = async (url: string, filename: string) => {
         setDownloading(filename)
         try {
-            const response = await fetch(url, { mode: 'cors' })
-            if (!response.ok) throw new Error(`HTTP ${response.status}`)
-            const blob = await response.blob()
-            const blobUrl = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = blobUrl
-            a.download = filename
-            a.style.display = 'none'
-            document.body.appendChild(a)
-            a.click()
-            // Cleanup
+            const isImg = filename.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i) || url.startsWith('data:image/')
+            if (isImg) {
+                const canvasSuccess = await downloadImageViaCanvas(url, filename)
+                if (canvasSuccess) {
+                    setDownloading(null)
+                    return
+                }
+            }
+
+            try {
+                const response = await fetch(url, { mode: 'cors' })
+                if (response.ok) {
+                    const blob = await response.blob()
+                    const blobUrl = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = blobUrl
+                    a.download = filename
+                    a.style.display = 'none'
+                    document.body.appendChild(a)
+                    a.click()
+                    setTimeout(() => {
+                        URL.revokeObjectURL(blobUrl)
+                        document.body.removeChild(a)
+                    }, 300)
+                    setDownloading(null)
+                    return
+                }
+            } catch (corsErr) {
+                console.warn('[Download] Direct fetch CORS error, using proxy fallback', corsErr)
+            }
+
+            const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+            const proxyLink = document.createElement('a')
+            proxyLink.href = proxyUrl
+            proxyLink.download = filename
+            document.body.appendChild(proxyLink)
+            proxyLink.click()
             setTimeout(() => {
-                URL.revokeObjectURL(blobUrl)
-                document.body.removeChild(a)
-            }, 200)
+                try { document.body.removeChild(proxyLink) } catch (e) { }
+            }, 300)
         } catch (err) {
             console.error('[Download] Error descargando archivo:', err)
-            // Fallback: abrir en nueva pestaña
             window.open(url, '_blank')
         } finally {
             setDownloading(null)
@@ -149,7 +246,6 @@ export default function SharedFileViewerModal({
                         order.archivos.map((file, i) => {
                             const isDataUrl = file.startsWith('data:')
                             const isAbsoluteUrl = file.startsWith('http://') || file.startsWith('https://')
-                            // Para URLs absolutas, extraer extensión antes del query string
                             const filePathOnly = isAbsoluteUrl ? file.split('?')[0] : file
                             const isImage = isDataUrl
                                 ? file.startsWith('data:image/')
@@ -158,11 +254,9 @@ export default function SharedFileViewerModal({
                             const isPdf = isDataUrl ? file.startsWith('data:application/pdf') : !!filePathOnly.match(/\.pdf$/i)
                             const isAudio = isDataUrl ? file.startsWith('data:audio/') : !!filePathOnly.match(/\.(mp3|wav|ogg|m4a)$/i)
                             const baseUrl = API_URL.replace('/api', '')
-                            // Si es data URL, usarla directamente
-                            // Si es URL absoluta (R2 presigned), usarla directamente
-                            // Si es ruta relativa, concatenar con el backend
                             const url = isDataUrl ? file : isAbsoluteUrl ? file : `${baseUrl}/uploads/${file}`
                             const originalName = order.archivosOriginales?.[i] || (isDataUrl ? `archivo_adjunto_${i + 1}` : file.split('/').pop()?.split('?')[0] || file)
+                            const productionName = buildProductionFilename(order, i, originalName)
                             const standardized = isStandardized(file)
 
                             return (
@@ -196,6 +290,9 @@ export default function SharedFileViewerModal({
                                         <div className="name-wrapper">
                                             <span className="file-label">Archivo {i + 1}</span>
                                             <span className="file-name" title={originalName}>{originalName}</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontFamily: 'monospace', fontWeight: 600, marginTop: '3px', display: 'block', wordBreak: 'break-all' }}>
+                                                🏷️ Nombre Producción: {productionName}
+                                            </span>
                                             {order.imgMetadata && (
                                                 <div className="tech-specs">
                                                     <span className="spec-badge dpi">{order.imgMetadata.dpi} DPI</span>
@@ -207,19 +304,19 @@ export default function SharedFileViewerModal({
                                             <button
                                                 type="button"
                                                 className="btn-download-premium"
-                                                disabled={downloading === originalName}
+                                                disabled={downloading === productionName}
                                                 onClick={(e) => {
                                                     e.preventDefault()
                                                     e.stopPropagation()
-                                                    forceDownload(url, originalName)
+                                                    forceDownload(url, productionName)
                                                 }}
                                                 style={{
-                                                    cursor: downloading === originalName ? 'wait' : 'pointer',
-                                                    opacity: downloading === originalName ? 0.7 : 1
+                                                    cursor: downloading === productionName ? 'wait' : 'pointer',
+                                                    opacity: downloading === productionName ? 0.7 : 1
                                                 }}
                                             >
-                                                <span className="icon">{downloading === originalName ? '⏳' : '📥'}</span>
-                                                {downloading === originalName ? 'Descargando...' : 'Descargar'}
+                                                <span className="icon">{downloading === productionName ? '⏳' : '📥'}</span>
+                                                {downloading === productionName ? 'Descargando...' : 'Descargar'}
                                             </button>
                                         </div>
                                     </div>
