@@ -13,6 +13,8 @@ export default function Login() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState('')
 
+    const [showPassword, setShowPassword] = useState(false)
+
     const { register, handleSubmit, formState: { errors } } = useForm<LoginCredentials>()
 
     const onSubmit = async (data: LoginCredentials) => {
@@ -64,13 +66,38 @@ export default function Login() {
 
                         <div className="form-group">
                             <label htmlFor="password">Contraseña</label>
-                            <input
-                                id="password"
-                                type="password"
-                                placeholder="Ingresa tu contraseña"
-                                autoComplete="current-password"
-                                {...register('password', { required: 'Contraseña es requerida' })}
-                            />
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    placeholder="Ingresa tu contraseña"
+                                    autoComplete="current-password"
+                                    style={{ width: '100%', paddingRight: '42px' }}
+                                    {...register('password', { required: 'Contraseña es requerida' })}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        fontSize: '1.2rem',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        opacity: 0.8,
+                                        transition: 'opacity 0.2s',
+                                        userSelect: 'none'
+                                    }}
+                                >
+                                    {showPassword ? '🙈' : '👁️'}
+                                </button>
+                            </div>
                             {errors.password && (
                                 <span className="form-error">{errors.password.message}</span>
                             )}
