@@ -13,6 +13,24 @@ export function generatePdfBudget(order: Order) {
     const clienteNombre = order.clienteNombre || (order as any).clientName || 'Cliente General'
     const direccionObra = (order as any).clienteDireccion || (order as any).direccion || '4438, Eduardo Secchi, Las Lilas'
 
+    // Technical metadata from image analysis
+    const meta = order.imgMetadata
+    const dpi = meta?.dpi || 0
+    const colorMode = meta?.colorMode || ''
+    const fileFormat = meta?.format || ''
+    const fileDimCm = (meta?.width && meta?.height) ? `${meta.width} × ${meta.height} cm` : ''
+    const printDimM = (order.ancho && order.alto) ? `${Number(order.ancho).toFixed(2)} × ${Number(order.alto).toFixed(2)} m` : ''
+    const hasMeta = dpi > 0 || colorMode || fileFormat
+
+    const getDpiQuality = (d: number) => {
+        if (d <= 0) return { label: 'Sin datos', color: '#94a3b8' }
+        if (d >= 300) return { label: 'Alta Calidad', color: '#16a34a' }
+        if (d >= 150) return { label: 'Estándar', color: '#2563eb' }
+        if (d >= 72) return { label: 'Media', color: '#d97706' }
+        return { label: 'Baja Resolución', color: '#dc2626' }
+    }
+    const dpiQuality = getDpiQuality(dpi)
+
     function strId(id: any) {
         if (!id) return '00000'
         return String(id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)
@@ -285,6 +303,57 @@ export function generatePdfBudget(order: Order) {
                     font-size: 14.5px;
                 }
 
+                /* Technical Specs Section */
+                .tech-specs {
+                    margin: 18px 0;
+                    padding: 14px 18px;
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 6px;
+                    position: relative;
+                    z-index: 2;
+                }
+                .tech-specs-title {
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.8px;
+                    margin-bottom: 10px;
+                }
+                .tech-specs-grid {
+                    display: flex;
+                    gap: 24px;
+                    flex-wrap: wrap;
+                }
+                .tech-spec-item {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+                .tech-spec-label {
+                    font-size: 10px;
+                    font-weight: 700;
+                    color: #94a3b8;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .tech-spec-value {
+                    font-size: 13.5px;
+                    font-weight: 700;
+                    color: #1e2433;
+                }
+                .dpi-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 10px;
+                    font-weight: 800;
+                    color: #ffffff;
+                    margin-left: 6px;
+                    vertical-align: middle;
+                }
+
                 /* Footer Fine Print */
                 .fine-print {
                     text-align: center;
@@ -377,6 +446,43 @@ export function generatePdfBudget(order: Order) {
                             <img src="${XIGNUX_LOGO_BASE64}" class="watermark-img" alt="Watermark Logo" />
                         </div>
                     </div>
+
+                    <!-- Technical Specifications -->
+                    ${hasMeta ? `
+                    <div class="tech-specs">
+                        <div class="tech-specs-title">📐 Especificaciones Técnicas del Archivo</div>
+                        <div class="tech-specs-grid">
+                            ${dpi > 0 ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Resolución</span>
+                                <span class="tech-spec-value">
+                                    ${dpi} DPI
+                                    <span class="dpi-badge" style="background: ${dpiQuality.color}">${dpiQuality.label}</span>
+                                </span>
+                            </div>` : ''}
+                            ${colorMode ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Modo Color</span>
+                                <span class="tech-spec-value">${colorMode}</span>
+                            </div>` : ''}
+                            ${fileFormat ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Formato</span>
+                                <span class="tech-spec-value">${fileFormat}</span>
+                            </div>` : ''}
+                            ${fileDimCm ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Dim. Archivo</span>
+                                <span class="tech-spec-value">${fileDimCm}</span>
+                            </div>` : ''}
+                            ${printDimM ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Medida Impresión</span>
+                                <span class="tech-spec-value">${printDimM}</span>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
 
                     <!-- Totals Section -->
                     <div class="totals-section">
