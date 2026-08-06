@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import { PDFDocument } from 'pdf-lib'
-import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL } from '@data/db'
+import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -92,8 +92,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     try {
                         const parsed = JSON.parse(stored);
                         const active = parsed.filter((s: any) => s.habilitado);
-                        setAvailableServices(active);
+                        if (active.length > 0) setAvailableServices(active);
                     } catch (e) { console.error("Error localStorage servicios", e); }
+                }
+
+                // 1b. Fallback: cargar desde db.ts (getServiciosActivos)
+                if (!stored) {
+                    const fromDb = getServiciosActivos();
+                    if (fromDb.length > 0) setAvailableServices(fromDb);
                 }
 
                 const storedVendedores = localStorage.getItem('luxius_session_vendedores');
@@ -1760,7 +1766,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             border: '1px dashed var(--accent)',
                                             minHeight: '40px'
                                         }}>
-                                            {availableServices.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Cargando servicios activos...</span>}
+                                            {availableServices.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No hay servicios configurados. <a href="#/abm/servicios" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Agregalos en Administración → Servicios</a></span>}
                                             {availableServices.map(s => (
                                                 <label key={s.id} className="service-chip" style={{
                                                     display: 'flex',
