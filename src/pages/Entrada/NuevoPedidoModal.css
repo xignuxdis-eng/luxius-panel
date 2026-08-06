@@ -851,3 +851,14 @@
     color: white;
     box-shadow: 0 1px 3px rgba(230, 57, 70, 0.3);
 }
+
+/* Upload Progress Animations */
+@keyframes progressShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

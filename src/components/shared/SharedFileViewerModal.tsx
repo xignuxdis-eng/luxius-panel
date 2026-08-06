@@ -21,6 +21,7 @@ export default function SharedFileViewerModal({
     showStandardize = false
 }: FileViewerModalProps) {
     const [renaming, setRenaming] = useState(false)
+    const [downloading, setDownloading] = useState<string | null>(null)
 
     if (!isOpen || !order) return null
 
@@ -56,6 +57,33 @@ export default function SharedFileViewerModal({
 
     const handlePrintPdf = () => {
         generatePdfBudget(order)
+    }
+
+    const forceDownload = async (url: string, filename: string) => {
+        setDownloading(filename)
+        try {
+            const response = await fetch(url, { mode: 'cors' })
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = blobUrl
+            a.download = filename
+            a.style.display = 'none'
+            document.body.appendChild(a)
+            a.click()
+            // Cleanup
+            setTimeout(() => {
+                URL.revokeObjectURL(blobUrl)
+                document.body.removeChild(a)
+            }, 200)
+        } catch (err) {
+            console.error('[Download] Error descargando archivo:', err)
+            // Fallback: abrir en nueva pestaña
+            window.open(url, '_blank')
+        } finally {
+            setDownloading(null)
+        }
     }
 
     const allStandardized = order.archivos?.every(isStandardized)
@@ -176,16 +204,23 @@ export default function SharedFileViewerModal({
                                             )}
                                         </div>
                                         <div className="card-actions">
-                                            <a
-                                                href={url}
-                                                download={originalName}
+                                            <button
+                                                type="button"
                                                 className="btn-download-premium"
-                                                target="_blank"
-                                                rel="noreferrer"
+                                                disabled={downloading === originalName}
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    forceDownload(url, originalName)
+                                                }}
+                                                style={{
+                                                    cursor: downloading === originalName ? 'wait' : 'pointer',
+                                                    opacity: downloading === originalName ? 0.7 : 1
+                                                }}
                                             >
-                                                <span className="icon">📥</span>
-                                                Descargar
-                                            </a>
+                                                <span className="icon">{downloading === originalName ? '⏳' : '📥'}</span>
+                                                {downloading === originalName ? 'Descargando...' : 'Descargar'}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

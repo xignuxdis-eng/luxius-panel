@@ -1518,14 +1518,19 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 <>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                         <label>Archivo</label>
-                                        <div className="compact-upload" onClick={() => fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative' }}>
+                                        <div className="compact-upload" onClick={() => !saving && fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}>
                                             {previewUrl ? (
                                                 <img src={previewUrl} className="upload-preview-thumb" style={{ width: '40px', height: '40px', marginRight: '8px' }} alt="" />
                                             ) : (
                                                 <span className="upload-icon">📁</span>
                                             )}
-                                            <div className="upload-text-stack">
+                                            <div className="upload-text-stack" style={{ flex: 1 }}>
                                                 <span className="upload-text">{fileName || 'Seleccionar archivo...'}</span>
+                                                {selectedFile && (
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                                        {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB
+                                                    </span>
+                                                )}
                                                 {metadata?.pageCount && metadata.pageCount > 1 && (
                                                     <button
                                                         type="button"
@@ -1563,7 +1568,87 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 )}
                                             </div>
                                             <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+
+                                            {/* PROGRESS BAR - Extracción de metadata */}
+                                            {extracting && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: '4px',
+                                                    background: 'rgba(255,255,255,0.1)',
+                                                    borderRadius: '0 0 8px 8px',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        background: 'linear-gradient(90deg, #2563eb, #7c3aed, #ec4899, #2563eb)',
+                                                        backgroundSize: '200% 100%',
+                                                        animation: 'progressShimmer 1.5s ease-in-out infinite',
+                                                        borderRadius: '0 0 8px 8px'
+                                                    }} />
+                                                </div>
+                                            )}
+
+                                            {/* PROGRESS BAR - Upload a R2 */}
+                                            {uploadProgress && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: '6px',
+                                                    background: 'rgba(255,255,255,0.1)',
+                                                    borderRadius: '0 0 8px 8px',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        width: `${uploadProgress.percent}%`,
+                                                        height: '100%',
+                                                        background: 'linear-gradient(90deg, #10b981, #2563eb)',
+                                                        borderRadius: '0 0 8px 8px',
+                                                        transition: 'width 0.3s ease-out',
+                                                        boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
+                                                    }} />
+                                                </div>
+                                            )}
                                         </div>
+
+                                        {/* Upload Status Inline (debajo del input) */}
+                                        {(extracting || uploadProgress) && (
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                marginTop: '6px',
+                                                padding: '6px 12px',
+                                                background: 'rgba(37, 99, 235, 0.1)',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(37, 99, 235, 0.25)',
+                                                fontSize: '0.8rem',
+                                                color: '#60a5fa',
+                                                fontWeight: 600
+                                            }}>
+                                                <div style={{
+                                                    width: '14px',
+                                                    height: '14px',
+                                                    border: '2px solid rgba(96, 165, 250, 0.3)',
+                                                    borderTopColor: '#60a5fa',
+                                                    borderRadius: '50%',
+                                                    animation: 'spin 0.8s linear infinite',
+                                                    flexShrink: 0
+                                                }} />
+                                                {extracting ? (
+                                                    <span>Analizando imagen (DPI, dimensiones, color)...</span>
+                                                ) : uploadProgress ? (
+                                                    <span>
+                                                        Subiendo a servidor: {uploadProgress.percent}% — {uploadProgress.loaded} MB / {uploadProgress.total} MB
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                         <label>Info Imagen</label>
