@@ -1169,16 +1169,47 @@ export function getEmpresa(): Config['empresa'] {
 // Servicios
 // ============================================================
 
+function inferServicioCodigo(s: Partial<Servicio>): string {
+    if (s.codigo && s.codigo.trim() !== '') {
+        return s.codigo.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 4)
+    }
+    const name = (s.nombre || '').toUpperCase()
+    if (name.includes('TENSA')) return 'TEN'
+    if (name.includes('ROTULA')) return 'ROT'
+    if (name.includes('LAMINA')) return 'LAM'
+    if (name.includes('DEMAS')) return 'DEM'
+    const clean = name.replace(/[^A-Z0-9]/g, '')
+    return clean ? clean.substring(0, 4) : 'SERV'
+}
+
 export function getServicios(): Servicio[] {
     const sessionItemsJson = localStorage.getItem(SESSION_SERVICIOS_KEY)
 
     if (sessionItemsJson) {
         try {
-            return JSON.parse(sessionItemsJson) as Servicio[]
+            const items = JSON.parse(sessionItemsJson) as Servicio[]
+            let hasChanges = false
+            const sanitized = items.map(s => {
+                if (!s.codigo || s.codigo.trim() === '') {
+                    hasChanges = true
+                    return { ...s, codigo: inferServicioCodigo(s) }
+                }
+                return s
+            })
+            if (hasChanges) {
+                localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(sanitized))
+            }
+            return sanitized
         } catch (e) { }
     }
 
-    return []
+    const defaultServicios: Servicio[] = [
+        { id: 1, codigo: 'TEN', nombre: 'TENSADO', descripcion: 'Tensado de lona sobre estructura', precioBase: 20000, unidad: 'm2', habilitado: true },
+        { id: 2, codigo: 'ROT', nombre: 'ROTULADO', descripcion: 'Servicio de rotulado de vinilo', precioBase: 20000, unidad: 'm2', habilitado: true },
+        { id: 3, codigo: 'LAM', nombre: 'LAMINADO BRILLANTE', descripcion: 'Laminado líquido brillante', precioBase: 6000, unidad: 'metro', habilitado: true }
+    ]
+    localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(defaultServicios))
+    return defaultServicios
 }
 
 export function getServicioById(id: number): Servicio | undefined {
@@ -1203,11 +1234,17 @@ export function saveServicio(servicio: Partial<Servicio>): Servicio {
     let result: Servicio
 
     if (existingIndex !== -1) {
-        sessionItems[existingIndex] = { ...sessionItems[existingIndex], ...servicio } as Servicio
+        const merged = { ...sessionItems[existingIndex], ...servicio } as Servicio
+        if (!merged.codigo || merged.codigo.trim() === '') {
+            merged.codigo = inferServicioCodigo(merged)
+        }
+        sessionItems[existingIndex] = merged
         result = sessionItems[existingIndex]
     } else {
+        const code = inferServicioCodigo(servicio)
         const newServicio: Servicio = {
             id: servicio.id || Math.floor(Math.random() * 900000) + 100000,
+            codigo: code,
             nombre: servicio.nombre || '',
             descripcion: servicio.descripcion || '',
             precioBase: servicio.precioBase || 0,
