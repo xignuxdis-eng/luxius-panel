@@ -216,7 +216,7 @@ export default function Entrada() {
     const handleSoftDeleteOrder = async (order: Order) => {
         try {
             setLoading(true)
-            await saveOrden({ ...order, status: 'eliminado' })
+            await saveBatchOrders('update', [String(order.id)], { status: 'eliminado' })
             await loadOrders()
         } catch (error) {
             console.error('Soft delete error:', error)

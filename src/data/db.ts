@@ -209,12 +209,13 @@ export async function getOrdenes(): Promise<Order[]> {
         localOrders = localOrders.filter(o => !isHidden(o));
     } catch (e) { }
 
-    // If localStorage was recently written (within 5 seconds), skip API to avoid
-    // race conditions where stale API data overwrites a just-saved order
+    // If localStorage was recently written (within 5 seconds), trust it fully
+    // to avoid race conditions where stale API data overwrites a just-saved/deleted order.
+    // IMPORTANT: Do NOT require localOrders.length > 0 — deletions can leave it empty.
     const lastSaveTs = Number(localStorage.getItem('luxius_ordenes_last_save') || '0');
     const timeSinceLastSave = Date.now() - lastSaveTs;
-    if (timeSinceLastSave < 5000 && localOrders.length > 0) {
-        console.log('[db] getOrdenes: Usando localStorage reciente (guardado hace', timeSinceLastSave, 'ms)');
+    if (timeSinceLastSave < 5000) {
+        console.log('[db] getOrdenes: Usando localStorage reciente (guardado hace', timeSinceLastSave, 'ms). Orders:', localOrders.length);
         return localOrders;
     }
 
@@ -225,9 +226,25 @@ export async function getOrdenes(): Promise<Order[]> {
             if (Array.isArray(apiOrders)) {
                 const activeApiOrders = apiOrders.filter((o: any) => !isHidden(o));
                 const apiIds = new Set(activeApiOrders.map((o: any) => String(o.id)));
-                // Keep ALL local orders that are not in the API response (recently created)
+                const localById = new Map(localOrders.map(o => [String(o.id), o]));
+
+                // Merge: API orders win UNLESS local has a more recent status change
+                const mergedApi = activeApiOrders.map((apiOrder: any) => {
+                    const localVersion = localById.get(String(apiOrder.id));
+                    if (localVersion) {
+                        // If locally soft-deleted, preserve that status
+                        if (localVersion.status === 'eliminado' && apiOrder.status !== 'eliminado') {
+                            return localVersion;
+                        }
+                        // Keep local data that might have been edited (archivos, metadata, etc.)
+                        return { ...apiOrder, ...localVersion, id: apiOrder.id };
+                    }
+                    return apiOrder;
+                });
+
+                // Add local-only orders (not in API, e.g. recently created)
                 const uniqueLocal = localOrders.filter(o => !apiIds.has(String(o.id)));
-                const merged = [...activeApiOrders, ...uniqueLocal];
+                const merged = [...mergedApi, ...uniqueLocal];
                 localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
                 return merged;
             }
@@ -286,23 +303,16 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         ...order,
     } as Order
 
-    // Handle HIDDEN_ORDENES_KEY based on status
+    // Handle HIDDEN_ORDENES_KEY: clear from hidden list if order is being saved/restored
+    // (so previously deleted orders become visible again when restored)
     const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
     try {
         let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
-        if (newOrder.status === 'eliminado') {
-            // SOFT DELETE: Add to hidden list so API merge won't resurrect it
-            const targetStr = String(newOrder.id).trim();
-            const targetClean = targetStr.replace(/^ot-/i, '');
-            const existingClean = new Set(hiddenIds.map(s => String(s).trim().toLowerCase().replace(/^ot-/i, '')));
-            if (!existingClean.has(targetClean.toLowerCase())) {
-                hiddenIds.push(targetStr, targetClean, `OT-${targetClean}`);
-            }
-        } else {
-            // Normal save/restore: Clear from hidden list
-            hiddenIds = hiddenIds.filter(id => !matchesOrderId({ id: id as any, ot: String(id) }, newOrder.id));
+        const before = hiddenIds.length;
+        hiddenIds = hiddenIds.filter(id => !matchesOrderId({ id: id as any, ot: String(id) }, newOrder.id));
+        if (hiddenIds.length !== before) {
+            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
         }
-        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
     } catch (e) { }
 
     const idx = localOrders.findIndex(o => matchesOrderId(o, newOrder.id));
@@ -396,7 +406,8 @@ export async function saveBatchOrders(
     let hiddenIds: (number | string)[] = [];
     try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
 
-    if (action === 'delete' || (action === 'update' && data?.status === 'eliminado')) {
+    if (action === 'delete') {
+        // HARD DELETE: permanently remove from localStorage + add to hidden list
         ids.forEach(id => {
             const targetStr = String(id).trim();
             const targetClean = targetStr.replace(/^ot-/i, '');
