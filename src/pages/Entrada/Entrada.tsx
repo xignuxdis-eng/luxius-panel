@@ -513,6 +513,8 @@ export default function Entrada() {
                         <tbody>
                             {displayedOrders.map(order => {
                                 const consumption = getConsumption(order);
+                                const isMobile = order.origen === 'mobile';
+                                const operarioNombre = order.operarioNombre || order.vendedorNombre || (order as any).vendedor?.nombre || (order as any).vendedorName || '';
                                 const otDisplay = order.ot || `OT-${order.id}`;
                                 let cleanDesc = (order.nombreTarea || order.observaciones || '').trim();
                                 if (!cleanDesc || cleanDesc.startsWith('Proyecto #') || cleanDesc.startsWith('Proyecto OT-')) {
