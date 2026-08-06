@@ -6,7 +6,7 @@ import './Sistema.css'
 
 
 import { useState, useEffect } from 'react'
-import { getRoles, deleteRole } from '@data/db'
+import { getRoles, deleteRole, HIDDEN_ORDENES_KEY } from '@data/db'
 import type { RoleConfig } from '@/types/auth'
 import RolModal from './RolModal'
 import LogViewerModal from './LogViewerModal'
@@ -122,26 +122,113 @@ function PermisosView() {
 function UtilidadesDB() {
     const [loading, setLoading] = useState<string | null>(null);
 
-    const handleAction = async (endpoint: string, method = 'POST', download = false) => {
-        setLoading(endpoint);
+    // Client-side full backup export (does NOT navigate away or crash SPA)
+    const handleExportBackup = () => {
+        setLoading('backup');
         try {
-            if (download) {
-                window.location.href = `/api/db/${endpoint}`;
-                setLoading(null);
-                return;
-            }
+            const backupData = {
+                version: '1.0',
+                createdAt: new Date().toISOString(),
+                ordenes: JSON.parse(localStorage.getItem('luxius_session_ordenes') || '[]'),
+                deletedOrdenes: JSON.parse(localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]'),
+                materiales: JSON.parse(localStorage.getItem('luxius_session_materiales') || '[]'),
+                servicios: JSON.parse(localStorage.getItem('luxius_session_servicios') || '[]'),
+            };
 
-            const res = await fetch(`/api/db/${endpoint}`, { method });
-            const result = await res.json();
+            const jsonStr = JSON.stringify(backupData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
 
-            if (res.ok) {
-                alert(result.message || 'Operación completada con éxito.');
-            } else {
-                alert('Error: ' + (result.error || 'Ocurrió un problema.'));
+            const dateStr = new Date().toISOString().split('T')[0];
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_luxius_${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert('Respaldo descargado con éxito.');
+        } catch (err) {
+            console.error('Error al exportar respaldo:', err);
+            alert('Hubo un problema al generar la copia de respaldo.');
+        } finally {
+            setLoading(null);
+        }
+    };
+
+    // Client-side backup import / restore
+    const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const data = JSON.parse(evt.target?.result as string);
+                if (data.ordenes && Array.isArray(data.ordenes)) {
+                    localStorage.setItem('luxius_session_ordenes', JSON.stringify(data.ordenes));
+                }
+                if (data.deletedOrdenes && Array.isArray(data.deletedOrdenes)) {
+                    localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(data.deletedOrdenes));
+                }
+                if (data.materiales && Array.isArray(data.materiales)) {
+                    localStorage.setItem('luxius_session_materiales', JSON.stringify(data.materiales));
+                }
+                if (data.servicios && Array.isArray(data.servicios)) {
+                    localStorage.setItem('luxius_session_servicios', JSON.stringify(data.servicios));
+                }
+
+                localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+                alert('¡Respaldo restaurado con éxito! Se recargará la aplicación.');
+                window.location.reload();
+            } catch (err) {
+                console.error('Error al importar archivo de respaldo:', err);
+                alert('El archivo seleccionado no tiene un formato de respaldo válido.');
             }
+        };
+        reader.readAsText(file);
+    };
+
+    // Safe client-side cleanup of historical orders (> 2 years old)
+    const handleCleanup = () => {
+        if (!confirm('¿Seguro? Esta acción eliminará registros de más de 2 años permanentemente.')) return;
+        setLoading('cleanup');
+        try {
+            const now = new Date();
+            const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate()).getTime();
+
+            const localOrders: any[] = JSON.parse(localStorage.getItem('luxius_session_ordenes') || '[]');
+            const filtered = localOrders.filter(o => {
+                const created = o.fechaCreacion ? new Date(o.fechaCreacion).getTime() : Date.now();
+                return created >= twoYearsAgo;
+            });
+
+            localStorage.setItem('luxius_session_ordenes', JSON.stringify(filtered));
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+            alert(`Limpieza completada. Se conservaron ${filtered.length} órdenes recientes.`);
+        } catch (err) {
+            console.error('Error en limpieza:', err);
+        } finally {
+            setLoading(null);
+        }
+    };
+
+    // Safe normalize case
+    const handleNormalizeCase = () => {
+        setLoading('normalize-case');
+        try {
+            const localOrders: any[] = JSON.parse(localStorage.getItem('luxius_session_ordenes') || '[]');
+            const normalized = localOrders.map(o => ({
+                ...o,
+                clienteNombre: (o.clienteNombre || '').toUpperCase(),
+                material: (o.material || '').toUpperCase(),
+            }));
+            localStorage.setItem('luxius_session_ordenes', JSON.stringify(normalized));
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+            alert('Textos de órdenes normalizados a MAYÚSCULAS.');
         } catch (err) {
             console.error(err);
-            alert('Error de conexión con el servidor.');
         } finally {
             setLoading(null);
         }
@@ -149,60 +236,55 @@ function UtilidadesDB() {
 
     return (
         <div className="sistema-view utilidades-view">
-            <h3>Utilidades de Base de Datos</h3>
+            <h3>Utilidades de Base de Datos y Respaldo</h3>
             <div className="db-tools-grid">
                 <div className="tool-card">
-                    <h4>Respaldo Full</h4>
-                    <p>Genera un backup completo de la base de datos en formato JSON.</p>
+                    <h4>Respaldo Full (Exportar)</h4>
+                    <p>Genera y descarga una copia completa de seguridad de tus órdenes, materiales y servicios en formato JSON.</p>
                     <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleAction('backup', 'GET', true)}
+                        onClick={handleExportBackup}
                         disabled={!!loading}
                     >
-                        {loading === 'backup' ? 'Generando...' : 'Ejecutar Backup'}
+                        {loading === 'backup' ? 'Generando...' : '📥 Descargar Backup'}
                     </Button>
                 </div>
                 <div className="tool-card">
-                    <h4>Limpiar Base</h4>
-                    <p>Elimina registros históricos (más de 2 años) para optimizar el rendimiento.</p>
+                    <h4>Restaurar Respaldo (Importar)</h4>
+                    <p>Carga un archivo de copia de seguridad (JSON) previamente exportado para recuperar todos tus datos.</p>
+                    <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer', display: 'inline-block', marginTop: '6px' }}>
+                        📂 Cargar Backup JSON
+                        <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleImportBackup}
+                            style={{ display: 'none' }}
+                        />
+                    </label>
+                </div>
+                <div className="tool-card">
+                    <h4>Limpiar Registros Antiguos</h4>
+                    <p>Elimina registros históricos locales de más de 2 años para optimizar el rendimiento del sistema.</p>
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                            if (confirm('¿Seguro? Esta acción eliminará registros de más de 2 años permanentemente.'))
-                                handleAction('cleanup')
-                        }}
+                        onClick={handleCleanup}
                         disabled={!!loading}
                     >
                         {loading === 'cleanup' ? 'Limpiando...' : 'Iniciar Limpieza'}
                     </Button>
                 </div>
                 <div className="tool-card">
-                    <h4>Reinicio de Saldos</h4>
-                    <p>Resetea balances de clientes y deudas de cuenta corriente a cero.</p>
-                    <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => {
-                            if (confirm('¿Seguro que deseas resetear todos los saldos?'))
-                                handleAction('reset-balances')
-                        }}
-                        disabled={!!loading}
-                    >
-                        {loading === 'reset-balances' ? 'Reiniciando...' : 'Reiniciar'}
-                    </Button>
-                </div>
-                <div className="tool-card">
-                    <h4>Mayúsculas</h4>
-                    <p>Normaliza nombres de clientes, materiales y máquinas a MAYÚSCULAS.</p>
+                    <h4>Normalizar Textos</h4>
+                    <p>Normaliza nombres de clientes y materiales de las órdenes a MAYÚSCULAS para mayor consistencia.</p>
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleAction('normalize-case')}
+                        onClick={handleNormalizeCase}
                         disabled={!!loading}
                     >
-                        {loading === 'normalize-case' ? 'Procesando...' : 'Procesar'}
+                        {loading === 'normalize-case' ? 'Procesando...' : 'Procesar Textos'}
                     </Button>
                 </div>
             </div>

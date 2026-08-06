@@ -914,16 +914,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         }
 
                         if (detectedDpi > 0) {
-                            dpi = detectedDpi;
+                            // Preserve high XMP DPI (e.g. 150/300) if available, otherwise use detectedDpi
+                            dpi = Math.max(dpi > 72 ? dpi : 0, detectedDpi);
                             console.log(`[Luxius-Meta] DPI de imagen incrustada en PDF detectado: ${dpi} DPI`);
-                        } else if (dpi === 72) {
+                        }
+                        if (!dpi || dpi < 72) {
                             dpi = 300;
-                            console.log(`[Luxius-Meta] PDF Vectorial detectado -> Asignando 300 DPI por defecto para imprenta`);
+                            console.log(`[Luxius-Meta] PDF Vectorial/fallback detectado -> Asignando 300 DPI por defecto para imprenta`);
                         }
                     }
                 } catch (pdfJsErr) {
                     console.warn("[Luxius-Meta] Cálculo de DPI con PDFJS omitido/timeout, manteniendo fallback", pdfJsErr);
-                    if (dpi === 72) dpi = 300;
+                    if (!dpi || dpi < 72) dpi = 300;
                 }
 
                 // 3. Page Thumbnail (Lazy call)

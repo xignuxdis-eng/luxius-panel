@@ -709,7 +709,8 @@ export function getMateriales(): Material[] {
         { id: 1, codigo: 'lona_front_light_13oz', descripcion: 'Lona Front Light 13oz', calidad: 'Solvente', tipo: 'lona', unidad: 'M2', color: '#ffffff', precioM2: 12500, ancho: 3.2, habilitado: true, stockActual: 100, stockMinimo: 20 },
         { id: 2, codigo: 'lona_back_light_15oz', descripcion: 'Lona Back Light 15oz', calidad: 'Solvente', tipo: 'lona', unidad: 'M2', color: '#ffffff', precioM2: 15000, ancho: 3.2, habilitado: true, stockActual: 100, stockMinimo: 20 },
         { id: 3, codigo: 'vinilo_adhesivo_brillo', descripcion: 'Vinilo Adhesivo Brillo', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 8400, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 },
-        { id: 4, codigo: 'vinilo_microperforado', descripcion: 'Vinilo Microperforado', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 5100, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 }
+        { id: 4, codigo: 'vinilo_microperforado', descripcion: 'Vinilo Microperforado', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 5100, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 },
+        { id: 5, codigo: 'vinilo_vehicular_o3651', descripcion: 'Vinilo Vehicular O-3651', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 18500, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 }
     ]
     const staticCombined = [...staticMateriales, ...supplementaryMaterials]
 
@@ -1412,7 +1413,8 @@ export function getServicios(): Servicio[] {
     const defaultServicios: Servicio[] = [
         { id: 1, codigo: 'TEN', nombre: 'TENSADO', descripcion: 'Tensado de lona sobre estructura', precioBase: 20000, unidad: 'm2', habilitado: true },
         { id: 2, codigo: 'ROT', nombre: 'ROTULADO', descripcion: 'Servicio de rotulado de vinilo', precioBase: 20000, unidad: 'm2', habilitado: true },
-        { id: 3, codigo: 'LAM', nombre: 'LAMINADO BRILLANTE', descripcion: 'Laminado líquido brillante', precioBase: 6000, unidad: 'metro', habilitado: true }
+        { id: 3, codigo: 'LAM', nombre: 'LAMINADO BRILLANTE', descripcion: 'Laminado líquido brillante', precioBase: 6000, unidad: 'metro', habilitado: true },
+        { id: 4, codigo: 'EST', nombre: 'ESTRUCTURA', descripcion: 'Fabricación y armado de estructura metálica', precioBase: 35000, unidad: 'global', habilitado: true }
     ]
     localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(defaultServicios))
     return defaultServicios
