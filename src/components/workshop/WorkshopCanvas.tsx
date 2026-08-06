@@ -8,7 +8,7 @@ import { getUsuarios, getMaquinas } from '@/data/db';
 interface WorkshopCanvasProps {
     orders: Order[];
     onSelectStation: (stationId: StationId) => void;
-    _onSelectOrder?: (order: Order) => void;
+    onSelectOrder?: (order: Order) => void;
     selectedStation: StationId | null;
 }
 
@@ -131,6 +131,7 @@ const getDynamicStations = (): StationConfig[] => {
 export const WorkshopCanvas: React.FC<WorkshopCanvasProps> = ({
     orders,
     onSelectStation,
+    onSelectOrder,
     selectedStation
 }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -565,6 +566,41 @@ export const WorkshopCanvas: React.FC<WorkshopCanvasProps> = ({
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
+        // 1. Check worker clicks
+        const clickedWorker = workersRef.current.find(w => {
+            const dx = mouseX - w.x;
+            const dy = mouseY - w.y;
+            return Math.sqrt(dx * dx + dy * dy) < 25;
+        });
+
+        if (clickedWorker && onSelectOrder) {
+            const heldText = clickedWorker.heldItem || clickedWorker.speechBubble?.text || '';
+            const otMatch = heldText.match(/OT\s*#?(\d+)/i);
+            let matchedOrder: Order | undefined;
+            if (otMatch) {
+                const idOrOt = otMatch[1];
+                matchedOrder = ordersRef.current.find(o => String(o.id) === idOrOt || String(o.ot) === idOrOt);
+            }
+            if (!matchedOrder) {
+                const roleStatusMap: Record<string, string> = {
+                    disenador: 'diseno',
+                    impresor: 'orden',
+                    cortador: 'impreso',
+                    empaquetador: 'completo'
+                };
+                const statusNeeded = roleStatusMap[clickedWorker.role];
+                if (statusNeeded) {
+                    matchedOrder = ordersRef.current.find(o => o.status === statusNeeded);
+                }
+            }
+            if (matchedOrder) {
+                audioEngine.playClick();
+                onSelectOrder(matchedOrder);
+                return;
+            }
+        }
+
+        // 2. Check station clicks
         const currentStations = getDynamicStations();
         const found = currentStations.find(s =>
             mouseX >= s.x && mouseX <= s.x + s.width &&

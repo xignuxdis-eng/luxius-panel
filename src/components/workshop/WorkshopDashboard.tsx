@@ -7,10 +7,12 @@ import { PrintManagerHUD } from './PrintManagerHUD';
 import { StationModal } from './StationModal';
 import { StationId } from './types';
 import { audioEngine } from './AudioEngine';
+import SharedFileViewerModal from '@components/shared/SharedFileViewerModal';
 
 export const WorkshopDashboard: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [selectedStation, setSelectedStation] = useState<StationId | null>(null);
+    const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
     const [isMuted, setIsMuted] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -93,7 +95,7 @@ export const WorkshopDashboard: React.FC = () => {
                         🏭 XignuX Print Den <span style={{ fontSize: '12px', backgroundColor: '#0284c7', padding: '2px 8px', borderRadius: '10px' }}>Luxius Interactive Workshop</span>
                     </h2>
                     <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
-                        Haz clic en las estaciones del taller para ver métricas reales o interactuar con el flujo de trabajo.
+                        Haz clic en las estaciones del taller o en cualquier orden para ver detalles, archivos o navegar a cada área.
                     </p>
                 </div>
 
@@ -123,12 +125,14 @@ export const WorkshopDashboard: React.FC = () => {
             <div style={{ position: 'relative' }}>
                 <PrintManagerHUD
                     orders={orders}
+                    onSelectOrder={(order) => setPreviewOrder(order)}
                     onSimulateStatusChange={handleUpdateStatus}
                 />
 
                 <WorkshopCanvas
                     orders={orders}
                     onSelectStation={(stationId) => setSelectedStation(stationId)}
+                    onSelectOrder={(order) => setPreviewOrder(order)}
                     selectedStation={selectedStation}
                 />
             </div>
@@ -139,7 +143,19 @@ export const WorkshopDashboard: React.FC = () => {
                 orders={orders}
                 onClose={() => setSelectedStation(null)}
                 onUpdateOrderStatus={handleUpdateStatus}
+                onViewOrder={(order) => setPreviewOrder(order)}
             />
+
+            {/* Order Detail & Files Viewer Modal */}
+            {previewOrder && (
+                <SharedFileViewerModal
+                    isOpen={!!previewOrder}
+                    onClose={() => setPreviewOrder(null)}
+                    order={previewOrder}
+                    showStandardize={true}
+                    onUpdate={fetchOrders}
+                />
+            )}
         </div>
     );
 };
