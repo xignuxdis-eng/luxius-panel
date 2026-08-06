@@ -120,14 +120,21 @@ export default function SharedFileViewerModal({
                     ) : (
                         order.archivos.map((file, i) => {
                             const isDataUrl = file.startsWith('data:')
-
-                            const isImage = isDataUrl ? file.startsWith('data:image/') : !!file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                            const isVideo = isDataUrl ? file.startsWith('data:video/') : !!file.match(/\.(mp4|webm|ogv|mov|avi)$/i)
-                            const isPdf = isDataUrl ? file.startsWith('data:application/pdf') : !!file.match(/\.pdf$/i)
-                            const isAudio = isDataUrl ? file.startsWith('data:audio/') : !!file.match(/\.(mp3|wav|ogg|m4a)$/i)
+                            const isAbsoluteUrl = file.startsWith('http://') || file.startsWith('https://')
+                            // Para URLs absolutas, extraer extensión antes del query string
+                            const filePathOnly = isAbsoluteUrl ? file.split('?')[0] : file
+                            const isImage = isDataUrl
+                                ? file.startsWith('data:image/')
+                                : !!filePathOnly.match(/\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i)
+                            const isVideo = isDataUrl ? file.startsWith('data:video/') : !!filePathOnly.match(/\.(mp4|webm|ogv|mov|avi)$/i)
+                            const isPdf = isDataUrl ? file.startsWith('data:application/pdf') : !!filePathOnly.match(/\.pdf$/i)
+                            const isAudio = isDataUrl ? file.startsWith('data:audio/') : !!filePathOnly.match(/\.(mp3|wav|ogg|m4a)$/i)
                             const baseUrl = API_URL.replace('/api', '')
-                            const url = isDataUrl ? file : `${baseUrl}/uploads/${file}`
-                            const originalName = order.archivosOriginales?.[i] || (isDataUrl ? `archivo_adjunto_${i + 1}` : file)
+                            // Si es data URL, usarla directamente
+                            // Si es URL absoluta (R2 presigned), usarla directamente
+                            // Si es ruta relativa, concatenar con el backend
+                            const url = isDataUrl ? file : isAbsoluteUrl ? file : `${baseUrl}/uploads/${file}`
+                            const originalName = order.archivosOriginales?.[i] || (isDataUrl ? `archivo_adjunto_${i + 1}` : file.split('/').pop()?.split('?')[0] || file)
                             const standardized = isStandardized(file)
 
                             return (
