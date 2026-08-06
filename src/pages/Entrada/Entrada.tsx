@@ -492,9 +492,9 @@ export default function Entrada() {
                                     />
                                 </th>
                                 <th style={{ width: '60px' }}>Tipo</th>
-                                <th>ID / OT</th>
+                                <th>N° OT</th>
                                 <th>Origen</th>
-                                <th>Proyecto / Tarea</th>
+                                <th>Descripción del Trabajo</th>
                                 <th>Creación</th>
                                 <th>Estado</th>
                                 <th>Cliente</th>

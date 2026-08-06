@@ -1383,8 +1383,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         archivosOriginales: finalArchivosOriginales,
                         demasiasConfig: isLonaOrNotVinilo(data.material) ? data.demasiasConfig : { top: false, bottom: false, left: false, right: false },
                         imgMetadata: metadata || order?.imgMetadata,
-                        status: numericData.status || (order ? order.status : (currentDefaultStatus as any)),
-                        category: (numericData.status === 'relevamiento' || numericData.status === 'diseno') ? 'diseno' : 'impresion',
+                        status: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') && numericData.status === 'orden') ? 'diseno' : (numericData.status || (order ? order.status : (currentDefaultStatus as any))),
+                        category: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') || numericData.status === 'relevamiento' || numericData.status === 'diseno') ? 'diseno' : 'impresion',
                         artistaId: user?.role === 'artista' ? user.id : order?.artistaId,
                         servicios: data.servicios
                     })
