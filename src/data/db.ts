@@ -20,6 +20,29 @@ export const API_URL = isDev
         ? 'https://luxius-backend.onrender.com/api'
         : '/api');
 
+export function resolveMediaUrl(fileStr: string): string {
+    if (!fileStr) return ''
+    const trimmed = fileStr.trim()
+
+    if (trimmed.startsWith('data:')) return trimmed
+
+    const httpIdx = trimmed.indexOf('http://')
+    const httpsIdx = trimmed.indexOf('https://')
+    const firstHttp = httpIdx !== -1 ? httpIdx : httpsIdx
+    if (firstHttp !== -1) {
+        return trimmed.substring(firstHttp)
+    }
+
+    const baseUrl = API_URL.replace(/\/api\/?$/, '')
+    let cleanPath = trimmed.replace(/^\/+/, '')
+
+    if (cleanPath.startsWith('uploads/')) {
+        cleanPath = cleanPath.replace(/^uploads\//, '')
+    }
+
+    return `${baseUrl}/uploads/${cleanPath}`
+}
+
 const COLLECTIONS_CONFIG = [
     { key: 'luxius_session_clientes', endpoint: 'clientes' },
     { key: 'luxius_session_materiales', endpoint: 'materiales' },

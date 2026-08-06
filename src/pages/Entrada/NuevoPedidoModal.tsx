@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import { PDFDocument } from 'pdf-lib'
-import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos } from '@data/db'
+import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -312,9 +312,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             if (order.archivos?.[0]) {
                 const name = order.archivos[0]
                 setFileName(name)
-                // Try to recover from blobStore
+                // Recover from blobStore, imgMetadata thumbnailUrl or resolveMediaUrl
                 const savedUrl = blobStore.get(name)
-                if (savedUrl) setPreviewUrl(savedUrl)
+                const targetUrl = savedUrl || order.imgMetadata?.thumbnailUrl || resolveMediaUrl(name)
+                if (targetUrl) setPreviewUrl(targetUrl)
                 if (order.imgMetadata) setMetadata(order.imgMetadata)
             }
         } else {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Modal from '@components/ui/Modal'
-import { API_URL, getServicios } from '@data/db'
+import { API_URL, getServicios, resolveMediaUrl } from '@data/db'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
 import './FileViewerModal.css'
@@ -132,52 +132,53 @@ export default function SharedFileViewerModal({
         })
     }
 
-    const forceDownload = async (url: string, filename: string) => {
+    const forceDownload = async (rawUrl: string, filename: string) => {
         setDownloading(filename)
+        const url = resolveMediaUrl(rawUrl)
         try {
-            const isImg = filename.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i) || url.startsWith('data:image/')
-            if (isImg) {
-                const canvasSuccess = await downloadImageViaCanvas(url, filename)
-                if (canvasSuccess) {
-                    setDownloading(null)
-                    return
-                }
+            if (url.startsWith('data:')) {
+                const a = document.createElement('a')
+                a.href = url
+                a.download = filename
+                a.style.display = 'none'
+                document.body.appendChild(a)
+                a.click()
+                setTimeout(() => {
+                    try { document.body.removeChild(a) } catch (e) { }
+                }, 300)
+                setDownloading(null)
+                return
             }
 
-            try {
-                const response = await fetch(url, { mode: 'cors' })
-                if (response.ok) {
-                    const blob = await response.blob()
-                    const blobUrl = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = blobUrl
-                    a.download = filename
-                    a.style.display = 'none'
-                    document.body.appendChild(a)
-                    a.click()
-                    setTimeout(() => {
-                        URL.revokeObjectURL(blobUrl)
-                        document.body.removeChild(a)
-                    }, 300)
-                    setDownloading(null)
-                    return
-                }
-            } catch (corsErr) {
-                console.warn('[Download] Direct fetch CORS error, using proxy fallback', corsErr)
+            // Direct fetch without Authorization or custom headers for S3/R2 presigned URLs
+            const response = await fetch(url, { method: 'GET', headers: {} })
+            if (response.ok) {
+                const blob = await response.blob()
+                const blobUrl = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = blobUrl
+                a.download = filename
+                a.style.display = 'none'
+                document.body.appendChild(a)
+                a.click()
+                setTimeout(() => {
+                    URL.revokeObjectURL(blobUrl)
+                    try { document.body.removeChild(a) } catch (e) { }
+                }, 500)
+                setDownloading(null)
+                return
             }
-
-            const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
-            const proxyLink = document.createElement('a')
-            proxyLink.href = proxyUrl
-            proxyLink.download = filename
-            document.body.appendChild(proxyLink)
-            proxyLink.click()
-            setTimeout(() => {
-                try { document.body.removeChild(proxyLink) } catch (e) { }
-            }, 300)
+            throw new Error(`HTTP ${response.status}`)
         } catch (err) {
-            console.error('[Download] Error descargando archivo:', err)
-            window.open(url, '_blank')
+            console.warn('[Download] Direct fetch failed, trying canvas fallback:', err)
+            const canvasSuccess = await downloadImageViaCanvas(url, filename)
+            if (canvasSuccess) {
+                setDownloading(null)
+                return
+            }
+            // Proxy endpoint or direct open as ultimate fallback
+            const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+            window.open(proxyUrl, '_blank')
         } finally {
             setDownloading(null)
         }
@@ -244,17 +245,16 @@ export default function SharedFileViewerModal({
                         </div>
                     ) : (
                         order.archivos.map((file, i) => {
-                            const isDataUrl = file.startsWith('data:')
-                            const isAbsoluteUrl = file.startsWith('http://') || file.startsWith('https://')
-                            const filePathOnly = isAbsoluteUrl ? file.split('?')[0] : file
+                            const url = resolveMediaUrl(file)
+                            const isDataUrl = url.startsWith('data:')
+                            const cleanPath = url.split('?')[0]
                             const isImage = isDataUrl
-                                ? file.startsWith('data:image/')
-                                : !!filePathOnly.match(/\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i)
-                            const isVideo = isDataUrl ? file.startsWith('data:video/') : !!filePathOnly.match(/\.(mp4|webm|ogv|mov|avi)$/i)
-                            const isPdf = isDataUrl ? file.startsWith('data:application/pdf') : !!filePathOnly.match(/\.pdf$/i)
-                            const isAudio = isDataUrl ? file.startsWith('data:audio/') : !!filePathOnly.match(/\.(mp3|wav|ogg|m4a)$/i)
-                            const baseUrl = API_URL.replace('/api', '')
-                            const url = isDataUrl ? file : isAbsoluteUrl ? file : `${baseUrl}/uploads/${file}`
+                                ? url.startsWith('data:image/')
+                                : !!cleanPath.match(/\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp|svg)$/i)
+                            const isVideo = isDataUrl ? url.startsWith('data:video/') : !!cleanPath.match(/\.(mp4|webm|ogv|mov|avi)$/i)
+                            const isPdf = isDataUrl ? url.startsWith('data:application/pdf') : !!cleanPath.match(/\.pdf$/i)
+                            const isAudio = isDataUrl ? url.startsWith('data:audio/') : !!cleanPath.match(/\.(mp3|wav|ogg|m4a)$/i)
+
                             const originalName = order.archivosOriginales?.[i] || (isDataUrl ? `archivo_adjunto_${i + 1}` : file.split('/').pop()?.split('?')[0] || file)
                             const productionName = buildProductionFilename(order, i, originalName)
                             const standardized = isStandardized(file)
@@ -263,7 +263,17 @@ export default function SharedFileViewerModal({
                                 <div key={i} className={`file-card ${standardized ? 'is-standard' : 'is-pending'}`}>
                                     <div className="file-preview-container" style={{ minHeight: isPdf ? '250px' : isVideo ? '200px' : 'auto' }}>
                                         {isImage ? (
-                                            <img src={url} alt="preview" className="img-preview" />
+                                            <img
+                                                src={url}
+                                                alt="preview"
+                                                className="img-preview"
+                                                onError={(e) => {
+                                                    console.warn('[Image Error] Fallback thumbnail:', url)
+                                                    if (order.imgMetadata?.thumbnailUrl && e.currentTarget.src !== order.imgMetadata.thumbnailUrl) {
+                                                        e.currentTarget.src = order.imgMetadata.thumbnailUrl
+                                                    }
+                                                }}
+                                            />
                                         ) : isVideo ? (
                                             <div className="video-preview-box" style={{ width: '100%', padding: '4px' }}>
                                                 <video controls src={url} style={{ width: '100%', maxHeight: '220px', borderRadius: '8px', background: '#000' }} playsInline></video>
