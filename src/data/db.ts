@@ -163,18 +163,50 @@ export async function refreshCollection(endpoint: string) {
 
 
 
+export function matchesOrderId(order: { id?: number | string, ot?: string }, targetId: number | string): boolean {
+    if (!order || targetId === undefined || targetId === null) return false;
+    const targetStr = String(targetId).trim().toLowerCase();
+    const targetClean = targetStr.replace(/^ot-/i, '');
+
+    const idStr = String(order.id || '').trim().toLowerCase();
+    const idClean = idStr.replace(/^ot-/i, '');
+
+    const otStr = String(order.ot || '').trim().toLowerCase();
+    const otClean = otStr.replace(/^ot-/i, '');
+
+    return (
+        idStr === targetStr ||
+        idClean === targetClean ||
+        otStr === targetStr ||
+        otClean === targetClean
+    );
+}
+
 export const HIDDEN_ORDENES_KEY = 'luxius_deleted_ordenes';
 
 export async function getOrdenes(): Promise<Order[]> {
     const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-    let hiddenIds: string[] = [];
-    try { hiddenIds = (JSON.parse(hiddenJson) as any[]).map(String); } catch (e) { }
+    let hiddenCleanIds: Set<string> = new Set();
+    try {
+        const rawHidden = JSON.parse(hiddenJson) as any[];
+        rawHidden.forEach(item => {
+            const s = String(item).trim().toLowerCase().replace(/^ot-/i, '');
+            if (s) hiddenCleanIds.add(s);
+        });
+    } catch (e) { }
+
+    const isHidden = (o: Order) => {
+        if (!o) return false;
+        const idClean = String(o.id || '').trim().toLowerCase().replace(/^ot-/i, '');
+        const otClean = String(o.ot || '').trim().toLowerCase().replace(/^ot-/i, '');
+        return hiddenCleanIds.has(idClean) || hiddenCleanIds.has(otClean);
+    };
 
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     let localOrders: Order[] = [];
     try {
         localOrders = JSON.parse(localOrdersJson);
-        localOrders = localOrders.filter(o => !hiddenIds.includes(String(o.id)) && !hiddenIds.includes(String(o.ot)));
+        localOrders = localOrders.filter(o => !isHidden(o));
     } catch (e) { }
 
     try {
@@ -182,7 +214,7 @@ export async function getOrdenes(): Promise<Order[]> {
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
-                const activeApiOrders = apiOrders.filter((o: any) => !hiddenIds.includes(String(o.id)) && !hiddenIds.includes(String(o.ot)));
+                const activeApiOrders = apiOrders.filter((o: any) => !isHidden(o));
                 const apiIds = new Set(activeApiOrders.map((o: any) => String(o.id)));
                 const uniqueLocal = localOrders.filter(o => !apiIds.has(String(o.id)));
                 const merged = [...activeApiOrders, ...uniqueLocal];
@@ -248,11 +280,11 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
     try {
         let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
-        hiddenIds = hiddenIds.filter(id => String(id) !== String(newOrder.id) && String(id) !== String(newOrder.ot));
+        hiddenIds = hiddenIds.filter(id => !matchesOrderId({ id: id as any, ot: String(id) }, newOrder.id));
         localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
     } catch (e) { }
 
-    const idx = localOrders.findIndex(o => String(o.id) === String(newOrder.id));
+    const idx = localOrders.findIndex(o => matchesOrderId(o, newOrder.id));
     if (idx >= 0) {
         localOrders[idx] = { ...localOrders[idx], ...newOrder };
     } else {
@@ -296,14 +328,19 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 }
 
 export async function deleteOrden(id: number | string): Promise<boolean> {
-    const stringId = String(id);
+    if (id === undefined || id === null) return false;
+    const targetStr = String(id).trim();
+    const targetClean = targetStr.replace(/^ot-/i, '');
 
     // 1. Add to HIDDEN_ORDENES_KEY
     const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
     let hiddenIds: (number | string)[] = [];
     try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
-    if (!hiddenIds.map(String).includes(stringId)) {
-        hiddenIds.push(id);
+    const existingStr = new Set(hiddenIds.map(s => String(s).trim().toLowerCase().replace(/^ot-/i, '')));
+    if (!existingStr.has(targetClean.toLowerCase())) {
+        hiddenIds.push(targetStr);
+        hiddenIds.push(targetClean);
+        hiddenIds.push(`OT-${targetClean}`);
         localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
     }
 
@@ -311,7 +348,7 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     try {
         let localOrders: Order[] = JSON.parse(localOrdersJson);
-        localOrders = localOrders.filter(o => String(o.id) !== stringId && String(o.ot) !== stringId);
+        localOrders = localOrders.filter(o => !matchesOrderId(o, id));
         localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
     } catch (e) { }
 
@@ -330,57 +367,34 @@ export async function saveBatchOrders(
     data?: Partial<Order>
 ): Promise<{ success: boolean, count: number }> {
     if (!ids || ids.length === 0) return { success: true, count: 0 };
-    
-    // Normalizar todos los IDs a string y agregar variantes (ej: 660103 -> "660103", "OT-660103")
-    const stringIdsSet = new Set<string>();
-    ids.forEach(rawId => {
-        const s = String(rawId).trim();
-        stringIdsSet.add(s);
-        const clean = s.replace(/^OT-/i, '');
-        stringIdsSet.add(clean);
-        stringIdsSet.add(`OT-${clean}`);
-    });
 
-    if (action === 'delete') {
-        const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-        let hiddenIds: (number | string)[] = [];
-        try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
-        const existingStr = new Set(hiddenIds.map(String));
-        stringIdsSet.forEach(sId => {
-            if (!existingStr.has(sId)) {
-                hiddenIds.push(sId);
-                existingStr.add(sId);
-            }
+    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+    let hiddenIds: (number | string)[] = [];
+    try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
+
+    if (action === 'delete' || (action === 'update' && data?.status === 'eliminado')) {
+        ids.forEach(id => {
+            const targetStr = String(id).trim();
+            const targetClean = targetStr.replace(/^ot-/i, '');
+            hiddenIds.push(targetStr);
+            hiddenIds.push(targetClean);
+            hiddenIds.push(`OT-${targetClean}`);
         });
         localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
 
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
-            localOrders = localOrders.filter(o => !stringIdsSet.has(String(o.id)) && !stringIdsSet.has(String(o.ot)));
+            localOrders = localOrders.filter(o => !ids.some(targetId => matchesOrderId(o, targetId)));
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
         } catch (e) { }
 
     } else if (action === 'update' && data) {
-        if (data.status === 'eliminado') {
-            const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-            let hiddenIds: (number | string)[] = [];
-            try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
-            const existingStr = new Set(hiddenIds.map(String));
-            stringIdsSet.forEach(sId => {
-                if (!existingStr.has(sId)) {
-                    hiddenIds.push(sId);
-                    existingStr.add(sId);
-                }
-            });
-            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
-        }
-
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
             localOrders = localOrders.map(o => {
-                if (stringIdsSet.has(String(o.id)) || stringIdsSet.has(String(o.ot))) {
+                if (ids.some(targetId => matchesOrderId(o, targetId))) {
                     return { ...o, ...data };
                 }
                 return o;
@@ -389,18 +403,18 @@ export async function saveBatchOrders(
         } catch (e) { }
 
     } else if (action === 'restore') {
-        const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-        try {
-            let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
-            hiddenIds = hiddenIds.filter(id => !stringIdsSet.has(String(id)));
-            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
-        } catch (e) { }
+        const cleanToRestore = new Set(ids.map(id => String(id).trim().toLowerCase().replace(/^ot-/i, '')));
+        hiddenIds = hiddenIds.filter(id => {
+            const clean = String(id).trim().toLowerCase().replace(/^ot-/i, '');
+            return !cleanToRestore.has(clean);
+        });
+        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
 
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
             localOrders = localOrders.map(o => {
-                if (stringIdsSet.has(String(o.id)) || stringIdsSet.has(String(o.ot))) {
+                if (ids.some(targetId => matchesOrderId(o, targetId))) {
                     return { ...o, status: (o.category === 'diseno' ? 'diseno' : 'orden') as any };
                 }
                 return o;
@@ -413,7 +427,7 @@ export async function saveBatchOrders(
         const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, ids: Array.from(stringIdsSet), data, updateData: data }),
+            body: JSON.stringify({ action, ids, data, updateData: data }),
         }, 5000);
 
         if (response.ok) {
