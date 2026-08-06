@@ -150,7 +150,48 @@ export default function SharedFileViewerModal({
                 return
             }
 
-            // Direct fetch without Authorization or custom headers for S3/R2 presigned URLs
+            // Detect R2/S3 presigned URLs or any external storage URL
+            const isExternalStorage = url.includes('r2.cloudflarestorage.com') ||
+                url.includes('s3.amazonaws.com') ||
+                url.includes('.r2.dev') ||
+                (url.includes('X-Amz-Signature') && url.includes('X-Amz-Credential'))
+
+            if (isExternalStorage) {
+                // For R2/S3 presigned URLs, use server proxy (direct fetch fails due to CORS)
+                console.log('[Download] R2/S3 URL detected, using server proxy...')
+                const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+                try {
+                    const proxyResp = await fetch(proxyUrl)
+                    if (proxyResp.ok) {
+                        const blob = await proxyResp.blob()
+                        const blobUrl = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = blobUrl
+                        a.download = filename
+                        a.style.display = 'none'
+                        document.body.appendChild(a)
+                        a.click()
+                        setTimeout(() => {
+                            URL.revokeObjectURL(blobUrl)
+                            try { document.body.removeChild(a) } catch (e) { }
+                        }, 500)
+                        setDownloading(null)
+                        return
+                    }
+                    // If proxy fetch failed, try window.open as last resort
+                    console.warn('[Download] Proxy fetch failed, opening in new tab...')
+                    window.open(proxyUrl, '_blank')
+                    setDownloading(null)
+                    return
+                } catch (proxyErr) {
+                    console.warn('[Download] Proxy fetch error, opening in new tab:', proxyErr)
+                    window.open(proxyUrl, '_blank')
+                    setDownloading(null)
+                    return
+                }
+            }
+
+            // For local/simple URLs, try direct fetch first
             const response = await fetch(url, { method: 'GET', headers: {} })
             if (response.ok) {
                 const blob = await response.blob()
@@ -176,7 +217,7 @@ export default function SharedFileViewerModal({
                 setDownloading(null)
                 return
             }
-            // Proxy endpoint or direct open as ultimate fallback
+            // Proxy endpoint as ultimate fallback
             const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
             window.open(proxyUrl, '_blank')
         } finally {

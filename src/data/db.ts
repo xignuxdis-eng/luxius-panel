@@ -209,6 +209,15 @@ export async function getOrdenes(): Promise<Order[]> {
         localOrders = localOrders.filter(o => !isHidden(o));
     } catch (e) { }
 
+    // If localStorage was recently written (within 5 seconds), skip API to avoid
+    // race conditions where stale API data overwrites a just-saved order
+    const lastSaveTs = Number(localStorage.getItem('luxius_ordenes_last_save') || '0');
+    const timeSinceLastSave = Date.now() - lastSaveTs;
+    if (timeSinceLastSave < 5000 && localOrders.length > 0) {
+        console.log('[db] getOrdenes: Usando localStorage reciente (guardado hace', timeSinceLastSave, 'ms)');
+        return localOrders;
+    }
+
     try {
         const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 3000);
         if (response.ok) {
@@ -216,6 +225,7 @@ export async function getOrdenes(): Promise<Order[]> {
             if (Array.isArray(apiOrders)) {
                 const activeApiOrders = apiOrders.filter((o: any) => !isHidden(o));
                 const apiIds = new Set(activeApiOrders.map((o: any) => String(o.id)));
+                // Keep ALL local orders that are not in the API response (recently created)
                 const uniqueLocal = localOrders.filter(o => !apiIds.has(String(o.id)));
                 const merged = [...activeApiOrders, ...uniqueLocal];
                 localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
@@ -293,6 +303,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     
     try {
         localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+        localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
     } catch (e) {
         console.warn('[db] QuotaExceededError en localStorage. Sanitizando DataURLs pesados:', e);
         const sanitized = localOrders.map(o => ({
@@ -301,6 +312,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         }));
         try {
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(sanitized));
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e2) {
             console.error('[db] Error crítico en localStorage setItem:', e2);
         }
@@ -387,6 +399,7 @@ export async function saveBatchOrders(
             let localOrders: Order[] = JSON.parse(localOrdersJson);
             localOrders = localOrders.filter(o => !ids.some(targetId => matchesOrderId(o, targetId)));
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
 
     } else if (action === 'update' && data) {
@@ -400,6 +413,7 @@ export async function saveBatchOrders(
                 return o;
             });
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
 
     } else if (action === 'restore') {
@@ -420,6 +434,7 @@ export async function saveBatchOrders(
                 return o;
             });
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
     }
 
