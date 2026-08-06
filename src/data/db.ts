@@ -329,14 +329,24 @@ export async function saveBatchOrders(
     ids: (number | string)[],
     data?: Partial<Order>
 ): Promise<{ success: boolean, count: number }> {
-    const stringIds = ids.map(String);
+    if (!ids || ids.length === 0) return { success: true, count: 0 };
+    
+    // Normalizar todos los IDs a string y agregar variantes (ej: 660103 -> "660103", "OT-660103")
+    const stringIdsSet = new Set<string>();
+    ids.forEach(rawId => {
+        const s = String(rawId).trim();
+        stringIdsSet.add(s);
+        const clean = s.replace(/^OT-/i, '');
+        stringIdsSet.add(clean);
+        stringIdsSet.add(`OT-${clean}`);
+    });
 
     if (action === 'delete') {
         const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
         let hiddenIds: (number | string)[] = [];
         try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
         const existingStr = new Set(hiddenIds.map(String));
-        stringIds.forEach(sId => {
+        stringIdsSet.forEach(sId => {
             if (!existingStr.has(sId)) {
                 hiddenIds.push(sId);
                 existingStr.add(sId);
@@ -347,7 +357,7 @@ export async function saveBatchOrders(
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
-            localOrders = localOrders.filter(o => !existingStr.has(String(o.id)) && !existingStr.has(String(o.ot)));
+            localOrders = localOrders.filter(o => !stringIdsSet.has(String(o.id)) && !stringIdsSet.has(String(o.ot)));
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
         } catch (e) { }
 
@@ -357,7 +367,7 @@ export async function saveBatchOrders(
             let hiddenIds: (number | string)[] = [];
             try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
             const existingStr = new Set(hiddenIds.map(String));
-            stringIds.forEach(sId => {
+            stringIdsSet.forEach(sId => {
                 if (!existingStr.has(sId)) {
                     hiddenIds.push(sId);
                     existingStr.add(sId);
@@ -370,7 +380,7 @@ export async function saveBatchOrders(
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
             localOrders = localOrders.map(o => {
-                if (stringIds.includes(String(o.id)) || stringIds.includes(String(o.ot))) {
+                if (stringIdsSet.has(String(o.id)) || stringIdsSet.has(String(o.ot))) {
                     return { ...o, ...data };
                 }
                 return o;
@@ -382,7 +392,7 @@ export async function saveBatchOrders(
         const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
         try {
             let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
-            hiddenIds = hiddenIds.filter(id => !stringIds.includes(String(id)));
+            hiddenIds = hiddenIds.filter(id => !stringIdsSet.has(String(id)));
             localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
         } catch (e) { }
 
@@ -390,7 +400,7 @@ export async function saveBatchOrders(
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
             localOrders = localOrders.map(o => {
-                if (stringIds.includes(String(o.id)) || stringIds.includes(String(o.ot))) {
+                if (stringIdsSet.has(String(o.id)) || stringIdsSet.has(String(o.ot))) {
                     return { ...o, status: (o.category === 'diseno' ? 'diseno' : 'orden') as any };
                 }
                 return o;
@@ -403,7 +413,7 @@ export async function saveBatchOrders(
         const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, ids, data, updateData: data }),
+            body: JSON.stringify({ action, ids: Array.from(stringIdsSet), data, updateData: data }),
         }, 5000);
 
         if (response.ok) {

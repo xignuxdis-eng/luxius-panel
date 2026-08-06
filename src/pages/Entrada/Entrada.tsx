@@ -238,66 +238,70 @@ export default function Entrada() {
     }
 
     // BATCH ACTIONS
-    const toggleSelection = (id: number) => {
-        const newSet = new Set(selectedIds)
-        if (newSet.has(id)) {
-            newSet.delete(id)
+    const toggleSelection = (id: number | string) => {
+        const strId = String(id);
+        const newSet = new Set(Array.from(selectedIds).map(String));
+        if (newSet.has(strId)) {
+            newSet.delete(strId);
         } else {
-            newSet.add(id)
+            newSet.add(strId);
         }
-        setSelectedIds(newSet)
+        setSelectedIds(newSet as any);
     }
 
     const toggleSelectAll = () => {
-        const displayedIds = displayedOrders.map(o => o.id)
-        const allSelected = displayedIds.length > 0 && displayedIds.every(id => selectedIds.has(id))
+        const displayedStrIds = displayedOrders.map(o => String(o.id));
+        const currentSelectedStr = new Set(Array.from(selectedIds).map(String));
+        const allSelected = displayedStrIds.length > 0 && displayedStrIds.every(id => currentSelectedStr.has(id));
 
         if (allSelected) {
-            setSelectedIds(new Set())
+            setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(displayedIds))
+            setSelectedIds(new Set(displayedStrIds as any));
         }
     }
 
     const handleBatchStatus = async (status: 'impreso' | 'entregado') => {
         try {
-            setLoading(true)
-            const displayedIds = new Set(displayedOrders.map(o => o.id))
-            const validIds = Array.from(selectedIds).filter(id => displayedIds.has(id))
+            setLoading(true);
+            const displayedStrSet = new Set(displayedOrders.map(o => String(o.id)));
+            const validIds = Array.from(selectedIds).map(String).filter(id => displayedStrSet.has(id));
+            const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
 
-            await saveBatchOrders('update', validIds, { status })
+            await saveBatchOrders('update', finalIds, { status });
 
-            setSelectedIds(new Set())
-            await loadOrders()
+            setSelectedIds(new Set());
+            await loadOrders();
         } catch (error) {
-            console.error('Batch error:', error)
-            alert('Hubo un error al procesar las órdenes')
+            console.error('Batch error:', error);
+            alert('Hubo un error al procesar las órdenes');
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
     }
 
     const handleBatchDelete = async () => {
-        const isTrash = viewTab === 'trash'
+        const isTrash = viewTab === 'trash';
 
         try {
-            setLoading(true)
-            const displayedIds = new Set(displayedOrders.map(o => o.id))
-            const validIds = Array.from(selectedIds).filter(id => displayedIds.has(id))
+            setLoading(true);
+            const displayedStrSet = new Set(displayedOrders.map(o => String(o.id)));
+            const validIds = Array.from(selectedIds).map(String).filter(id => displayedStrSet.has(id));
+            const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
 
             if (isTrash) {
-                await saveBatchOrders('delete', validIds)
+                await saveBatchOrders('delete', finalIds);
             } else {
-                await saveBatchOrders('update', validIds, { status: 'eliminado' })
+                await saveBatchOrders('update', finalIds, { status: 'eliminado' });
             }
 
-            setSelectedIds(new Set())
-            await loadOrders()
+            setSelectedIds(new Set());
+            await loadOrders();
         } catch (error) {
-            console.error('Batch delete error:', error)
-            alert('Hubo un error al procesar la eliminación masiva.')
+            console.error('Batch delete error:', error);
+            alert('Hubo un error al procesar la eliminación masiva.');
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
     }
 
