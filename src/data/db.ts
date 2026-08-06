@@ -286,11 +286,22 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         ...order,
     } as Order
 
-    // Clear from HIDDEN_ORDENES_KEY if it was deleted before (restored order)
+    // Handle HIDDEN_ORDENES_KEY based on status
     const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
     try {
         let hiddenIds: (number | string)[] = JSON.parse(hiddenJson);
-        hiddenIds = hiddenIds.filter(id => !matchesOrderId({ id: id as any, ot: String(id) }, newOrder.id));
+        if (newOrder.status === 'eliminado') {
+            // SOFT DELETE: Add to hidden list so API merge won't resurrect it
+            const targetStr = String(newOrder.id).trim();
+            const targetClean = targetStr.replace(/^ot-/i, '');
+            const existingClean = new Set(hiddenIds.map(s => String(s).trim().toLowerCase().replace(/^ot-/i, '')));
+            if (!existingClean.has(targetClean.toLowerCase())) {
+                hiddenIds.push(targetStr, targetClean, `OT-${targetClean}`);
+            }
+        } else {
+            // Normal save/restore: Clear from hidden list
+            hiddenIds = hiddenIds.filter(id => !matchesOrderId({ id: id as any, ot: String(id) }, newOrder.id));
+        }
         localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
     } catch (e) { }
 
@@ -362,6 +373,7 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
         let localOrders: Order[] = JSON.parse(localOrdersJson);
         localOrders = localOrders.filter(o => !matchesOrderId(o, id));
         localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
+        localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
     } catch (e) { }
 
     // 3. Delete from remote backend API

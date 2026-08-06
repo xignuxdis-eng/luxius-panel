@@ -849,8 +849,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                         let detectedDpi = 0;
                         const ops = await pdfPage.getOperatorList();
+
+                        // Track the Current Transformation Matrix (CTM) to calculate real image DPI.
+                        // In PDFs, images are placed via: save → transform [a,b,c,d,e,f] → paintImage → restore
+                        // The 'a' component = image width in PDF points, 'd' = height in points.
+                        // Real DPI = imagePixels / (placementPoints / 72)
+                        let lastTransformArgs: number[] | null = null;
                         for (let k = 0; k < ops.fnArray.length; k++) {
                             const fn = ops.fnArray[k];
+
+                            // Track the most recent transform before a paintImage operation
+                            if (fn === pdfjsLib.OPS.transform) {
+                                lastTransformArgs = ops.argsArray[k] as number[];
+                            }
+
                             if (
                                 fn === pdfjsLib.OPS.paintImageXObject ||
                                 fn === pdfjsLib.OPS.paintInlineImageXObject ||
@@ -863,14 +875,41 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     else if (pdfPage.commonObjs.has(imgName)) imgObj = pdfPage.commonObjs.get(imgName);
 
                                     if (imgObj && imgObj.width && imgObj.height) {
-                                        const pageWidthInches = viewport.width / 72;
-                                        const pageHeightInches = viewport.height / 72;
-                                        const dpiX = Math.round(imgObj.width / pageWidthInches);
-                                        const dpiY = Math.round(imgObj.height / pageHeightInches);
-                                        const calcDpi = Math.max(dpiX, dpiY);
+                                        let calcDpi = 0;
+
+                                        if (lastTransformArgs && lastTransformArgs.length >= 4) {
+                                            // CTM: [a, b, c, d, e, f]
+                                            // a = horizontal scale (width in points), d = vertical scale (height in points)
+                                            // For rotated images, width might be in 'b'/'c' components
+                                            const a = Math.abs(lastTransformArgs[0]);
+                                            const b = Math.abs(lastTransformArgs[1]);
+                                            const c = Math.abs(lastTransformArgs[2]);
+                                            const d = Math.abs(lastTransformArgs[3]);
+
+                                            // Effective placement size in points (handle rotation)
+                                            const placementWidthPts = Math.max(a, b) || viewport.width;
+                                            const placementHeightPts = Math.max(c, d) || viewport.height;
+
+                                            const placementWidthInches = placementWidthPts / 72;
+                                            const placementHeightInches = placementHeightPts / 72;
+
+                                            const dpiX = Math.round(imgObj.width / placementWidthInches);
+                                            const dpiY = Math.round(imgObj.height / placementHeightInches);
+                                            calcDpi = Math.max(dpiX, dpiY);
+                                            console.log(`[Luxius-Meta] PDF Image CTM: a=${a.toFixed(1)} d=${d.toFixed(1)} → img ${imgObj.width}×${imgObj.height}px → ${calcDpi} DPI`);
+                                        } else {
+                                            // Fallback: use full page dimensions (less accurate)
+                                            const pageWidthInches = viewport.width / 72;
+                                            const pageHeightInches = viewport.height / 72;
+                                            const dpiX = Math.round(imgObj.width / pageWidthInches);
+                                            const dpiY = Math.round(imgObj.height / pageHeightInches);
+                                            calcDpi = Math.max(dpiX, dpiY);
+                                        }
+
                                         if (calcDpi > detectedDpi) detectedDpi = calcDpi;
                                     }
                                 } catch (e) { }
+                                lastTransformArgs = null; // Reset after consuming
                             }
                         }
 
