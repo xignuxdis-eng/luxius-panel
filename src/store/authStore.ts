@@ -1,9 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, LoginCredentials, UserRole } from '@/types'
-import { getUsuarios, getClientes } from '@/data/db'
-
-// Mock users matching IMPGESV2 credentials
+import { getUsuarios, getClientes, API_URL } from '@/data/db'
 
 
 interface AuthState {
@@ -54,10 +52,6 @@ export const useAuthStore = create<AuthState>()(
                 if (!foundUser) {
                     debugInfo.push('User not found locally. Trying API...');
                     try {
-                        const hostname = window.location.hostname;
-                        const isDev = window.location.port === "3005" || window.location.port === "5173";
-                        const API_URL = isDev ? `http://${hostname}:5000/api` : '/api';
-
                         debugInfo.push(`Fetching: ${API_URL}/usuarios`);
 
                         const res = await fetch(`${API_URL}/usuarios`, { cache: 'no-store' });
