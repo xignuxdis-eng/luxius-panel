@@ -176,6 +176,24 @@ app.post('/api/migration/receive', (req, res) => {
 
 // --- GENERIC GENERIC RESOURCE HANDLER ---
 
+const { exec } = require('child_process');
+
+let pushTimer = null;
+const triggerAutoPush = () => {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+        console.log("🚀 [AutoSync] Triggering background git commit & push to GitHub...");
+        const parentDir = path.join(__dirname, '..');
+        exec('git add -A && git commit -m "auto-sync: update database from local UI" && git push', { cwd: parentDir }, (error, stdout, stderr) => {
+            if (error) {
+                console.warn("⚠️ [AutoSync] Push note:", error.message);
+            } else {
+                console.log("✅ [AutoSync] Database changes pushed to GitHub successfully!");
+            }
+        });
+    }, 2000);
+};
+
 const getCollectionPath = (collection) => path.join(DATA_DIR, `${collection}.json`);
 
 const readCollection = (collection) => {
@@ -195,6 +213,7 @@ const readCollection = (collection) => {
 const writeCollection = (collection, data) => {
     const filePath = getCollectionPath(collection);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    triggerAutoPush();
 };
 
 // POST /api/upload

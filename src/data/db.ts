@@ -697,20 +697,20 @@ export function getClientesActivos(): Cliente[] {
 
 // Fallback materials for Inks and Solvents
 const supplementaryMaterials: Material[] = [
-    { id: 901, codigo: 'INK-C', descripcion: 'Tinta Cyan', calidad: 'Solvente', tipo: 'tinta', unidad: 'L', color: '#00ffff', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 902, codigo: 'INK-M', descripcion: 'Tinta Magenta', calidad: 'Solvente', tipo: 'tinta', unidad: 'L', color: '#ff00ff', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 903, codigo: 'INK-Y', descripcion: 'Tinta Yellow', calidad: 'Solvente', tipo: 'tinta', unidad: 'L', color: '#ffff00', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 904, codigo: 'INK-K', descripcion: 'Tinta Black', calidad: 'Solvente', tipo: 'tinta', unidad: 'L', color: '#222222', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 905, codigo: 'FLS-01', descripcion: 'Solvente Flush (Limpieza)', calidad: 'General', tipo: 'solvente', unidad: 'L', color: '#e0e0e0', precioM2: 0, ancho: 0, habilitado: true, stockActual: 20, stockMinimo: 8 }
+    { id: 901, codigo: 'INK C', descripcion: 'Tinta Cyan', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#00ffff', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
+    { id: 902, codigo: 'INK M', descripcion: 'Tinta Magenta', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#ff00ff', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
+    { id: 903, codigo: 'INK Y', descripcion: 'Tinta Yellow', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#ffff00', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
+    { id: 904, codigo: 'INK K', descripcion: 'Tinta Black', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#222222', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
+    { id: 905, codigo: 'FLS-01', descripcion: 'Solvente Flush (Limpieza)', calidad: 'General', tipo: 'solvente', unidad: 'Litros', color: '#e0e0e0', precioM2: 0, ancho: 0, habilitado: true, stockActual: 20, stockMinimo: 8 }
 ]
 
 export function getMateriales(): Material[] {
     const staticMateriales: Material[] = [
-        { id: 1, codigo: 'lona_front_light_13oz', descripcion: 'Lona Front Light 13oz', calidad: 'Solvente', tipo: 'lona', unidad: 'M2', color: '#ffffff', precioM2: 12500, ancho: 3.2, habilitado: true, stockActual: 100, stockMinimo: 20 },
-        { id: 2, codigo: 'lona_back_light_15oz', descripcion: 'Lona Back Light 15oz', calidad: 'Solvente', tipo: 'lona', unidad: 'M2', color: '#ffffff', precioM2: 15000, ancho: 3.2, habilitado: true, stockActual: 100, stockMinimo: 20 },
-        { id: 3, codigo: 'vinilo_adhesivo_brillo', descripcion: 'Vinilo Adhesivo Brillo', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 8400, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 },
-        { id: 4, codigo: 'vinilo_microperforado', descripcion: 'Vinilo Microperforado', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 5100, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 },
-        { id: 5, codigo: 'vinilo_vehicular_o3651', descripcion: 'Vinilo Vehicular O-3651', calidad: 'Ecológica', tipo: 'vinilo', unidad: 'M2', color: '#ffffff', precioM2: 18500, ancho: 1.52, habilitado: true, stockActual: 150, stockMinimo: 30 }
+        { id: 13, codigo: 'VV', descripcion: 'Vinilo Orajet 3651', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'ml', unidad: 'M Lineal', precioM2: 32000, ancho: 1.52, habilitado: true, bobinas: [{ ancho: 1.37, precioML: 32000 }, { ancho: 1.52, precioML: 34000 }] },
+        { id: 6, codigo: 'VM', descripcion: 'Vinilo Microperforado', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 18000, ancho: 1.52, habilitado: true },
+        { id: 3, codigo: 'VBB', descripcion: 'Vinilo Adhesivo Base Blanca Brillante', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 14000, ancho: 1.52, habilitado: true },
+        { id: 2, codigo: 'BL', descripcion: 'Lona Back Light 15oz', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 18000, ancho: 3.2, habilitado: true },
+        { id: 1, codigo: 'FL', descripcion: 'Lona Front Light 13oz', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 14000, ancho: 3.2, habilitado: true }
     ]
     const staticCombined = [...staticMateriales, ...supplementaryMaterials]
 
@@ -895,12 +895,10 @@ export function getMaterialesByCalidad(calidadId: number): Material[] {
 
 export function getCalidades(): Calidad[] {
     const staticCalidades: Calidad[] = [
-        { id: 1, nombre: 'Solvente', descripcion: 'Impresión solvente estándar para lonas', habilitado: true, orden: 1 },
-        { id: 2, nombre: 'Ecológica', descripcion: 'Impresión látex / ecológica para vinilos', habilitado: true, orden: 2 },
-        { id: 3, nombre: 'Eco-Solvente', descripcion: 'Impresión eco-solvente para vinilos y lonas', habilitado: true, orden: 3 },
-        { id: 4, nombre: 'UV', descripcion: 'Impresión UV cama plana y rollo', habilitado: true, orden: 4 },
-        { id: 5, nombre: 'Fotográfica', descripcion: 'Impresión fotográfica de alta resolución', habilitado: true, orden: 5 },
-        { id: 6, nombre: 'General', descripcion: 'Calidad estándar / insumos generales', habilitado: true, orden: 6 }
+        { id: 769475, nombre: 'ECO', descripcion: 'TINTAS ECOLOGICAS DE ALTA DURACION', habilitado: true, orden: 1 },
+        { id: 4, nombre: 'UV', descripcion: 'Impresión UV cama plana y rollo', habilitado: true, orden: 2 },
+        { id: 5, nombre: 'Fotográfica', descripcion: 'Impresión fotográfica de alta resolución', habilitado: true, orden: 3 },
+        { id: 6, nombre: 'General', descripcion: 'Calidad estándar / insumos generales', habilitado: true, orden: 4 }
     ]
     const sessionItemsJson = localStorage.getItem(SESSION_CALIDADES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_CALIDADES_KEY)

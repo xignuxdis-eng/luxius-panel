@@ -389,9 +389,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             renderCanvas.height = scaledViewport.height;
                             const renderTask = page.render({
                                 canvasContext: renderCtx,
-                                viewport: scaledViewport,
-                                // @ts-ignore - Some versions might require or name this differently
-                                canvas: renderCanvas
+                                viewport: scaledViewport
                             });
                             await renderTask.promise;
 
@@ -1120,7 +1118,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                     // EXPLOSION LOGIC — use fresh copies from masterBuffer
                     if (realPageCount > 1 && ext === 'PDF' && masterBuffer && masterBuffer.byteLength > 0) {
-                        console.log(`[Luxius-DEBUG] EXPLOTANDO EN BG: ${file.name} -> ${realPageCount} páginas. masterBuffer alive: ${masterBuffer.byteLength} bytes`);
+                        console.log(`[Luxius-DEBUG] EXPLOTANDO EN BG: ${file.name} -> ${realPageCount} páginas.`);
 
                         // INHERITANCE: Read from REF to get latest user input
                         const mother = batchItemsRef.current.find(it => it.id === fileId);
@@ -1133,7 +1131,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                         let srcDoc: PDFDocument | null = null;
                         try {
-                            // CRITICAL: fresh copy for PDF-LIB explosion
                             srcDoc = await PDFDocument.load(masterBuffer.slice(0), { ignoreEncryption: true });
                         } catch (e) { console.error("[Luxius-DEBUG] PDF-LIB no pudo cargar base para explosión.", e); }
 
@@ -1141,82 +1138,101 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             const itemId = Math.random().toString(36).substring(2, 9);
                             const pageName = `${file.name.replace(/\.pdf$/i, '')}_P${p}.pdf`;
 
-                            // 1. ADD PAGE PLACEHOLDER IMMEDIATELY
-                            const pMeta = { ...meta, pageCount: 1, width: meta.width || 0, height: meta.height || 0 };
-                            const pagePlaceholder: BatchItem = {
-                                ...placeholder,
-                                id: itemId,
-                                fileName: pageName,
-                                metadata: pMeta,
-                                material: inheritedMaterial,
-                                copias: inheritedCopias,
-                                servicios: inheritedServicios
-                            };
-                            setBatchItems(prev => [...prev, pagePlaceholder]);
+                            // 1. Generate page thumbnail directly from masterBuffer for page p
+                            let thumbUrl: string | undefined = undefined;
+                            try {
+                                thumbUrl = await getPdfThumbnail(masterBuffer.slice(0), p, meta.width || 21, meta.height || 29.7);
+                            } catch (tErr) {
+                                console.warn(`[Luxius-DEBUG] Error generando miniatura P${p}:`, tErr);
+                            }
 
-                            // 2. EXTRACT/RESURRECT PAGE CONTENT ASYNCHRONOUSLY
-                            (async () => {
+                            // 2. Extract page p into a single-page PDF File
+                            let pageFile: File | null = null;
+                            let wCm = meta.width || 21.0;
+                            let hCm = meta.height || 29.7;
+
+                            if (srcDoc && p <= srcDoc.getPageCount()) {
                                 try {
-                                    let pageFile: File | null = null;
-                                    let wCm = meta.width || 21.0;
-                                    let hCm = meta.height || 29.7;
+                                    const newDoc = await PDFDocument.create();
+                                    const [copiedPage] = await newDoc.copyPages(srcDoc, [p - 1]);
+                                    newDoc.addPage(copiedPage);
+                                    const pdfBytes = await newDoc.save();
+                                    pageFile = new File([new Uint8Array(pdfBytes)], pageName, { type: 'application/pdf' });
 
-                                    if (srcDoc && p <= srcDoc.getPageCount()) {
-                                        try {
-                                            const newDoc = await PDFDocument.create();
-                                            const [copiedPage] = await newDoc.copyPages(srcDoc, [p - 1]);
-                                            newDoc.addPage(copiedPage);
-                                            const pdfBytes = await newDoc.save();
-                                            pageFile = new File([new Uint8Array(pdfBytes)], pageName, { type: 'application/pdf' });
+                                    const pdfPage = srcDoc.getPage(p - 1);
+                                    const { width: pW, height: pH } = pdfPage.getSize();
+                                    wCm = parseFloat((pW * 2.54 / 72).toFixed(2));
+                                    hCm = parseFloat((pH * 2.54 / 72).toFixed(2));
+                                } catch (e) {
+                                    console.error(`[Luxius-DEBUG] Error extrayendo página ${p} con PDF-LIB:`, e);
+                                }
+                            }
 
-                                            const pdfPage = srcDoc.getPage(p - 1);
-                                            const { width: pW, height: pH } = pdfPage.getSize();
-                                            wCm = parseFloat((pW * 2.54 / 72).toFixed(2));
-                                            hCm = parseFloat((pH * 2.54 / 72).toFixed(2));
-                                        } catch (e) { }
-                                    }
-
-                                    // Fallback Resurrection via PDFJS
-                                    if (!pageFile) {
-                                        try {
-                                            const pjDoc = await pdfjsLib.getDocument({ data: masterBuffer!.slice(0) }).promise;
-                                            if (p <= pjDoc.numPages) {
-                                                const page = await pjDoc.getPage(p);
-                                                const vp = page.getViewport({ scale: 2.0 });
-                                                const can = document.createElement('canvas');
-                                                const ctx = can.getContext('2d');
-                                                if (ctx) {
-                                                    can.height = vp.height; can.width = vp.width;
-                                                    await page.render({ canvasContext: ctx, viewport: vp, canvas: can }).promise;
-                                                    const resDoc = await PDFDocument.create();
-                                                    const resImg = await resDoc.embedPng(can.toDataURL('image/png'));
-                                                    const resP = resDoc.addPage([resImg.width, resImg.height]);
-                                                    resP.drawImage(resImg, { x: 0, y: 0, width: resImg.width, height: resImg.height });
-                                                    pageFile = new File([new Uint8Array(await resDoc.save())], pageName, { type: 'application/pdf' });
-                                                    wCm = Math.round((vp.width * 2.54 / (72 * 2)) * 10) / 10;
-                                                    hCm = Math.round((vp.height * 2.54 / (72 * 2)) * 10) / 10;
-                                                }
-                                            }
-                                        } catch (e) { }
-                                    }
-
-                                    if (pageFile) {
-                                        const pUrl = URL.createObjectURL(pageFile);
-                                        blobStore.set(pageName, pUrl);
-                                        setBatchItems(prev => prev.map(it => it.id === itemId ? {
-                                            ...it, file: pageFile!, metadata: { ...it.metadata, width: wCm, height: hCm }
-                                        } : it));
-
-                                        const pBuf = await pageFile.arrayBuffer();
-                                        const thumb = await getPdfThumbnail(pBuf, 1, wCm, hCm);
-                                        if (thumb) {
-                                            setBatchItems(prev => prev.map(it => it.id === itemId ? {
-                                                ...it, previewUrl: thumb, metadata: { ...it.metadata, thumbnailUrl: thumb }
-                                            } : it));
+                            // Fallback Resurrection via PDFJS if PDF-LIB extraction failed
+                            if (!pageFile) {
+                                try {
+                                    const pjDoc = await pdfjsLib.getDocument({ data: masterBuffer.slice(0) }).promise;
+                                    if (p <= pjDoc.numPages) {
+                                        const page = await pjDoc.getPage(p);
+                                        const vp = page.getViewport({ scale: 2.0 });
+                                        const can = document.createElement('canvas');
+                                        const ctx = can.getContext('2d');
+                                        if (ctx) {
+                                            can.height = vp.height; can.width = vp.width;
+                                            await page.render({ canvasContext: ctx, viewport: vp }).promise;
+                                            const resDoc = await PDFDocument.create();
+                                            const resImg = await resDoc.embedPng(can.toDataURL('image/png'));
+                                            const resP = resDoc.addPage([resImg.width, resImg.height]);
+                                            resP.drawImage(resImg, { x: 0, y: 0, width: resImg.width, height: resImg.height });
+                                            pageFile = new File([new Uint8Array(await resDoc.save())], pageName, { type: 'application/pdf' });
+                                            wCm = Math.round((vp.width * 2.54 / (72 * 2)) * 10) / 10;
+                                            hCm = Math.round((vp.height * 2.54 / (72 * 2)) * 10) / 10;
                                         }
                                     }
-                                } catch (e) { console.error(`[Luxius-DEBUG] Error P${p}`, e); }
-                            })();
+                                } catch (e) {
+                                    console.error(`[Luxius-DEBUG] Fallback PDFJS error P${p}:`, e);
+                                }
+                            }
+
+                            if (pageFile) {
+                                const pUrl = URL.createObjectURL(pageFile);
+                                blobStore.set(pageName, pUrl);
+
+                                // If thumbnail from masterBuffer failed, try thumbnail from single-page PDF
+                                if (!thumbUrl) {
+                                    try {
+                                        const pBuf = await pageFile.arrayBuffer();
+                                        thumbUrl = await getPdfThumbnail(pBuf, 1, wCm, hCm);
+                                    } catch (e) {}
+                                }
+
+                                const pMeta = {
+                                    ...meta,
+                                    pageCount: 1,
+                                    width: wCm,
+                                    height: hCm,
+                                    thumbnailUrl: thumbUrl
+                                };
+
+                                const pageItem: BatchItem = {
+                                    id: itemId,
+                                    file: pageFile,
+                                    fileName: pageName,
+                                    previewUrl: thumbUrl || pUrl,
+                                    metadata: pMeta,
+                                    confirmed: true,
+                                    copias: inheritedCopias,
+                                    material: inheritedMaterial,
+                                    demasiasConfig: { top: false, bottom: false, left: false, right: false },
+                                    servicios: inheritedServicios
+                                };
+
+                                setBatchItems(prev => [...prev, pageItem]);
+                            } else {
+                                console.error(`[Luxius-DEBUG] No se pudo crear el archivo para la página ${p}`);
+                            }
+
+                            // Small pause between pages to keep UI responsive
                             await new Promise(r => setTimeout(r, 20));
                         }
                     } else {

@@ -1,44 +1,30 @@
 [
   {
-    "id": 1,
-    "nombre": "Solvente",
-    "descripcion": "Impresión solvente estándar para lonas",
+    "id": 769475,
+    "nombre": "ECO",
+    "descripcion": "TINTAS ECOLOGICAS DE ALTA DURACION",
     "habilitado": true,
     "orden": 1
-  },
-  {
-    "id": 2,
-    "nombre": "Ecológica",
-    "descripcion": "Impresión látex / ecológica para vinilos",
-    "habilitado": true,
-    "orden": 2
-  },
-  {
-    "id": 3,
-    "nombre": "Eco-Solvente",
-    "descripcion": "Impresión eco-solvente para vinilos y lonas",
-    "habilitado": true,
-    "orden": 3
   },
   {
     "id": 4,
     "nombre": "UV",
     "descripcion": "Impresión UV cama plana y rollo",
     "habilitado": true,
-    "orden": 4
+    "orden": 2
   },
   {
     "id": 5,
     "nombre": "Fotográfica",
     "descripcion": "Impresión fotográfica de alta resolución",
     "habilitado": true,
-    "orden": 5
+    "orden": 3
   },
   {
     "id": 6,
     "nombre": "General",
     "descripcion": "Calidad estándar / insumos generales",
     "habilitado": true,
-    "orden": 6
+    "orden": 4
   }
 ]
