@@ -12,13 +12,8 @@ import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, L
 import { INITIAL_CLIENTES } from './initialClientes'
 
 // API Configuration
-// API Configuration
-const isDev = window.location.port === "3005" || window.location.port === "5173";
-export const API_URL = isDev
-    ? `http://${window.location.hostname}:5000/api`
-    : (typeof window !== 'undefined' && window.location.hostname.includes('github.io')
-        ? 'https://luxius-backend.onrender.com/api'
-        : '/api');
+// API Configuration - Centralized Cloud Backend
+export const API_URL = 'https://luxius-backend.onrender.com/api';
 
 export function resolveMediaUrl(fileStr: string): string {
     if (!fileStr) return ''
