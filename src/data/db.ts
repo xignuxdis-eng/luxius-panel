@@ -743,6 +743,10 @@ export function getMateriales(): Material[] {
 
     const filteredSession = sessionItems.filter(i => !hiddenSet.has(i.id))
 
+    const calidadesList = getCalidades();
+    const validCalidadesMap = new Map(calidadesList.map(c => [c.nombre.trim().toLowerCase(), c.nombre]));
+    const defaultCalidadName = calidadesList.find(c => c.habilitado !== false)?.nombre || calidadesList[0]?.nombre || 'Solvente';
+
     return [...filteredSession, ...filteredStatic].map(m => {
         let color = m.color
         if (!color) {
@@ -762,8 +766,23 @@ export function getMateriales(): Material[] {
             else unidad = 'mts'
         }
 
+        let rawCalidad = (m.calidad || '').trim();
+        let calidad = defaultCalidadName;
+        if (rawCalidad) {
+            const lower = rawCalidad.toLowerCase();
+            if (validCalidadesMap.has(lower)) {
+                calidad = validCalidadesMap.get(lower)!;
+            } else {
+                const match = calidadesList.find(c =>
+                    lower.includes(c.nombre.toLowerCase()) || c.nombre.toLowerCase().includes(lower)
+                );
+                calidad = match ? match.nombre : defaultCalidadName;
+            }
+        }
+
         return {
             ...m,
+            calidad,
             color,
             unidad
         }
@@ -780,18 +799,38 @@ export function saveMaterial(material: Partial<Material>): Material {
         } catch (e) { }
     }
 
+    const calidadesList = getCalidades();
+    const validCalidadesMap = new Map(calidadesList.map(c => [c.nombre.trim().toLowerCase(), c.nombre]));
+    const defaultCalidadName = calidadesList.find(c => c.habilitado !== false)?.nombre || calidadesList[0]?.nombre || 'Solvente';
+
+    let rawCalidad = (material.calidad || '').trim();
+    let normalizedCalidad = defaultCalidadName;
+    if (rawCalidad) {
+        const lower = rawCalidad.toLowerCase();
+        if (validCalidadesMap.has(lower)) {
+            normalizedCalidad = validCalidadesMap.get(lower)!;
+        } else {
+            const match = calidadesList.find(c => lower.includes(c.nombre.toLowerCase()) || c.nombre.toLowerCase().includes(lower));
+            normalizedCalidad = match ? match.nombre : defaultCalidadName;
+        }
+    }
+
     const existingIndex = sessionItems.findIndex(m => m.id === material.id)
     let result: Material
 
     if (existingIndex !== -1) {
-        sessionItems[existingIndex] = { ...sessionItems[existingIndex], ...material } as Material
+        sessionItems[existingIndex] = {
+            ...sessionItems[existingIndex],
+            ...material,
+            calidad: normalizedCalidad
+        } as Material
         result = sessionItems[existingIndex]
     } else {
         const newMaterial: Material = {
             id: material.id || Math.floor(Math.random() * 900000) + 100000,
             codigo: material.codigo || 'NEW',
             descripcion: material.descripcion || '',
-            calidad: material.calidad || 'Standard',
+            calidad: normalizedCalidad,
             tipo: material.tipo || 'Sustrato',
             tipoCobro: material.tipoCobro || 'm2',
             preciosPorAncho: material.preciosPorAncho,
@@ -845,8 +884,6 @@ export function getMaterialByCodigo(codigo: string): Material | undefined {
 }
 
 export function getMaterialesByCalidad(calidadId: number): Material[] {
-    // This assumes there is no direct relationship ID in Material yet, or we map it.
-    // Given the types, Material has 'calidad': string.
     const calidad = getCalidadById(calidadId);
     if (!calidad) return [];
     return getMateriales().filter(m => m.calidad === calidad.nombre)
@@ -859,7 +896,11 @@ export function getMaterialesByCalidad(calidadId: number): Material[] {
 export function getCalidades(): Calidad[] {
     const staticCalidades: Calidad[] = [
         { id: 1, nombre: 'Solvente', descripcion: 'Impresión solvente estándar para lonas', habilitado: true, orden: 1 },
-        { id: 2, nombre: 'Ecológica', descripcion: 'Impresión látex / ecológica para vinilos', habilitado: true, orden: 2 }
+        { id: 2, nombre: 'Ecológica', descripcion: 'Impresión látex / ecológica para vinilos', habilitado: true, orden: 2 },
+        { id: 3, nombre: 'Eco-Solvente', descripcion: 'Impresión eco-solvente para vinilos y lonas', habilitado: true, orden: 3 },
+        { id: 4, nombre: 'UV', descripcion: 'Impresión UV cama plana y rollo', habilitado: true, orden: 4 },
+        { id: 5, nombre: 'Fotográfica', descripcion: 'Impresión fotográfica de alta resolución', habilitado: true, orden: 5 },
+        { id: 6, nombre: 'General', descripcion: 'Calidad estándar / insumos generales', habilitado: true, orden: 6 }
     ]
     const sessionItemsJson = localStorage.getItem(SESSION_CALIDADES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_CALIDADES_KEY)

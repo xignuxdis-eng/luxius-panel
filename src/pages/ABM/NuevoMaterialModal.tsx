@@ -26,10 +26,12 @@ export default function NuevoMaterialModal({ isOpen, onClose, onSave, material }
 
     useEffect(() => {
         if (isOpen) {
+            const activeCalidades = getCalidades().filter(c => c.habilitado !== false);
+            const defaultCalidad = activeCalidades[0]?.nombre || 'Solvente';
             reset(material || {
                 codigo: '',
                 descripcion: '',
-                calidad: 'Standard',
+                calidad: defaultCalidad,
                 ancho: 1.0,
                 precioM2: 0,
                 tipo: 'Sustrato',
