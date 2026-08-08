@@ -1053,7 +1053,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 metadata: { width: 0, height: 0, dpi: 72, format: ext, colorMode: 'Detectando...', pageCount: 0 },
                 confirmed: true,
                 copias: 1,
-                material: '',
+                material: watchedMaterial || '',
                 demasiasConfig: { top: false, bottom: false, left: false, right: false },
                 servicios: {}
             };
@@ -1122,7 +1122,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                         // INHERITANCE: Read from REF to get latest user input
                         const mother = batchItemsRef.current.find(it => it.id === fileId);
-                        const inheritedMaterial = mother?.material || '';
+                        const inheritedMaterial = mother?.material || watchedMaterial || '';
                         const inheritedCopias = mother?.copias || 1;
                         const inheritedServicios = mother?.servicios || {};
 
@@ -1882,16 +1882,76 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                         <input type="file" ref={batchInputRef} style={{ display: 'none' }} multiple onChange={handleBatchChange} />
                                     </div>
 
+                                    {/* BANNER INFORMATIVO MECÁNICA */}
+                                    <div style={{
+                                        marginTop: '10px',
+                                        padding: '10px 14px',
+                                        background: 'rgba(37, 99, 235, 0.08)',
+                                        border: '1px solid rgba(37, 99, 235, 0.25)',
+                                        borderRadius: 'var(--radius-md)',
+                                        fontSize: '0.83rem',
+                                        color: 'var(--text-secondary)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px'
+                                    }}>
+                                        <span style={{ fontSize: '1.2rem' }}>💡</span>
+                                        <span>
+                                            <b>Mecánica de asignación:</b> Los archivos y páginas explotadas heredan automáticamente el material seleccionado arriba. Si lo necesitas, puedes cambiar el material a todo el lote desde la barra o personalizarlo individualmente en cada tarjeta.
+                                        </span>
+                                    </div>
+
                                     {batchItems.length > 0 && (
-                                        <div className="batch-grid" style={{
-                                            marginTop: '20px',
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                            gap: '12px',
-                                            maxHeight: '480px',
-                                            overflowY: 'auto',
-                                            paddingRight: '8px'
-                                        }}>
+                                        <>
+                                            {/* BARRA DE HERRAMIENTAS DE LOTE */}
+                                            <div style={{
+                                                marginTop: '14px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                flexWrap: 'wrap',
+                                                background: 'var(--bg-card)',
+                                                padding: '10px 14px',
+                                                borderRadius: 'var(--radius-md)',
+                                                border: '1px solid var(--border)'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                                                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🏷️ Material para todo el lote:</span>
+                                                    <select
+                                                        className="input-field"
+                                                        style={{ padding: '4px 10px', fontSize: '0.82rem', width: 'auto', background: 'var(--bg-input)' }}
+                                                        value={watchedMaterial || ''}
+                                                        onChange={(e) => {
+                                                            const selectedMat = e.target.value;
+                                                            setValue('material', selectedMat);
+                                                            if (selectedMat) {
+                                                                setBatchItems(prev => prev.map(item => ({ ...item, material: selectedMat })));
+                                                            }
+                                                        }}
+                                                    >
+                                                        <option value="">Aplicar material a todos...</option>
+                                                        {getMateriales()
+                                                            .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
+                                                            .map(m => (
+                                                                <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                                    📦 {batchItems.length} ítem(s) en lote
+                                                </span>
+                                            </div>
+
+                                            <div className="batch-grid" style={{
+                                                marginTop: '14px',
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                                gap: '12px',
+                                                maxHeight: '480px',
+                                                overflowY: 'auto',
+                                                paddingRight: '8px'
+                                            }}>
                                             {batchItems.map((item) => (
                                                 <div key={item.id} className={`batch-item ${item.confirmed ? 'confirmed' : ''}`} style={{
                                                     display: 'flex',
@@ -2008,6 +2068,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 </div>
                                             ))}
                                         </div>
+                                    </>
                                     )}
                                 </div>
                             )}
