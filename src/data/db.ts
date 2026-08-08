@@ -12,8 +12,12 @@ import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, L
 import { INITIAL_CLIENTES } from './initialClientes'
 
 // API Configuration
-// API Configuration - Centralized Cloud Backend
-export const API_URL = 'https://luxius-backend.onrender.com/api';
+const isDev = typeof window !== 'undefined' && (window.location.port === "3005" || window.location.port === "5173");
+export const API_URL = isDev
+    ? `http://${window.location.hostname}:5000/api`
+    : (typeof window !== 'undefined' && window.location.hostname.includes('github.io')
+        ? 'https://luxius-backend.onrender.com/api'
+        : '/api');
 
 export function resolveMediaUrl(fileStr: string): string {
     if (!fileStr) return ''
@@ -48,7 +52,8 @@ const COLLECTIONS_CONFIG = [
     { key: 'luxius_session_servicios', endpoint: 'servicios' },
     { key: 'luxius_session_logisticas', endpoint: 'logisticas' },
     { key: 'luxius_session_calendar', endpoint: 'calendar' },
-    { key: 'luxius_session_roles', endpoint: 'roles' }
+    { key: 'luxius_session_roles', endpoint: 'roles' },
+    { key: 'luxius_session_ordenes', endpoint: 'orders' }
 ];
 
 export const SESSION_CLIENTES_KEY = 'luxius_session_clientes'
@@ -105,7 +110,7 @@ const syncDelete = (collection: string, id: number) => {
     }).catch(e => console.error(`[Sync] Network error delete [${collection}]:`, e));
 };
 
-const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 1000) => {
+const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 3000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -125,7 +130,7 @@ export async function initializeData() {
         await Promise.race([
             Promise.all(COLLECTIONS_CONFIG.map(async (col) => {
                 try {
-                    const res = await fetchWithTimeout(`${API_URL}/${col.endpoint}`, { cache: 'no-store' }, 800);
+                    const res = await fetchWithTimeout(`${API_URL}/${col.endpoint}`, { cache: 'no-store' }, 3000);
                     if (res.ok) {
                         const data = await res.json();
                         if (Array.isArray(data)) {
@@ -134,7 +139,7 @@ export async function initializeData() {
                     }
                 } catch (e) { }
             })),
-            new Promise(resolve => setTimeout(resolve, 1000))
+            new Promise(resolve => setTimeout(resolve, 4000))
         ]);
     } catch (e) { }
 
