@@ -8,31 +8,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
-// Hack for loading worker as Blob to bypass server MIME type issues
-const initPdfJsWorker = async () => {
-    try {
-        if (pdfjsLib.GlobalWorkerOptions.workerSrc) return;
-        console.log("[Luxius-DEBUG] Iniciando worker via Blob...");
-        const response = await fetch(pdfjsWorker);
-        const text = await response.text();
-
-        // Validation: Server might return index.html if asset is not found (SPA redirect)
-        if (text.trim().startsWith('<!DOCTYPE html>')) {
-            console.error("[Luxius-DEBUG] ERROR: El servidor devolvió HTML en vez del Worker de PDF. Usando fallback...");
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-            return;
-        }
-
-        const blob = new Blob([text], { type: 'text/javascript' });
-        const workerUrl = URL.createObjectURL(blob);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-        console.log("[Luxius-DEBUG] Worker inyectado con éxito.");
-    } catch (e) {
-        console.error("[Luxius-DEBUG] Error inyectando worker:", e);
+try {
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
     }
-};
-const workerReady = initPdfJsWorker();
+} catch (e) {
+    console.warn("[Luxius-PDF] Error configurando PDF worker:", e);
+}
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
 import type { Order, DemasiasConfig } from '@/types'
@@ -199,6 +181,23 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [watchedMaterial, watchedCalidad, setValue])
 
+    // Auto-select initial default material if empty
+    useEffect(() => {
+        if (isOpen && (!watchedMaterial || watchedMaterial.trim() === '')) {
+            const mats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
+            if (mats.length > 0) {
+                setValue('material', mats[0].codigo);
+            }
+        }
+    }, [isOpen, watchedMaterial, setValue]);
+
+    // Synchronize batch items material when global watchedMaterial changes or when items are empty
+    useEffect(() => {
+        if (watchedMaterial && batchItems.length > 0) {
+            setBatchItems(prev => prev.map(item => item.material ? item : { ...item, material: watchedMaterial }));
+        }
+    }, [watchedMaterial, batchItems.length]);
+
     // Auto-select client for Client Role
     useEffect(() => {
         if (user?.role === 'cliente') {
@@ -353,8 +352,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [order, reset, setValue])
 
-    const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string | undefined> => {
-        await workerReady;
+    const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string> => {
         const timeoutMs = 6000;
         let pdfRendered = false;
         try {
@@ -363,7 +361,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             canvas.width = w;
             canvas.height = h;
             const ctx = canvas.getContext('2d');
-            if (!ctx) return undefined;
+            if (!ctx) return '';
 
             // 1. Base Paper Background
             ctx.fillStyle = '#ffffff';
@@ -1044,6 +1042,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             const url = URL.createObjectURL(file);
             blobStore.set(file.name, url);
 
+            const availableMats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
+            const initialMat = watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
+
             // STEP 1: ADD INSTANT PLACEHOLDER CARD
             const placeholder: BatchItem = {
                 id: fileId,
@@ -1053,7 +1054,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 metadata: { width: 0, height: 0, dpi: 72, format: ext, colorMode: 'Detectando...', pageCount: 0 },
                 confirmed: true,
                 copias: 1,
-                material: watchedMaterial || '',
+                material: initialMat,
                 demasiasConfig: { top: false, bottom: false, left: false, right: false },
                 servicios: {}
             };
@@ -1083,7 +1084,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     if (ext === 'PDF' && masterBuffer && masterBuffer.byteLength > 0) {
                         // A. PDFJS with Timeout — fresh copy
                         try {
-                            await workerReady;
                             const pdfjsDoc = await Promise.race([
                                 pdfjsLib.getDocument({ data: masterBuffer.slice(0) }).promise,
                                 new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 8000))
@@ -1122,7 +1122,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                         // INHERITANCE: Read from REF to get latest user input
                         const mother = batchItemsRef.current.find(it => it.id === fileId);
-                        const inheritedMaterial = mother?.material || watchedMaterial || '';
+                        const inheritedMaterial = mother?.material || initialMat;
                         const inheritedCopias = mother?.copias || 1;
                         const inheritedServicios = mother?.servicios || {};
 
