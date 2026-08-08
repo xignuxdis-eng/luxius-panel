@@ -1185,8 +1185,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     }
 
                                     if (pageFile) {
+                                        const pUrl = URL.createObjectURL(pageFile);
+                                        blobStore.set(pageName, pUrl);
                                         setBatchItems(prev => prev.map(it => it.id === itemId ? {
-                                            ...it, file: pageFile!, metadata: { ...it.metadata, width: wCm * 100, height: hCm * 100 }
+                                            ...it, file: pageFile!, metadata: { ...it.metadata, width: wCm, height: hCm }
                                         } : it));
 
                                         const pBuf = await pageFile.arrayBuffer();
@@ -1210,7 +1212,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         } : it));
 
                         if (ext === 'PDF' && !meta.thumbnailUrl && masterBuffer) {
-                            const thumb = await getPdfThumbnail(masterBuffer.slice(0), 1, meta.width ? meta.width / 100 : 21, meta.height ? meta.height / 100 : 29);
+                            const thumb = await getPdfThumbnail(masterBuffer.slice(0), 1, meta.width || 21, meta.height || 29.7);
                             if (thumb) {
                                 setBatchItems(prev => prev.map(it => it.id === fileId ? {
                                     ...it, previewUrl: thumb, metadata: { ...it.metadata, thumbnailUrl: thumb }
@@ -1322,6 +1324,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     });
                                     setUploadProgress(null);
                                     remoteFileName = uploadRes.filename;
+                                    if (item.previewUrl && item.previewUrl.startsWith('blob:')) {
+                                        blobStore.set(remoteFileName, item.previewUrl);
+                                    }
                                 } catch (uErr) {
                                     setUploadProgress(null);
                                     console.error(`[Luxius-Save] Upload falló para ${item.fileName}`, uErr)
@@ -1407,6 +1412,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         });
                         finalArchivos = [uploadRes.filename];
                         finalArchivosOriginales = [uploadRes.originalName];
+                        if (previewUrl && previewUrl.startsWith('blob:')) {
+                            blobStore.set(uploadRes.filename, previewUrl);
+                        }
                     }
 
                     await saveOrden({
@@ -1527,7 +1535,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             {/* Línea 2: Material y Calidad */}
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Material</label>
-                                <select {...register('material', { required: watch('status') === 'orden' })} className="input-field">
+                                <select {...register('material', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
                                     <option value="">...</option>
                                     {(() => {
                                         // RESTORED: Filter out ink and solvent types
@@ -1549,7 +1557,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Calidad</label>
-                                <select {...register('calidad', { required: watch('status') === 'orden' })} className="input-field">
+                                <select {...register('calidad', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
                                     <option value="">...</option>
                                     {getCalidades().filter(c => c.habilitado !== false).map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                 </select>
