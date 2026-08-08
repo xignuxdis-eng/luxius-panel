@@ -174,17 +174,27 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const watchedClientId = watch('clienteId')
 
     useEffect(() => {
-        // Only auto-fill if we have a material but NO quality selected
-        if (watchedMaterial && (!watchedCalidad || (watchedCalidad as string).trim() === '')) {
-            const mats = getMateriales();
-            const mat = mats.find(m => m.codigo === watchedMaterial);
-            if (mat?.calidad) {
-                // Check if this quality is actually enabled in our system
-                const activeQuals = getCalidades().filter(c => c.habilitado !== false);
-                const match = activeQuals.find(q => (q.nombre || '').toLowerCase().trim() === mat.calidad.toLowerCase().trim());
-                if (match) {
-                    setValue('calidad', match.nombre);
+        const activeQuals = getCalidades().filter(c => c.habilitado !== false);
+        if (activeQuals.length === 0) return;
+
+        if (!watchedCalidad || (watchedCalidad as string).trim() === '' || activeQuals.length === 1) {
+            if (activeQuals.length === 1) {
+                if (watchedCalidad !== activeQuals[0].nombre) {
+                    setValue('calidad', activeQuals[0].nombre);
                 }
+            } else if (watchedMaterial) {
+                const mats = getMateriales();
+                const mat = mats.find(m => m.codigo === watchedMaterial);
+                if (mat?.calidad) {
+                    const match = activeQuals.find(q => (q.nombre || '').toLowerCase().trim() === mat.calidad.toLowerCase().trim());
+                    if (match) {
+                        setValue('calidad', match.nombre);
+                    }
+                } else {
+                    setValue('calidad', activeQuals[0].nombre);
+                }
+            } else if (!watchedCalidad) {
+                setValue('calidad', activeQuals[0].nombre);
             }
         }
     }, [watchedMaterial, watchedCalidad, setValue])
@@ -306,9 +316,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
     // ... (rest of code)
     useEffect(() => {
+        const activeQuals = getCalidades().filter(c => c.habilitado !== false);
+        const defaultCalidad = activeQuals.length > 0 ? activeQuals[0].nombre : '';
+
         if (order) {
             setActiveTab('unitario')
             reset(order)
+            if (!order.calidad && defaultCalidad) {
+                setValue('calidad', defaultCalidad);
+            }
             if (order.archivos?.[0]) {
                 const name = order.archivos[0]
                 setFileName(name)
@@ -322,7 +338,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             reset({
                 clienteId: '',
                 material: '',
-                calidad: '',
+                calidad: defaultCalidad,
                 ancho: '',
                 alto: '',
                 copias: 1,
@@ -335,7 +351,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setMetadata(null)
             setSelectedFile(null)
         }
-    }, [order, reset])
+    }, [order, reset, setValue])
 
     const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string | undefined> => {
         await workerReady;
@@ -1558,7 +1574,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Calidad</label>
                                 <select {...register('calidad', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
-                                    <option value="">...</option>
+                                    {getCalidades().filter(c => c.habilitado !== false).length > 1 && <option value="">...</option>}
                                     {getCalidades().filter(c => c.habilitado !== false).map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                                 </select>
                             </div>
