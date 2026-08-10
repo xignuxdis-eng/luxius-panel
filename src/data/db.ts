@@ -126,6 +126,14 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 3000
 export async function initializeData() {
     console.log("🔄 Syncing data from Server...");
 
+    // Clear legacy tombstone keys that cause data resurrection bugs
+    [
+        'luxius_deleted_clientes', 'luxius_deleted_materiales', 'luxius_deleted_calidades',
+        'luxius_deleted_maquinas', 'luxius_deleted_usuarios', 'luxius_deleted_proveedores',
+        'luxius_deleted_servicios', 'luxius_deleted_logisticas', 'luxius_deleted_roles',
+        'luxius_deleted_ordenes', 'luxius_deleted_combos'
+    ].forEach(k => localStorage.removeItem(k));
+
     try {
         await Promise.race([
             Promise.all(COLLECTIONS_CONFIG.map(async (col) => {
@@ -362,22 +370,8 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 
 export async function deleteOrden(id: number | string): Promise<boolean> {
     if (id === undefined || id === null) return false;
-    const targetStr = String(id).trim();
-    const targetClean = targetStr.replace(/^ot-/i, '');
 
-    // 1. Add to HIDDEN_ORDENES_KEY
-    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-    let hiddenIds: (number | string)[] = [];
-    try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
-    const existingStr = new Set(hiddenIds.map(s => String(s).trim().toLowerCase().replace(/^ot-/i, '')));
-    if (!existingStr.has(targetClean.toLowerCase())) {
-        hiddenIds.push(targetStr);
-        hiddenIds.push(targetClean);
-        hiddenIds.push(`OT-${targetClean}`);
-        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
-    }
-
-    // 2. Remove from local storage session orders
+    // 1. Remove from local storage session orders
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     try {
         let localOrders: Order[] = JSON.parse(localOrdersJson);
@@ -386,11 +380,11 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
         localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
     } catch (e) { }
 
-    // 3. Delete from remote backend API
+    // 2. Delete from remote backend API
     try {
         await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 3000);
     } catch (error) {
-        console.warn('[db] API deleteOrden falló, eliminado localmente:', error);
+        console.warn('[db] API deleteOrden falló:', error);
     }
     return true;
 }
@@ -402,25 +396,11 @@ export async function saveBatchOrders(
 ): Promise<{ success: boolean, count: number }> {
     if (!ids || ids.length === 0) return { success: true, count: 0 };
 
-    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-    let hiddenIds: (number | string)[] = [];
-    try { hiddenIds = JSON.parse(hiddenJson); } catch (e) { }
-
     if (action === 'delete') {
-        // HARD DELETE: permanently remove from localStorage + add to hidden list
-        ids.forEach(id => {
-            const targetStr = String(id).trim();
-            const targetClean = targetStr.replace(/^ot-/i, '');
-            hiddenIds.push(targetStr);
-            hiddenIds.push(targetClean);
-            hiddenIds.push(`OT-${targetClean}`);
-        });
-        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
-
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
-            localOrders = localOrders.filter(o => !ids.some(targetId => matchesOrderId(o, targetId)));
+            localOrders = localOrders.filter(o => !ids.some(id => matchesOrderId(o, id)));
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
@@ -440,13 +420,6 @@ export async function saveBatchOrders(
         } catch (e) { }
 
     } else if (action === 'restore') {
-        const cleanToRestore = new Set(ids.map(id => String(id).trim().toLowerCase().replace(/^ot-/i, '')));
-        hiddenIds = hiddenIds.filter(id => {
-            const clean = String(id).trim().toLowerCase().replace(/^ot-/i, '');
-            return !cleanToRestore.has(clean);
-        });
-        localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hiddenIds));
-
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
@@ -665,21 +638,9 @@ export function deleteCliente(id: number) {
             let sessionItems = JSON.parse(sessionItemsJson) as Cliente[]
             sessionItems = sessionItems.filter(c => c.id !== id)
             localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(sessionItems))
-            syncDelete('clientes', id);
         } catch (e) { }
     }
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_CLIENTES_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_CLIENTES_KEY, JSON.stringify(hiddenIds))
-    }
+    syncDelete('clientes', id);
 }
 
 export function getClienteById(id: number): Cliente | undefined {
@@ -858,21 +819,9 @@ export function deleteMaterial(id: number) {
             let sessionItems = JSON.parse(sessionItemsJson) as Material[]
             sessionItems = sessionItems.filter(m => m.id !== id)
             localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(sessionItems))
-            syncDelete('materiales', id);
         } catch (e) { }
     }
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_MATERIALES_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_MATERIALES_KEY, JSON.stringify(hiddenIds))
-    }
+    syncDelete('materiales', id);
 }
 
 export function getMaterialById(id: number): Material | undefined {
@@ -974,21 +923,9 @@ export function deleteCalidad(id: number) {
             let sessionItems = JSON.parse(sessionItemsJson) as Calidad[]
             sessionItems = sessionItems.filter(c => c.id !== id)
             localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems))
-            syncDelete('calidades', id);
         } catch (e) { }
     }
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_CALIDADES_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_CALIDADES_KEY, JSON.stringify(hiddenIds))
-    }
+    syncDelete('calidades', id);
 }
 
 export function getCalidadById(id: number): Calidad | undefined {
@@ -1065,18 +1002,6 @@ export function deleteMaquina(id: number) {
     sessionItems = sessionItems.filter(m => m.id !== id)
     localStorage.setItem(SESSION_MAQUINAS_KEY, JSON.stringify(sessionItems))
     syncDelete('maquinas', id);
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_MAQUINAS_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_MAQUINAS_KEY, JSON.stringify(hiddenIds))
-    }
 }
 
 // ============================================================
@@ -1252,18 +1177,6 @@ export function deleteUsuario(id: number) {
     sessionItems = sessionItems.filter(u => u.id !== id)
     localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems))
     syncDelete('usuarios', id);
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_USUARIOS_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_USUARIOS_KEY, JSON.stringify(hiddenIds))
-    }
 }
 
 
@@ -1334,21 +1247,9 @@ export function deleteProveedor(id: number) {
             let sessionItems = JSON.parse(sessionItemsJson) as Proveedor[]
             sessionItems = sessionItems.filter(p => p.id !== id)
             localStorage.setItem(SESSION_PROVEEDORES_KEY, JSON.stringify(sessionItems))
-            syncDelete('proveedores', id);
         } catch (e) { }
     }
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_PROVEEDORES_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_PROVEEDORES_KEY, JSON.stringify(hiddenIds))
-    }
+    syncDelete('proveedores', id);
 }
 
 // ============================================================
@@ -1514,21 +1415,9 @@ export function deleteServicio(id: number) {
             let sessionItems = JSON.parse(sessionItemsJson) as Servicio[]
             sessionItems = sessionItems.filter(s => s.id !== id)
             localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(sessionItems))
-            syncDelete('servicios', id);
         } catch (e) { }
     }
-
-    const hiddenItemsJson = localStorage.getItem(HIDDEN_SERVICIOS_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenItemsJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenItemsJson) as number[]
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_SERVICIOS_KEY, JSON.stringify(hiddenIds))
-    }
+    syncDelete('servicios', id);
 }
 
 
@@ -1860,21 +1749,9 @@ export function deleteLogistica(id: number) {
             let sessionItems = JSON.parse(sessionJson) as Logistica[]
             sessionItems = sessionItems.filter(l => l.id !== id)
             localStorage.setItem(SESSION_LOGISTICAS_KEY, JSON.stringify(sessionItems))
-            syncDelete('logisticas', id);
         } catch (e) { }
     }
-
-    const hiddenJson = localStorage.getItem(HIDDEN_LOGISTICAS_KEY)
-    let hiddenIds: number[] = []
-    if (hiddenJson) {
-        try {
-            hiddenIds = JSON.parse(hiddenJson)
-        } catch (e) { }
-    }
-    if (!hiddenIds.includes(id)) {
-        hiddenIds.push(id)
-        localStorage.setItem(HIDDEN_LOGISTICAS_KEY, JSON.stringify(hiddenIds))
-    }
+    syncDelete('logisticas', id);
 }
 
 
@@ -2141,15 +2018,5 @@ export function deleteCombo(id: number) {
             localStorage.setItem(SESSION_COMBOS_KEY, JSON.stringify(sessionItems));
         } catch (e) { }
     }
-
-    const hiddenJson = localStorage.getItem(HIDDEN_COMBOS_KEY) || '[]';
-    try {
-        let hiddenIds: number[] = JSON.parse(hiddenJson);
-        if (!hiddenIds.includes(id)) {
-            hiddenIds.push(id);
-            localStorage.setItem(HIDDEN_COMBOS_KEY, JSON.stringify(hiddenIds));
-        }
-    } catch (e) { }
-
     syncDelete('combos', id);
 }
