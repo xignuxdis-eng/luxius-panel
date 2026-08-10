@@ -88,11 +88,25 @@ export const SESSION_LOGS_KEY = 'luxius_session_logs'
 
 
 // --- SYNC HELPERS ---
+function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record<string, string> {
+    const headers = { ...baseHeaders };
+    try {
+        const stored = localStorage.getItem('luxius_auth');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed?.state?.token) {
+                headers['Authorization'] = `Bearer ${parsed.state.token}`;
+            }
+        }
+    } catch (_) { }
+    return headers;
+}
+
 const syncSave = (collection: string, data: any) => {
     console.log(`[Sync] Saving to ${collection}`, data);
     fetch(`${API_URL}/${collection}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
         keepalive: true
     }).then(res => {
@@ -104,6 +118,7 @@ const syncDelete = (collection: string, id: number) => {
     console.log(`[Sync] Deleting from ${collection} ID: ${id}`);
     fetch(`${API_URL}/${collection}/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
         keepalive: true
     }).then(res => {
         if (!res.ok) console.warn(`[Sync] Delete failed ${collection}: ${res.status}`);
@@ -114,7 +129,8 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 6000
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const response = await fetch(url, { ...options, signal: controller.signal });
+        const headers = getAuthHeaders(options.headers || {});
+        const response = await fetch(url, { ...options, headers, signal: controller.signal });
         clearTimeout(id);
         return response;
     } catch (error) {
