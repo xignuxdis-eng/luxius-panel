@@ -57,7 +57,7 @@ REM ─── LAUNCH ───────────────────�
 echo.
 echo  [LAUNCH] Iniciando servidores...
 
-start "Luxius Backend (Node :5000)" cmd /k "cd /d "%SERVER_DIR%" && node index.js"
+start "Luxius Backend (Python/SQL :5000)" cmd /k "cd /d "%SERVER_DIR%" && call .venv\Scripts\activate.bat && python app.py"
 
 timeout /t 3 /nobreak >nul
 
