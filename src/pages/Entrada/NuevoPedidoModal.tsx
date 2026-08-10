@@ -1138,15 +1138,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             const itemId = Math.random().toString(36).substring(2, 9);
                             const pageName = `${file.name.replace(/\.pdf$/i, '')}_P${p}.pdf`;
 
-                            // 1. Generate page thumbnail directly from masterBuffer for page p
-                            let thumbUrl: string | undefined = undefined;
-                            try {
-                                thumbUrl = await getPdfThumbnail(masterBuffer.slice(0), p, meta.width || 21, meta.height || 29.7);
-                            } catch (tErr) {
-                                console.warn(`[Luxius-DEBUG] Error generando miniatura P${p}:`, tErr);
-                            }
-
-                            // 2. Extract page p into a single-page PDF File
+                            // 1. Extract page p into a single-page PDF File first
                             let pageFile: File | null = null;
                             let wCm = meta.width || 21.0;
                             let hCm = meta.height || 29.7;
@@ -1198,12 +1190,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 const pUrl = URL.createObjectURL(pageFile);
                                 blobStore.set(pageName, pUrl);
 
-                                // If thumbnail from masterBuffer failed, try thumbnail from single-page PDF
-                                if (!thumbUrl) {
-                                    try {
-                                        const pBuf = await pageFile.arrayBuffer();
-                                        thumbUrl = await getPdfThumbnail(pBuf, 1, wCm, hCm);
-                                    } catch (e) {}
+                                // 2. Generate page thumbnail directly from the extracted single-page PDF (guarantees exact 1:1 match)
+                                let thumbUrl: string | undefined = undefined;
+                                try {
+                                    const pBuf = await pageFile.arrayBuffer();
+                                    thumbUrl = await getPdfThumbnail(pBuf, 1, wCm, hCm);
+                                } catch (e) {
+                                    console.warn(`[Luxius-DEBUG] Error generando miniatura P${p} desde single-page PDF:`, e);
                                 }
 
                                 const pMeta = {
