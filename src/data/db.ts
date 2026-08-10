@@ -110,7 +110,7 @@ const syncDelete = (collection: string, id: number) => {
     }).catch(e => console.error(`[Sync] Network error delete [${collection}]:`, e));
 };
 
-const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 3000) => {
+const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 60000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -135,20 +135,17 @@ export async function initializeData() {
     ].forEach(k => localStorage.removeItem(k));
 
     try {
-        await Promise.race([
-            Promise.all(COLLECTIONS_CONFIG.map(async (col) => {
-                try {
-                    const res = await fetchWithTimeout(`${API_URL}/${col.endpoint}`, { cache: 'no-store' }, 3000);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (Array.isArray(data)) {
-                            localStorage.setItem(col.key, JSON.stringify(data));
-                        }
+        await Promise.all(COLLECTIONS_CONFIG.map(async (col) => {
+            try {
+                const res = await fetchWithTimeout(`${API_URL}/${col.endpoint}`, { cache: 'no-store' }, 60000);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        localStorage.setItem(col.key, JSON.stringify(data));
                     }
-                } catch (e) { }
-            })),
-            new Promise(resolve => setTimeout(resolve, 4000))
-        ]);
+                }
+            } catch (e) { }
+        }));
     } catch (e) { }
 
     console.log("✅ Data sync complete.");
@@ -159,7 +156,7 @@ export async function refreshCollection(endpoint: string) {
     if (!config) return;
 
     try {
-        const res = await fetchWithTimeout(`${API_URL}/${endpoint}`, { cache: 'no-store' }, 800);
+        const res = await fetchWithTimeout(`${API_URL}/${endpoint}`, { cache: 'no-store' }, 10000);
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
@@ -228,7 +225,7 @@ export async function getOrdenes(): Promise<Order[]> {
     }
 
     try {
-        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 3000);
+        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 30000);
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
@@ -355,7 +352,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newOrder),
-        }, 5000);
+        }, 60000);
 
         if (response.ok) {
             const serverOrder = await response.json();
@@ -382,7 +379,7 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
 
     // 2. Delete from remote backend API
     try {
-        await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 3000);
+        await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 60000);
     } catch (error) {
         console.warn('[db] API deleteOrden falló:', error);
     }
@@ -439,7 +436,7 @@ export async function saveBatchOrders(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action, ids, data, updateData: data }),
-        }, 5000);
+        }, 60000);
 
         if (response.ok) {
             return await response.json();
