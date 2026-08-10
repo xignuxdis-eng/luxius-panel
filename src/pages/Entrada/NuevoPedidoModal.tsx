@@ -1149,7 +1149,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     const [copiedPage] = await newDoc.copyPages(srcDoc, [p - 1]);
                                     newDoc.addPage(copiedPage);
                                     const pdfBytes = await newDoc.save();
-                                    pageFile = new File([new Uint8Array(pdfBytes)], pageName, { type: 'application/pdf' });
+                                    
+                                    // Append a unique comment at the end to bypass PDF.js aggressive caching by fingerprint
+                                    const uniqueString = `\n% EOF_PADDING_${itemId}_${Math.random()}\n`;
+                                    const paddingBytes = new TextEncoder().encode(uniqueString);
+                                    const finalBytes = new Uint8Array(pdfBytes.length + paddingBytes.length);
+                                    finalBytes.set(pdfBytes);
+                                    finalBytes.set(paddingBytes, pdfBytes.length);
+                                    
+                                    pageFile = new File([finalBytes], pageName, { type: 'application/pdf' });
 
                                     const pdfPage = srcDoc.getPage(p - 1);
                                     const { width: pW, height: pH } = pdfPage.getSize();
@@ -1176,7 +1184,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             const resImg = await resDoc.embedPng(can.toDataURL('image/png'));
                                             const resP = resDoc.addPage([resImg.width, resImg.height]);
                                             resP.drawImage(resImg, { x: 0, y: 0, width: resImg.width, height: resImg.height });
-                                            pageFile = new File([new Uint8Array(await resDoc.save())], pageName, { type: 'application/pdf' });
+                                            const pdfBytes = await resDoc.save();
+                                            const uniqueString = `\n% EOF_PADDING_${itemId}_${Math.random()}\n`;
+                                            const paddingBytes = new TextEncoder().encode(uniqueString);
+                                            const finalBytes = new Uint8Array(pdfBytes.length + paddingBytes.length);
+                                            finalBytes.set(pdfBytes);
+                                            finalBytes.set(paddingBytes, pdfBytes.length);
+                                            pageFile = new File([finalBytes], pageName, { type: 'application/pdf' });
                                             wCm = Math.round((vp.width * 2.54 / (72 * 2)) * 10) / 10;
                                             hCm = Math.round((vp.height * 2.54 / (72 * 2)) * 10) / 10;
                                         }
@@ -1863,6 +1877,29 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             {/* Lote Tab */}
                             {activeTab === 'lote' && (
                                 <div className="form-group" style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🏷️ Material por defecto para el lote:</span>
+                                        <select
+                                            className="input-field"
+                                            style={{ padding: '6px 12px', width: 'auto', minWidth: '250px' }}
+                                            value={watchedMaterial || ''}
+                                            onChange={(e) => {
+                                                const selectedMat = e.target.value;
+                                                setValue('material', selectedMat);
+                                                if (selectedMat && batchItems.length > 0) {
+                                                    setBatchItems(prev => prev.map(item => ({ ...item, material: selectedMat })));
+                                                }
+                                            }}
+                                        >
+                                            <option value="">Seleccionar material (Obligatorio)...</option>
+                                            {getMateriales()
+                                                .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
+                                                .map(m => (
+                                                    <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                ))}
+                                        </select>
+                                    </div>
+
                                     <label>Carga masiva</label>
                                     <div className="batch-upload-zone"
                                         onClick={() => batchInputRef.current?.click()}
@@ -1900,37 +1937,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             <div style={{
                                                 marginTop: '14px',
                                                 display: 'flex',
-                                                justifyContent: 'space-between',
+                                                justifyContent: 'flex-end',
                                                 alignItems: 'center',
-                                                gap: '10px',
-                                                flexWrap: 'wrap',
                                                 background: 'var(--bg-card)',
                                                 padding: '10px 14px',
                                                 borderRadius: 'var(--radius-md)',
                                                 border: '1px solid var(--border)'
                                             }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
-                                                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🏷️ Material para todo el lote:</span>
-                                                    <select
-                                                        className="input-field"
-                                                        style={{ padding: '4px 10px', fontSize: '0.82rem', width: 'auto', background: 'var(--bg-input)' }}
-                                                        value={watchedMaterial || ''}
-                                                        onChange={(e) => {
-                                                            const selectedMat = e.target.value;
-                                                            setValue('material', selectedMat);
-                                                            if (selectedMat) {
-                                                                setBatchItems(prev => prev.map(item => ({ ...item, material: selectedMat })));
-                                                            }
-                                                        }}
-                                                    >
-                                                        <option value="">Aplicar material a todos...</option>
-                                                        {getMateriales()
-                                                            .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
-                                                            .map(m => (
-                                                                <option key={m.id} value={m.codigo}>{m.descripcion}</option>
-                                                            ))}
-                                                    </select>
-                                                </div>
                                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                                                     📦 {batchItems.length} ítem(s) en lote
                                                 </span>
