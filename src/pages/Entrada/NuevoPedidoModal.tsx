@@ -1149,16 +1149,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     const [copiedPage] = await newDoc.copyPages(srcDoc, [p - 1]);
                                     newDoc.addPage(copiedPage);
                                     const pdfBytes = await newDoc.save();
-                                    
-                                    // Append a unique comment at the end to bypass PDF.js aggressive caching by fingerprint
-                                    const uniqueString = `\n% EOF_PADDING_${itemId}_${Math.random()}\n`;
-                                    const paddingBytes = new TextEncoder().encode(uniqueString);
-                                    const finalBytes = new Uint8Array(pdfBytes.length + paddingBytes.length);
-                                    finalBytes.set(pdfBytes);
-                                    finalBytes.set(paddingBytes, pdfBytes.length);
-                                    
-                                    pageFile = new File([finalBytes], pageName, { type: 'application/pdf' });
-
+                                    pageFile = new File([pdfBytes], pageName, { type: 'application/pdf' });
                                     const pdfPage = srcDoc.getPage(p - 1);
                                     const { width: pW, height: pH } = pdfPage.getSize();
                                     wCm = parseFloat((pW * 2.54 / 72).toFixed(2));
@@ -1185,12 +1176,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             const resP = resDoc.addPage([resImg.width, resImg.height]);
                                             resP.drawImage(resImg, { x: 0, y: 0, width: resImg.width, height: resImg.height });
                                             const pdfBytes = await resDoc.save();
-                                            const uniqueString = `\n% EOF_PADDING_${itemId}_${Math.random()}\n`;
-                                            const paddingBytes = new TextEncoder().encode(uniqueString);
-                                            const finalBytes = new Uint8Array(pdfBytes.length + paddingBytes.length);
-                                            finalBytes.set(pdfBytes);
-                                            finalBytes.set(paddingBytes, pdfBytes.length);
-                                            pageFile = new File([finalBytes], pageName, { type: 'application/pdf' });
+                                            pageFile = new File([pdfBytes], pageName, { type: 'application/pdf' });
                                             wCm = Math.round((vp.width * 2.54 / (72 * 2)) * 10) / 10;
                                             hCm = Math.round((vp.height * 2.54 / (72 * 2)) * 10) / 10;
                                         }
@@ -1204,11 +1190,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 const pUrl = URL.createObjectURL(pageFile);
                                 blobStore.set(pageName, pUrl);
 
-                                // 2. Generate page thumbnail directly from the extracted single-page PDF (guarantees exact 1:1 match)
+                                // 2. Generate page thumbnail directamente desde el buffer original para evitar problemas de parseo
                                 let thumbUrl: string | undefined = undefined;
                                 try {
-                                    const pBuf = await pageFile.arrayBuffer();
-                                    thumbUrl = await getPdfThumbnail(pBuf, 1, wCm, hCm);
+                                    thumbUrl = await getPdfThumbnail(masterBuffer.slice(0), p, wCm, hCm);
                                 } catch (e) {
                                     console.warn(`[Luxius-DEBUG] Error generando miniatura P${p} desde single-page PDF:`, e);
                                 }
@@ -1345,8 +1330,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         setSaveProgress(prev => ({ ...prev, current: i + 1 }))
 
                         try {
-                            const itemAncho = Number((item.metadata.width / 100).toFixed(2));
-                            const itemAlto = Number((item.metadata.height / 100).toFixed(2));
+                            const itemAncho = Number(item.metadata.width);
+                            const itemAlto = Number(item.metadata.height);
                             const itemSubtotal = calculateItemPrice(item.material, itemAncho, itemAlto, item.copias, item.servicios)
 
                             // Upload file
