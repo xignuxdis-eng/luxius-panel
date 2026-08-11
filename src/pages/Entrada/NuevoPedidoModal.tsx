@@ -1043,7 +1043,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             blobStore.set(file.name, url);
 
             const availableMats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
-            const initialMat = watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
+            const currentMat = getValues('material');
+            const initialMat = currentMat || watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
 
             // STEP 1: ADD INSTANT PLACEHOLDER CARD
             const placeholder: BatchItem = {
@@ -1190,10 +1191,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 const pUrl = URL.createObjectURL(pageFile);
                                 blobStore.set(pageName, pUrl);
 
-                                // 2. Generate page thumbnail directamente desde el buffer original para evitar problemas de parseo
+                                // 2. Generate page thumbnail usando el archivo de página individual
                                 let thumbUrl: string | undefined = undefined;
                                 try {
-                                    thumbUrl = await getPdfThumbnail(masterBuffer.slice(0), p, wCm, hCm);
+                                    const pBuf = await pageFile.arrayBuffer();
+                                    thumbUrl = await getPdfThumbnail(pBuf, 1, wCm, hCm);
                                 } catch (e) {
                                     console.warn(`[Luxius-DEBUG] Error generando miniatura P${p} desde single-page PDF:`, e);
                                 }
@@ -1330,8 +1332,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         setSaveProgress(prev => ({ ...prev, current: i + 1 }))
 
                         try {
-                            const itemAncho = Number(item.metadata.width);
-                            const itemAlto = Number(item.metadata.height);
+                            // Convertir cm a metros para backend y cálculo de precio
+                            const itemAncho = Number(item.metadata.width) / 100;
+                            const itemAlto = Number(item.metadata.height) / 100;
                             const itemSubtotal = calculateItemPrice(item.material, itemAncho, itemAlto, item.copias, item.servicios)
 
                             // Upload file
