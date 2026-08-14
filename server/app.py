@@ -217,10 +217,10 @@ def _ensure_client_user(cliente: Cliente):
 # GENERIC COLLECTION READ (compatibilidad con frontend)
 # ================================================================
 
-ALLOWED = ['clientes', 'maquinas', 'usuarios', 'vendedores', 'presupuestos', 'materiales', 'servicios', 'calidades', 'logisticas']
+ALLOWED = ['clientes', 'maquinas', 'usuarios', 'vendedores', 'presupuestos', 'materiales', 'servicios', 'calidades', 'logisticas', 'proveedores', 'calendar', 'roles']
 
 # Collections stored as JSON arrays in config_global (no dedicated DB model)
-JSON_COLLECTIONS = {'materiales', 'servicios', 'calidades', 'logisticas'}
+JSON_COLLECTIONS = {'materiales', 'servicios', 'calidades', 'logisticas', 'proveedores', 'calendar', 'roles'}
 
 def _get_json_collection(name):
     """Read a JSON collection from config_global."""
