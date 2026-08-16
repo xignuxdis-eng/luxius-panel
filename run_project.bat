@@ -57,11 +57,11 @@ REM ─── LAUNCH ───────────────────�
 echo.
 echo  [LAUNCH] Iniciando servidores...
 
-start "Luxius Backend (Python/SQL :5000)" cmd /k "cd /d "%SERVER_DIR%" && call .venv\Scripts\activate.bat && python app.py"
+start "Luxius Backend (Python/SQL :5000)" /D "%SERVER_DIR%" cmd /k "call .venv\Scripts\activate.bat && python app.py"
 
 timeout /t 3 /nobreak >nul
 
-start "Luxius Frontend (Vite :3005)" cmd /k "cd /d "%ROOT%" && npm run dev"
+start "Luxius Frontend (Vite :3005)" /D "%ROOT%" cmd /k "npm run dev"
 
 echo.
 echo  ============================================

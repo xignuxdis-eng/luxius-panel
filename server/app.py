@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -8,6 +12,7 @@ from routes.auth import auth_bp
 from routes.operators import operators_bp
 from routes.tasks import tasks_bp
 from routes.orders import orders_bp
+from routes.xana import xana_bp
 import io, json, os
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
@@ -25,6 +30,33 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(operators_bp)
 app.register_blueprint(tasks_bp)
 app.register_blueprint(orders_bp)
+app.register_blueprint(xana_bp)
+
+# Global error handler for debugging
+@app.errorhandler(500)
+def handle_500(e):
+    import traceback, sys
+    traceback.print_exc(file=sys.stderr)
+    return jsonify({'error': 'Internal Server Error', 'details': str(e)}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback, sys
+    traceback.print_exc(file=sys.stderr)
+    return jsonify({'error': str(e)}), 500
+
+# Diagnostic endpoint
+@app.get('/api/health')
+def health_check():
+    try:
+        from sqlalchemy import text
+        result = db.session.execute(text("SELECT 1"))
+        result.close()
+        tables = db.session.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public'")).fetchall()
+        table_names = [t[0] for t in tables]
+        return jsonify({'status': 'ok', 'tables': table_names, 'version': 'unified-v2.0'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
@@ -95,10 +127,21 @@ def upload_file_endpoint():
     }), 200
 
 with app.app_context():
-    db.create_all()
+    import sys
+    print("=" * 60, file=sys.stderr)
+    print("[LUXIUS] Starting unified backend v2.0", file=sys.stderr)
+    print(f"[LUXIUS] DB URI: {app.config['SQLALCHEMY_DATABASE_URI'][:50]}...", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+    try:
+        db.create_all()
+        print("[LUXIUS] db.create_all() completed successfully", file=sys.stderr)
+    except Exception as e:
+        print(f"[LUXIUS] WARNING: db.create_all() error: {e}", file=sys.stderr)
 
     # Seed default system users if missing (preserve modified user accounts)
     def _seed_default_users():
+        if Usuario.query.first():
+            return
         from werkzeug.security import generate_password_hash
         defaults = [
             {'id': 1, 'nombre': 'SISTEMA', 'username': 'sistema', 'email': 'sistema@luxius.com', 'rol': 'principal', 'password': 'sistema123'},
@@ -128,6 +171,8 @@ with app.app_context():
 
     def _seed_default_clientes():
         try:
+            if Cliente.query.first():
+                return
             import os
             json_file = os.path.join(os.path.dirname(__file__), 'data', 'clientes.json')
             if os.path.exists(json_file):
@@ -217,10 +262,10 @@ def _ensure_client_user(cliente: Cliente):
 # GENERIC COLLECTION READ (compatibilidad con frontend)
 # ================================================================
 
-ALLOWED = ['clientes', 'maquinas', 'usuarios', 'vendedores', 'presupuestos', 'materiales', 'servicios', 'calidades', 'logisticas']
+ALLOWED = ['clientes', 'maquinas', 'usuarios', 'vendedores', 'presupuestos', 'materiales', 'servicios', 'calidades', 'logisticas', 'proveedores', 'calendar', 'roles']
 
 # Collections stored as JSON arrays in config_global (no dedicated DB model)
-JSON_COLLECTIONS = {'materiales', 'servicios', 'calidades', 'logisticas'}
+JSON_COLLECTIONS = {'materiales', 'servicios', 'calidades', 'logisticas', 'proveedores', 'calendar', 'roles'}
 
 def _get_json_collection(name):
     """Read a JSON collection from config_global."""
@@ -802,5 +847,4 @@ def get_analytics_reconciliation():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        seed_clientes()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

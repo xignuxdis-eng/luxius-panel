@@ -13,8 +13,11 @@ build/
 # Python
 .venv/
 venv/
-__pycache__/
+**/.venv/
+**/venv/
+**/__pycache__/
 *.pyc
+**/*.pyc
 
 # Logs & temp
 *.log

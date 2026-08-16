@@ -1,115 +1,219 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, Sparkles } from 'lucide-react';
+import { X, Send, Bot, Sparkles, AlertTriangle, Database, Activity, RefreshCw } from 'lucide-react';
+import { getRecentLogs, clearLogs, RecordedError } from '../utils/errorRecorder';
+import { API_URL } from '../data/db';
+import './XanaAssistant.css';
+
+interface Message {
+    role: 'user' | 'bot';
+    text: string;
+    isDiagnostic?: boolean;
+    logsCount?: number;
+}
 
 export default function XanaAssistant() {
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([
-        { role: 'bot', text: '¡Hola! Soy Xana, tu asistente de LuXius. ¿En qué puedo ayudarte hoy?' }
+    const [messages, setMessages] = useState<Message[]>([
+        { 
+            role: 'bot', 
+            text: '¡Hola! Soy Xana AI, tu asistente de LuXius. Puedo ayudarte con pedidos, cotizaciones o diagnosticar cualquier error del sistema.' 
+        }
     ]);
     const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const getUserInfo = () => {
+        try {
+            const authRaw = localStorage.getItem('luxius_auth');
+            if (authRaw) {
+                const parsed = JSON.parse(authRaw);
+                if (parsed?.state?.user) {
+                    return {
+                        role: parsed.state.user.rol || parsed.state.user.role || 'cliente',
+                        username: parsed.state.user.nombre || parsed.state.user.username || 'Usuario',
+                        id: parsed.state.user.id || 0
+                    };
+                }
+            }
+        } catch (_) {}
+        return { role: 'admin', username: 'Administrador', id: 1 };
+    };
+
+    const userInfo = getUserInfo();
+    const isAdmin = userInfo.role === 'admin';
 
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages]);
+    }, [messages, isLoading]);
 
-    const handleSend = () => {
-        if (!input.trim()) return;
+    const sendMessage = async (customText?: string, sendLogs: boolean = false) => {
+        const textToSend = customText || input.trim();
+        if (!textToSend || isLoading) return;
 
-        const userMsg = input.trim();
-        setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        const capturedLogs: RecordedError[] = sendLogs ? getRecentLogs() : [];
+        
+        setMessages(prev => [
+            ...prev, 
+            { role: 'user', text: textToSend, isDiagnostic: sendLogs, logsCount: capturedLogs.length }
+        ]);
+        
         setInput('');
+        setIsLoading(true);
 
-        // Simulación de respuesta IA - Entrenamiento Industria Gráfica Argentina
-        setTimeout(() => {
-            let response = "Entendido, che. ¿En qué más te puedo dar una mano con la producción?";
-            const msg = userMsg.toLowerCase();
+        try {
+            const payload = {
+                message: textToSend,
+                context: {
+                    userRole: userInfo.role,
+                    userName: userInfo.username,
+                    currentView: window.location.pathname,
+                    logs: capturedLogs
+                }
+            };
 
-            if (msg.includes("hola")) {
-                response = "¡Hola! ¿Cómo va el trabajo hoy? ¿Todo bien?";
-            } else if (msg.includes("orden")) {
-                response = "Las órdenes de trabajo están en el panel de producción. ¿Querés que miremos alguna bajada específica?";
-            } else if (msg.includes("stock") || msg.includes("material")) {
-                response = "Tenemos stock de vinilo monomérico y lona frontlight. El inventario está valorado en approx. $4,000,000 ARS.";
-            } else if (msg.includes("vinilo")) {
-                response = "Manejamos vinilo monomérico para promocionales y polimérico para mayor durabilidad. ¿Para qué superficie lo buscás?";
-            } else if (msg.includes("lona")) {
-                response = "Trabajamos con Lona Frontlight para cartelería común y Backlight para cajas de luz. También tenemos Blackout.";
-            } else if (msg.includes("precio")) {
-                response = "Los precios se calculan según los m2 y el material. Por ejemplo, el m2 de lona está en $2600 ARS ahora.";
+            const response = await fetch(`${API_URL}/xana/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al conectar con el servidor');
             }
 
-            setMessages(prev => [...prev, { role: 'bot', text: response }]);
-        }, 1000);
+            const data = await response.json();
+            
+            if (sendLogs) {
+                clearLogs(); 
+            }
+
+            setMessages(prev => [
+                ...prev, 
+                { role: 'bot', text: data.reply }
+            ]);
+        } catch (error) {
+            console.error("Xana Error:", error);
+            setMessages(prev => [
+                ...prev, 
+                { role: 'bot', text: 'Lo siento, no pude procesar tu mensaje. El servidor no está disponible.' }
+            ]);
+        } finally {
+            setIsLoading(false);
+            // Re-focus after sending
+            setTimeout(() => inputRef.current?.focus(), 10);
+        }
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-50">
-            {/* Botón flotante */}
+        <>
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full shadow-lg flex items-center justify-center text-white hover:scale-110 transition-transform active:scale-95"
+                    className="xana-button"
+                    title="Asistente Xana AI & Diagnósticos"
                 >
-                    <Bot className="w-8 h-8" />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full animate-pulse"></div>
+                    <Sparkles size={24} />
                 </button>
             )}
 
-            {/* Ventana de chat */}
             {isOpen && (
-                <div className="bg-white w-80 md:w-96 h-[500px] rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-                    {/* Header */}
-                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 flex items-center justify-between text-white">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-yellow-300" />
+                <div className="xana-chat-container">
+                    <div className="xana-header">
+                        <div className="xana-header-info">
+                            <div className="xana-avatar">
+                                <Bot size={24} />
+                            </div>
                             <div>
-                                <h3 className="font-bold">Xana AI</h3>
-                                <p className="text-xs text-purple-100">En línea</p>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <h3 className="xana-title">Xana AI</h3>
+                                    <span className="xana-role-badge">
+                                        {userInfo.role}
+                                    </span>
+                                </div>
+                                <p className="xana-subtitle">Diagnóstico & Gestión Gráfica</p>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
-                            <X className="w-6 h-6" />
+                        <button onClick={() => setIsOpen(false)} className="xana-close-btn">
+                            <X size={20} />
                         </button>
                     </div>
 
-                    {/* Mensajes */}
-                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                    <div className="xana-quick-actions">
+                        <button
+                            onClick={() => sendMessage('Diagnostica los errores recientes de pantalla y consola', true)}
+                            disabled={isLoading}
+                            className="xana-pill xana-pill-red"
+                        >
+                            <AlertTriangle size={14} />
+                            <span>Diagnosticar Errores</span>
+                        </button>
+                        <button
+                            onClick={() => sendMessage('¿Cuál es el estado general de las órdenes de trabajo activas?')}
+                            disabled={isLoading}
+                            className="xana-pill xana-pill-indigo"
+                        >
+                            <Activity size={14} />
+                            <span>Estado Órdenes</span>
+                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={() => sendMessage('Audita la salud de la base de datos Neon y tablas del sistema')}
+                                disabled={isLoading}
+                                className="xana-pill xana-pill-purple"
+                            >
+                                <Database size={14} />
+                                <span>Salud BD</span>
+                            </button>
+                        )}
+                    </div>
+
+                    <div ref={scrollRef} className="xana-messages">
                         {messages.map((msg, i) => (
-                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user'
-                                    ? 'bg-purple-600 text-white rounded-tr-none'
-                                    : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-none'
-                                    }`}>
-                                    {msg.text}
+                            <div key={i} className={`xana-msg-row ${msg.role === 'user' ? 'xana-msg-user' : 'xana-msg-bot'}`}>
+                                <div className={`xana-bubble ${msg.role === 'user' ? 'xana-bubble-user' : 'xana-bubble-bot'}`}>
+                                    {msg.isDiagnostic && (
+                                        <div className="xana-diagnostic-badge">
+                                            🩺 Diagnóstico adjunto ({msg.logsCount || 0} logs de consola)
+                                        </div>
+                                    )}
+                                    <div>{msg.text}</div>
                                 </div>
                             </div>
                         ))}
+                        {isLoading && (
+                            <div className="xana-msg-row xana-msg-bot">
+                                <div className="xana-loading">
+                                    <RefreshCw size={16} className="animate-spin" />
+                                    <span>Xana está analizando...</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Input */}
-                    <div className="p-4 bg-white border-t border-gray-200">
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                                placeholder="Pregúntale a Xana..."
-                                className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500"
-                            />
-                            <button
-                                onClick={handleSend}
-                                className="bg-purple-600 text-white p-2 rounded-xl hover:bg-purple-700 transition-colors"
-                            >
-                                <Send className="w-5 h-5" />
-                            </button>
-                        </div>
+                    <div className="xana-input-area">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                            placeholder="Pregúntale a Xana o pide un diagnóstico..."
+                            className="xana-input"
+                        />
+                        <button
+                            onClick={() => sendMessage()}
+                            disabled={isLoading || !input.trim()}
+                            className="xana-send-btn"
+                        >
+                            <Send size={18} />
+                        </button>
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -3,6 +3,7 @@ import { useAuthStore } from '@store/authStore'
 
 // Layouts
 import MainLayout from '@components/layout/MainLayout'
+import XanaAssistant from '@components/XanaAssistant'
 
 // Pages
 import Login from '@pages/Login/Login'
@@ -100,33 +101,36 @@ function App() {
     }
 
     return (
-        <Routes>
-            <Route path="/login" element={<Login />} />
+        <>
+            <Routes>
+                <Route path="/login" element={<Login />} />
 
-            <Route
-                path="/*"
-                element={
-                    <ProtectedRoute>
-                        <MainLayout>
-                            <Routes>
-                                <Route path="/" element={<Dashboard />} />
-                                <Route path="/entrada" element={<Entrada />} />
-                                <Route path="/presupuestador" element={<Presupuestador />} />
-                                <Route path="/diseno" element={<Diseno />} />
-                                <Route path="/impresion" element={<Impresion />} />
-                                <Route path="/stock" element={<Stock />} />
-                                <Route path="/analiticas" element={<Analytics />} />
-                                <Route path="/utilidades" element={<Utilidades />} />
-                                <Route path="/abm/*" element={<ABM />} />
-                                <Route path="/reportes" element={<Reportes />} />
-                                <Route path="/sistema/*" element={<Sistema />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
-                            </Routes>
-                        </MainLayout>
-                    </ProtectedRoute>
-                }
-            />
-        </Routes>
+                <Route
+                    path="/*"
+                    element={
+                        <ProtectedRoute>
+                            <MainLayout>
+                                <Routes>
+                                    <Route path="/" element={<Dashboard />} />
+                                    <Route path="/entrada" element={<Entrada />} />
+                                    <Route path="/presupuestador" element={<Presupuestador />} />
+                                    <Route path="/diseno" element={<Diseno />} />
+                                    <Route path="/impresion" element={<Impresion />} />
+                                    <Route path="/stock" element={<Stock />} />
+                                    <Route path="/analiticas" element={<Analytics />} />
+                                    <Route path="/utilidades" element={<Utilidades />} />
+                                    <Route path="/abm/*" element={<ABM />} />
+                                    <Route path="/reportes" element={<Reportes />} />
+                                    <Route path="/sistema/*" element={<Sistema />} />
+                                    <Route path="*" element={<Navigate to="/" replace />} />
+                                </Routes>
+                            </MainLayout>
+                        </ProtectedRoute>
+                    }
+                />
+            </Routes>
+            <XanaAssistant />
+        </>
     )
 }
 

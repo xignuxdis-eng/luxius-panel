@@ -4,71 +4,62 @@
     "nombre": "SISTEMA",
     "username": "sistema",
     "email": "sistema@luxius.com",
-    "rol": "principal",
-    "password": "nueva98261"
+    "rol": "principal"
   },
   {
     "id": 2,
     "nombre": "Admin",
     "username": "admin",
     "email": "admin@luxius.com",
-    "rol": "administrador",
-    "password": "admin123"
+    "rol": "administrador"
   },
   {
     "id": 3,
     "nombre": "Vendedor",
     "username": "vendedor",
     "email": "vendedor@xignux.com.ar",
-    "rol": "vendedor",
-    "password": "vendedor123"
+    "rol": "vendedor"
   },
   {
     "id": 4,
     "nombre": "Impresion",
     "username": "impresion",
     "email": "impresion@luxius.com",
-    "rol": "impresion",
-    "password": "impresion123"
+    "rol": "impresion"
   },
   {
     "id": 5,
     "nombre": "Diseño",
     "username": "diseno",
     "email": "xignux.dis@gmail.com",
-    "rol": "artista",
-    "password": "diseno123"
+    "rol": "artista"
   },
   {
     "id": 6,
     "nombre": "Cliente",
     "username": "cliente",
     "email": "cliente@luxius.com",
-    "rol": "cliente",
-    "password": "cliente123"
+    "rol": "cliente"
   },
   {
     "id": 10,
     "nombre": "ADRIAN",
     "username": "adrian",
     "email": "adrian@luxius.com",
-    "rol": "principal",
-    "password": "nueva98261"
+    "rol": "principal"
   },
   {
     "id": 830011,
     "nombre": "Carlos Flores",
     "username": "carlos",
     "email": "carlos@luxius.com",
-    "rol": "impresion",
-    "password": "impresion123"
+    "rol": "impresion"
   },
   {
     "id": 530597,
     "nombre": "JAVIER ALVAREZ",
     "username": "javier",
     "email": "javier@luxius.com",
-    "rol": "cliente",
-    "password": "cliente123"
+    "rol": "cliente"
   }
 ]

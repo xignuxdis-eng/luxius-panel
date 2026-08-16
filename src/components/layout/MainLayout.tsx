@@ -3,6 +3,7 @@ import MediaPlayer from '@components/ui/MediaPlayer'
 import FloatingCalculator from '@components/ui/FloatingCalculator'
 import FloatingAlarm from '@components/ui/FloatingAlarm'
 import FloatingWhatsApp from '@components/ui/FloatingWhatsApp'
+import XanaAssistant from '@components/XanaAssistant'
 import './MainLayout.css'
 
 interface MainLayoutProps {
@@ -16,6 +17,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <main className="main-content">
                 {children}
             </main>
+            <XanaAssistant />
             <FloatingWhatsApp />
             <FloatingAlarm />
             <FloatingCalculator />
