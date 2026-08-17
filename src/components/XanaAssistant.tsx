@@ -67,12 +67,11 @@ export default function XanaAssistant() {
         try {
             const payload = {
                 message: textToSend,
-                context: {
-                    userRole: userInfo.role,
-                    userName: userInfo.username,
-                    currentView: window.location.pathname,
-                    logs: capturedLogs
-                }
+                userRole: userInfo.role.toLowerCase(),
+                username: userInfo.username,
+                userId: userInfo.id,
+                clientLogs: capturedLogs,
+                currentUrl: window.location.pathname
             };
 
             const response = await fetch(`${API_URL}/xana/chat`, {
