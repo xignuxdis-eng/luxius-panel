@@ -174,94 +174,70 @@ export default function UploadPage() {
   };
 
   const handleFiles = async (files: File[]) => {
-    console.log("handleFiles llamado con", files.length, "archivos");
-    
     // En modo individual, reemplazar archivos existentes
     if (uploadMode === "individual") {
-      // Limpiar archivos existentes
       uploadedFiles.forEach(file => {
-        if (file.preview) {
-          URL.revokeObjectURL(file.preview);
-        }
+        if (file.preview) URL.revokeObjectURL(file.preview);
       });
       setUploadedFiles([]);
     }
 
-    const newFiles: UploadedFile[] = [];
-    
-    for (const file of files) {
-      console.log("Procesando archivo:", file.name, file.type, file.size);
+    const initialFiles: UploadedFile[] = files.map(file => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      progress: 0,
+      status: "uploading" as const
+    }));
+
+    setUploadedFiles(prev => uploadMode === "individual" ? initialFiles : [...prev, ...initialFiles]);
+
+    // Procesar cada archivo asincrónicamente
+    initialFiles.forEach(async (initialFile, index) => {
+      const originalFile = files[index];
       
-      const newFile: UploadedFile = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        progress: 0,
-        status: "uploading" as const
-      };
-
-      // Crear preview para imágenes y PDFs
-      if (file.type.startsWith("image/") || file.type === "application/pdf") {
-        newFile.preview = URL.createObjectURL(file);
-        console.log("Preview creado para:", file.name, "URL:", newFile.preview);
-      } else {
-        console.log("No se creó preview para:", file.name, "tipo:", file.type);
-      }
-
-      // Extraer metadata real
-      try {
-        console.log("Iniciando extracción de metadata para", file.name);
-        newFile.metadata = await extractFileMetadata(file);
-        console.log("Metadata extraída para", file.name, newFile.metadata);
-      } catch (error) {
-        console.log("Error extrayendo metadata para", file.name, error);
-        // Crear metadata básica como fallback
-        newFile.metadata = {
-          dimensions: { width: 0, height: 0 },
-          resolution: 72
-        };
-      }
-
-      // Si es modo individual, agregar información específica
-      if (uploadMode === "individual") {
-        newFile.material = individualInfo.material;
-        newFile.alto = individualInfo.alto;
-        newFile.ancho = individualInfo.ancho;
-        newFile.copias = individualInfo.copias;
-      }
-
-      newFiles.push(newFile);
-      console.log("Archivo agregado al array:", newFile.name, "Total en newFiles:", newFiles.length);
-    }
-
-    console.log("Actualizando estado con", newFiles.length, "archivos nuevos");
-    console.log("Modo:", uploadMode, "Archivos actuales:", uploadedFiles.length);
-    setUploadedFiles(prev => uploadMode === "individual" ? newFiles : [...prev, ...newFiles]);
-    console.log("Archivos agregados al estado. Total:", uploadMode === "individual" ? newFiles.length : uploadedFiles.length + newFiles.length);
-
-    // Simular progreso de upload
-    newFiles.forEach(file => {
+      // Simular progreso
       const interval = setInterval(() => {
-        setUploadedFiles(prev => 
-          prev.map(f => 
-            f.id === file.id 
-              ? { ...f, progress: Math.min(f.progress + 10, 100) }
-              : f
-          )
-        );
-
-        if (file.progress >= 100) {
-          clearInterval(interval);
-          setUploadedFiles(prev => 
-            prev.map(f => 
-              f.id === file.id 
-                ? { ...f, status: "completed" as const }
-                : f
-            )
-          );
-        }
+        setUploadedFiles(prev => {
+          const currentFile = prev.find(f => f.id === initialFile.id);
+          if (!currentFile) {
+            clearInterval(interval);
+            return prev;
+          }
+          if (currentFile.progress >= 100) {
+            clearInterval(interval);
+            return prev.map(f => f.id === initialFile.id ? { ...f, status: "completed" as const } : f);
+          }
+          return prev.map(f => f.id === initialFile.id ? { ...f, progress: Math.min(f.progress + 10, 100) } : f);
+        });
       }, 200);
+
+      // Crear preview y extraer metadata en paralelo a la simulación de progreso
+      let preview: string | undefined;
+      if (originalFile.type.startsWith("image/") || originalFile.type === "application/pdf") {
+        preview = URL.createObjectURL(originalFile);
+      }
+
+      let metadata = { dimensions: { width: 0, height: 0 }, resolution: 72 };
+      try {
+        metadata = await extractFileMetadata(originalFile) as any;
+      } catch (error) {}
+
+      // Actualizar estado con la metadata
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === initialFile.id 
+          ? { 
+              ...f, 
+              preview,
+              metadata,
+              material: uploadMode === "individual" ? individualInfo.material : f.material,
+              alto: uploadMode === "individual" ? individualInfo.alto : f.alto,
+              ancho: uploadMode === "individual" ? individualInfo.ancho : f.ancho,
+              copias: uploadMode === "individual" ? individualInfo.copias : f.copias
+            } 
+          : f
+      ));
     });
   };
 
