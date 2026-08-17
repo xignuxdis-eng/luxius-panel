@@ -240,33 +240,33 @@ export default function Entrada() {
 
     // BATCH ACTIONS
     const toggleSelection = (id: number | string) => {
-        const strId = String(id);
-        const newSet = new Set(Array.from(selectedIds).map(String));
-        if (newSet.has(strId)) {
-            newSet.delete(strId);
+        const numId = Number(id);
+        const newSet = new Set(selectedIds);
+        if (newSet.has(numId)) {
+            newSet.delete(numId);
         } else {
-            newSet.add(strId);
+            newSet.add(numId);
         }
-        setSelectedIds(newSet as any);
+        setSelectedIds(newSet);
     }
 
     const toggleSelectAll = () => {
-        const displayedStrIds = displayedOrders.map(o => String(o.id));
-        const currentSelectedStr = new Set(Array.from(selectedIds).map(String));
-        const allSelected = displayedStrIds.length > 0 && displayedStrIds.every(id => currentSelectedStr.has(id));
+        const displayedIds = displayedOrders.map(o => o.id);
+        const currentSelected = new Set(selectedIds);
+        const allSelected = displayedIds.length > 0 && displayedIds.every(id => currentSelected.has(id));
 
         if (allSelected) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(displayedStrIds as any));
+            setSelectedIds(new Set(displayedIds));
         }
     }
 
     const handleBatchStatus = async (status: 'impreso' | 'entregado') => {
         try {
             setLoading(true);
-            const displayedStrSet = new Set(displayedOrders.map(o => String(o.id)));
-            const validIds = Array.from(selectedIds).map(String).filter(id => displayedStrSet.has(id));
+            const displayedIdsSet = new Set(displayedOrders.map(o => o.id));
+            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(id));
             const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
 
             await saveBatchOrders('update', finalIds, { status });
@@ -282,7 +282,7 @@ export default function Entrada() {
     }
 
     const handleExportClientReportPdf = () => {
-        const selectedList = displayedOrders.filter(o => (selectedIds as any).has(o.id) || (selectedIds as any).has(String(o.id)));
+        const selectedList = displayedOrders.filter(o => selectedIds.has(o.id));
         const ordersToExport = selectedList.length > 0 ? selectedList : displayedOrders;
 
         if (ordersToExport.length === 0) {
@@ -301,8 +301,8 @@ export default function Entrada() {
 
         try {
             setLoading(true);
-            const displayedStrSet = new Set(displayedOrders.map(o => String(o.id)));
-            const validIds = Array.from(selectedIds).map(String).filter(id => displayedStrSet.has(id));
+            const displayedIdsSet = new Set(displayedOrders.map(o => o.id));
+            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(id));
             const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
 
             if (isTrash) {
