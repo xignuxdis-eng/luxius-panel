@@ -65,8 +65,10 @@ export default function XanaAssistant() {
         setIsLoading(true);
 
         try {
+            const history = messages.map(m => ({ role: m.role, content: m.text }));
             const payload = {
                 message: textToSend,
+                history: history,
                 userRole: userInfo.role.toLowerCase(),
                 username: userInfo.username,
                 userId: userInfo.id,
