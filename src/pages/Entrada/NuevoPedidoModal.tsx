@@ -1919,6 +1919,33 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                         </span>
                                     </div>
 
+                                    {extracting && (
+                                        <div style={{
+                                            marginTop: '10px',
+                                            padding: '12px 14px',
+                                            background: 'rgba(37, 99, 235, 0.15)',
+                                            border: '1px solid rgba(37, 99, 235, 0.4)',
+                                            borderRadius: 'var(--radius-md)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            boxShadow: '0 0 10px rgba(37, 99, 235, 0.1)'
+                                        }}>
+                                            <div style={{
+                                                width: '18px',
+                                                height: '18px',
+                                                border: '3px solid rgba(96, 165, 250, 0.3)',
+                                                borderTopColor: '#60a5fa',
+                                                borderRadius: '50%',
+                                                animation: 'spin 0.8s linear infinite',
+                                                flexShrink: 0
+                                            }} />
+                                            <span style={{ color: '#60a5fa', fontWeight: '600', fontSize: '0.9rem' }}>
+                                                Analizando archivos en lote (DPI, dimensiones y explosión de PDFs)...
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {batchItems.length > 0 && (
                                         <>
                                             {/* BARRA DE HERRAMIENTAS DE LOTE */}
@@ -1993,6 +2020,25 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Upload Progress for this Item */}
+                                                    {uploadProgress && uploadProgress.fileName === item.fileName && (
+                                                        <div style={{ marginTop: '2px', marginBottom: '2px', background: 'rgba(37, 99, 235, 0.1)', padding: '6px', borderRadius: '4px', border: '1px solid rgba(37, 99, 235, 0.2)' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#60a5fa', fontWeight: 'bold' }}>
+                                                                <span>Subiendo archivo...</span>
+                                                                <span>{uploadProgress.percent}% ({uploadProgress.loaded}MB / {uploadProgress.total}MB)</span>
+                                                            </div>
+                                                            <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden', marginTop: '4px' }}>
+                                                                <div style={{
+                                                                    width: `${uploadProgress.percent}%`,
+                                                                    height: '100%',
+                                                                    background: 'linear-gradient(90deg, #10b981, #2563eb)',
+                                                                    transition: 'width 0.3s ease-out',
+                                                                    boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
+                                                                }} />
+                                                            </div>
+                                                        </div>
+                                                    )}
 
                                                     {/* Controls: Material and Copies */}
                                                     <div style={{ display: 'flex', gap: '8px' }}>
