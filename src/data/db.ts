@@ -52,8 +52,7 @@ const COLLECTIONS_CONFIG = [
     { key: 'luxius_session_servicios', endpoint: 'servicios' },
     { key: 'luxius_session_logisticas', endpoint: 'logisticas' },
     { key: 'luxius_session_calendar', endpoint: 'calendar' },
-    { key: 'luxius_session_roles', endpoint: 'roles' },
-    { key: 'luxius_session_ordenes', endpoint: 'orders' }
+    { key: 'luxius_session_roles', endpoint: 'roles' }
 ];
 
 export const SESSION_CLIENTES_KEY = 'luxius_session_clientes'
