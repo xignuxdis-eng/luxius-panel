@@ -2175,38 +2175,66 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             </p>
                         )}
 
-                        {/* Progress Bar Container */}
-                        <div style={{
-                            width: '100%',
-                            height: '14px',
-                            background: 'rgba(255,255,255,0.08)',
-                            borderRadius: '10px',
-                            overflow: 'hidden',
-                            position: 'relative',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            marginBottom: '15px'
-                        }}>
-                            <div style={{
-                                width: `${uploadProgress ? uploadProgress.percent : Math.min(100, Math.round((saveProgress.current / (saveProgress.total || 1)) * 100))}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #2563eb, #7c3aed, #ec4899)',
-                                borderRadius: '10px',
-                                transition: 'width 0.2s ease-out',
-                                boxShadow: '0 0 15px rgba(124, 58, 237, 0.6)'
-                            }}></div>
-                        </div>
+                        {/* OVERALL BATCH PROGRESS */}
+                        {saveProgress && saveProgress.total > 1 && (
+                            <div style={{ width: '100%', marginBottom: uploadProgress ? '20px' : '0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fff', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                    <span style={{ fontWeight: 600 }}>Progreso del Lote (Órdenes de Trabajo)</span>
+                                    <span style={{ color: '#10b981', fontWeight: 700 }}>
+                                        {saveProgress.current} de {saveProgress.total} ítems ({Math.round((saveProgress.current / (saveProgress.total || 1)) * 100)}%)
+                                    </span>
+                                </div>
+                                <div style={{
+                                    width: '100%',
+                                    height: '14px',
+                                    background: 'rgba(255,255,255,0.08)',
+                                    borderRadius: '10px',
+                                    overflow: 'hidden',
+                                    border: '1px solid rgba(255,255,255,0.1)'
+                                }}>
+                                    <div style={{
+                                        width: `${Math.min(100, Math.round((saveProgress.current / (saveProgress.total || 1)) * 100))}%`,
+                                        height: '100%',
+                                        background: 'linear-gradient(90deg, #059669, #10b981)',
+                                        borderRadius: '10px',
+                                        transition: 'width 0.3s ease-out',
+                                        boxShadow: '0 0 10px rgba(16, 185, 129, 0.4)'
+                                    }}></div>
+                                </div>
+                            </div>
+                        )}
 
-                        {/* Percentage and Bytes Info */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', color: '#fff', fontWeight: 700, fontSize: '0.95rem' }}>
-                            <span style={{ color: '#60a5fa' }}>
-                                {uploadProgress ? `${uploadProgress.percent}%` : `${saveProgress.current} de ${saveProgress.total} ítems`}
-                            </span>
-                            {uploadProgress && (
-                                <span style={{ color: 'var(--text-muted, #aaa)', fontWeight: 500 }}>
-                                    {uploadProgress.loaded} MB de {uploadProgress.total} MB
-                                </span>
-                            )}
-                        </div>
+                        {/* CURRENT FILE UPLOAD PROGRESS */}
+                        {uploadProgress && (
+                            <div style={{ width: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fff', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                    <span style={{ fontWeight: 600 }}>Subiendo archivo actual</span>
+                                    <span style={{ color: '#60a5fa', fontWeight: 700 }}>{uploadProgress.percent}%</span>
+                                </div>
+                                <div style={{
+                                    width: '100%',
+                                    height: '14px',
+                                    background: 'rgba(255,255,255,0.08)',
+                                    borderRadius: '10px',
+                                    overflow: 'hidden',
+                                    border: '1px solid rgba(255,255,255,0.1)'
+                                }}>
+                                    <div style={{
+                                        width: `${uploadProgress.percent}%`,
+                                        height: '100%',
+                                        background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
+                                        borderRadius: '10px',
+                                        transition: 'width 0.2s ease-out',
+                                        boxShadow: '0 0 10px rgba(59, 130, 246, 0.4)'
+                                    }}></div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                    <span style={{ color: 'var(--text-muted, #aaa)', fontSize: '0.8rem', fontWeight: 500 }}>
+                                        {uploadProgress.loaded} MB de {uploadProgress.total} MB
+                                    </span>
+                                </div>
+                            </div>
+                        )}
 
                         {saveProgress.errorCount > 0 && (
                             <div style={{ color: '#ef4444', marginTop: '15px', fontSize: '0.85rem' }}>
