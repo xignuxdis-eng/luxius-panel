@@ -281,6 +281,7 @@ export default function UploadPage() {
       }
     });
     setUploadedFiles(prev => prev.filter(f => !ids.includes(f.id)));
+    setSelectedFiles(prev => prev.filter(id => !ids.includes(id)));
   };
 
   // Funciones para modo lotes
@@ -1528,10 +1529,10 @@ export default function UploadPage() {
                 </h3>
                 {uploadMode === "lote" && uploadedFiles.length > 1 && (
                   <button
-                    onClick={() => removeMultipleFiles(uploadedFiles.map(f => f.id))}
+                    onClick={() => removeMultipleFiles(selectedFiles.length > 0 ? selectedFiles : uploadedFiles.map(f => f.id))}
                     className="text-red-500 hover:text-red-700 text-sm font-medium"
                   >
-                    Eliminar todos
+                    {selectedFiles.length > 0 ? `Eliminar seleccionados (${selectedFiles.length})` : "Eliminar todos"}
                   </button>
                 )}
               </div>
