@@ -222,6 +222,24 @@ export default function FileGrid({
                           {file.metadata.colorSpace}
                         </div>
                       )}
+
+                      {/* Barra de progreso */}
+                      {file.status === "uploading" && (
+                        <div className="mt-2 flex items-center space-x-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${file.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 w-8 text-right">{file.progress}%</span>
+                        </div>
+                      )}
+                      {file.status === "completed" && (
+                        <div className="mt-1 text-sm text-green-600 font-medium flex items-center">
+                          <Check className="w-4 h-4 mr-1" /> Completado
+                        </div>
+                      )}
                     </div>
                   </div>
 
