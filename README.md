@@ -33,16 +33,16 @@ El backend carga automáticamente el archivo `.env` ubicado en la raíz del proy
 # ----------------------------------------------------
 # POSTGRESQL DATABASE CONFIGURATION (Neon)
 # ----------------------------------------------------
-DATABASE_URL=postgresql://neondb_owner:npg_2iQIEeF6ldyt@ep-plain-fire-axw02rtm-pooler.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://<user>:<password>@<host>/neondb?sslmode=require&channel_binding=require
 
 # ----------------------------------------------------
 # CLOUDFLARE R2 CONFIGURATION
 # ----------------------------------------------------
-R2_ACCOUNT_ID=62e10a84196d5f6cfb46c97af6e5931d
-R2_ACCESS_KEY_ID=bfcc97d2553861278095fa1027ecc989
-R2_SECRET_ACCESS_KEY=97dcf66d7aab716e7b58b905b189e5b9ade2a531c908739a6b8e7fcd996d85eb
+R2_ACCOUNT_ID=<your_account_id>
+R2_ACCESS_KEY_ID=<your_access_key>
+R2_SECRET_ACCESS_KEY=<your_secret_key>
 R2_BUCKET_NAME=luxius-media
-R2_ENDPOINT_URL=https://62e10a84196d5f6cfb46c97af6e5931d.r2.cloudflarestorage.com
+R2_ENDPOINT_URL=https://<your_account_id>.r2.cloudflarestorage.com
 
 # ----------------------------------------------------
 # JWT / SEGURIDAD
