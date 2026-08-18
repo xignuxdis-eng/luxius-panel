@@ -251,7 +251,7 @@ export default function Entrada() {
     }
 
     const toggleSelectAll = () => {
-        const displayedIds = displayedOrders.map(o => o.id);
+        const displayedIds = displayedOrders.map(o => Number(o.id));
         const currentSelected = new Set(selectedIds);
         const allSelected = displayedIds.length > 0 && displayedIds.every(id => currentSelected.has(id));
 
@@ -265,11 +265,11 @@ export default function Entrada() {
     const handleBatchStatus = async (status: 'impreso' | 'entregado') => {
         try {
             setLoading(true);
-            const displayedIdsSet = new Set(displayedOrders.map(o => o.id));
-            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(id));
+            const displayedIdsSet = new Set(displayedOrders.map(o => Number(o.id)));
+            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(Number(id)));
             const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
 
-            await saveBatchOrders('update', finalIds, { status });
+            await saveBatchOrders('update', finalIds.map(String), { status });
 
             setSelectedIds(new Set());
             await loadOrders();
@@ -282,7 +282,7 @@ export default function Entrada() {
     }
 
     const handleExportClientReportPdf = () => {
-        const selectedList = displayedOrders.filter(o => selectedIds.has(o.id));
+        const selectedList = displayedOrders.filter(o => selectedIds.has(Number(o.id)));
         const ordersToExport = selectedList.length > 0 ? selectedList : displayedOrders;
 
         if (ordersToExport.length === 0) {
@@ -301,14 +301,14 @@ export default function Entrada() {
 
         try {
             setLoading(true);
-            const displayedIdsSet = new Set(displayedOrders.map(o => o.id));
-            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(id));
+            const displayedIdsSet = new Set(displayedOrders.map(o => Number(o.id)));
+            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(Number(id)));
             const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
 
             if (isTrash) {
-                await saveBatchOrders('delete', finalIds);
+                await saveBatchOrders('delete', finalIds.map(String));
             } else {
-                await saveBatchOrders('update', finalIds, { status: 'eliminado' });
+                await saveBatchOrders('update', finalIds.map(String), { status: 'eliminado' });
             }
 
             setSelectedIds(new Set());
@@ -326,17 +326,17 @@ export default function Entrada() {
 
         try {
             setLoading(true)
-            const displayedIds = new Set(displayedOrders.map(o => o.id))
-            const validIds = Array.from(selectedIds).filter(id => displayedIds.has(id))
+            const displayedIds = new Set(displayedOrders.map(o => Number(o.id)))
+            const validIds = Array.from(selectedIds).filter(id => displayedIds.has(Number(id)))
 
-            const designIds: number[] = []
-            const productionIds: number[] = []
+            const designIds: string[] = []
+            const productionIds: string[] = []
 
             validIds.forEach(id => {
-                const o = orders.find(x => x.id === id)
+                const o = orders.find(x => Number(x.id) === id)
                 if (o) {
-                    if (o.category === 'diseno') designIds.push(id)
-                    else productionIds.push(id)
+                    if (o.category === 'diseno') designIds.push(String(id))
+                    else productionIds.push(String(id))
                 }
             })
 
@@ -550,11 +550,11 @@ export default function Entrada() {
                                 }
 
                                 return (
-                                    <tr key={order.id} className={`fade-in hover-row ${selectedIds.has(order.id) ? 'selected-row' : ''}`} style={selectedIds.has(order.id) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
+                                    <tr key={order.id} className={`fade-in hover-row ${selectedIds.has(Number(order.id)) ? 'selected-row' : ''}`} style={selectedIds.has(Number(order.id)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
                                         <td>
                                             <input
                                                 type="checkbox"
-                                                checked={selectedIds.has(order.id)}
+                                                checked={selectedIds.has(Number(order.id))}
                                                 onChange={() => toggleSelection(order.id)}
                                                 style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
                                             />
