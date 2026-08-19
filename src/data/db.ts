@@ -668,25 +668,7 @@ export function getClientesActivos(): Cliente[] {
 // Materiales
 // ============================================================
 
-// Fallback materials for Inks and Solvents
-const supplementaryMaterials: Material[] = [
-    { id: 901, codigo: 'INK C', descripcion: 'Tinta Cyan', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#00ffff', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 902, codigo: 'INK M', descripcion: 'Tinta Magenta', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#ff00ff', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 903, codigo: 'INK Y', descripcion: 'Tinta Yellow', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#ffff00', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 904, codigo: 'INK K', descripcion: 'Tinta Black', calidad: 'ECO', tipo: 'tinta', unidad: 'Litros', color: '#222222', precioM2: 0, ancho: 0, habilitado: true, stockActual: 10, stockMinimo: 5 },
-    { id: 905, codigo: 'FLS-01', descripcion: 'Solvente Flush (Limpieza)', calidad: 'General', tipo: 'solvente', unidad: 'Litros', color: '#e0e0e0', precioM2: 0, ancho: 0, habilitado: true, stockActual: 20, stockMinimo: 8 }
-]
-
 export function getMateriales(): Material[] {
-    const staticMateriales: Material[] = [
-        { id: 13, codigo: 'VV', descripcion: 'Vinilo Orajet 3651', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'ml', unidad: 'M Lineal', precioM2: 32000, ancho: 1.52, habilitado: true, bobinas: [{ ancho: 1.37, precioML: 32000 }, { ancho: 1.52, precioML: 34000 }] },
-        { id: 6, codigo: 'VM', descripcion: 'Vinilo Microperforado', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 18000, ancho: 1.52, habilitado: true },
-        { id: 3, codigo: 'VBB', descripcion: 'Vinilo Adhesivo Base Blanca Brillante', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 14000, ancho: 1.52, habilitado: true },
-        { id: 2, codigo: 'BL', descripcion: 'Lona Back Light 15oz', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 18000, ancho: 3.2, habilitado: true },
-        { id: 1, codigo: 'FL', descripcion: 'Lona Front Light 13oz', calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2', unidad: 'M Lineal', precioM2: 14000, ancho: 3.2, habilitado: true }
-    ]
-    const staticCombined = [...staticMateriales, ...supplementaryMaterials]
-
     const sessionItemsJson = localStorage.getItem(SESSION_MATERIALES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_MATERIALES_KEY)
 
@@ -705,22 +687,14 @@ export function getMateriales(): Material[] {
         } catch (e) { }
     }
 
-    const sessionIds = new Set(sessionItems.map(i => i.id))
-    const sessionCodes = new Set(sessionItems.map(i => (i.codigo || '').trim().toLowerCase()))
     const hiddenSet = new Set(hiddenIds)
-
-    const filteredStatic = staticCombined.filter(i => {
-        const iCode = (i.codigo || '').trim().toLowerCase()
-        return !sessionIds.has(i.id) && iCode && !sessionCodes.has(iCode) && !hiddenSet.has(i.id)
-    })
-
     const filteredSession = sessionItems.filter(i => !hiddenSet.has(i.id))
 
     const calidadesList = getCalidades();
     const validCalidadesMap = new Map(calidadesList.map(c => [c.nombre.trim().toLowerCase(), c.nombre]));
     const defaultCalidadName = calidadesList.find(c => c.habilitado !== false)?.nombre || calidadesList[0]?.nombre || 'Solvente';
 
-    return [...filteredSession, ...filteredStatic].map(m => {
+    return filteredSession.map(m => {
         let color = m.color
         if (!color) {
             if (m.codigo === 'INK-C') color = '#00ffff'
@@ -855,12 +829,6 @@ export function getMaterialesByCalidad(calidadId: number): Material[] {
 // ============================================================
 
 export function getCalidades(): Calidad[] {
-    const staticCalidades: Calidad[] = [
-        { id: 769475, nombre: 'ECO', descripcion: 'TINTAS ECOLOGICAS DE ALTA DURACION', habilitado: true, orden: 1 },
-        { id: 4, nombre: 'UV', descripcion: 'Impresión UV cama plana y rollo', habilitado: true, orden: 2 },
-        { id: 5, nombre: 'Fotográfica', descripcion: 'Impresión fotográfica de alta resolución', habilitado: true, orden: 3 },
-        { id: 6, nombre: 'General', descripcion: 'Calidad estándar / insumos generales', habilitado: true, orden: 4 }
-    ]
     const sessionItemsJson = localStorage.getItem(SESSION_CALIDADES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_CALIDADES_KEY)
 
@@ -879,20 +847,10 @@ export function getCalidades(): Calidad[] {
         } catch (e) { }
     }
 
-    const sessionIds = new Set(sessionItems.map(i => i.id))
-    const sessionNames = new Set(sessionItems.map(i => (i.nombre || '').trim().toLowerCase()))
     const hiddenSet = new Set(hiddenIds)
-
-    // Filter static with stricter anti-duplication (by ID AND Name)
-    const filteredStatic = staticCalidades.filter(i => {
-        const iName = (i.nombre || '').trim().toLowerCase()
-        return !sessionIds.has(i.id) && iName && !sessionNames.has(iName) && !hiddenSet.has(i.id)
-    })
-
     const filteredSession = sessionItems.filter(i => !hiddenSet.has(i.id))
 
-    // Final merge (filtering for active items SHOULD be done by the UI if needed)
-    return [...filteredSession, ...filteredStatic]
+    return filteredSession
 }
 
 export function saveCalidad(calidad: Partial<Calidad>): Calidad {
@@ -1362,14 +1320,7 @@ export function getServicios(): Servicio[] {
         } catch (e) { }
     }
 
-    const defaultServicios: Servicio[] = [
-        { id: 1, codigo: 'TEN', nombre: 'TENSADO', descripcion: 'Tensado de lona sobre estructura', precioBase: 20000, unidad: 'm2', habilitado: true },
-        { id: 2, codigo: 'ROT', nombre: 'ROTULADO', descripcion: 'Servicio de rotulado de vinilo', precioBase: 20000, unidad: 'm2', habilitado: true },
-        { id: 3, codigo: 'LAM', nombre: 'LAMINADO BRILLANTE', descripcion: 'Laminado líquido brillante', precioBase: 6000, unidad: 'metro', habilitado: true },
-        { id: 4, codigo: 'EST', nombre: 'ESTRUCTURA', descripcion: 'Fabricación y armado de estructura metálica', precioBase: 35000, unidad: 'global', habilitado: true }
-    ]
-    localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(defaultServicios))
-    return defaultServicios
+    return []
 }
 
 export function getServicioById(id: number): Servicio | undefined {
@@ -1882,84 +1833,6 @@ export interface ComboData {
 }
 
 export function getCombos(): ComboData[] {
-    const staticCombos: ComboData[] = [
-        {
-            id: 1,
-            codigo: 'COMBO-ROLLUP',
-            nombre: 'Combo Roll Banner Promocional (85x200cm)',
-            categoria: 'Banners y Rollups',
-            descripcion: 'Estructura de aluminio autoenrollable con impresión en lona front_light 13oz de alta resolución',
-            materialCodigo: 'LF',
-            ancho: 0.85,
-            alto: 2.00,
-            componentes: [
-                { tipo: 'material', nombre: 'Lona Front light 13oz (0.85x2.0m)', cantidad: 1, precioUnitario: 13500 },
-                { tipo: 'servicio', nombre: 'Montaje en Estructura Rollup', cantidad: 1, precioUnitario: 3500 },
-                { tipo: 'producto', nombre: 'Estructura de Aluminio Rollup 85cm', cantidad: 1, precioUnitario: 11500 }
-            ],
-            precioSugerido: 28500,
-            precioFinal: 27000,
-            habilitado: true,
-            destacado: true
-        },
-        {
-            id: 2,
-            codigo: 'COMBO-CARTEL-FRONT',
-            nombre: 'Cartel Completo Lona Front con Bastidor de Caño (2x1m)',
-            categoria: 'Cartelería Comercial',
-            descripcion: 'Cartel frontal completo con estructura metálica electro-soldada, tensado de lona y perfilado',
-            materialCodigo: 'LF',
-            ancho: 2.00,
-            alto: 1.00,
-            componentes: [
-                { tipo: 'material', nombre: 'Lona Front light 13oz (2x1m)', cantidad: 2, precioUnitario: 9500 },
-                { tipo: 'servicio', nombre: 'Estructura y Soldadura de Caño 20x20', cantidad: 1, precioUnitario: 18000 },
-                { tipo: 'servicio', nombre: 'Confección de Vainas y Tensado', cantidad: 1, precioUnitario: 7500 }
-            ],
-            precioSugerido: 44500,
-            precioFinal: 42000,
-            habilitado: true,
-            destacado: true
-        },
-        {
-            id: 3,
-            codigo: 'COMBO-SALIENTE-DF',
-            nombre: 'Letrero Saliente Doble Faz con Luz (1.5x0.8m)',
-            categoria: 'Cartelería Comercial',
-            descripcion: 'Cajón metálico saliente doble faz con iluminación LED interior y lona backlight traslúcida',
-            materialCodigo: 'BL',
-            ancho: 1.50,
-            alto: 0.80,
-            componentes: [
-                { tipo: 'material', nombre: 'Lona Backlight Traslúcida 15oz', cantidad: 2.4, precioUnitario: 14000 },
-                { tipo: 'servicio', nombre: 'Cajón de Caño Doble Faz con Iluminación LED', cantidad: 1, precioUnitario: 38000 },
-                { tipo: 'servicio', nombre: 'Confección y Montaje Doble Faz', cantidad: 1, precioUnitario: 12000 }
-            ],
-            precioSugerido: 83600,
-            precioFinal: 79000,
-            habilitado: true,
-            destacado: false
-        },
-        {
-            id: 4,
-            codigo: 'COMBO-VINILO-LAM',
-            nombre: 'Combo Vinilo Impreso + Laminado UV Mate (2x1m)',
-            categoria: 'Vinilos y Películas',
-            descripcion: 'Vinilo autoadhesivo Ritrama impreso en alta calidad con película de laminado mate protector UV antigrafiti',
-            materialCodigo: 'VILM',
-            ancho: 2.00,
-            alto: 1.00,
-            componentes: [
-                { tipo: 'material', nombre: 'Vinilo Autoadhesivo Ritrama 2m²', cantidad: 2, precioUnitario: 8500 },
-                { tipo: 'servicio', nombre: 'Laminado Mate UV Protector', cantidad: 2, precioUnitario: 4500 }
-            ],
-            precioSugerido: 26000,
-            precioFinal: 24500,
-            habilitado: true,
-            destacado: false
-        }
-    ];
-
     const sessionItemsJson = localStorage.getItem(SESSION_COMBOS_KEY);
     const hiddenItemsJson = localStorage.getItem(HIDDEN_COMBOS_KEY);
 
@@ -1973,13 +1846,10 @@ export function getCombos(): ComboData[] {
         try { hiddenIds = JSON.parse(hiddenItemsJson); } catch (e) { }
     }
 
-    const sessionIds = new Set(sessionItems.map(c => c.id));
     const hiddenSet = new Set(hiddenIds);
-
-    const filteredStatic = staticCombos.filter(c => !sessionIds.has(c.id) && !hiddenSet.has(c.id));
     const filteredSession = sessionItems.filter(c => !hiddenSet.has(c.id));
 
-    return [...filteredSession, ...filteredStatic];
+    return filteredSession;
 }
 
 export function saveCombo(combo: Partial<ComboData>): ComboData {
