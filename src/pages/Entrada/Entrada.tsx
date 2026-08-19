@@ -53,16 +53,17 @@ export default function Entrada() {
         loadOrders()
     }, [])
 
-    // Clear selection when switching tabs
-    useEffect(() => {
-        setSelectedIds(new Set())
-    }, [viewTab])
-
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [calidadFilter] = useState('')
     const [materialFilter, setMaterialFilter] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
+
+    // Clear selection when switching tabs or changing filters
+    useEffect(() => {
+        setSelectedIds(new Set())
+    }, [viewTab, searchTerm, statusFilter, materialFilter, categoryFilter])
+
     const { user } = useAuthStore()
     const allClientes = useState(() => getClientes())[0]
     const allMateriales = useState(() => getMateriales())[0]
@@ -265,9 +266,7 @@ export default function Entrada() {
     const handleBatchStatus = async (status: 'impreso' | 'entregado') => {
         try {
             setLoading(true);
-            const displayedIdsSet = new Set(displayedOrders.map(o => Number(o.id)));
-            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(Number(id)));
-            const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
+            const finalIds = Array.from(selectedIds);
 
             await saveBatchOrders('update', finalIds.map(String), { status });
 
@@ -301,9 +300,7 @@ export default function Entrada() {
 
         try {
             setLoading(true);
-            const displayedIdsSet = new Set(displayedOrders.map(o => Number(o.id)));
-            const validIds = Array.from(selectedIds).filter(id => displayedIdsSet.has(Number(id)));
-            const finalIds = validIds.length > 0 ? validIds : Array.from(selectedIds);
+            const finalIds = Array.from(selectedIds);
 
             if (isTrash) {
                 await saveBatchOrders('delete', finalIds.map(String));
@@ -326,8 +323,7 @@ export default function Entrada() {
 
         try {
             setLoading(true)
-            const displayedIds = new Set(displayedOrders.map(o => Number(o.id)))
-            const validIds = Array.from(selectedIds).filter(id => displayedIds.has(Number(id)))
+            const validIds = Array.from(selectedIds)
 
             const designIds: string[] = []
             const productionIds: string[] = []

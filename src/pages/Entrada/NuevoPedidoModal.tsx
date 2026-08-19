@@ -2142,7 +2142,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             </div>
 
                             {/* OVERALL BATCH PROGRESS */}
-                            {saveProgress && saveProgress.total > 1 && (
+                            {saveProgress && saveProgress.total > 0 && (
                                 <div style={{ width: '100%' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ccc', fontSize: '0.85rem', marginBottom: '6px' }}>
                                         <span style={{ fontWeight: 500 }}>Progreso del lote</span>
