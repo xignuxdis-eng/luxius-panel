@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
+import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { PDFDocument } from 'pdf-lib'
 import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
@@ -1596,11 +1597,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                         <label>Archivo</label>
                                         <div className="compact-upload" onClick={() => !saving && fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}>
-                                            {previewUrl ? (
-                                                <img src={previewUrl} className="upload-preview-thumb" style={{ width: '40px', height: '40px', marginRight: '8px' }} alt="" />
-                                            ) : (
-                                                <span className="upload-icon">📁</span>
-                                            )}
+                                            <UniversalFilePreview
+                                                file={selectedFile || undefined}
+                                                fileUrl={previewUrl || undefined}
+                                                fileName={fileName}
+                                                className="upload-preview-thumb"
+                                                style={{ width: '40px', height: '40px', marginRight: '8px' }}
+                                            />
                                             <div className="upload-text-stack" style={{ flex: 1 }}>
                                                 <span className="upload-text">{fileName || 'Seleccionar archivo...'}</span>
                                                 {selectedFile && (
@@ -1994,12 +1997,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(239, 68, 68, 0.9)', border: 'none', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '12px', cursor: 'pointer', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                                 onClick={(e) => { e.stopPropagation(); setBatchItems(prev => prev.filter(i => i.id !== item.id)); }}
                                                             >×</button>
-                                                            {(() => {
-                                                                if (item.previewUrl && item.previewUrl.length > 10) {
-                                                                    return <img src={item.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
-                                                                }
-                                                                return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '2.5rem', background: '#f8f9fa', color: '#333' }}>📄</div>;
-                                                            })()}
+                                                            <UniversalFilePreview
+                                                                file={item.file || undefined}
+                                                                fileUrl={item.previewUrl || undefined}
+                                                                fileName={item.fileName}
+                                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                            />
                                                             <input
                                                                 type="checkbox"
                                                                 style={{ position: 'absolute', bottom: '2px', left: '2px', width: '16px', height: '16px', zIndex: 10, cursor: 'pointer' }}
