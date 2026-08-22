@@ -972,7 +972,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         } catch (err) { console.error('[Luxius-Meta] Error fatal:', err); }
 
         return {
-            width: widthCm || 21.0, height: heightCm || 29.7,
+            width: widthCm || 0, height: heightCm || 0,
             dpi: dpi || 72, format: extension, colorMode: colorMode || 'CMYK',
             pageCount, thumbnailUrl
         };
@@ -1740,20 +1740,33 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 </div>
                                             ) : metadata ? (
                                                 <div className="meta-layout">
-                                                    <div className="meta-item">
-                                                        <span className="meta-label">📏 DIMENSIONES</span>
-                                                        <span className="meta-value">{metadata.width} x {metadata.height} cm</span>
-                                                    </div>
-                                                    <div className="meta-item-sep"></div>
-                                                    <div className="meta-item">
-                                                        <span className="meta-label">🎯 RESOLUCIÓN</span>
-                                                        <span className="meta-value">{metadata.dpi} DPI</span>
-                                                    </div>
-                                                    <div className="meta-item-sep"></div>
-                                                    <div className="meta-item">
-                                                        <span className="meta-label">🎨 COLOR</span>
-                                                        <span className="meta-value">{metadata.colorMode}</span>
-                                                    </div>
+                                                    {metadata.width > 0 ? (
+                                                        <>
+                                                            <div className="meta-item">
+                                                                <span className="meta-label">📏 DIMENSIONES</span>
+                                                                <span className="meta-value">{metadata.width} x {metadata.height} cm</span>
+                                                            </div>
+                                                            <div className="meta-item-sep"></div>
+                                                            <div className="meta-item">
+                                                                <span className="meta-label">🎯 RESOLUCIÓN</span>
+                                                                <span className="meta-value">{metadata.dpi} DPI</span>
+                                                            </div>
+                                                            <div className="meta-item-sep"></div>
+                                                            <div className="meta-item">
+                                                                <span className="meta-label">🎨 COLOR</span>
+                                                                <span className="meta-value">{metadata.colorMode}</span>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="meta-item" style={{ flex: 1, padding: '4px' }}>
+                                                            <span className="meta-label" style={{ color: '#f59e0b', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                ⚠️ AVISO
+                                                            </span>
+                                                            <span className="meta-value" style={{ fontSize: '0.75rem', whiteSpace: 'normal', color: 'var(--text-muted)' }}>
+                                                                Este tipo de archivo ({metadata.format}) no reporta medidas automáticas en el navegador. Por favor, <b>ingresá el Ancho y Alto manualmente</b> según el diseño original.
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="metadata-placeholder">Sin datos o esperando archivo...</div>
@@ -2013,8 +2026,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                             <span style={{ fontWeight: '600', fontSize: '0.85rem', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.fileName}>{item.fileName}</span>
                                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                                <b style={{ color: 'var(--accent)' }}>{item.metadata.width}x{item.metadata.height} cm</b>
-                                                                {item.metadata.dpi > 0 && <span> · {item.metadata.dpi} DPI</span>}
+                                                                {item.metadata.width > 0 ? (
+                                                                    <>
+                                                                        <b style={{ color: 'var(--accent)' }}>{item.metadata.width}x{item.metadata.height} cm</b>
+                                                                        {item.metadata.dpi > 0 && <span> · {item.metadata.dpi} DPI</span>}
+                                                                    </>
+                                                                ) : (
+                                                                    <b style={{ color: '#f59e0b' }}>⚠️ Medidas no detectadas</b>
+                                                                )}
                                                             </div>
                                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                                                 {item.metadata.format && <span>📄 {item.metadata.format}</span>}
@@ -2039,6 +2058,33 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                     transition: 'width 0.3s ease-out',
                                                                     boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
                                                                 }} />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Missing Dimensions Warning & Inputs */}
+                                                    {item.metadata.width === 0 && (
+                                                        <div style={{ padding: '6px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '4px', marginBottom: '4px' }}>
+                                                            <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginBottom: '6px', fontWeight: 600 }}>⚠️ Ingrese las medidas manualmente:</div>
+                                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Ancho (cm)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        style={{ width: '100%', padding: '4px', fontSize: '0.8rem', borderRadius: '4px', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                                        value={item.metadata.width || ''}
+                                                                        onChange={(e) => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, metadata: { ...i.metadata, width: parseFloat(e.target.value) || 0 } } : i))}
+                                                                    />
+                                                                </div>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Alto (cm)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        style={{ width: '100%', padding: '4px', fontSize: '0.8rem', borderRadius: '4px', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                                        value={item.metadata.height || ''}
+                                                                        onChange={(e) => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, metadata: { ...i.metadata, height: parseFloat(e.target.value) || 0 } } : i))}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )}
