@@ -1077,7 +1077,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     // INITIAL DETECTION — pass a COPY of the buffer
                     const meta = await Promise.race([
                         extractMetadata(file, url, 1, masterBuffer ? masterBuffer.slice(0) : undefined),
-                        new Promise<BatchItem['metadata']>(r => setTimeout(() => r({ width: 21, height: 29.7, dpi: 72, format: ext, colorMode: 'RGB', pageCount: 0 }), 12000))
+                        new Promise<BatchItem['metadata']>(r => setTimeout(() => r({ width: 0, height: 0, dpi: 72, format: ext, colorMode: 'RGB', pageCount: 0 }), 12000))
                     ]);
                     let realPageCount = meta.pageCount || 1;
                     console.log(`[Luxius-DEBUG] extractMetadata retornó pageCount=${meta.pageCount}, realPageCount=${realPageCount} para ${file.name}`);
