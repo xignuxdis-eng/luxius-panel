@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { API_URL } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../utils/vectorPreview';
 import { FilePreviewModal } from './FilePreviewModal';
+import { XpressViewerModal } from './shared/XpressViewerModal';
 import * as pdfjsLib from 'pdfjs-dist';
 
 interface UniversalFilePreviewProps {
@@ -27,16 +28,16 @@ const getExtension = (filename: string) => {
 
 const getFallbackIcon = (ext: string) => {
     switch (ext) {
-        case 'cdr': return '✏️'; // CorelDRAW
-        case 'ai': return '✒️'; // Illustrator
-        case 'eps': return '📐'; // EPS
-        case 'pdf': return '📄'; // PDF
-        case 'svg': return '🌐'; // SVG
+        case 'cdr': return 'âœï¸'; // CorelDRAW
+        case 'ai': return 'âœ’ï¸'; // Illustrator
+        case 'eps': return 'ðŸ“'; // EPS
+        case 'pdf': return 'ðŸ“„'; // PDF
+        case 'svg': return 'ðŸŒ'; // SVG
         case 'tif':
-        case 'tiff': return '🖼️'; // TIFF
+        case 'tiff': return 'ðŸ–¼ï¸'; // TIFF
         case 'zip':
-        case 'rar': return '🗜️'; // Archive
-        default: return '📁'; // Generic
+        case 'rar': return 'ðŸ—œï¸'; // Archive
+        default: return 'ðŸ“'; // Generic
     }
 };
 
@@ -229,7 +230,7 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                                 transition: 'opacity 0.15s ease',
                                 pointerEvents: 'none'
                             }}>
-                                🔍
+                                ðŸ”
                             </div>
                         )}
                     </>
@@ -254,3 +255,4 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
         </>
     );
 };
+
