@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 import { hasRolePermission } from '@/types/auth'
@@ -13,18 +13,18 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-    { label: 'Dashboard', path: '/', icon: 'ðŸ“Š' },
-    { label: 'Entrada', path: '/entrada', icon: 'ðŸ“' },
-    { label: 'Presupuestador', path: '/presupuestador', icon: 'ðŸ§®' },
+    { label: 'Dashboard', path: '/', icon: '📊' },
+    { label: 'Entrada', path: '/entrada', icon: '📥' },
+    { label: 'Presupuestador', path: '/presupuestador', icon: '💰' },
     { label: 'Xpress Viewer', path: '/xpress-viewer', icon: '👁️' },
-    { label: 'DiseÃ±o', path: '/diseno', icon: 'ðŸŽ¨' },
-    { label: 'ImpresiÃ³n', path: '/impresion', icon: 'ðŸ–¨ï¸' },
-    { label: 'Stock', path: '/stock', icon: 'ðŸ“¦' },
-    { label: 'AnalÃ­ticas', path: '/analiticas', icon: 'ðŸ“ˆ' },
-    { label: 'AdministraciÃ³n', path: '/abm', icon: 'ðŸ’¼' },
-    { label: 'Utilidades', path: '/utilidades', icon: 'ðŸ› ï¸' },
-    { label: 'Reportes', path: '/reportes', icon: 'ðŸ“Š' },
-    { label: 'Sistema', path: '/sistema', icon: 'âš™ï¸' },
+    { label: 'Diseño', path: '/diseno', icon: '🎨' },
+    { label: 'Impresión', path: '/impresion', icon: '🖨️' },
+    { label: 'Stock', path: '/stock', icon: '📦' },
+    { label: 'Analíticas', path: '/analiticas', icon: '📈' },
+    { label: 'Administración', path: '/abm', icon: '💼' },
+    { label: 'Utilidades', path: '/utilidades', icon: '🛠️' },
+    { label: 'Reportes', path: '/reportes', icon: '📊' },
+    { label: 'Sistema', path: '/sistema', icon: '⚙️' },
 ]
 
 export default function Sidebar() {
@@ -47,10 +47,10 @@ export default function Sidebar() {
         <aside className="sidebar">
             <div className="sidebar-logo">
                 <div className="logo-brand">
-                    <span className="logo-icon">âœ¦</span>
+                    <span className="logo-icon">✦</span>
                     <span className="logo-text">LuXius</span>
                 </div>
-                <span className="logo-subtitle">...nÃºcleo operativo de XignuX</span>
+                <span className="logo-subtitle">...núcleo operativo de XignuX</span>
             </div>
 
             <nav className="sidebar-nav">
@@ -81,7 +81,7 @@ export default function Sidebar() {
                         title="Abrir Arcade Center de Minijuegos"
                         style={{ fontSize: '11px', padding: '4px 8px' }}
                     >
-                        ðŸ•¹ï¸ ARCADE
+                        🕹️ ARCADE
                     </button>
                     <button className="logout-btn" onClick={handleLogout}>
                         Salir
