@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
-import { extractTiffThumbnail, extractEpsThumbnail } from '../utils/vectorPreview';
+import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../utils/vectorPreview';
 import { FilePreviewModal } from './FilePreviewModal';
 import * as pdfjsLib from 'pdfjs-dist';
 
 interface UniversalFilePreviewProps {
-    fileUrl?: string; // URL on the backend, e.g. /uploads/12345_file.cdr
+    fileUrl?: string; // URL on the backend, e.g. /uploads/12345_file.cdr or data:image/...
     fileName?: string; // Original filename, e.g. file.cdr
     file?: File; // Local file object if not yet uploaded
     className?: string;
@@ -58,32 +58,60 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
 
+    const ext = getExtension(fileName || file?.name || fileUrl || '');
+    const displayName = fileName || file?.name || 'Archivo';
+
     useEffect(() => {
         setHasError(false);
         let objectUrl: string | null = null;
 
+        // 1. Direct DataURL or pre-generated preview provided
+        if (fileUrl && fileUrl.startsWith('data:image/')) {
+            setImgSrc(fileUrl);
+            return;
+        }
+
         if (file) {
             // Local file mode (not uploaded yet)
-            const ext = getExtension(file.name);
-            if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(ext)) {
+            const fileExt = getExtension(file.name);
+
+            if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(fileExt)) {
                 objectUrl = URL.createObjectURL(file);
                 setImgSrc(objectUrl);
-            } else if (ext === 'cdr') {
+            } else if (fileExt === 'cdr') {
                 extractCdrThumbnail(file).then(thumbUrl => {
-                    if (thumbUrl) setImgSrc(thumbUrl);
-                    else setImgSrc(null);
-                }).catch(() => setImgSrc(null));
-            } else if (ext === 'tif' || ext === 'tiff') {
+                    if (thumbUrl) {
+                        setImgSrc(thumbUrl);
+                    } else {
+                        setImgSrc(generateVectorCard('CDR', file.name, dimensions, dpi));
+                    }
+                }).catch(() => {
+                    setImgSrc(generateVectorCard('CDR', file.name, dimensions, dpi));
+                });
+            } else if (fileExt === 'tif' || fileExt === 'tiff') {
                 extractTiffThumbnail(file).then(thumbUrl => {
-                    if (thumbUrl) setImgSrc(thumbUrl);
-                    else setImgSrc(null);
+                    if (thumbUrl) {
+                        setImgSrc(thumbUrl);
+                    } else if (fileUrl && fileUrl.startsWith('data:image/')) {
+                        setImgSrc(fileUrl);
+                    } else {
+                        setImgSrc(null);
+                    }
                 }).catch(() => setImgSrc(null));
-            } else if (ext === 'eps') {
+            } else if (fileExt === 'eps') {
                 extractEpsThumbnail(file).then(thumbUrl => {
-                    if (thumbUrl) setImgSrc(thumbUrl);
-                    else setImgSrc(null);
-                }).catch(() => setImgSrc(null));
-            } else if (ext === 'ai' || ext === 'pdf') {
+                    if (thumbUrl) {
+                        setImgSrc(thumbUrl);
+                    } else if (fileUrl && fileUrl.startsWith('data:image/')) {
+                        setImgSrc(fileUrl);
+                    } else {
+                        // Generate vector blueprint card for ASCII EPS
+                        setImgSrc(generateVectorCard('EPS', file.name, dimensions, dpi));
+                    }
+                }).catch(() => {
+                    setImgSrc(generateVectorCard('EPS', file.name, dimensions, dpi));
+                });
+            } else if (fileExt === 'ai' || fileExt === 'pdf') {
                 // Attempt PDFJS page 1 rendering for AI & PDF
                 (async () => {
                     try {
@@ -99,11 +127,13 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                             if (ctx) {
                                 await page.render({ canvasContext: ctx, viewport }).promise;
                                 setImgSrc(canvas.toDataURL('image/webp', 0.85));
+                                return;
                             }
                         }
                     } catch (e) {
-                        setImgSrc(null);
+                        // PDFJS failed (e.g. pure PostScript .ai)
                     }
+                    setImgSrc(generateVectorCard(fileExt.toUpperCase(), file.name, dimensions, dpi));
                 })();
             } else {
                 setImgSrc(null); // Force fallback icon
@@ -131,10 +161,7 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                 URL.revokeObjectURL(objectUrl);
             }
         };
-    }, [fileUrl, file]);
-
-    const ext = getExtension(fileName || file?.name || fileUrl || '');
-    const displayName = fileName || file?.name || 'Archivo';
+    }, [fileUrl, file, dimensions?.width, dimensions?.height, dpi]);
 
     const handleOpenModal = (e: React.MouseEvent) => {
         if (enableModal) {
