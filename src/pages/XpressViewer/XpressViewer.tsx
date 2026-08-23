@@ -5,6 +5,7 @@ import { API_URL } from '../../data/db';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
+import { extractTiffThumbnail, extractEpsThumbnail } from '../../utils/vectorPreview';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -248,6 +249,40 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     setStatusText('Fallo Fast Preview, conectando al Backend...');
                 }
             }
+            // 4. TIFF local rapido
+            else if (['tif', 'tiff'].includes(ext || '')) {
+                setStatusText('Extrayendo miniatura TIFF local...');
+                extractedPreview = await extractTiffThumbnail(uploadedFile);
+                if (extractedPreview) {
+                    meta.colorMode = 'TIFF Preview';
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            meta.width = img.width;
+                            meta.height = img.height;
+                            resolve(true);
+                        };
+                        img.src = extractedPreview as string;
+                    });
+                }
+            }
+            // 5. EPS local rapido
+            else if (ext === 'eps') {
+                setStatusText('Extrayendo miniatura EPS local...');
+                extractedPreview = await extractEpsThumbnail(uploadedFile);
+                if (extractedPreview) {
+                    meta.colorMode = 'EPS Preview';
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            meta.width = img.width;
+                            meta.height = img.height;
+                            resolve(true);
+                        };
+                        img.src = extractedPreview as string;
+                    });
+                }
+            }
 
             if (extractedPreview) {
                 setPreviewUrl(extractedPreview);
@@ -256,7 +291,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 return;
             }
 
-            // 4. Fallback Backend
+            // 6. Fallback Backend
             setStatusText('Enviando al servicio HQ Render (Backend)...');
             const formData = new FormData();
             formData.append('file', uploadedFile);
@@ -412,7 +447,8 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                     className="xpress-preview-image" 
                                     onLoad={handleImageLoad}
                                     crossOrigin="anonymous"
-                                    style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                    draggable={false}
+                                    style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', userSelect: 'none', WebkitUserSelect: 'none' }}
                                 />
                                 
                                 {/* Overlay Interactivo (Regla y Guías) */}
