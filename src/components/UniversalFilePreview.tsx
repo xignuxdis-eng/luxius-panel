@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
+import { extractTiffThumbnail, extractEpsThumbnail } from '../utils/vectorPreview';
 import { FilePreviewModal } from './FilePreviewModal';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -31,6 +32,8 @@ const getFallbackIcon = (ext: string) => {
         case 'eps': return '📐'; // EPS
         case 'pdf': return '📄'; // PDF
         case 'svg': return '🌐'; // SVG
+        case 'tif':
+        case 'tiff': return '🖼️'; // TIFF
         case 'zip':
         case 'rar': return '🗜️'; // Archive
         default: return '📁'; // Generic
@@ -67,11 +70,18 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                 setImgSrc(objectUrl);
             } else if (ext === 'cdr') {
                 extractCdrThumbnail(file).then(thumbUrl => {
-                    if (thumbUrl) {
-                        setImgSrc(thumbUrl);
-                    } else {
-                        setImgSrc(null);
-                    }
+                    if (thumbUrl) setImgSrc(thumbUrl);
+                    else setImgSrc(null);
+                }).catch(() => setImgSrc(null));
+            } else if (ext === 'tif' || ext === 'tiff') {
+                extractTiffThumbnail(file).then(thumbUrl => {
+                    if (thumbUrl) setImgSrc(thumbUrl);
+                    else setImgSrc(null);
+                }).catch(() => setImgSrc(null));
+            } else if (ext === 'eps') {
+                extractEpsThumbnail(file).then(thumbUrl => {
+                    if (thumbUrl) setImgSrc(thumbUrl);
+                    else setImgSrc(null);
                 }).catch(() => setImgSrc(null));
             } else if (ext === 'ai' || ext === 'pdf') {
                 // Attempt PDFJS page 1 rendering for AI & PDF
