@@ -1683,12 +1683,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </Button>
                                                         <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
                                                     </div>
-                                                    {isCloudImporting && cloudImportStatus && (
-                                                        <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '6px 12px', borderRadius: '4px' }}>
-                                                            <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                            {cloudImportStatus}
-                                                        </div>
-                                                    )}
+                                                )}
+                                                {isCloudImporting && cloudImportStatus && (
+                                                    <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '6px 12px', borderRadius: '4px' }}>
+                                                        <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                        {cloudImportStatus}
+                                                    </div>
                                                 )}
                                                 {selectedFile && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
@@ -2023,12 +2023,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </Button>
                                                         <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
                                                     </div>
-                                                    {isCloudImporting && cloudImportStatus && (
-                                                        <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
-                                                            <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                            {cloudImportStatus}
-                                                        </div>
-                                                    )}
+                                                )}
+                                                {isCloudImporting && cloudImportStatus && (
+                                                    <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
+                                                        <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                        {cloudImportStatus}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
