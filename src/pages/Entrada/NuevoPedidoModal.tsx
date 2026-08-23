@@ -1636,8 +1636,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         <button 
                                                             type="button" 
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
-                                                            className="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded"
-                                                            style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                            className="lux-btn lux-btn-secondary"
+                                                            style={{ fontSize: '0.8rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: '4px' }}
                                                             title="Importar desde Google Drive"
                                                         >
                                                             🔗 Importar Link
@@ -1965,7 +1965,36 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     >
                                         <div className="batch-upload-text">
                                             <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: '600' }}>Haz clic para seleccionar múltiples archivos</span>
-                                            <span className="batch-upload-hint" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.9rem' }}>Los PDFs multipágina se explotarán automáticamente</span>
+                                            <span className="batch-upload-hint" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>Los PDFs multipágina se explotarán automáticamente</span>
+                                            
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }} onClick={e => e.stopPropagation()}>
+                                                {!showCloudInput ? (
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
+                                                        className="lux-btn lux-btn-secondary"
+                                                        style={{ fontSize: '0.9rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: '6px', margin: '0 auto' }}
+                                                        title="Importar desde Google Drive"
+                                                    >
+                                                        🔗 Importar desde Link de Google Drive
+                                                    </button>
+                                                ) : (
+                                                    <div style={{ display: 'flex', gap: '8px', maxWidth: '400px', width: '100%', margin: '0 auto' }}>
+                                                        <input 
+                                                            type="text" 
+                                                            value={cloudUrl} 
+                                                            onChange={e => setCloudUrl(e.target.value)} 
+                                                            placeholder="Pegar enlace público de Google Drive..." 
+                                                            className="lux-input"
+                                                            style={{ flex: 1, fontSize: '0.9rem', padding: '6px 10px' }}
+                                                        />
+                                                        <Button type="button" variant="primary" onClick={handleCloudImport} disabled={isCloudImporting} style={{ padding: '6px 12px', fontSize: '0.9rem' }}>
+                                                            {isCloudImporting ? '⏳' : 'Cargar'}
+                                                        </Button>
+                                                        <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         <input type="file" ref={batchInputRef} style={{ display: 'none' }} multiple onChange={handleBatchChange} />
                                     </div>
