@@ -17,6 +17,39 @@ try {
 type ToolMode = 'none' | 'measure' | 'bleed';
 type Point = { x: number, y: number };
 
+type ColorSwatch = {
+    hex: string;
+    rgb: [number, number, number];
+    cmyk: { c: number, m: number, y: number, k: number };
+    count: number;
+};
+
+const rgbToHex = (r: number, g: number, b: number) => {
+    return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+};
+
+const rgbToCmyk = (r: number, g: number, b: number) => {
+    let c = 1 - (r / 255);
+    let m = 1 - (g / 255);
+    let y = 1 - (b / 255);
+    let k = Math.min(c, Math.min(m, y));
+    
+    if (k === 1) {
+        return { c: 0, m: 0, y: 0, k: 100 };
+    }
+    
+    c = (c - k) / (1 - k);
+    m = (m - k) / (1 - k);
+    y = (y - k) / (1 - k);
+    
+    return { 
+        c: Math.round(c * 100), 
+        m: Math.round(m * 100), 
+        y: Math.round(y * 100), 
+        k: Math.round(k * 100) 
+    };
+};
+
 export const XpressViewer: React.FC = () => {
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -24,7 +57,7 @@ export const XpressViewer: React.FC = () => {
     const [metadata, setMetadata] = useState<any>(null);
     const [statusText, setStatusText] = useState<string>('');
 
-    // Herramientas Interactivas (Sprint 2)
+    // Herramientas Interactivas
     const [toolMode, setToolMode] = useState<ToolMode>('none');
     const [measureStart, setMeasureStart] = useState<Point | null>(null);
     const [measureEnd, setMeasureEnd] = useState<Point | null>(null);
@@ -36,6 +69,54 @@ export const XpressViewer: React.FC = () => {
 
     const imageRef = useRef<HTMLImageElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
+
+    const extractColorsFromImage = (img: HTMLImageElement) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        // Sampling ultra rápido a 64x64
+        canvas.width = 64;
+        canvas.height = 64;
+        ctx.drawImage(img, 0, 0, 64, 64);
+        
+        const imageData = ctx.getImageData(0, 0, 64, 64).data;
+        const colorCounts: Record<string, ColorSwatch> = {};
+        
+        for (let i = 0; i < imageData.length; i += 4) {
+            const r = imageData[i];
+            const g = imageData[i + 1];
+            const b = imageData[i + 2];
+            const a = imageData[i + 3];
+            
+            // Ignorar píxeles transparentes o fondo blanco puro
+            if (a < 128) continue;
+            if (r > 250 && g > 250 && b > 250) continue;
+            
+            // Agrupar colores cercanos (Quantization de 32 niveles)
+            const step = 32;
+            let qR = Math.round(r / step) * step;
+            let qG = Math.round(g / step) * step;
+            let qB = Math.round(b / step) * step;
+            qR = qR > 255 ? 255 : qR;
+            qG = qG > 255 ? 255 : qG;
+            qB = qB > 255 ? 255 : qB;
+            
+            const key = `${qR},${qG},${qB}`;
+            if (!colorCounts[key]) {
+                colorCounts[key] = {
+                    hex: rgbToHex(qR, qG, qB),
+                    rgb: [qR, qG, qB],
+                    cmyk: rgbToCmyk(qR, qG, qB),
+                    count: 0
+                };
+            }
+            colorCounts[key].count++;
+        }
+        
+        const sortedColors = Object.values(colorCounts).sort((a, b) => b.count - a.count).slice(0, 5);
+        setMetadata((prev: any) => ({ ...prev, colors: sortedColors }));
+    };
 
     const processFile = async (uploadedFile: File) => {
         setIsProcessing(true);
@@ -230,10 +311,13 @@ export const XpressViewer: React.FC = () => {
             if (originalWidth > 0) {
                 setImageScale(displayWidth / originalWidth);
             }
+            // Extraer colores si no se hizo aún
+            if (!metadata.colors) {
+                extractColorsFromImage(imageRef.current);
+            }
         }
     };
 
-    // Recalcular escala si cambia la ventana
     React.useEffect(() => {
         const handleResize = () => handleImageLoad();
         window.addEventListener('resize', handleResize);
@@ -272,6 +356,7 @@ export const XpressViewer: React.FC = () => {
                         <div style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
                             <span className="xpress-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>⚡ Fast Preview</span>
                             <span className="xpress-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>📏 Smart Measure</span>
+                            <span className="xpress-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>🎨 Auto Palette</span>
                         </div>
                     </div>
                 ) : (
@@ -282,7 +367,6 @@ export const XpressViewer: React.FC = () => {
                                 <span style={{ color: '#94a3b8' }}>{statusText}</span>
                             </div>
                         ) : previewUrl ? (
-                            // Wrapper con posición relativa para el overlay
                             <div 
                                 className="xpress-interactive-wrapper" 
                                 style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%', cursor: toolMode === 'measure' ? 'crosshair' : 'default' }}
@@ -297,6 +381,7 @@ export const XpressViewer: React.FC = () => {
                                     alt="Preview" 
                                     className="xpress-preview-image" 
                                     onLoad={handleImageLoad}
+                                    crossOrigin="anonymous"
                                     style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                                 />
                                 
@@ -305,10 +390,8 @@ export const XpressViewer: React.FC = () => {
                                     ref={svgRef}
                                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
                                 >
-                                    {/* Guías de Demasía (Bleed) */}
                                     {toolMode === 'bleed' && (
                                         <>
-                                            {/* Ejemplo estandar: 5% de sangría */}
                                             <rect 
                                                 x="5%" y="5%" width="90%" height="90%" 
                                                 fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="5,5" 
@@ -322,7 +405,6 @@ export const XpressViewer: React.FC = () => {
                                         </>
                                     )}
 
-                                    {/* Línea de Medición */}
                                     {toolMode === 'measure' && measureStart && measureEnd && (
                                         <>
                                             <line 
@@ -437,7 +519,7 @@ export const XpressViewer: React.FC = () => {
                                 </div>
 
                                 <div className="xpress-meta-row">
-                                    <span className="xpress-meta-label">Color</span>
+                                    <span className="xpress-meta-label">Color Original</span>
                                     <span className="xpress-meta-value">{metadata.colorMode}</span>
                                 </div>
                                 {metadata.pages && (
@@ -453,6 +535,37 @@ export const XpressViewer: React.FC = () => {
                                     </span>
                                 </div>
                             </div>
+                            
+                            {/* Panel de Paleta de Colores (Sprint 3) */}
+                            {metadata.colors && metadata.colors.length > 0 && (
+                                <div className="xpress-card">
+                                    <h3>Paleta de Color Estimada</h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                                        {metadata.colors.map((color: ColorSwatch, idx: number) => (
+                                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: '6px' }}>
+                                                <div 
+                                                    style={{ 
+                                                        width: '32px', height: '32px', borderRadius: '4px', 
+                                                        backgroundColor: color.hex,
+                                                        border: '1px solid rgba(255,255,255,0.1)'
+                                                    }} 
+                                                />
+                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#f8fafc' }}>
+                                                        {color.hex}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                                        C:{color.cmyk.c} M:{color.cmyk.m} Y:{color.cmyk.y} K:{color.cmyk.k}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '12px', textAlign: 'center' }}>
+                                        *Valores CMYK calculados matemáticamente desde previsualización RGB. Solo para referencia técnica.
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div style={{ color: '#64748b', fontSize: '0.9rem', textAlign: 'center', padding: '40px 20px' }}>
