@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import './XpressViewer.css';
 import { API_URL } from '../../data/db';
@@ -50,7 +50,12 @@ const rgbToCmyk = (r: number, g: number, b: number) => {
     };
 };
 
-export interface XpressViewerProps { initialFileUrl?: string; initialFile?: File; initialFileName?: string; onClose?: () => void; }
+export interface XpressViewerProps {
+    initialFileUrl?: string;
+    initialFile?: File;
+    initialFileName?: string;
+    onClose?: () => void;
+}
 
 export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, onClose }) => {
     const [file, setFile] = useState<File | null>(null);
@@ -73,7 +78,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const svgRef = useRef<SVGSVGElement>(null);
 
     React.useEffect(() => {
-        if (initialFile) { processFile(initialFile); } else if (initialFileUrl) {
+        if (initialFile) {
+            processFile(initialFile);
+        } else if (initialFileUrl) {
             const fetchFile = async () => {
                 setIsProcessing(true);
                 setStatusText('Descargando archivo original...');
@@ -91,14 +98,14 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             };
             fetchFile();
         }
-    }, [initialFileUrl]);
+    }, [initialFileUrl, initialFile]);
 
     const extractColorsFromImage = (img: HTMLImageElement) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         
-        // Sampling ultra rÃ¡pido a 64x64
+        // Sampling ultra rápido a 64x64
         canvas.width = 64;
         canvas.height = 64;
         ctx.drawImage(img, 0, 0, 64, 64);
@@ -112,7 +119,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             const b = imageData[i + 2];
             const a = imageData[i + 3];
             
-            // Ignorar pÃ­xeles transparentes o fondo blanco puro
+            // Ignorar píxeles transparentes o fondo blanco puro
             if (a < 128) continue;
             if (r > 250 && g > 250 && b > 250) continue;
             
@@ -334,7 +341,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             if (originalWidth > 0) {
                 setImageScale(displayWidth / originalWidth);
             }
-            // Extraer colores si no se hizo aÃºn
+            // Extraer colores si no se hizo aún
             if (!metadata.colors) {
                 extractColorsFromImage(imageRef.current);
             }
@@ -347,7 +354,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         return () => window.removeEventListener('resize', handleResize);
     }, [metadata, previewUrl]);
 
-    // MatemÃ¡ticas de MediciÃ³n
+    // Matemáticas de Medición
     const calculateDistance = () => {
         if (!measureStart || !measureEnd) return null;
         const dx = measureEnd.x - measureStart.x;
@@ -371,15 +378,15 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 
                 {!file ? (
                     <div className={`xpress-dropzone ${isDragActive ? 'active' : ''}`}>
-                        <div className="xpress-dropzone-icon">â˜ï¸</div>
-                        <p>Arrastra un archivo aquÃ­ o haz clic para explorar</p>
+                        <div className="xpress-dropzone-icon">☁️</div>
+                        <p>Arrastra un archivo aquí o haz clic para explorar</p>
                         <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '8px' }}>
                             Soporta: CDR, AI, EPS, PDF, SVG, JPG, PNG, WEBP
                         </span>
                         <div style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
-                            <span className="xpress-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>âš¡ Fast Preview</span>
-                            <span className="xpress-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>ðŸ“ Smart Measure</span>
-                            <span className="xpress-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>ðŸŽ¨ Auto Palette</span>
+                            <span className="xpress-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>⚡ Fast Preview</span>
+                            <span className="xpress-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>📏 Smart Measure</span>
+                            <span className="xpress-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>🎨 Auto Palette</span>
                         </div>
                     </div>
                 ) : (
@@ -408,7 +415,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                     style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                                 />
                                 
-                                {/* Overlay Interactivo (Regla y GuÃ­as) */}
+                                {/* Overlay Interactivo (Regla y Guías) */}
                                 <svg 
                                     ref={svgRef}
                                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
@@ -419,12 +426,12 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                                 x="5%" y="5%" width="90%" height="90%" 
                                                 fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="5,5" 
                                             />
-                                            <text x="5%" y="4%" fill="#ef4444" fontSize="12" fontWeight="bold">Ãrea de Corte (Safe Area)</text>
+                                            <text x="5%" y="4%" fill="#ef4444" fontSize="12" fontWeight="bold">Área de Corte (Safe Area)</text>
                                             <rect 
                                                 x="2%" y="2%" width="96%" height="96%" 
                                                 fill="none" stroke="#3b82f6" strokeWidth="1" 
                                             />
-                                            <text x="2%" y="1%" fill="#3b82f6" fontSize="12" fontWeight="bold">DemasÃ­a (Bleed)</text>
+                                            <text x="2%" y="1%" fill="#3b82f6" fontSize="12" fontWeight="bold">Demasía (Bleed)</text>
                                         </>
                                     )}
 
@@ -451,7 +458,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             </div>
                         ) : (
                             <div style={{ color: '#ef4444' }}>
-                                âš ï¸ No se pudo generar una vista previa para este archivo.
+                                ⚠️ No se pudo generar una vista previa para este archivo.
                             </div>
                         )}
                         
@@ -459,21 +466,21 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             <button 
                                 className={`xpress-tool-btn ${toolMode === 'measure' ? 'active' : ''}`} 
                                 onClick={(e) => { e.stopPropagation(); setToolMode(toolMode === 'measure' ? 'none' : 'measure'); }} 
-                                title="Regla / CintrÃ³n Digital"
+                                title="Regla / Cintrón Digital"
                                 style={toolMode === 'measure' ? { background: 'var(--accent)' } : {}}
                             >
-                                ðŸ“
+                                📏
                             </button>
                             <button 
                                 className={`xpress-tool-btn ${toolMode === 'bleed' ? 'active' : ''}`} 
                                 onClick={(e) => { e.stopPropagation(); setToolMode(toolMode === 'bleed' ? 'none' : 'bleed'); }} 
-                                title="GuÃ­as de Corte y DemasÃ­a"
+                                title="Guías de Corte y Demasía"
                                 style={toolMode === 'bleed' ? { background: 'var(--accent)' } : {}}
                             >
-                                âœ‚ï¸
+                                ✂️
                             </button>
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
-                            <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); handleClear(); }} title="Cerrar archivo">âŒ</button>
+                            <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>
                         </div>
                     </div>
                 )}
@@ -482,14 +489,14 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             {/* Sidebar Metadata */}
             <div className="xpress-sidebar">
                 <div className="xpress-sidebar-header">
-                    <h2>ðŸ‘ï¸ Xpress Viewer</h2>
+                    <h2>👁️ Xpress Viewer</h2>
                 </div>
                 
                 <div className="xpress-sidebar-content">
                     {metadata ? (
                         <>
                             <div className="xpress-card">
-                                <h3>InformaciÃ³n del Archivo</h3>
+                                <h3>Información del Archivo</h3>
                                 <div className="xpress-meta-row">
                                     <span className="xpress-meta-label">Archivo</span>
                                     <span className="xpress-meta-value" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={metadata.name}>
@@ -508,23 +515,23 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 </div>
                                 {metadata.version && (
                                     <div className="xpress-meta-row">
-                                        <span className="xpress-meta-label">VersiÃ³n</span>
+                                        <span className="xpress-meta-label">Versión</span>
                                         <span className="xpress-meta-value">{metadata.version}</span>
                                     </div>
                                 )}
                             </div>
 
                             <div className="xpress-card">
-                                <h3>Vista de ProducciÃ³n</h3>
+                                <h3>Vista de Producción</h3>
                                 <div className="xpress-meta-row">
-                                    <span className="xpress-meta-label">ResoluciÃ³n</span>
+                                    <span className="xpress-meta-label">Resolución</span>
                                     <span className="xpress-meta-value">
-                                        {metadata.width} Ã— {metadata.height} px
+                                        {metadata.width} × {metadata.height} px
                                     </span>
                                 </div>
                                 
                                 <div className="xpress-meta-row">
-                                    <span className="xpress-meta-label">DPI (ResoluciÃ³n de ImpresiÃ³n)</span>
+                                    <span className="xpress-meta-label">DPI (Resolución de Impresión)</span>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         {(!metadata.dpi || metadata.dpi === 0) ? (
                                             <input 
@@ -547,7 +554,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 </div>
                                 {metadata.pages && (
                                     <div className="xpress-meta-row">
-                                        <span className="xpress-meta-label">PÃ¡ginas</span>
+                                        <span className="xpress-meta-label">Páginas</span>
                                         <span className="xpress-meta-value">{metadata.pages}</span>
                                     </div>
                                 )}
@@ -585,14 +592,14 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                         ))}
                                     </div>
                                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '12px', textAlign: 'center' }}>
-                                        *Valores CMYK calculados matemÃ¡ticamente desde previsualizaciÃ³n RGB. Solo para referencia tÃ©cnica.
+                                        *Valores CMYK calculados matemáticamente desde previsualización RGB. Solo para referencia técnica.
                                     </div>
                                 </div>
                             )}
                         </>
                     ) : (
                         <div style={{ color: '#64748b', fontSize: '0.9rem', textAlign: 'center', padding: '40px 20px' }}>
-                            Abre un archivo para ver su metadata tÃ©cnica.
+                            Abre un archivo para ver su metadata técnica.
                         </div>
                     )}
                 </div>
@@ -602,5 +609,3 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 };
 
 export default XpressViewer;
-
-
