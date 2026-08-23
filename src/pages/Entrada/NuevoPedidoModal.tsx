@@ -944,18 +944,24 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         if (!cloudUrl) return;
         setIsCloudImporting(true);
         try {
-            const res = await fetch(`${API_URL}/api/import-cloud`, {
+            const baseUrl = API_URL.replace(/\/api\/?$/, '');
+            const res = await fetch(`${API_URL}/import-cloud`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url: cloudUrl })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error al importar desde la nube');
+            let data;
+            try {
+                data = await res.json();
+            } catch (e) {
+                throw new Error("No se pudo parsear la respuesta del servidor");
+            }
+            if (!res.ok) throw new Error(data?.error || 'Error al importar desde la nube');
 
             if (data.status === 'success' && data.files.length > 0) {
                 if (activeTab === 'unitario') {
                     const fileInfo = data.files[0];
-                    const blobRes = await fetch(`${API_URL}${fileInfo.tempUrl}`);
+                    const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`);
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
                     const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
@@ -963,7 +969,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 } else if (activeTab === 'lote') {
                     for (const fileInfo of data.files) {
                         try {
-                            const blobRes = await fetch(`${API_URL}${fileInfo.tempUrl}`);
+                            const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`);
                             if (!blobRes.ok) continue;
                             const blob = await blobRes.blob();
                             const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
