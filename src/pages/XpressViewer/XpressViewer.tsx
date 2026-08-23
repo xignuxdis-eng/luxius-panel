@@ -5,7 +5,7 @@ import { API_URL } from '../../data/db';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
-import { extractTiffThumbnail, extractEpsThumbnail } from '../../utils/vectorPreview';
+import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../../utils/vectorPreview';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -293,27 +293,44 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 
             // 6. Fallback Backend
             setStatusText('Enviando al servicio HQ Render (Backend)...');
-            const formData = new FormData();
-            formData.append('file', uploadedFile);
+            try {
+                const formData = new FormData();
+                formData.append('file', uploadedFile);
 
-            const res = await fetch(`${API_URL}/preview`, {
-                method: 'POST',
-                body: formData
-            });
+                const res = await fetch(`${API_URL}/preview`, {
+                    method: 'POST',
+                    body: formData
+                });
 
-            if (res.ok) {
-                const data = await res.json();
-                if (data.url) {
-                    const fullUrl = data.url.startsWith('http') ? data.url : `${API_URL.replace(/\/api\/?$/, '')}${data.url}`;
-                    setPreviewUrl(fullUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) {
+                        const fullUrl = data.url.startsWith('http') ? data.url : `${API_URL.replace(/\/api\/?$/, '')}${data.url}`;
+                        setPreviewUrl(fullUrl);
+                    }
+
+                    meta.width = data.width || 0;
+                    meta.height = data.height || 0;
+                    meta.dpi = data.dpi || 0;
+                    meta.colorMode = data.colorMode || 'Desconocido';
+                    meta.source = 'Backend HQ Render';
+
+                    setMetadata(meta);
+                    return;
+                } else {
+                    console.warn(`Backend returned ${res.status}`);
+                    throw new Error(`Backend fallback failed with status ${res.status}`);
                 }
-
-                meta.width = data.width || 0;
-                meta.height = data.height || 0;
-                meta.dpi = data.dpi || 0;
-                meta.colorMode = data.colorMode || 'Desconocido';
-                meta.source = 'Backend HQ Render';
-
+            } catch (backendErr) {
+                console.warn('Backend fallback failed or unavailable, using generic vector card.', backendErr);
+                // Fallback to generateVectorCard
+                const cardUrl = generateVectorCard(format, uploadedFile.name);
+                setPreviewUrl(cardUrl);
+                
+                meta.width = 320;
+                meta.height = 360;
+                meta.colorMode = 'Vector Card Gen';
+                meta.source = 'Local Vector Card Fallback';
                 setMetadata(meta);
             }
 
