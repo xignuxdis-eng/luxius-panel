@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Modal from '@components/ui/Modal'
+import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { API_URL, getServicios, resolveMediaUrl } from '@data/db'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
@@ -328,10 +329,15 @@ export default function SharedFileViewerModal({
                                                 <span style={{ fontSize: '1.8rem' }}>🎙️</span>
                                                 <audio controls src={url} style={{ width: '100%', height: '36px' }}></audio>
                                             </div>
-                                        ) : order.imgMetadata?.thumbnailUrl ? (
-                                            <img src={order.imgMetadata.thumbnailUrl} alt="preview" className="img-preview" />
                                         ) : (
-                                            <div className="file-icon-placeholder Large">📄</div>
+                                            <UniversalFilePreview
+                                                fileUrl={file}
+                                                fileName={originalName}
+                                                dimensions={order.ancho && order.alto ? { width: Number(order.ancho) * 100, height: Number(order.alto) * 100 } : undefined}
+                                                dpi={order.imgMetadata?.dpi}
+                                                colorMode={order.imgMetadata?.colorMode}
+                                                style={{ minHeight: '140px', maxHeight: '220px' }}
+                                            />
                                         )}
                                         {!standardized && (
                                             <div className="quick-warning" title="Nombre no estandarizado">⚠️</div>

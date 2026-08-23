@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
+import { FilePreviewModal } from './FilePreviewModal';
+import * as pdfjsLib from 'pdfjs-dist';
 
 interface UniversalFilePreviewProps {
     fileUrl?: string; // URL on the backend, e.g. /uploads/12345_file.cdr
@@ -9,6 +11,11 @@ interface UniversalFilePreviewProps {
     className?: string;
     style?: React.CSSProperties;
     alt?: string;
+    dimensions?: { width: number; height: number };
+    dpi?: number;
+    colorMode?: string;
+    fileSize?: string;
+    enableModal?: boolean;
 }
 
 const getExtension = (filename: string) => {
@@ -30,9 +37,23 @@ const getFallbackIcon = (ext: string) => {
     }
 };
 
-export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({ fileUrl, fileName, file, className, style, alt = "" }) => {
+export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({ 
+    fileUrl, 
+    fileName, 
+    file, 
+    className, 
+    style, 
+    alt = "",
+    dimensions,
+    dpi,
+    colorMode,
+    fileSize,
+    enableModal = true
+}) => {
     const [imgSrc, setImgSrc] = useState<string | null>(null);
     const [hasError, setHasError] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
 
     useEffect(() => {
         setHasError(false);
@@ -52,13 +73,33 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({ file
                         setImgSrc(null);
                     }
                 }).catch(() => setImgSrc(null));
+            } else if (ext === 'ai' || ext === 'pdf') {
+                // Attempt PDFJS page 1 rendering for AI & PDF
+                (async () => {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        if (pdf.numPages > 0) {
+                            const page = await pdf.getPage(1);
+                            const viewport = page.getViewport({ scale: 0.5 });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                                await page.render({ canvasContext: ctx, viewport }).promise;
+                                setImgSrc(canvas.toDataURL('image/webp', 0.85));
+                            }
+                        }
+                    } catch (e) {
+                        setImgSrc(null);
+                    }
+                })();
             } else {
                 setImgSrc(null); // Force fallback icon
             }
         } else if (fileUrl) {
             // Backend URL mode
-            // We expect fileUrl to look like "/uploads/filename.ext" or similar.
-            // We want to hit "/api/preview/<filename>"
             let cleanUrl = fileUrl;
             if (cleanUrl.startsWith(API_URL)) {
                 cleanUrl = cleanUrl.replace(API_URL, '');
@@ -83,33 +124,96 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({ file
     }, [fileUrl, file]);
 
     const ext = getExtension(fileName || file?.name || fileUrl || '');
-    
-    if (!imgSrc || hasError) {
-        // Fallback state
-        return (
-            <div className={`universal-preview-fallback ${className || ''}`} style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                background: 'var(--bg-card)', 
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px',
-                color: 'var(--text-muted)',
-                fontSize: '24px',
-                ...style 
-            }}>
-                {getFallbackIcon(ext)}
-            </div>
-        );
-    }
+    const displayName = fileName || file?.name || 'Archivo';
+
+    const handleOpenModal = (e: React.MouseEvent) => {
+        if (enableModal) {
+            e.stopPropagation();
+            setIsModalOpen(true);
+        }
+    };
 
     return (
-        <img 
-            src={imgSrc} 
-            alt={alt || fileName || "File preview"} 
-            className={className} 
-            style={{ objectFit: 'contain', ...style }}
-            onError={() => setHasError(true)}
-        />
+        <>
+            <div 
+                className={`universal-preview-wrapper ${className || ''}`}
+                style={{ 
+                    position: 'relative', 
+                    width: '100%', 
+                    height: '100%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    cursor: enableModal && imgSrc ? 'pointer' : 'default',
+                    overflow: 'hidden',
+                    ...style 
+                }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                onClick={handleOpenModal}
+                title={enableModal && imgSrc ? `Clic para ampliar ${displayName}` : displayName}
+            >
+                {!imgSrc || hasError ? (
+                    <div className="universal-preview-fallback" style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        background: 'rgba(255, 255, 255, 0.03)', 
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '4px',
+                        fontSize: '22px',
+                        userSelect: 'none'
+                    }}>
+                        {getFallbackIcon(ext)}
+                    </div>
+                ) : (
+                    <>
+                        <img 
+                            src={imgSrc} 
+                            alt={alt || displayName} 
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            onError={() => setHasError(true)}
+                        />
+                        {enableModal && isHovered && (
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                background: 'rgba(0, 0, 0, 0.45)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                fontSize: '18px',
+                                transition: 'opacity 0.15s ease',
+                                pointerEvents: 'none'
+                            }}>
+                                🔍
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Lightbox Modal */}
+            {enableModal && isModalOpen && (
+                <FilePreviewModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    imgSrc={imgSrc}
+                    fileName={displayName}
+                    format={ext.toUpperCase()}
+                    dimensions={dimensions}
+                    dpi={dpi}
+                    colorMode={colorMode}
+                    fileSize={fileSize}
+                    downloadUrl={fileUrl || undefined}
+                />
+            )}
+        </>
     );
 };

@@ -1606,6 +1606,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 file={selectedFile || undefined}
                                                 fileUrl={previewUrl || undefined}
                                                 fileName={fileName}
+                                                dimensions={metadata ? { width: metadata.width, height: metadata.height } : undefined}
+                                                dpi={metadata?.dpi}
+                                                colorMode={metadata?.colorMode}
+                                                fileSize={selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : undefined}
                                                 className="upload-preview-thumb"
                                                 style={{ width: '40px', height: '40px', marginRight: '8px' }}
                                             />
@@ -2019,6 +2023,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 file={item.file || undefined}
                                                                 fileUrl={item.previewUrl || undefined}
                                                                 fileName={item.fileName}
+                                                                dimensions={{ width: item.metadata.width, height: item.metadata.height }}
+                                                                dpi={item.metadata.dpi}
+                                                                colorMode={item.metadata.colorMode}
+                                                                fileSize={item.file ? `${(item.file.size / (1024 * 1024)).toFixed(1)} MB` : undefined}
                                                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                             />
                                                             <input
