@@ -4,6 +4,7 @@ import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { extractCdrThumbnail } from '@/utils/cdrPreview'
+import { generateVectorCard } from '@/utils/vectorPreview'
 import { PDFDocument } from 'pdf-lib'
 import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
@@ -724,53 +725,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         return { widthPx: mW, heightPx: mH, dpi: mD || 300, thumbOffset: tO, thumbSize: tS, colorMode: cM };
     }
 
-    const generateVectorThumbnail = (type: string, fileName: string, wCm: number, hCm: number, dpiVal: number): string => {
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 300;
-            canvas.height = 360;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return '';
-
-            const grad = ctx.createLinearGradient(0, 0, 300, 360);
-            grad.addColorStop(0, '#1e1e2f');
-            grad.addColorStop(1, '#0f0f1b');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 300, 360);
-
-            ctx.font = '54px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('🎨', 150, 90);
-
-            ctx.fillStyle = '#ff9f43';
-            ctx.font = '900 20px Arial';
-            ctx.fillText(`ARCHIVO VECTORIAL ${type}`, 150, 140);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '13px Arial';
-            const shortName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
-            ctx.fillText(shortName, 150, 180);
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-            ctx.fillRect(20, 210, 260, 100);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(20, 210, 260, 100);
-
-            ctx.fillStyle = '#20bf6b';
-            ctx.font = 'bold 22px Arial';
-            ctx.fillText(wCm > 0 && hCm > 0 ? `${wCm} × ${hCm} cm` : 'Vector Sin Escala', 150, 250);
-
-            ctx.fillStyle = '#0abc5f';
-            ctx.font = '13px Arial';
-            ctx.fillText(`${dpiVal || 300} DPI • MODO CMYK`, 150, 285);
-
-            return canvas.toDataURL('image/png');
-        } catch (e) {
-            return '';
-        }
-    };
-
     const parseEPSMetadata = async (file: File) => {
         let w = 0, h = 0, d = 300, thumb = "";
         try {
@@ -797,7 +751,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         } catch (e) { }
 
         if (!thumb) {
-            thumb = generateVectorThumbnail('EPS', file.name, w, h, d);
+            thumb = generateVectorCard('EPS', file.name, { width: w, height: h }, d);
         }
 
         return { width: w, height: h, dpi: d, thumbnailUrl: thumb };
