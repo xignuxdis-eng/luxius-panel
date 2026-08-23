@@ -1,22 +1,27 @@
 .preview-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(8px);
-    z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    z-index: 999999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 24px;
+    box-sizing: border-box;
     animation: fadeIn 0.2s ease-out;
 }
 
 .preview-modal-container {
     width: 90vw;
-    max-width: 1200px;
+    max-width: 1100px;
     height: 85vh;
+    max-height: 850px;
     background: var(--bg-card, #121824);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 12px;
@@ -24,10 +29,12 @@
     flex-direction: column;
     overflow: hidden;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+    margin: auto;
 }
 
 .preview-modal-header {
     height: 56px;
+    min-height: 56px;
     padding: 0 20px;
     background: rgba(0, 0, 0, 0.4);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -73,6 +80,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .tool-btn {
@@ -161,6 +169,7 @@
 
 .preview-modal-footer {
     height: 48px;
+    min-height: 48px;
     padding: 0 20px;
     background: rgba(0, 0, 0, 0.4);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -174,6 +183,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    overflow-x: auto;
 }
 
 .tech-chip {
@@ -182,6 +192,7 @@
     padding: 4px 10px;
     border-radius: 4px;
     color: #cbd5e1;
+    white-space: nowrap;
 }
 
 .tech-chip strong {
@@ -191,6 +202,7 @@
 .preview-tip {
     color: var(--text-muted, #64748b);
     font-size: 0.75rem;
+    white-space: nowrap;
 }
 
 @keyframes fadeIn {

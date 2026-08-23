@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Maximize, X, Download, FileText, Image as ImageIcon } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ZoomIn, ZoomOut, RotateCcw, X, Download, FileText } from 'lucide-react';
 import './FilePreviewModal.css';
 
 export interface FilePreviewModalProps {
@@ -42,6 +43,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         }
     }, [isOpen, imgSrc]);
 
+    // Handle Escape key to close
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 4));
@@ -80,7 +92,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
     const ext = format || (fileName.split('.').pop()?.toUpperCase() || 'FILE');
 
-    return (
+    const modalContent = (
         <div className="preview-modal-overlay" onClick={onClose}>
             <div className="preview-modal-container" onClick={e => e.stopPropagation()}>
                 {/* Header */}
@@ -175,4 +187,6 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             </div>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 };
