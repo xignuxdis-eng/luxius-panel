@@ -61,6 +61,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [vendedores, setVendedores] = useState<any[]>([])
     const [uploadProgress, setUploadProgress] = useState<{ percent: number; loaded: string; total: string; fileName: string } | null>(null);
     const [isCloudImporting, setIsCloudImporting] = useState(false)
+    const [cloudImportStatus, setCloudImportStatus] = useState<string>('')
     const [showCloudInput, setShowCloudInput] = useState(false)
     const [cloudUrl, setCloudUrl] = useState('')
 
@@ -943,6 +944,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const handleCloudImport = async () => {
         if (!cloudUrl) return;
         setIsCloudImporting(true);
+        setCloudImportStatus('Conectando con Google Drive...');
         try {
             const baseUrl = API_URL.replace(/\/api\/?$/, '');
             const res = await fetch(`${API_URL}/import-cloud`, {
@@ -959,15 +961,24 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             if (!res.ok) throw new Error(data?.error || 'Error al importar desde la nube');
 
             if (data.status === 'success' && data.files.length > 0) {
-                if (activeTab === 'unitario') {
+                let targetTab = activeTab;
+                if (targetTab === 'unitario' && data.files.length > 1) {
+                    targetTab = 'lote';
+                    setActiveTab('lote');
+                }
+
+                if (targetTab === 'unitario') {
+                    setCloudImportStatus('Descargando archivo (1/1)...');
                     const fileInfo = data.files[0];
                     const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`);
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
                     const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
                     handleFileChange({ target: { files: [file] } } as any);
-                } else if (activeTab === 'lote') {
-                    for (const fileInfo of data.files) {
+                } else if (targetTab === 'lote') {
+                    for (let i = 0; i < data.files.length; i++) {
+                        const fileInfo = data.files[i];
+                        setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
                         try {
                             const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`);
                             if (!blobRes.ok) continue;
@@ -1008,6 +1019,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             alert(err.message);
         } finally {
             setIsCloudImporting(false);
+            setCloudImportStatus('');
         }
     }
 
@@ -1671,6 +1683,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </Button>
                                                         <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
                                                     </div>
+                                                    {isCloudImporting && cloudImportStatus && (
+                                                        <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '6px 12px', borderRadius: '4px' }}>
+                                                            <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            {cloudImportStatus}
+                                                        </div>
+                                                    )}
                                                 )}
                                                 {selectedFile && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
@@ -2005,6 +2023,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </Button>
                                                         <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
                                                     </div>
+                                                    {isCloudImporting && cloudImportStatus && (
+                                                        <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
+                                                            <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            {cloudImportStatus}
+                                                        </div>
+                                                    )}
                                                 )}
                                             </div>
                                         </div>
