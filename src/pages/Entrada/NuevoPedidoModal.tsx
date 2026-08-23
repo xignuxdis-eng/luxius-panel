@@ -60,6 +60,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0, errorCount: 0 })
     const [vendedores, setVendedores] = useState<any[]>([])
     const [uploadProgress, setUploadProgress] = useState<{ percent: number; loaded: string; total: string; fileName: string } | null>(null);
+    const [isCloudImporting, setIsCloudImporting] = useState(false)
+    const [showCloudInput, setShowCloudInput] = useState(false)
+    const [cloudUrl, setCloudUrl] = useState('')
 
     // REF for async access to latest batch state
     const batchItemsRef = useRef(batchItems);
@@ -937,6 +940,65 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         };
     }
 
+    const handleCloudImport = async () => {
+        if (!cloudUrl) return;
+        setIsCloudImporting(true);
+        try {
+            const res = await fetch(`${API_URL}/api/import-cloud`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: cloudUrl })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al importar desde la nube');
+
+            if (data.status === 'success' && data.files.length > 0) {
+                const fileInfo = data.files[0];
+                
+                // Fetch the file blob to have a real File object for the form
+                const blobRes = await fetch(`${API_URL}${fileInfo.tempUrl}`);
+                if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
+                const blob = await blobRes.blob();
+                const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
+
+                // Treat it exactly as if the user uploaded it
+                if (activeTab === 'unitario') {
+                    handleFileChange({ target: { files: [file] } } as any);
+                } else if (activeTab === 'lote') {
+                    const placeholder: BatchItem = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        file: file,
+                        fileName: file.name,
+                        previewUrl: '',
+                        metadata: { width: 0, height: 0, dpi: 72, format: '', colorMode: '' },
+                        confirmed: false,
+                        copias: 1,
+                        material: watchedMaterial || ''
+                    };
+                    setBatchItems(prev => [...prev, placeholder]);
+                    
+                    // Run extraction
+                    const url = URL.createObjectURL(file);
+                    blobStore.set(file.name, url);
+                    extractMetadata(file, url).then(meta => {
+                        setBatchItems(prev => prev.map(it => it.id === placeholder.id ? {
+                            ...it,
+                            previewUrl: meta.thumbnailUrl || url,
+                            metadata: meta
+                        } : it));
+                    });
+                }
+                
+                setShowCloudInput(false);
+                setCloudUrl('');
+            }
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsCloudImporting(false);
+        }
+    }
+
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         console.log(`[Luxius-UI] Evento handleFileChange disparado`);
         const file = e.target.files?.[0]
@@ -1568,7 +1630,36 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 style={{ width: '40px', height: '40px', marginRight: '8px' }}
                                             />
                                             <div className="upload-text-stack" style={{ flex: 1 }}>
-                                                <span className="upload-text">{fileName || 'Seleccionar archivo...'}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span className="upload-text">{fileName || 'Seleccionar archivo...'}</span>
+                                                    {!showCloudInput && (
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
+                                                            className="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded"
+                                                            style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                            title="Importar desde Google Drive"
+                                                        >
+                                                            🔗 Importar Link
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {showCloudInput && (
+                                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }} onClick={e => e.stopPropagation()}>
+                                                        <input 
+                                                            type="text" 
+                                                            value={cloudUrl} 
+                                                            onChange={e => setCloudUrl(e.target.value)} 
+                                                            placeholder="Pegar enlace público de Google Drive..." 
+                                                            className="lux-input"
+                                                            style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px' }}
+                                                        />
+                                                        <Button type="button" variant="primary" onClick={handleCloudImport} disabled={isCloudImporting} style={{ padding: '4px 8px', fontSize: '0.8rem' }}>
+                                                            {isCloudImporting ? '⏳' : 'Cargar'}
+                                                        </Button>
+                                                        <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
+                                                    </div>
+                                                )}
                                                 {selectedFile && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                                                         {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB
