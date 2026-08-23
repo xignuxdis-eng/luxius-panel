@@ -953,40 +953,46 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             if (!res.ok) throw new Error(data.error || 'Error al importar desde la nube');
 
             if (data.status === 'success' && data.files.length > 0) {
-                const fileInfo = data.files[0];
-                
-                // Fetch the file blob to have a real File object for the form
-                const blobRes = await fetch(`${API_URL}${fileInfo.tempUrl}`);
-                if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
-                const blob = await blobRes.blob();
-                const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
-
-                // Treat it exactly as if the user uploaded it
                 if (activeTab === 'unitario') {
+                    const fileInfo = data.files[0];
+                    const blobRes = await fetch(`${API_URL}${fileInfo.tempUrl}`);
+                    if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
+                    const blob = await blobRes.blob();
+                    const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
                     handleFileChange({ target: { files: [file] } } as any);
                 } else if (activeTab === 'lote') {
-                    const placeholder: BatchItem = {
-                        id: Math.random().toString(36).substr(2, 9),
-                        file: file,
-                        fileName: file.name,
-                        previewUrl: '',
-                        metadata: { width: 0, height: 0, dpi: 72, format: '', colorMode: '' },
-                        confirmed: false,
-                        copias: 1,
-                        material: watchedMaterial || ''
-                    };
-                    setBatchItems(prev => [...prev, placeholder]);
-                    
-                    // Run extraction
-                    const url = URL.createObjectURL(file);
-                    blobStore.set(file.name, url);
-                    extractMetadata(file, url).then(meta => {
-                        setBatchItems(prev => prev.map(it => it.id === placeholder.id ? {
-                            ...it,
-                            previewUrl: meta.thumbnailUrl || url,
-                            metadata: meta
-                        } : it));
-                    });
+                    for (const fileInfo of data.files) {
+                        try {
+                            const blobRes = await fetch(`${API_URL}${fileInfo.tempUrl}`);
+                            if (!blobRes.ok) continue;
+                            const blob = await blobRes.blob();
+                            const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
+
+                            const placeholder: BatchItem = {
+                                id: Math.random().toString(36).substr(2, 9),
+                                file: file,
+                                fileName: file.name,
+                                previewUrl: '',
+                                metadata: { width: 0, height: 0, dpi: 72, format: '', colorMode: '' },
+                                confirmed: false,
+                                copias: 1,
+                                material: watchedMaterial || ''
+                            };
+                            setBatchItems(prev => [...prev, placeholder]);
+                            
+                            const url = URL.createObjectURL(file);
+                            blobStore.set(file.name, url);
+                            extractMetadata(file, url).then(meta => {
+                                setBatchItems(prev => prev.map(it => it.id === placeholder.id ? {
+                                    ...it,
+                                    previewUrl: meta.thumbnailUrl || url,
+                                    metadata: meta
+                                } : it));
+                            });
+                        } catch (e) {
+                            console.error("Error importando archivo del lote", fileInfo, e);
+                        }
+                    }
                 }
                 
                 setShowCloudInput(false);
