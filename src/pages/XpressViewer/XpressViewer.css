@@ -1,0 +1,184 @@
+.xpress-container {
+    display: flex;
+    flex-direction: row;
+    height: calc(100vh - 80px); /* Adjust based on layout */
+    width: 100%;
+    background: #0f172a;
+    color: #f8fafc;
+    overflow: hidden;
+    position: relative;
+}
+
+.xpress-viewport {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 20px;
+}
+
+.xpress-dropzone {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.xpress-dropzone.active {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.xpress-dropzone-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.xpress-dropzone p {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0;
+}
+
+.xpress-preview-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.xpress-preview-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.xpress-sidebar {
+    width: 320px;
+    background: #1e293b;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.xpress-sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.xpress-sidebar-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+.xpress-sidebar-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.xpress-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.xpress-card h3 {
+    margin: 0 0 12px 0;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+.xpress-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.xpress-meta-row:last-child {
+    margin-bottom: 0;
+}
+
+.xpress-meta-label {
+    color: #94a3b8;
+}
+
+.xpress-meta-value {
+    color: #e2e8f0;
+    font-weight: 500;
+    text-align: right;
+}
+
+.xpress-toolbar {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    padding: 8px 16px;
+    display: flex;
+    gap: 12px;
+    z-index: 10;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.xpress-tool-btn {
+    background: transparent;
+    border: none;
+    color: #f8fafc;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.xpress-tool-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.xpress-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #3b82f6;
+    color: white;
+}

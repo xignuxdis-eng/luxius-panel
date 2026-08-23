@@ -42,6 +42,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 import Utilidades from '@pages/Utilidades/Utilidades'
 import Stock from '@pages/Stock/Stock'
 import Presupuestador from '@/pages/Presupuestador/Presupuestador'
+import XpressViewer from '@/pages/XpressViewer/XpressViewer'
 
 import { useEffect, useState } from 'react'
 import { initializeData } from '@/data/db'
@@ -114,6 +115,7 @@ function App() {
                                     <Route path="/" element={<Dashboard />} />
                                     <Route path="/entrada" element={<Entrada />} />
                                     <Route path="/presupuestador" element={<Presupuestador />} />
+                                    <Route path="/xpress-viewer" element={<XpressViewer />} />
                                     <Route path="/diseno" element={<Diseno />} />
                                     <Route path="/impresion" element={<Impresion />} />
                                     <Route path="/stock" element={<Stock />} />
