@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../config';
+import { API_URL } from '../data/db';
+import { extractCdrThumbnail } from '../utils/cdrPreview';
 
 interface UniversalFilePreviewProps {
     fileUrl?: string; // URL on the backend, e.g. /uploads/12345_file.cdr
@@ -40,9 +41,17 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({ file
         if (file) {
             // Local file mode (not uploaded yet)
             const ext = getExtension(file.name);
-            if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
+            if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(ext)) {
                 objectUrl = URL.createObjectURL(file);
                 setImgSrc(objectUrl);
+            } else if (ext === 'cdr') {
+                extractCdrThumbnail(file).then(thumbUrl => {
+                    if (thumbUrl) {
+                        setImgSrc(thumbUrl);
+                    } else {
+                        setImgSrc(null);
+                    }
+                }).catch(() => setImgSrc(null));
             } else {
                 setImgSrc(null); // Force fallback icon
             }

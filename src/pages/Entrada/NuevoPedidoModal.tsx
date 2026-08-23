@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import { UniversalFilePreview } from '@components/UniversalFilePreview'
+import { extractCdrThumbnail } from '@/utils/cdrPreview'
 import { PDFDocument } from 'pdf-lib'
 import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
@@ -956,6 +957,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         thumbnailUrl = await new Promise<string>(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result as string); rd.readAsDataURL(thumbBlob); });
                     } catch (e) { }
                 }
+            } else if (extension === 'CDR') {
+                try {
+                    thumbnailUrl = (await extractCdrThumbnail(cachedBuffer || file)) || '';
+                } catch (e) { }
             } else {
                 const meta = await new Promise<any>((resolve) => {
                     const img = new Image(); const url = existingUrl || URL.createObjectURL(file);
