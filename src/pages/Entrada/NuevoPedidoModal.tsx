@@ -65,6 +65,22 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [showCloudInput, setShowCloudInput] = useState(false)
     const [cloudUrl, setCloudUrl] = useState('')
 
+    // --- Searchable Client Dropdown State ---
+    const [clientSearch, setClientSearch] = useState('');
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+                setShowClientDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+    // ----------------------------------------
+
     // REF for async access to latest batch state
     const batchItemsRef = useRef(batchItems);
     useEffect(() => { batchItemsRef.current = batchItems; }, [batchItems]);
@@ -1575,10 +1591,53 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                         <input type="hidden" {...register('clienteId', { required: false })} />
                                     </>
                                 ) : (
-                                    <select {...register('clienteId', { required: false })} className="input-field">
-                                        <option value="">Buscar...</option>
-                                        {getClientes().map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.empresa})</option>)}
-                                    </select>
+                                    <div className="relative" ref={clientDropdownRef}>
+                                        <input type="hidden" {...register('clienteId', { required: false })} />
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            placeholder="Buscar cliente por nombre o empresa..."
+                                            value={showClientDropdown ? clientSearch : (() => {
+                                                const selectedId = watch('clienteId');
+                                                if (!selectedId) return '';
+                                                const c = getClientes().find(cl => String(cl.id) === String(selectedId));
+                                                return c ? `${c.nombre} (${c.empresa || 'Particular'})` : '';
+                                            })()}
+                                            onChange={(e) => {
+                                                setClientSearch(e.target.value);
+                                                if (!showClientDropdown) setShowClientDropdown(true);
+                                            }}
+                                            onFocus={() => {
+                                                setClientSearch('');
+                                                setShowClientDropdown(true);
+                                            }}
+                                        />
+                                        {showClientDropdown && (
+                                            <div className="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md shadow-lg max-h-60 overflow-y-auto" style={{ zIndex: 9999 }}>
+                                                {getClientes()
+                                                    .filter(c => 
+                                                        c.nombre.toLowerCase().includes(clientSearch.toLowerCase()) || 
+                                                        (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase())
+                                                    )
+                                                    .map(c => (
+                                                        <div 
+                                                            key={c.id} 
+                                                            className="px-3 py-2 cursor-pointer hover:bg-[var(--primary-color)] hover:text-white border-b border-[var(--border-color)] last:border-0"
+                                                            onClick={() => {
+                                                                setValue('clienteId', String(c.id));
+                                                                setShowClientDropdown(false);
+                                                            }}
+                                                        >
+                                                            <div style={{ fontWeight: 'bold' }}>{c.nombre}</div>
+                                                            <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{c.empresa || 'Particular'}</div>
+                                                        </div>
+                                                    ))}
+                                                {getClientes().filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase()) || (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                                                    <div className="px-3 py-2 text-sm opacity-50">No se encontraron clientes</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
