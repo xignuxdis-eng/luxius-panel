@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import './Analytics.css';
 import ConciliationTable from './ConciliationTable';
-import { getMateriales } from '@data/db';
+import { getMateriales, API_URL } from '@data/db';
 import type { Material } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import Modal from '@/components/ui/Modal';
@@ -54,7 +54,7 @@ export default function Analytics() {
     const fetchData = async () => {
         try {
             // Fetch Stats
-            const resStats = await fetch('/api/analytics/stats');
+            const resStats = await fetch(`${API_URL}/analytics/stats`);
             if (!resStats.ok) throw new Error(`HTTP error! status: ${resStats.status}`);
             const dataStats = await resStats.json();
             setStats(dataStats);
@@ -65,7 +65,7 @@ export default function Analytics() {
 
             // Fetch Dashboard Data (Admin Only)
             if (isAdmin) {
-                const resDash = await fetch('/api/analytics/dashboard');
+                const resDash = await fetch(`${API_URL}/analytics/dashboard`);
                 if (resDash.ok) {
                     const dataDash = await resDash.json();
                     setDashboardData(dataDash);
@@ -85,7 +85,7 @@ export default function Analytics() {
     const handleSync = async () => {
         setSyncing(true);
         try {
-            const res = await fetch('/api/analytics/process-logs', { method: 'POST' });
+            const res = await fetch(`${API_URL}/analytics/process-logs`, { method: 'POST' });
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const result = await res.json();
             alert(result.message);
