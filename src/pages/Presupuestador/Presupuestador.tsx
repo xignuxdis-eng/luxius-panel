@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getClientes, getMateriales, getCalidades, saveOrden } from '@/data/db';
 import { useAuthStore } from '@/store/authStore';
@@ -17,6 +17,22 @@ export default function Presupuestador() {
 
     // Presupuesto Meta State
     const [selectedClientId, setSelectedClientId] = useState<number | ''>(clientes[0]?.id || '');
+
+    // --- Searchable Client Dropdown State ---
+    const [clientSearch, setClientSearch] = useState('');
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+                setShowClientDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+    // ----------------------------------------
     const [validezDias, setValidezDias] = useState<number>(15);
     const [descuento, setDescuento] = useState<number>(0);
     const [observaciones, setObservaciones] = useState<string>('');
@@ -195,17 +211,50 @@ export default function Presupuestador() {
                         <div className="form-grid-2">
                             <div className="form-group">
                                 <label>Cliente</label>
-                                <select
-                                    className="form-select"
-                                    value={selectedClientId}
-                                    onChange={(e) => setSelectedClientId(Number(e.target.value))}
-                                >
-                                    {clientes.map(c => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.nombre} {c.empresa ? `(${c.empresa})` : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="relative" ref={clientDropdownRef}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Buscar cliente por nombre o empresa..."
+                                        value={showClientDropdown ? clientSearch : (() => {
+                                            const c = clientes.find(cl => String(cl.id) === String(selectedClientId));
+                                            return c ? `${c.nombre} (${c.empresa || 'Particular'})` : '';
+                                        })()}
+                                        onChange={(e) => {
+                                            setClientSearch(e.target.value);
+                                            if (!showClientDropdown) setShowClientDropdown(true);
+                                        }}
+                                        onFocus={() => {
+                                            setClientSearch('');
+                                            setShowClientDropdown(true);
+                                        }}
+                                    />
+                                    {showClientDropdown && (
+                                        <div className="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md shadow-lg max-h-60 overflow-y-auto" style={{ zIndex: 9999 }}>
+                                            {clientes
+                                                .filter(c => 
+                                                    c.nombre.toLowerCase().includes(clientSearch.toLowerCase()) || 
+                                                    (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase())
+                                                )
+                                                .map(c => (
+                                                    <div 
+                                                        key={c.id} 
+                                                        className="px-3 py-2 cursor-pointer hover:bg-[var(--primary-color)] hover:text-white border-b border-[var(--border-color)] last:border-0"
+                                                        onClick={() => {
+                                                            setSelectedClientId(Number(c.id));
+                                                            setShowClientDropdown(false);
+                                                        }}
+                                                    >
+                                                        <div style={{ fontWeight: 'bold' }}>{c.nombre}</div>
+                                                        <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{c.empresa || 'Particular'}</div>
+                                                    </div>
+                                                ))}
+                                            {clientes.filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase()) || (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                                                <div className="px-3 py-2 text-sm opacity-50">No se encontraron clientes</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="form-grid-2">
                                 <div className="form-group">
