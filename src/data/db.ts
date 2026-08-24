@@ -404,6 +404,18 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 
         if (response.ok) {
             const serverOrder = await response.json();
+            
+            // Re-read and update local storage so it has the backend UUID instead of the local ID
+            try {
+                const currentLocalStr = localStorage.getItem('luxius_session_ordenes') || '[]';
+                let currentLocal: Order[] = JSON.parse(currentLocalStr);
+                const localIdx = currentLocal.findIndex(o => (o.id || o.ot) === (newOrder.id || newOrder.ot));
+                if (localIdx >= 0) {
+                    currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverOrder };
+                    localStorage.setItem('luxius_session_ordenes', JSON.stringify(currentLocal));
+                }
+            } catch(e) { }
+
             return serverOrder;
         }
     } catch (error) {
