@@ -32,7 +32,7 @@ export default function Entrada() {
     const [loading, setLoading] = useState(true)
 
     // BATCH SELECTION STATE
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
     // VIEW TAB: 'active' (current OTs), 'history' (completed), or 'trash' (soft-deleted)
     const [viewTab, setViewTab] = useState<'active' | 'history' | 'trash'>('active')
@@ -155,19 +155,19 @@ export default function Entrada() {
 
     const selectedTotals = {
         m2: Array.from(selectedIds).reduce((acc, id) => {
-            const o = orders.find(x => x.id === id);
+            const o = orders.find(x => String(x.id) === String(id));
             if (!o) return acc;
             const cons = getConsumption(o);
             return cons.unit === 'm²' ? acc + cons.value : acc;
         }, 0),
         ml: Array.from(selectedIds).reduce((acc, id) => {
-            const o = orders.find(x => x.id === id);
+            const o = orders.find(x => String(x.id) === String(id));
             if (!o) return acc;
             const cons = getConsumption(o);
             return cons.unit === 'ml' ? acc + cons.value : acc;
         }, 0),
         price: Array.from(selectedIds).reduce((acc, id) => {
-            const o = orders.find(x => x.id === id);
+            const o = orders.find(x => String(x.id) === String(id));
             return acc + (o ? calculateOrderPrice(o) : 0);
         }, 0)
     };
@@ -241,18 +241,18 @@ export default function Entrada() {
 
     // BATCH ACTIONS
     const toggleSelection = (id: number | string) => {
-        const numId = Number(id);
+        const strId = String(id);
         const newSet = new Set(selectedIds);
-        if (newSet.has(numId)) {
-            newSet.delete(numId);
+        if (newSet.has(strId)) {
+            newSet.delete(strId);
         } else {
-            newSet.add(numId);
+            newSet.add(strId);
         }
         setSelectedIds(newSet);
     }
 
     const toggleSelectAll = () => {
-        const displayedIds = displayedOrders.map(o => Number(o.id));
+        const displayedIds = displayedOrders.map(o => String(o.id));
         const currentSelected = new Set(selectedIds);
         const allSelected = displayedIds.length > 0 && displayedIds.every(id => currentSelected.has(id));
 
@@ -281,7 +281,7 @@ export default function Entrada() {
     }
 
     const handleExportClientReportPdf = () => {
-        const selectedList = displayedOrders.filter(o => selectedIds.has(Number(o.id)));
+        const selectedList = displayedOrders.filter(o => selectedIds.has(String(o.id)));
         const ordersToExport = selectedList.length > 0 ? selectedList : displayedOrders;
 
         if (ordersToExport.length === 0) {
@@ -546,12 +546,12 @@ export default function Entrada() {
                                 }
 
                                 return (
-                                    <tr key={order.id} className={`fade-in hover-row ${selectedIds.has(Number(order.id)) ? 'selected-row' : ''}`} style={selectedIds.has(Number(order.id)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
+                                    <tr key={order.id || order.ot} className={`fade-in hover-row ${selectedIds.has(String(order.id)) ? 'selected-row' : ''}`} style={selectedIds.has(String(order.id)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
                                         <td>
                                             <input
                                                 type="checkbox"
-                                                checked={selectedIds.has(Number(order.id))}
-                                                onChange={() => toggleSelection(order.id)}
+                                                checked={selectedIds.has(String(order.id))}
+                                                onChange={() => toggleSelection(order.id || order.ot || '')}
                                                 style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
                                             />
                                         </td>
