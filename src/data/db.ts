@@ -260,22 +260,39 @@ export async function getOrdenes(): Promise<Order[]> {
                 });
 
                 // Add local-only orders (not in API, e.g. recently created)
-                const uniqueLocal = localOrders.filter(o => !apiIds.has(normalizeId(o.id)));
+                const uniqueLocal = localOrders.filter(o => !apiIds.has(normalizeId(o.id || o.ot)));
                 
                 // Auto-sync offline/local orders to the cloud backend
                 if (uniqueLocal.length > 0) {
+                    let updatedLocally = false;
                     console.log(`[db] Found ${uniqueLocal.length} unsynced local orders. Uploading to backend...`);
+                    
                     Promise.allSettled(uniqueLocal.map(async (order) => {
+                        const localId = order.id || order.ot;
                         const method = order.id ? 'PUT' : 'POST';
                         const url = order.id ? `${API_URL}/orders/${order.id}` : `${API_URL}/orders`;
                         try {
-                            await fetchWithTimeout(url, {
+                            const res = await fetchWithTimeout(url, {
                                 method,
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(order)
                             }, 30000);
+                            
+                            if (res.ok) {
+                                const savedOrder = await res.json();
+                                // If backend assigned a new ID, update our local store so it doesn't duplicate!
+                                if (savedOrder.id && String(savedOrder.id) !== String(localId)) {
+                                    const localJson = localStorage.getItem('luxius_session_ordenes') || '[]';
+                                    let parsedLocal = JSON.parse(localJson);
+                                    const idx = parsedLocal.findIndex((o: any) => (o.id || o.ot) === localId);
+                                    if (idx >= 0) {
+                                        parsedLocal[idx] = { ...parsedLocal[idx], ...savedOrder };
+                                        localStorage.setItem('luxius_session_ordenes', JSON.stringify(parsedLocal));
+                                    }
+                                }
+                            }
                         } catch (e) {
-                            console.warn('[db] Auto-sync failed for order:', order.id);
+                            console.warn('[db] Auto-sync failed for order:', localId);
                         }
                     }));
                 }
