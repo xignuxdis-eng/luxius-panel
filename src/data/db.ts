@@ -338,7 +338,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     const newOrder: Order = {
         id: Number(nextSeqId),
         ot: otCode,
-        nombreTarea: order.nombreTarea || (order as any).observaciones || `Proyecto ${otCode}`,
+        nombreTarea: order.nombreTarea || (order as any).observaciones || '',
         clientId: Number(order.clientId) || 1,
         clienteNombre: order.clienteNombre || 'Cliente',
         material: order.material || 'Lona Front',
@@ -352,6 +352,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         archivos: order.archivos || [],
         archivosOriginales: order.archivosOriginales || [],
         fechaCreacion: order.fechaCreacion || now.toISOString(),
+        createdAt: (order as any).createdAt || now.toISOString(),
         fechaEntrega: order.fechaEntrega || now.toISOString().split('T')[0],
         ...order,
     } as Order
