@@ -141,12 +141,12 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 6000
 export async function initializeData() {
     console.log("🔄 Syncing data from Server...");
 
-    // Clear legacy tombstone keys that cause data resurrection bugs
+    // Clear legacy tombstone keys that cause data resurrection bugs (except for ordenes, which we need for offline/fallback deletion)
     [
         'luxius_deleted_clientes', 'luxius_deleted_materiales', 'luxius_deleted_calidades',
         'luxius_deleted_maquinas', 'luxius_deleted_usuarios', 'luxius_deleted_proveedores',
         'luxius_deleted_servicios', 'luxius_deleted_logisticas', 'luxius_deleted_roles',
-        'luxius_deleted_ordenes', 'luxius_deleted_combos'
+        'luxius_deleted_combos'
     ].forEach(k => localStorage.removeItem(k));
 
     try {
@@ -392,7 +392,18 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
         localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
     } catch (e) { }
 
-    // 2. Delete from remote backend API
+    // 2. Add to tombstone (luxius_deleted_ordenes) so it doesn't resurrect from API
+    try {
+        const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+        const hidden: string[] = JSON.parse(hiddenJson);
+        const cleanId = String(id).trim().toLowerCase().replace(/^ot-/i, '');
+        if (!hidden.includes(cleanId)) {
+            hidden.push(cleanId);
+            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hidden));
+        }
+    } catch (e) { }
+
+    // 3. Delete from remote backend API
     try {
         await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 60000);
     } catch (error) {
