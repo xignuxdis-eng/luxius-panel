@@ -244,13 +244,15 @@ export async function getOrdenes(): Promise<Order[]> {
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
+                const normalizeId = (id: any) => String(id || '').trim().toLowerCase().replace(/^ot-/i, '');
+                
                 const activeApiOrders = apiOrders.filter((o: any) => !isHidden(o));
-                const apiIds = new Set(activeApiOrders.map((o: any) => String(o.id)));
-                const localById = new Map(localOrders.map(o => [String(o.id), o]));
+                const apiIds = new Set(activeApiOrders.map((o: any) => normalizeId(o.id)));
+                const localById = new Map(localOrders.map(o => [normalizeId(o.id), o]));
 
                 // Merge: API orders win UNLESS local has a more recent status change
                 const mergedApi = activeApiOrders.map((apiOrder: any) => {
-                    const localVersion = localById.get(String(apiOrder.id));
+                    const localVersion = localById.get(normalizeId(apiOrder.id));
                     if (localVersion) {
                         // If locally soft-deleted, preserve that status
                         if (localVersion.status === 'eliminado' && apiOrder.status !== 'eliminado') {
@@ -263,7 +265,7 @@ export async function getOrdenes(): Promise<Order[]> {
                 });
 
                 // Add local-only orders (not in API, e.g. recently created)
-                const uniqueLocal = localOrders.filter(o => !apiIds.has(String(o.id)));
+                const uniqueLocal = localOrders.filter(o => !apiIds.has(normalizeId(o.id)));
                 const merged = [...mergedApi, ...uniqueLocal];
                 localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
                 return merged;
