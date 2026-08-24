@@ -16,7 +16,7 @@ try {
     console.warn("[Luxius-PDF] Error configurando PDF worker:", e);
 }
 
-type ToolMode = 'none' | 'measure' | 'bleed';
+type ToolMode = 'none' | 'measure' | 'bleed' | 'pan';
 type Point = { x: number, y: number };
 
 type ColorSwatch = {
@@ -72,6 +72,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const [measureEnd, setMeasureEnd] = useState<Point | null>(null);
     const [isMeasuring, setIsMeasuring] = useState(false);
     const [imageScale, setImageScale] = useState(1);
+    const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
     
     // Config
     const [assumedDpi, setAssumedDpi] = useState<number>(300);
@@ -157,6 +160,8 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         setToolMode('none');
         setMeasureStart(null);
         setMeasureEnd(null);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
 
         try {
             const ext = uploadedFile.name.split('.').pop()?.toLowerCase();
@@ -362,10 +367,16 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         setToolMode('none');
         setMeasureStart(null);
         setMeasureEnd(null);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
     };
 
     // Herramientas Interactivas: Eventos
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (toolMode === 'pan') {
+            setIsPanning(true);
+            return;
+        }
         if (toolMode !== 'measure' || !svgRef.current) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -376,6 +387,13 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (isPanning && toolMode === 'pan') {
+            setPan(prev => ({
+                x: prev.x + e.movementX,
+                y: prev.y + e.movementY
+            }));
+            return;
+        }
         if (!isMeasuring || toolMode !== 'measure' || !svgRef.current) return;
         const rect = svgRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -384,6 +402,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     };
 
     const handleMouseUp = () => {
+        if (toolMode === 'pan') {
+            setIsPanning(false);
+        }
         if (toolMode === 'measure') {
             setIsMeasuring(false);
         }
@@ -454,7 +475,21 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         ) : previewUrl ? (
                             <div 
                                 className="xpress-interactive-wrapper" 
-                                style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%', cursor: toolMode === 'measure' ? 'crosshair' : 'default' }}
+                                style={{ 
+                                    position: 'relative', 
+                                    display: 'inline-block', 
+                                    maxWidth: '100%', 
+                                    maxHeight: '100%', 
+                                    cursor: toolMode === 'measure' ? 'crosshair' : toolMode === 'pan' ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                                    transformOrigin: 'center center',
+                                    transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+                                }}
+                                onWheel={(e) => {
+                                    if (toolMode === 'pan' || toolMode === 'none' || toolMode === 'measure' || toolMode === 'bleed') {
+                                        setZoom(prev => Math.min(Math.max(0.1, prev + e.deltaY * -0.001), 10));
+                                    }
+                                }}
                                 onMouseDown={handleMouseDown}
                                 onMouseMove={handleMouseMove}
                                 onMouseUp={handleMouseUp}
@@ -519,6 +554,18 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         )}
                         
                         <div className="xpress-toolbar">
+                            <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.1, z - 0.2)); }} title="Alejar">➖</button>
+                            <span style={{color: '#fff', fontSize: '0.8rem', minWidth: '40px', textAlign: 'center'}}>{Math.round(zoom * 100)}%</span>
+                            <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(10, z + 0.2)); }} title="Acercar">➕</button>
+                            <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
+                            <button 
+                                className={`xpress-tool-btn ${toolMode === 'pan' ? 'active' : ''}`} 
+                                onClick={(e) => { e.stopPropagation(); setToolMode(toolMode === 'pan' ? 'none' : 'pan'); }} 
+                                title="Mano (Navegar)"
+                                style={toolMode === 'pan' ? { background: 'var(--accent)' } : {}}
+                            >
+                                ✋
+                            </button>
                             <button 
                                 className={`xpress-tool-btn ${toolMode === 'measure' ? 'active' : ''}`} 
                                 onClick={(e) => { e.stopPropagation(); setToolMode(toolMode === 'measure' ? 'none' : 'measure'); }} 
