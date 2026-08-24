@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { API_URL } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../utils/vectorPreview';
@@ -26,18 +26,19 @@ const getExtension = (filename: string) => {
     return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
 };
 
-const getFallbackIcon = (ext: string) => {
+const getIconForExtension = (filename: string) => {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
     switch (ext) {
-        case 'cdr': return 'âœï¸'; // CorelDRAW
-        case 'ai': return 'âœ’ï¸'; // Illustrator
-        case 'eps': return 'ðŸ“'; // EPS
-        case 'pdf': return 'ðŸ“„'; // PDF
-        case 'svg': return 'ðŸŒ'; // SVG
+        case 'cdr': return '🎨'; // CorelDRAW
+        case 'ai': return '🎨'; // Illustrator
+        case 'eps': return '📄'; // EPS
+        case 'pdf': return '📄'; // PDF
+        case 'svg': return '🖼️'; // SVG
         case 'tif':
-        case 'tiff': return 'ðŸ–¼ï¸'; // TIFF
+        case 'tiff': return '🖼️'; // TIFF
         case 'zip':
-        case 'rar': return 'ðŸ—œï¸'; // Archive
-        default: return 'ðŸ“'; // Generic
+        case 'rar': return '📦'; // Archive
+        default: return '📄'; // Generic
     }
 };
 
