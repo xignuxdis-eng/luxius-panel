@@ -428,6 +428,21 @@ export async function saveBatchOrders(
             localOrders = localOrders.filter(o => !ids.some(id => matchesOrderId(o, id)));
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+            
+            // Add to tombstone
+            const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+            const hidden: string[] = JSON.parse(hiddenJson);
+            let updated = false;
+            ids.forEach(id => {
+                const cleanId = String(id).trim().toLowerCase().replace(/^ot-/i, '');
+                if (!hidden.includes(cleanId)) {
+                    hidden.push(cleanId);
+                    updated = true;
+                }
+            });
+            if (updated) {
+                localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hidden));
+            }
         } catch (e) { }
 
     } else if (action === 'update' && data) {
