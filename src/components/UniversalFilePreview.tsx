@@ -26,8 +26,7 @@ const getExtension = (filename: string) => {
     return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
 };
 
-const getIconForExtension = (filename: string) => {
-    const ext = filename.split('.').pop()?.toLowerCase() || '';
+const getFallbackIcon = (ext: string) => {
     switch (ext) {
         case 'cdr': return '🎨'; // CorelDRAW
         case 'ai': return '🎨'; // Illustrator
