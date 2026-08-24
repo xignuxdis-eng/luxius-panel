@@ -12,12 +12,7 @@ import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, L
 import { INITIAL_CLIENTES } from './initialClientes'
 
 // API Configuration
-const isDev = typeof window !== 'undefined' && (window.location.port === "3005" || window.location.port === "5173");
-export const API_URL = isDev
-    ? `http://${window.location.hostname}:5000/api`
-    : (typeof window !== 'undefined' && window.location.hostname.includes('github.io')
-        ? 'https://luxius-backend.onrender.com/api'
-        : '/api');
+export const API_URL = 'https://luxius-backend.onrender.com/api';
 
 export function resolveMediaUrl(fileStr: string): string {
     if (!fileStr) return ''
@@ -266,6 +261,25 @@ export async function getOrdenes(): Promise<Order[]> {
 
                 // Add local-only orders (not in API, e.g. recently created)
                 const uniqueLocal = localOrders.filter(o => !apiIds.has(normalizeId(o.id)));
+                
+                // Auto-sync offline/local orders to the cloud backend
+                if (uniqueLocal.length > 0) {
+                    console.log(`[db] Found ${uniqueLocal.length} unsynced local orders. Uploading to backend...`);
+                    Promise.allSettled(uniqueLocal.map(async (order) => {
+                        const method = order.id ? 'PUT' : 'POST';
+                        const url = order.id ? `${API_URL}/orders/${order.id}` : `${API_URL}/orders`;
+                        try {
+                            await fetchWithTimeout(url, {
+                                method,
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(order)
+                            }, 30000);
+                        } catch (e) {
+                            console.warn('[db] Auto-sync failed for order:', order.id);
+                        }
+                    }));
+                }
+
                 const merged = [...mergedApi, ...uniqueLocal];
                 localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
                 return merged;
