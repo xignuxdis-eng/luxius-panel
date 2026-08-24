@@ -1332,7 +1332,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             } else {
                 // Auto-create client profile if not found
                 console.log(`[Auto-Client] Creando perfil de cliente para: ${user.name}`);
-                const newClient = saveCliente({
+                const newClient = await saveCliente({
                     nombre: user.name,
                     empresa: 'Particular (Web)',
                     email: (user as any).email || '',

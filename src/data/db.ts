@@ -671,7 +671,7 @@ export function getClientes(): Cliente[] {
     return INITIAL_CLIENTES;
 }
 
-export function saveCliente(cliente: Partial<Cliente>): Cliente {
+export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {
     const sessionItemsJson = localStorage.getItem(SESSION_CLIENTES_KEY)
     let sessionItems: Cliente[] = []
 
@@ -681,7 +681,7 @@ export function saveCliente(cliente: Partial<Cliente>): Cliente {
         } catch (e) { }
     }
 
-    const existingIndex = sessionItems.findIndex(c => c.id === cliente.id)
+    const existingIndex = sessionItems.findIndex(c => String(c.id) === String(cliente.id))
     let result: Cliente
 
     if (existingIndex !== -1) {
@@ -710,7 +710,35 @@ export function saveCliente(cliente: Partial<Cliente>): Cliente {
     }
 
     localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(sessionItems))
-    syncSave('clientes', result);
+    
+    try {
+        const method = cliente.id ? 'PUT' : 'POST';
+        const url = cliente.id ? `${API_URL}/clientes/${result.id}` : `${API_URL}/clientes`;
+        const res = await fetchWithTimeout(url, {
+            method,
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(result)
+        }, 10000);
+        
+        if (res.ok) {
+            const serverCliente = await res.json();
+            try {
+                const currentLocalStr = localStorage.getItem(SESSION_CLIENTES_KEY) || '[]';
+                let currentLocal: Cliente[] = JSON.parse(currentLocalStr);
+                const localIdx = currentLocal.findIndex(c => String(c.id) === String(result.id));
+                if (localIdx >= 0) {
+                    currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverCliente };
+                    localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(currentLocal));
+                    result = currentLocal[localIdx];
+                }
+            } catch(e) { }
+        } else {
+            console.warn(`[Sync] Save failed clientes: ${res.status}`);
+        }
+    } catch (e) {
+        console.error(`[Sync] Network error [clientes]:`, e);
+    }
+    
     return result
 }
 
@@ -833,7 +861,7 @@ export function saveMaterial(material: Partial<Material>): Material {
         }
     }
 
-    const existingIndex = sessionItems.findIndex(m => m.id === material.id)
+    const existingIndex = sessionItems.findIndex(m => String(m.id) === String(material.id))
     let result: Material
 
     if (existingIndex !== -1) {
@@ -934,7 +962,7 @@ export function saveCalidad(calidad: Partial<Calidad>): Calidad {
         } catch (e) { }
     }
 
-    const existingIndex = sessionItems.findIndex(c => c.id === calidad.id)
+    const existingIndex = sessionItems.findIndex(c => String(c.id) === String(calidad.id))
     let result: Calidad
 
     if (existingIndex !== -1) {
@@ -1012,7 +1040,7 @@ export function getMaquinasOnline(): Maquina[] {
 export function saveMaquina(maquina: Partial<Maquina>): Maquina {
     const sessionItems = getMaquinas()
 
-    const existingIndex = sessionItems.findIndex(m => m.id === maquina.id)
+    const existingIndex = sessionItems.findIndex(m => String(m.id) === String(maquina.id))
     let result: Maquina
 
     if (existingIndex !== -1) {
@@ -1183,7 +1211,7 @@ export function getUsuarioByUsername(username: string): Usuario | undefined {
 export function saveUsuario(usuario: Partial<Usuario>): Usuario {
     const sessionItems = getUsuarios();
 
-    const existingIndex = sessionItems.findIndex(u => (usuario.id && u.id === usuario.id) || (usuario.username && u.username.toLowerCase() === usuario.username.toLowerCase()))
+    const existingIndex = sessionItems.findIndex(u => (usuario.id && String(u.id) === String(usuario.id)) || (usuario.username && u.username.toLowerCase() === usuario.username.toLowerCase()))
     let result: Usuario
 
     if (existingIndex !== -1) {
@@ -1251,7 +1279,7 @@ export function saveProveedor(proveedor: Partial<Proveedor>): Proveedor {
         } catch (e) { }
     }
 
-    const existingIndex = sessionItems.findIndex(p => p.id === proveedor.id)
+    const existingIndex = sessionItems.findIndex(p => String(p.id) === String(proveedor.id))
     let result: Proveedor
 
     if (existingIndex !== -1) {
@@ -1412,7 +1440,7 @@ export function saveServicio(servicio: Partial<Servicio>): Servicio {
         } catch (e) { }
     }
 
-    const existingIndex = sessionItems.findIndex(s => s.id === servicio.id)
+    const existingIndex = sessionItems.findIndex(s => String(s.id) === String(servicio.id))
     let result: Servicio
 
     if (existingIndex !== -1) {
@@ -1584,7 +1612,7 @@ export function saveCalendarEvent(event: Partial<import('@/types').CalendarEvent
         } catch (e) { }
     }
 
-    const existingIndex = sessionEvents.findIndex(e => e.id === event.id)
+    const existingIndex = sessionEvents.findIndex(e => String(e.id) === String(event.id))
     if (existingIndex !== -1) {
         sessionEvents[existingIndex] = { ...sessionEvents[existingIndex], ...event } as any
     } else {
@@ -1646,7 +1674,7 @@ export function getRoles(): RoleConfig[] {
 
 export function saveRole(role: Partial<RoleConfig>): RoleConfig {
     const roles = getRoles()
-    const existingIndex = roles.findIndex(r => r.id === role.id)
+    const existingIndex = roles.findIndex(r => String(r.id) === String(role.id))
     let result: RoleConfig
 
     if (existingIndex !== -1) {
@@ -1752,7 +1780,7 @@ export function saveLogistica(logistica: Partial<Logistica>): Logistica {
         } catch (e) { }
     }
 
-    const existingIndex = sessionItems.findIndex(l => l.id === logistica.id)
+    const existingIndex = sessionItems.findIndex(l => String(l.id) === String(logistica.id))
     let result: Logistica
 
     if (existingIndex !== -1) {
@@ -1930,7 +1958,7 @@ export function saveCombo(combo: Partial<ComboData>): ComboData {
         try { sessionItems = JSON.parse(sessionItemsJson); } catch (e) { }
     }
 
-    const existingIndex = sessionItems.findIndex(c => c.id === combo.id);
+    const existingIndex = sessionItems.findIndex(c => String(c.id) === String(combo.id));
     let result: ComboData;
 
     if (existingIndex !== -1) {

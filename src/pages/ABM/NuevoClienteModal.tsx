@@ -37,8 +37,8 @@ export default function NuevoClienteModal({ isOpen, onClose, onSave, cliente }: 
         }
     }, [isOpen, cliente, reset])
 
-    const onSubmit = (data: Cliente) => {
-        saveCliente({ ...data, id: cliente?.id })
+    const onSubmit = async (data: Cliente) => {
+        await saveCliente({ ...data, id: cliente?.id })
         // Refresh users to show the auto-created one (stale state fix)
         refreshCollection('usuarios')
         onSave()
