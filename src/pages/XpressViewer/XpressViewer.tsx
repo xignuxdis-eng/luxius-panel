@@ -6,6 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../../utils/vectorPreview';
+import { extractCdrThumbnail } from '../../utils/cdrPreview';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -212,23 +213,25 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             // 3. CorelDRAW (JSZip)
             else if (ext === 'cdr') {
                 setStatusText('Extrayendo ZIP interno (Fast Preview CDR)...');
-                const arrayBuffer = await uploadedFile.arrayBuffer();
-                const zip = new JSZip();
                 
                 try {
-                    const loadedZip = await zip.loadAsync(arrayBuffer);
-                    const previewFile = loadedZip.file("previews/thumbnail.png") || loadedZip.file("previews/thumbnail.bmp");
-                    if (previewFile) {
-                        const blob = await previewFile.async("blob");
-                        extractedPreview = URL.createObjectURL(blob);
-                        
-                        const metaFile = loadedZip.file("metadata/metadata.xml");
-                        if (metaFile) {
-                            const xmlStr = await metaFile.async("string");
-                            const versionMatch = xmlStr.match(/<cdr:version>([^<]+)<\/cdr:version>/i);
-                            if (versionMatch && versionMatch[1]) {
-                                meta.version = `CorelDRAW v${versionMatch[1]}`;
+                    extractedPreview = await extractCdrThumbnail(uploadedFile);
+                    if (extractedPreview) {
+                        // Extract metadata optionally
+                        try {
+                            const arrayBuffer = await uploadedFile.arrayBuffer();
+                            const zip = new JSZip();
+                            const loadedZip = await zip.loadAsync(arrayBuffer);
+                            const metaFile = loadedZip.file("metadata/metadata.xml");
+                            if (metaFile) {
+                                const xmlStr = await metaFile.async("string");
+                                const versionMatch = xmlStr.match(/<cdr:version>([^<]+)<\/cdr:version>/i);
+                                if (versionMatch && versionMatch[1]) {
+                                    meta.version = `CorelDRAW v${versionMatch[1]}`;
+                                }
                             }
+                        } catch (e) {
+                            // Metadata is optional
                         }
 
                         await new Promise((resolve) => {
@@ -242,7 +245,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             img.src = extractedPreview as string;
                         });
                     } else {
-                        throw new Error("No miniatura");
+                        throw new Error("No miniatura extraíble");
                     }
                 } catch (e) {
                     console.warn("Fallo ZIP CDR:", e);
