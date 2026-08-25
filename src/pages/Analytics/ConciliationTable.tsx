@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Clock } from 'lucide-react';
+import { API_URL } from '@data/db';
 import './ConciliationTable.css';
 
 interface ReconciledItem {
@@ -28,7 +29,7 @@ export default function ConciliationTable() {
 
     const fetchReconciliation = async () => {
         try {
-            const res = await fetch('/api/analytics/reconciliation');
+            const res = await fetch(`${API_URL}/analytics/reconciliation`);
             if (!res.ok) return;
             const result = await res.json();
             if (result && Array.isArray(result.reconciled)) {

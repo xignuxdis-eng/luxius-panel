@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
     { label: 'Utilidades', path: '/utilidades', icon: '🛠️' },
     { label: 'Reportes', path: '/reportes', icon: '📊' },
     { label: 'Sistema', path: '/sistema', icon: '⚙️' },
+    { label: 'Xana Memoria', path: '/xana', icon: '🧠' },
 ]
 
 export default function Sidebar() {

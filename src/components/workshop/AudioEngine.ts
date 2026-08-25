@@ -36,7 +36,7 @@ class AudioEngine {
 
         try {
             if (!this.ambientAudio) {
-                this.ambientAudio = new Audio('/xignux_ambient.mp3');
+                this.ambientAudio = new Audio(`${import.meta.env.BASE_URL}xignux_ambient.mp3`);
                 this.ambientAudio.loop = true;
                 this.ambientAudio.volume = 0.35;
             }

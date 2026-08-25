@@ -2002,3 +2002,82 @@ export function deleteCombo(id: number) {
     }
     syncDelete('combos', id);
 }
+
+// ==========================================
+// XANA AI API BINDINGS
+// ==========================================
+
+export interface XanaTask {
+    id: number;
+    task_id: string;
+    project: string;
+    objective: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface XanaSession {
+    id: number;
+    session_id: string;
+    task_id: string;
+    agent: string;
+    model: string;
+    started_at: string;
+    ended_at: string | null;
+}
+
+export interface XanaDecision {
+    id: number;
+    decision_id: string;
+    task_id: string;
+    topic: string;
+    choice: string;
+    alternatives_rejected: string[];
+    reason: string;
+    created_at: string;
+}
+
+export interface XanaAction {
+    id: number;
+    session_id: string;
+    action_type: string;
+    target: string;
+    details: any;
+    created_at: string;
+}
+
+export async function getXanaTasks(): Promise<XanaTask[]> {
+    try {
+        const res = await fetch(`${API_URL}/xana/tasks`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+export async function getXanaSessions(): Promise<XanaSession[]> {
+    try {
+        const res = await fetch(`${API_URL}/xana/sessions`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+export async function getXanaDecisions(): Promise<XanaDecision[]> {
+    try {
+        const res = await fetch(`${API_URL}/xana/decisions`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+export async function getXanaActions(): Promise<XanaAction[]> {
+    try {
+        // Assuming there is a GET endpoint for actions, if not, we might need to add it to backend. 
+        // For dashboard purposes, let's assume we can fetch them or we just rely on tasks/sessions/decisions.
+        // Actually, backend didn't implement GET /api/xana/actions. Let's gracefully handle.
+        const res = await fetch(`${API_URL}/xana/actions`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}

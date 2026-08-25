@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import { useAuthStore } from '@store/authStore'
-import { getStats, getOrdenes, getMateriales, saveOrden } from '@data/db'
+import { getStats, getOrdenes, getMateriales, saveOrden, API_URL } from '@data/db'
 import CalendarView from './CalendarView'
 import QuickNotes from './QuickNotes'
 import { Order } from '@/types'
@@ -272,7 +272,7 @@ function InkCoverageWidget() {
         const calculateCoverage = async () => {
             try {
                 // 1. Fetch Printer Stats for Usage Calculation
-                const res = await fetch('http://localhost:3001/api/analytics/stats')
+                const res = await fetch(`${API_URL}/analytics/stats`)
                 if (!res.ok) return
                 const jobs = await res.json()
 

@@ -43,6 +43,7 @@ import Utilidades from '@pages/Utilidades/Utilidades'
 import Stock from '@pages/Stock/Stock'
 import Presupuestador from '@/pages/Presupuestador/Presupuestador'
 import XpressViewer from '@/pages/XpressViewer/XpressViewer'
+import XanaDashboard from '@/pages/Xana/XanaDashboard'
 
 import { useEffect, useState } from 'react'
 import { initializeData } from '@/data/db'
@@ -121,6 +122,7 @@ function App() {
                                     <Route path="/stock" element={<Stock />} />
                                     <Route path="/analiticas" element={<Analytics />} />
                                     <Route path="/utilidades" element={<Utilidades />} />
+                                    <Route path="/xana" element={<ProtectedRoute><XanaDashboard /></ProtectedRoute>} />
                                     <Route path="/abm/*" element={<ABM />} />
                                     <Route path="/reportes" element={<Reportes />} />
                                     <Route path="/sistema/*" element={<Sistema />} />
