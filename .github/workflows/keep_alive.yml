@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: Ping Backend
         run: |
-          curl -s -f https://luxius-backend.onrender.com/api/clientes > /dev/null || true
+          curl -s -f -m 15 https://luxius-backend.onrender.com/api/health > /dev/null || true
