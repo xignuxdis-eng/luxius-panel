@@ -64,6 +64,42 @@ const XanaDashboard: React.FC = () => {
         setTimeout(() => setCopied(false), 2500);
     };
 
+    const formatArgDateTime = (dateStr?: string | Date | null): string => {
+        if (!dateStr) return '-';
+        let s = typeof dateStr === 'string' ? dateStr : dateStr.toISOString();
+        if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-', 10)) {
+            s += 'Z';
+        }
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return '-';
+        return d.toLocaleString('es-AR', {
+            timeZone: 'America/Argentina/Buenos_Aires',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }) + ' hs';
+    };
+
+    const formatArgTime = (dateStr?: string | Date | null): string => {
+        if (!dateStr) return '-';
+        let s = typeof dateStr === 'string' ? dateStr : dateStr.toISOString();
+        if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-', 10)) {
+            s += 'Z';
+        }
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return '-';
+        return d.toLocaleTimeString('es-AR', {
+            timeZone: 'America/Argentina/Buenos_Aires',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        }) + ' hs';
+    };
+
     const getStatusClass = (status: string) => {
         switch (status) {
             case 'completed': return 'status-success';
@@ -159,7 +195,7 @@ const XanaDashboard: React.FC = () => {
                                         <p>{task.objective}</p>
                                     </div>
                                     <div className="xana-card-footer">
-                                        <small>Actualizado: {new Date(task.updated_at).toLocaleString()}</small>
+                                        <small>Actualizado: {formatArgDateTime(task.updated_at)}</small>
                                     </div>
                                 </div>
                             ))}
@@ -192,6 +228,11 @@ const XanaDashboard: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
+                                    {dec.created_at && (
+                                        <div className="xana-card-footer">
+                                            <small>{formatArgDateTime(dec.created_at)}</small>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -212,7 +253,7 @@ const XanaDashboard: React.FC = () => {
                                         <p className="xana-commit-msg">{commit.message}</p>
                                     </div>
                                     <div className="xana-card-footer">
-                                        <small>{commit.author} • {new Date(commit.created_at).toLocaleString()}</small>
+                                        <small>{commit.author} • {formatArgDateTime(commit.created_at)}</small>
                                     </div>
                                 </div>
                             ))}
@@ -243,8 +284,8 @@ const XanaDashboard: React.FC = () => {
                                                 <span className="xana-agent-badge">{session.agent}</span>
                                                 <small className="xana-model">{session.model}</small>
                                             </td>
-                                            <td>{new Date(session.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                                            <td>{session.ended_at ? new Date(session.ended_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="status-warning">En curso</span>}</td>
+                                            <td>{formatArgTime(session.started_at)}</td>
+                                            <td>{session.ended_at ? formatArgTime(session.ended_at) : <span className="status-warning">En curso</span>}</td>
                                         </tr>
                                     ))}
                                 </tbody>
