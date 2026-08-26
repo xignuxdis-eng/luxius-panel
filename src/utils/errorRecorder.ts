@@ -49,11 +49,25 @@ export function initErrorRecorder(): void {
         });
     });
 
+    const formatLogArg = (a: any): string => {
+        if (a instanceof Error) {
+            return `${a.name}: ${a.message}`;
+        }
+        if (typeof a === 'object' && a !== null) {
+            try {
+                return JSON.stringify(a);
+            } catch (_) {
+                return String(a);
+            }
+        }
+        return String(a);
+    };
+
     // 3. Interceptar console.error
     const originalConsoleError = console.error;
     console.error = (...args: any[]) => {
         try {
-            const message = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+            const message = args.map(formatLogArg).join(' ');
             // Evitar recursión o logs ruidosos de extensiones
             if (!message.includes('[Xana AI]') && !message.includes('Download the React DevTools')) {
                 addLog({
@@ -71,7 +85,7 @@ export function initErrorRecorder(): void {
     const originalConsoleWarn = console.warn;
     console.warn = (...args: any[]) => {
         try {
-            const message = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+            const message = args.map(formatLogArg).join(' ');
             if (message.includes('API') || message.includes('falló') || message.includes('failed') || message.includes('timeout')) {
                 addLog({
                     timestamp: new Date().toISOString(),

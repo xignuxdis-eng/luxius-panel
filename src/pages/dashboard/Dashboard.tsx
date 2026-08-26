@@ -271,59 +271,65 @@ function InkCoverageWidget() {
     useEffect(() => {
         const calculateCoverage = async () => {
             try {
-                // 1. Fetch Printer Stats for Usage Calculation
-                const res = await fetch(`${API_URL}/analytics/stats`)
-                if (!res.ok) return
-                const jobs = await res.json()
+                // Default standard ink usage per m2 for eco-solvent/UV large format printing (in mL/m2)
+                let avgUsage: { [key: string]: number } = { c: 2.8, m: 3.2, y: 2.5, k: 3.5 }
 
-                // Calculate Totals
-                let totalM2 = 0
-                let totalInk = { c: 0, m: 0, y: 0, k: 0 }
+                // 1. Fetch Printer Stats for actual usage calculation if available
+                try {
+                    const res = await fetch(`${API_URL}/analytics/stats`)
+                    if (res.ok) {
+                        const jobs = await res.json()
+                        if (Array.isArray(jobs) && jobs.length > 0) {
+                            let totalM2 = 0
+                            let totalInk = { c: 0, m: 0, y: 0, k: 0 }
 
-                jobs.forEach((job: any) => {
-                    if (job.sizeM2 > 0 && job.ink) {
-                        totalM2 += job.sizeM2
-                        totalInk.c += job.ink.c || 0
-                        totalInk.m += job.ink.m || 0
-                        totalInk.y += job.ink.y || 0
-                        totalInk.k += job.ink.k || 0
+                            jobs.forEach((job: any) => {
+                                if (job && job.sizeM2 > 0 && job.ink) {
+                                    totalM2 += Number(job.sizeM2) || 0
+                                    totalInk.c += Number(job.ink.c) || 0
+                                    totalInk.m += Number(job.ink.m) || 0
+                                    totalInk.y += Number(job.ink.y) || 0
+                                    totalInk.k += Number(job.ink.k) || 0
+                                }
+                            })
+
+                            if (totalM2 > 0) {
+                                avgUsage = {
+                                    c: (totalInk.c / totalM2) || 2.8,
+                                    m: (totalInk.m / totalM2) || 3.2,
+                                    y: (totalInk.y / totalM2) || 2.5,
+                                    k: (totalInk.k / totalM2) || 3.5
+                                }
+                            }
+                        }
                     }
-                })
-
-                if (totalM2 === 0) return
-
-                // Average mL per m2
-                const avgUsage = {
-                    c: totalInk.c / totalM2,
-                    m: totalInk.m / totalM2,
-                    y: totalInk.y / totalM2,
-                    k: totalInk.k / totalM2
+                } catch {
+                    // Use default standard usage if stats endpoint is unavailable
                 }
 
                 // 2. Fetch Current Stock
-                const materiales = getMateriales()
+                const materiales = getMateriales() || []
                 const inks = [
                     { code: 'C', name: 'Cyan', color: '#00ffff', matcher: ['cyan', 'cian', 'ink-c'] },
                     { code: 'M', name: 'Magenta', color: '#ff00ff', matcher: ['magenta', 'ink-m'] },
                     { code: 'Y', name: 'Yellow', color: '#ffff00', matcher: ['yellow', 'amarillo', 'ink-y'] },
-                    { code: 'K', name: 'Black', color: '#dddddd', matcher: ['black', 'negro', 'ink-k'] } // Using light gray for visibility in dark mode or border it
+                    { code: 'K', name: 'Black', color: '#dddddd', matcher: ['black', 'negro', 'ink-k'] }
                 ]
 
                 const estimates = inks.map(inkType => {
-                    // Sum stock for this color (in Liters)
                     const stockLiters = (materiales as any[])
                         .filter((m: any) => {
-                            const desc = (m.descripcion + ' ' + m.codigo).toLowerCase()
-                            // Ensure it's ink
+                            if (!m) return false
+                            const desc = `${m.descripcion || ''} ${m.codigo || ''}`.toLowerCase()
                             const isInk = m.tipo === 'tinta' || desc.includes('tinta') || desc.includes('ink')
                             if (!isInk) return false
 
                             return inkType.matcher.some(term => desc.includes(term))
                         })
-                        .reduce((sum: number, m: any) => sum + (m.stockActual || 0), 0)
+                        .reduce((sum: number, m: any) => sum + (Number(m.stockActual) || 0), 0)
 
                     const stockmL = stockLiters * 1000
-                    const usagePerM2 = (avgUsage as any)[inkType.code.toLowerCase()] || 0.1 // avoid division by zero
+                    const usagePerM2 = avgUsage[inkType.code.toLowerCase()] || 3.0
                     const capacityM2 = usagePerM2 > 0 ? stockmL / usagePerM2 : 0
 
                     return {
@@ -335,9 +341,8 @@ function InkCoverageWidget() {
                 })
 
                 setCoverage(estimates)
-
             } catch (e) {
-                console.error("Error calculating ink coverage", e)
+                console.warn("[Ink Coverage] No se pudo calcular la cobertura de tintas:", e)
             } finally {
                 setLoading(false)
             }
@@ -346,10 +351,10 @@ function InkCoverageWidget() {
         calculateCoverage()
     }, [])
 
-    if (loading) return null
+    if (loading || coverage.length === 0) return null
 
     // Find limiting factor
-    const minmetrics = coverage.reduce((min, curr) => curr.capacityM2 < min.capacityM2 ? curr : min, coverage[0])
+    const minmetrics = coverage.reduce((min, curr) => (curr.capacityM2 < (min?.capacityM2 ?? Infinity) ? curr : min), coverage[0])
 
     return (
         <div className="ink-coverage-card animate-slide-up" style={{ marginTop: '1rem', background: 'var(--bg-mid)', borderRadius: '12px', padding: '1.5rem' }}>
