@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
     X, Send, Bot, Sparkles, AlertTriangle, Database, 
-    Activity, RefreshCw, ChevronDown, Package, Trash2, Zap
+    Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle
 } from 'lucide-react';
 import { getRecentLogs, clearLogs, RecordedError } from '../utils/errorRecorder';
 import { API_URL } from '../data/db';
@@ -21,7 +21,7 @@ export default function XanaAssistant() {
     const [messages, setMessages] = useState<Message[]>([
         { 
             role: 'bot', 
-            text: '¡Hola! Soy **Xana AI**, tu copiloto de LuXius.\n\nPuedes hacerme preguntas sobre pedidos, cotizaciones, stock o seleccionar una opción en **⚡ Acciones**.',
+            text: '¡Hola! Soy **Xana AI**, tu copiloto de LuXius.\n\nPuedes hacerme preguntas sobre pedidos, cotizaciones, stock, pedirme cálculos de planchas/calcos o seleccionar una opción en **⚡ Acciones**.',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
     ]);
@@ -38,7 +38,7 @@ export default function XanaAssistant() {
                 const parsed = JSON.parse(authRaw);
                 if (parsed?.state?.user) {
                     return {
-                        role: parsed.state.user.rol || parsed.state.user.role || 'cliente',
+                        role: (parsed.state.user.rol || parsed.state.user.role || 'cliente').toLowerCase(),
                         username: parsed.state.user.nombre || parsed.state.user.username || 'Usuario',
                         id: parsed.state.user.id || 0
                     };
@@ -50,6 +50,8 @@ export default function XanaAssistant() {
 
     const userInfo = getUserInfo();
     const isAdmin = userInfo.role === 'admin';
+    const isImpresor = userInfo.role === 'impresor' || isAdmin;
+    const isCliente = userInfo.role === 'cliente';
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -97,7 +99,7 @@ export default function XanaAssistant() {
             const payload = {
                 message: textToSend,
                 history: history,
-                userRole: userInfo.role.toLowerCase(),
+                userRole: userInfo.role,
                 username: userInfo.username,
                 userId: userInfo.id,
                 clientLogs: capturedLogs,
@@ -228,39 +230,74 @@ export default function XanaAssistant() {
                             {isMenuOpen && (
                                 <div className="xana-dropdown-menu">
                                     <div className="dropdown-header">Consultas Rápidas</div>
+                                    
+                                    {/* Cálculo de imposición (Para todos) */}
                                     <button 
-                                        className="dropdown-item item-diagnostic"
-                                        onClick={() => sendMessage('Diagnostica los errores recientes de pantalla y consola', true)}
+                                        className="dropdown-item item-calc"
+                                        onClick={() => sendMessage('¿Cuántos calcos de 5x5 cm entran en una hoja A4?')}
                                     >
-                                        <AlertTriangle size={15} />
+                                        <Calculator size={15} />
                                         <div>
-                                            <strong>Diagnóstico del Sistema</strong>
-                                            <small>Analizar logs de consola y pantalla</small>
+                                            <strong>Calcular Planchas / Calcos</strong>
+                                            <small>Rendimiento e imposición A4/A3</small>
                                         </div>
                                     </button>
 
+                                    {/* Órdenes */}
                                     <button 
                                         className="dropdown-item item-orders"
-                                        onClick={() => sendMessage('¿Cuál es el estado general de las órdenes de trabajo activas?')}
+                                        onClick={() => sendMessage(isCliente ? '¿Cómo consulto el estado de mis pedidos?' : '¿Cuál es el estado general de las órdenes de trabajo activas?')}
                                     >
                                         <Activity size={15} />
                                         <div>
-                                            <strong>Estado de Órdenes</strong>
-                                            <small>Resumen de taller y pendientes</small>
+                                            <strong>{isCliente ? 'Mis Pedidos' : 'Estado de Órdenes'}</strong>
+                                            <small>{isCliente ? 'Seguimiento de mis trabajos' : 'Resumen de taller y pendientes'}</small>
                                         </div>
                                     </button>
 
-                                    <button 
-                                        className="dropdown-item item-stock"
-                                        onClick={() => sendMessage('Revisar estado e inventario de stock y materiales')}
-                                    >
-                                        <Package size={15} />
-                                        <div>
-                                            <strong>Alertas de Stock</strong>
-                                            <small>Nivel de lonas, vinilos y tintas</small>
-                                        </div>
-                                    </button>
+                                    {/* Stock (Admin / Impresor) */}
+                                    {isImpresor && (
+                                        <button 
+                                            className="dropdown-item item-stock"
+                                            onClick={() => sendMessage('Revisar estado e inventario de stock y materiales')}
+                                        >
+                                            <Package size={15} />
+                                            <div>
+                                                <strong>Alertas de Stock</strong>
+                                                <small>Nivel de lonas, vinilos y tintas</small>
+                                            </div>
+                                        </button>
+                                    )}
 
+                                    {/* Materiales y Formatos (Cliente) */}
+                                    {isCliente && (
+                                        <button 
+                                            className="dropdown-item item-help"
+                                            onClick={() => sendMessage('¿Qué formatos de archivos y materiales aceptan?')}
+                                        >
+                                            <HelpCircle size={15} />
+                                            <div>
+                                                <strong>Formatos & Materiales</strong>
+                                                <small>Requisitos técnicos de diseño</small>
+                                            </div>
+                                        </button>
+                                    )}
+
+                                    {/* Diagnóstico (Admin / Impresor) */}
+                                    {isImpresor && (
+                                        <button 
+                                            className="dropdown-item item-diagnostic"
+                                            onClick={() => sendMessage('Diagnostica los errores recientes de pantalla y consola', true)}
+                                        >
+                                            <AlertTriangle size={15} />
+                                            <div>
+                                                <strong>Diagnóstico del Sistema</strong>
+                                                <small>Analizar logs de consola y UI</small>
+                                            </div>
+                                        </button>
+                                    )}
+
+                                    {/* Salud BD (Solo Admin) */}
                                     {isAdmin && (
                                         <button 
                                             className="dropdown-item item-db"
@@ -318,7 +355,7 @@ export default function XanaAssistant() {
                             <div className="xana-msg-row xana-msg-bot">
                                 <div className="xana-loading">
                                     <RefreshCw size={15} className="animate-spin" />
-                                    <span>Xana está procesando...</span>
+                                    <span>Xana está calculando...</span>
                                 </div>
                             </div>
                         )}
@@ -332,7 +369,7 @@ export default function XanaAssistant() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                            placeholder="Escribe tu consulta o pide un diagnóstico..."
+                            placeholder="Escribe tu consulta o pide un cálculo..."
                             className="xana-input"
                         />
                         <button

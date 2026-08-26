@@ -231,10 +231,12 @@
     color: #94a3b8;
 }
 
+.item-calc svg { color: #34d399; }
 .item-diagnostic svg { color: #f87171; }
 .item-orders svg { color: #818cf8; }
 .item-stock svg { color: #38bdf8; }
 .item-db svg { color: #c084fc; }
+.item-help svg { color: #fbbf24; }
 .item-clear svg { color: #94a3b8; }
 
 .dropdown-divider {
