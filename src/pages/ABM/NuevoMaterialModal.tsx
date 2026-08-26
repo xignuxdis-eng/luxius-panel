@@ -181,6 +181,38 @@ export default function NuevoMaterialModal({ isOpen, onClose, onSave, material }
                     </div>
                 )}
 
+                {/* Stock Controls */}
+                <div className="form-group">
+                    <Input
+                        label="Stock Actual"
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        {...register('stockActual', { valueAsNumber: true })}
+                    />
+                </div>
+
+                <div className="form-group">
+                    <Input
+                        label="Stock Mínimo (Alerta)"
+                        type="number"
+                        step="any"
+                        placeholder="10"
+                        {...register('stockMinimo', { valueAsNumber: true })}
+                    />
+                </div>
+
+                <div className="form-group">
+                    <label className="input-label">Unidad de Medida</label>
+                    <select className="input-field" {...register('unidad')}>
+                        <option value="M Lineal">Metros Lineales (M Lineal)</option>
+                        <option value="m2">Metros Cuadrados (m²)</option>
+                        <option value="Litros">Litros (L)</option>
+                        <option value="un">Unidades (un)</option>
+                        <option value="plancha">Planchas</option>
+                    </select>
+                </div>
+
                 <div className="form-group-row" style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
                     <input
                         type="checkbox"

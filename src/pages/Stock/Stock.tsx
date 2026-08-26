@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import Header from '@components/layout/Header'
-import { getMateriales, saveMaterial } from '@data/db'
+import { getMateriales, saveMaterial, refreshCollection } from '@data/db'
 import type { Material } from '@/types'
 import Button from '@components/ui/Button'
+import { RefreshCw } from 'lucide-react'
 import './Stock.css'
 
 export default function Stock() {
@@ -12,21 +13,31 @@ export default function Stock() {
     const [isAdjustmentModalOpen, setAdjustmentModalOpen] = useState(false)
     const [adjustmentAmount, setAdjustmentAmount] = useState<string>('') // string to handle empty/decimals better
     const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract' | 'set'>('add')
+    const [isRefreshing, setIsRefreshing] = useState(false)
 
     useEffect(() => {
         loadStock()
+        // Sync with live server in background
+        refreshCollection('materiales').then(() => loadStock())
     }, [])
 
     const loadStock = () => {
         let allMaterials = getMateriales()
         // Filter only enabled ones
         allMaterials = allMaterials.filter(m => m.habilitado !== false)
-
-        // Sort production materials by low stock first, but keep liquids separate if possible
-        // Actually, we group them in the render, so we can sort the whole list here
-        // but it might be better to handle specific orders in the grouped sections.
         setMateriales(allMaterials)
     }
+
+    const handleManualRefresh = async () => {
+        setIsRefreshing(true)
+        try {
+            await refreshCollection('materiales')
+            loadStock()
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
+
 
     const handleOpenAdjustment = (material: Material) => {
         setSelectedMaterial(material)
@@ -278,6 +289,16 @@ export default function Stock() {
                     />
                 </div>
                 <div className="stock-stats">
+                    <button 
+                        className="stat-pill" 
+                        style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        onClick={handleManualRefresh}
+                        disabled={isRefreshing}
+                        title="Sincronizar stock con la base de datos"
+                    >
+                        <RefreshCw size={14} className={isRefreshing ? 'spinning' : ''} />
+                        <span className="label">{isRefreshing ? 'Sincronizando...' : 'Sincronizar'}</span>
+                    </button>
                     <div className="stat-pill">
                         <span className="label">Total Ítems:</span>
                         <span className="value">{materiales.length}</span>
