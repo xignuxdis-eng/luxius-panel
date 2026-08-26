@@ -2,11 +2,11 @@
 
 .floating-whatsapp {
     position: fixed;
-    bottom: 200px;
+    bottom: 232px;
     /* Above alarm */
     right: 16px;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     background: linear-gradient(135deg, #25d366, #128c7e);
     border: none;
     border-radius: 50%;

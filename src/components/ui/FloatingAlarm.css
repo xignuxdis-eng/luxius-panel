@@ -2,8 +2,8 @@
 
 .floating-alarm {
     position: fixed;
-    bottom: 140px;
-    /* Above calculator */
+    bottom: 178px;
+    /* Above Xana button */
     right: 16px;
     width: 220px;
     background: var(--bg-sidebar);
@@ -16,7 +16,7 @@
 
 .minimized-alarm {
     position: fixed;
-    bottom: 140px;
+    bottom: 178px;
     right: 16px;
     min-width: 44px;
     height: 44px;

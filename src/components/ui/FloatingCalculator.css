@@ -2,7 +2,7 @@
 
 .floating-calculator {
     position: fixed;
-    bottom: 80px;
+    bottom: 70px;
     /* Above media player */
     right: 16px;
     width: 280px;
@@ -16,7 +16,7 @@
 
 .minimized-calculator {
     position: fixed;
-    bottom: 80px;
+    bottom: 70px;
     right: 16px;
     width: 44px;
     height: 44px;
