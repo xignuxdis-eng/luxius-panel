@@ -21,7 +21,7 @@ export default function XanaAssistant() {
     const [messages, setMessages] = useState<Message[]>([
         { 
             role: 'bot', 
-            text: '¡Hola! Soy **Xana AI**, tu copiloto de LuXius.\n\nPuedes hacerme preguntas sobre pedidos, cotizaciones, stock, pedirme cálculos de planchas/calcos o seleccionar una opción en **⚡ Acciones**.',
+            text: '¡Hola! 👋 Soy **Xana AI**, tu copiloto de LuXius.\n\n¿En qué te puedo ayudar hoy? Puedes hacerme consultas, pedir cálculos de planchas o usar el menú **⚡ Acciones**.',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
     ]);
