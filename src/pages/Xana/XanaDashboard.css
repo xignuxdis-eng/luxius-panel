@@ -7,9 +7,20 @@
 }
 
 .xana-header {
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
     border-bottom: 1px solid rgba(255,255,255,0.1);
     padding-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.xana-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .xana-title-wrap {
@@ -32,11 +43,150 @@
 }
 
 .xana-subtitle {
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
     color: #94a3b8;
-    font-size: 1.1rem;
+    font-size: 1rem;
+    margin-bottom: 0;
 }
 
+.xana-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.xana-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.xana-btn-primary {
+    background: linear-gradient(135deg, #9333ea, #3b82f6);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3);
+}
+
+.xana-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(147, 51, 234, 0.5);
+}
+
+.xana-btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.xana-btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.xana-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Context Banner (Fase 3) */
+.xana-context-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 1.25rem;
+    background: linear-gradient(90deg, rgba(147, 51, 234, 0.15), rgba(59, 130, 246, 0.15));
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.context-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.banner-icon {
+    color: #a855f7;
+}
+
+.context-banner-left div {
+    display: flex;
+    flex-direction: column;
+}
+
+.context-banner-left strong {
+    color: #f1f5f9;
+    font-size: 0.95rem;
+}
+
+.context-banner-left span {
+    color: #94a3b8;
+    font-size: 0.8rem;
+}
+
+.xana-link-btn {
+    background: transparent;
+    border: none;
+    color: #38bdf8;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    text-decoration: underline;
+}
+
+.xana-link-btn:hover {
+    color: #7dd3fc;
+}
+
+/* Prompt Preview */
+.xana-prompt-preview {
+    margin-top: 0.5rem;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    background: rgba(10, 15, 30, 0.85);
+}
+
+.prompt-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.xana-copy-small {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.prompt-content {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.82rem;
+    color: #cbd5e1;
+    max-height: 250px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+/* Grid & Panels */
 .xana-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -46,24 +196,20 @@
 .xana-section {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-}
-
-.xana-full-width {
-    grid-column: 1 / -1;
+    gap: 1.25rem;
 }
 
 .glass-panel {
     background: rgba(30, 41, 59, 0.4);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
     padding: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
 }
 
 .xana-section h2 {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 600;
     margin: 0;
     display: flex;
@@ -84,7 +230,7 @@
 
 .xana-card {
     background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 1.25rem;
     transition: transform 0.2s, box-shadow 0.2s;
@@ -143,18 +289,45 @@
 .decision-card .xana-topic {
     font-weight: 600;
     color: #e2e8f0;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
 }
 
 .xana-choice, .xana-rejected, .xana-reason {
     margin-top: 0.5rem;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     line-height: 1.5;
 }
 
 .xana-choice { color: #4ade80; }
 .xana-rejected { color: #f87171; }
 .xana-reason { color: #94a3b8; }
+
+/* Commits (Fase 4) */
+.commit-card {
+    border-left: 3px solid #38bdf8;
+}
+
+.xana-commit-hash {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.xana-branch-badge {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.xana-commit-msg {
+    font-weight: 500;
+    color: #f1f5f9;
+}
 
 /* Table */
 .xana-table-container {
@@ -168,20 +341,21 @@
 }
 
 .xana-table th {
-    padding: 1rem;
-    background: rgba(0,0,0,0.2);
+    padding: 0.85rem 1rem;
+    background: rgba(0,0,0,0.25);
     color: #94a3b8;
     font-weight: 500;
     text-transform: uppercase;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     letter-spacing: 1px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .xana-table td {
-    padding: 1rem;
+    padding: 0.85rem 1rem;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     color: #cbd5e1;
+    font-size: 0.9rem;
 }
 
 .xana-table tr:hover td {
@@ -199,13 +373,14 @@
     color: #60a5fa;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     margin-bottom: 0.25rem;
 }
 
 .xana-model {
     display: block;
     color: #64748b;
+    font-size: 0.75rem;
 }
 
 .xana-empty {
@@ -224,6 +399,15 @@
     font-size: 1.2rem;
     font-weight: 500;
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 @keyframes pulse {

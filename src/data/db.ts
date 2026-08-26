@@ -2047,6 +2047,25 @@ export interface XanaAction {
     created_at: string;
 }
 
+export interface XanaCommit {
+    id: number;
+    commit_hash: string;
+    task_id?: string;
+    message: string;
+    author: string;
+    branch: string;
+    repo: string;
+    created_at: string;
+}
+
+export interface XanaPromptContext {
+    prompt_markdown: string;
+    tasks_count: number;
+    decisions_count: number;
+    commits_count: number;
+    timestamp: string;
+}
+
 export async function getXanaTasks(): Promise<XanaTask[]> {
     try {
         const res = await fetch(`${API_URL}/xana/tasks`);
@@ -2073,11 +2092,36 @@ export async function getXanaDecisions(): Promise<XanaDecision[]> {
 
 export async function getXanaActions(): Promise<XanaAction[]> {
     try {
-        // Assuming there is a GET endpoint for actions, if not, we might need to add it to backend. 
-        // For dashboard purposes, let's assume we can fetch them or we just rely on tasks/sessions/decisions.
-        // Actually, backend didn't implement GET /api/xana/actions. Let's gracefully handle.
         const res = await fetch(`${API_URL}/xana/actions`);
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
 }
+
+export async function getXanaCommits(): Promise<XanaCommit[]> {
+    try {
+        const res = await fetch(`${API_URL}/xana/commits`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+export async function logXanaCommit(commit: Partial<XanaCommit>): Promise<boolean> {
+    try {
+        const res = await fetch(`${API_URL}/xana/commits`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(commit)
+        });
+        return res.ok;
+    } catch { return false; }
+}
+
+export async function getXanaPromptContext(): Promise<XanaPromptContext | null> {
+    try {
+        const res = await fetch(`${API_URL}/xana/context/prompt`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch { return null; }
+}
+

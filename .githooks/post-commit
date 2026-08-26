@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Xana Auto-Commit Sync Hook (Fase 4)
+# Envia silenciosamente el hash del commit y el mensaje a la memoria de Xana en Render
+
+COMMIT_HASH=$(git rev-parse HEAD)
+COMMIT_MSG=$(git log -1 --pretty=%B | tr '\n' ' ' | sed 's/"/\\"/g')
+COMMIT_AUTHOR=$(git log -1 --pretty=%an)
+COMMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+curl -s -X POST https://luxius-backend.onrender.com/api/xana/commits \
+     -H "Content-Type: application/json" \
+     -d "{\"commit_hash\": \"$COMMIT_HASH\", \"message\": \"$COMMIT_MSG\", \"author\": \"$COMMIT_AUTHOR\", \"branch\": \"$COMMIT_BRANCH\", \"repo\": \"luxius-panel\"}" > /dev/null 2>&1 &

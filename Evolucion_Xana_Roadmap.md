@@ -66,10 +66,10 @@
   [ Requerimiento / Prompt Usuario ]
                  │
                  ▼
-      1. Intent Detection
+       1. Intent Detection
                  │
                  ▼
- 2. PostgreSQL Context Fetcher
+ 2. PostgreSQL Context Fetcher (/api/xana/context/prompt)
    ├── Reglas del Proyecto (project_context)
    ├── Tarea Activa (tasks)
    ├── Intentos Fallidos Previos (attempt_logs)
@@ -82,6 +82,10 @@
    4. Construcción del Prompt Final -> LLM
 ```
 
+#### Entregables Técnicos:
+- [x] Endpoint `GET /api/xana/context/prompt` que consolida reglas, tareas, decisiones y lecciones.
+- [x] Visor interactivo y botón de exportación de contexto en el Dashboard (`XanaDashboard.tsx`).
+
 ---
 
 ### FASE 4: Git Synchronization & Context Engine (Xana 5.0)
@@ -90,7 +94,14 @@
 #### Integración Git:
 * **Git Hook (`post-commit`):** Asocia automáticamente el hash del commit con el `task_id` y `session_id` activos.
 * **Mapeo Integrado:** `Task <---> Session <---> Decision <---> Commit <---> Diff`.
-* **Motor Semántico Integrado:** Incorporación de embeddings / BBDD vectorial para documentación extendida y búsqueda no estructurada sobre el código fuente.
+* **Visualización en Dashboard:** Stream de commits vinculados en tiempo real.
+
+#### Entregables Técnicos:
+- [x] Modelo y tabla `XanaCommit` en PostgreSQL.
+- [x] Endpoints `/api/xana/commits` (GET/POST).
+- [x] Git Hook `.githooks/post-commit` para sincronización automática en cada commit.
+- [x] Sección de commits sincronizados en el Dashboard de Xana.
+
 
 ---
 
