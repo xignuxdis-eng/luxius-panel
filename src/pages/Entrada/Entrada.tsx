@@ -297,22 +297,27 @@ export default function Entrada() {
 
     const handleBatchDelete = async () => {
         const isTrash = viewTab === 'trash';
+        const count = selectedIds.size;
+
+        if (!confirm(`¿${isTrash ? 'Borrar definitivamente' : 'Enviar a papelera'} ${count} orden${count > 1 ? 'es' : ''}?`)) return;
+
+        const finalIds = Array.from(selectedIds).map(String);
+        setSelectedIds(new Set());
 
         try {
             setLoading(true);
-            const finalIds = Array.from(selectedIds);
 
             if (isTrash) {
-                await saveBatchOrders('delete', finalIds.map(String));
+                await saveBatchOrders('delete', finalIds);
             } else {
-                await saveBatchOrders('update', finalIds.map(String), { status: 'eliminado' });
+                await saveBatchOrders('update', finalIds, { status: 'eliminado' });
             }
 
-            setSelectedIds(new Set());
             await loadOrders();
         } catch (error) {
             console.error('Batch delete error:', error);
             alert('Hubo un error al procesar la eliminación masiva.');
+            await loadOrders();
         } finally {
             setLoading(false);
         }

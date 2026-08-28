@@ -546,19 +546,17 @@ export async function saveBatchOrders(
         } catch (e) { }
     }
 
-    try {
-        const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, ids, data, updateData: data }),
-        }, 60000);
-
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (e) {
+    // Sync with remote API in background (don't block UI)
+    fetchWithTimeout(`${API_URL}/orders/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ids, data, updateData: data }),
+    }, 60000).then(response => {
+        if (!response.ok) console.warn('[db] API saveBatchOrders respuesta no-ok:', response.status);
+    }).catch(e => {
         console.warn('[db] API saveBatchOrders falló, procesado localmente:', e);
-    }
+    });
+
     return { success: true, count: ids.length };
 }
 
