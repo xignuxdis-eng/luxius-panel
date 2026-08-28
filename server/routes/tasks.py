@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from flask import jsonify, request, g
 from models import db, Presupuesto, Vendedor, Cliente
-from middleware.auth import operator_required
+from middleware.auth import operator_required, login_required
 from routes import tasks_bp
 
 
@@ -198,6 +198,7 @@ def delete_task(presupuesto_id):
 
 
 @tasks_bp.get('/<presupuesto_id>/messages')
+@login_required
 def get_task_messages(presupuesto_id):
     from routes.orders import _find_presupuesto
     presupuesto = _find_presupuesto(presupuesto_id)
@@ -210,6 +211,7 @@ def get_task_messages(presupuesto_id):
 
 
 @tasks_bp.post('/<presupuesto_id>/messages')
+@login_required
 def add_task_message(presupuesto_id):
     from routes.orders import _find_presupuesto
     from sqlalchemy.orm.attributes import flag_modified

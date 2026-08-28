@@ -8,8 +8,9 @@ al formato que el frontend consume, y viceversa.
 
 from datetime import datetime, timezone
 from flask import jsonify, request
-from models import db, Presupuesto, Cliente
+from models import db, Presupuesto, Cliente, Vendedor
 from routes import orders_bp
+from middleware.auth import login_required
 
 # ================================================================
 # MAPEO DE ESTADOS  BD → Frontend y viceversa
@@ -300,6 +301,7 @@ def _apply_order_to_presupuesto(p, data):
 # ================================================================
 
 @orders_bp.get('')
+@login_required
 def get_orders():
     presupuestos = Presupuesto.query.filter(
         Presupuesto.deleted_at.is_(None)
@@ -313,6 +315,7 @@ def get_orders():
 # ================================================================
 
 @orders_bp.get('/<int:order_id>')
+@login_required
 def get_order(order_id):
     # Buscar por el hash-ID o iterar
     presupuestos = Presupuesto.query.filter(
@@ -332,6 +335,7 @@ def get_order(order_id):
 # ================================================================
 
 @orders_bp.post('')
+@login_required
 def create_order():
     data = request.get_json(force=True)
     if not data:
@@ -419,6 +423,7 @@ def create_order():
 # ================================================================
 
 @orders_bp.put('/<order_id>')
+@login_required
 def update_order(order_id):
     data = request.get_json(force=True)
     target = _find_presupuesto(order_id)
@@ -437,6 +442,7 @@ def update_order(order_id):
 # ================================================================
 
 @orders_bp.delete('/<order_id>')
+@login_required
 def delete_order(order_id):
     target = _find_presupuesto(order_id)
 
@@ -453,6 +459,7 @@ def delete_order(order_id):
 # ================================================================
 
 @orders_bp.post('/batch')
+@login_required
 def batch_orders():
     data = request.get_json(force=True)
     action = data.get('action')
@@ -485,6 +492,7 @@ def batch_orders():
 
 
 @orders_bp.get('/<order_id>/messages')
+@login_required
 def get_order_messages(order_id):
     target = _find_presupuesto(order_id)
     if not target:
@@ -494,6 +502,7 @@ def get_order_messages(order_id):
 
 
 @orders_bp.post('/<order_id>/messages')
+@login_required
 def add_order_message(order_id):
     from sqlalchemy.orm.attributes import flag_modified
     target = _find_presupuesto(order_id)

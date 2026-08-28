@@ -13,18 +13,54 @@ from routes.operators import operators_bp
 from routes.tasks import tasks_bp
 from routes.orders import orders_bp
 from routes.xana import xana_bp
-import io, json, os
+import io, json, os, sys
+from urllib.parse import urlparse
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
+from middleware.auth import login_required, admin_required
 
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config.from_object(Config)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB limit
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB limit
+
+# CORS — Restrict to known origins (dev + production)
+ALLOWED_ORIGINS = [
+    # Development
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:3000',
+    # Production (Render)
+    'https://luxius-backend.onrender.com',
+    'https://luxius.onrender.com',
+]
+# Allow adding extra origins via env var (comma-separated)
+extra_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if extra_origins:
+    ALLOWED_ORIGINS.extend([o.strip() for o in extra_origins.split(',') if o.strip()])
+
+CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS}}, supports_credentials=True)
 db.init_app(app)
+
+# ================================================================
+# RATE LIMITING — Prevención de fuerza bruta
+# ================================================================
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per minute"],        # Límite global: 200 req/min por IP
+    storage_uri="memory://",                   # In-memory (para producción usar Redis)
+)
+# Make limiter available to blueprints
+app.limiter = limiter
 app.register_blueprint(sync_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(operators_bp)
@@ -32,18 +68,32 @@ app.register_blueprint(tasks_bp)
 app.register_blueprint(orders_bp)
 app.register_blueprint(xana_bp)
 
-# Global error handler for debugging
+# Rate limits are configured directly on routes or via limiter default limits
+
+# ================================================================
+# SECURITY HEADERS
+# ================================================================
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    return response
+
+# Global error handler — log details server-side, return generic message to client
 @app.errorhandler(500)
 def handle_500(e):
-    import traceback, sys
+    import traceback
     traceback.print_exc(file=sys.stderr)
-    return jsonify({'error': 'Internal Server Error', 'details': str(e)}), 500
+    return jsonify({'error': 'Error interno del servidor'}), 500
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    import traceback, sys
+    import traceback
     traceback.print_exc(file=sys.stderr)
-    return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Error interno del servidor'}), 500
 
 # Diagnostic endpoint
 @app.get('/api/health')
@@ -60,19 +110,33 @@ def health_check():
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
+    # Prevent directory traversal
+    if '..' in filename or filename.startswith('/'):
+        return jsonify({'error': 'Nombre de archivo inválido'}), 400
     return send_from_directory(UPLOADS_DIR, filename)
 
+# SSRF-safe download domains whitelist
+DOWNLOAD_ALLOWED_DOMAINS = {
+    '62e10a84196d5f6cfb46c97af6e5931d.r2.cloudflarestorage.com',
+    'pub-luxius-media.r2.dev',
+    'r2.cloudflarestorage.com',
+}
+
 @app.route('/api/download', methods=['GET'])
+@login_required
 def proxy_download():
     file_url = request.args.get('url')
     custom_filename = request.args.get('filename', 'archivo_descargado')
     if not file_url:
         return jsonify({'error': 'Missing url parameter'}), 400
 
-    safe_name = custom_filename.replace('"', '').replace('\n', '').replace('\r', '')
+    safe_name = secure_filename(custom_filename) or 'archivo_descargado'
 
+    # Allow local uploads
     if file_url.startswith('/uploads/') or file_url.startswith('uploads/'):
         clean_name = file_url.replace('/uploads/', '').replace('uploads/', '')
+        if '..' in clean_name:
+            return jsonify({'error': 'Nombre de archivo inválido'}), 400
         return send_from_directory(
             UPLOADS_DIR,
             clean_name,
@@ -80,12 +144,22 @@ def proxy_download():
             download_name=safe_name
         )
 
-    import requests
+    # Validate remote URL against whitelist to prevent SSRF
+    try:
+        parsed = urlparse(file_url)
+        if parsed.scheme not in ('http', 'https'):
+            return jsonify({'error': 'Protocolo no permitido'}), 403
+        if parsed.hostname not in DOWNLOAD_ALLOWED_DOMAINS:
+            return jsonify({'error': 'Dominio no permitido para descarga'}), 403
+    except Exception:
+        return jsonify({'error': 'URL inválida'}), 400
+
+    import requests as http_requests
     from flask import Response
     try:
-        resp = requests.get(file_url, stream=True, timeout=30)
+        resp = http_requests.get(file_url, stream=True, timeout=30)
         if resp.status_code != 200:
-            return jsonify({'error': f'Failed to fetch remote file: HTTP {resp.status_code}'}), 400
+            return jsonify({'error': f'Error al descargar archivo remoto: HTTP {resp.status_code}'}), 400
 
         def generate():
             for chunk in resp.iter_content(chunk_size=65536):
@@ -95,13 +169,19 @@ def proxy_download():
         headers = {
             'Content-Disposition': f'attachment; filename="{safe_name}"',
             'Content-Type': content_type,
-            'Access-Control-Allow-Origin': '*'
         }
         return Response(generate(), headers=headers)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        return jsonify({'error': 'Error al descargar el archivo'}), 500
+
+# Upload file extension whitelist
+ALLOWED_UPLOAD_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
+                              '.pdf', '.svg', '.cdr', '.ai', '.eps', '.psd',
+                              '.webm', '.mp4', '.mp3', '.wav',
+                              '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt', '.json'}
 
 @app.route('/api/upload', methods=['POST'])
+@login_required
 def upload_file_endpoint():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -110,9 +190,15 @@ def upload_file_endpoint():
         return jsonify({'error': 'No selected file'}), 400
 
     original_name = file.filename
-    ext = os.path.splitext(original_name)[1]
-    unique_filename = f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{secure_filename(original_name)}"
-    if ext and not unique_filename.lower().endswith(ext.lower()):
+    ext = os.path.splitext(original_name)[1].lower()
+
+    # Validate file extension
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        return jsonify({'error': f'Tipo de archivo no permitido: {ext}. Extensiones válidas: {sorted(ALLOWED_UPLOAD_EXTENSIONS)}'}), 400
+
+    safe_original = secure_filename(original_name)
+    unique_filename = f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{safe_original}"
+    if ext and not unique_filename.lower().endswith(ext):
         unique_filename += ext
 
     file_path = os.path.join(UPLOADS_DIR, unique_filename)
@@ -157,7 +243,7 @@ with app.app_context():
             if not u:
                 u = Usuario.query.get(u_data['id'])
             if not u:
-                u = Usuario(**u_data, password_hash=generate_password_hash(pwd), habilitado=True, extra={'password': pwd})
+                u = Usuario(**u_data, password_hash=generate_password_hash(pwd), habilitado=True, extra={})
                 db.session.add(u)
                 db.session.commit()
             
@@ -223,9 +309,7 @@ def _apply_usuario_fields(user, item):
     password = item.get('password')
     if password:
         user.password_hash = generate_password_hash(password)
-        extra = user.extra or {}
-        extra['password'] = password
-        user.extra = extra
+        # SECURITY: Never store plaintext passwords
 
 
 # ================================================================
@@ -283,6 +367,7 @@ def _save_json_collection(name, data):
 
 
 @app.get('/api/<collection>')
+@login_required
 def get_collection(collection: str):
     if collection not in ALLOWED:
         return jsonify({'error': 'Invalid collection'}), 403
@@ -313,7 +398,7 @@ def get_collection(collection: str):
         }
         raw = [u.to_dict() for u in Usuario.query.order_by(Usuario.id).all()]
         for u_obj, u_dict in zip(Usuario.query.order_by(Usuario.id).all(), raw):
-            u_dict['password'] = (u_obj.extra or {}).get('password', 'xignux2026')
+            # SECURITY: Never expose passwords to the client
             u_dict['rol'] = u_obj.rol
             u_dict['role'] = ROLE_MAP.get(u_obj.rol, 'vendedor')
         items = raw
@@ -333,6 +418,7 @@ def get_collection(collection: str):
 # ================================================================
 
 @app.post('/api/clientes')
+@login_required
 def post_clientes():
     item = request.get_json(force=True)
     if not item:
@@ -357,6 +443,7 @@ def post_clientes():
 # ================================================================
 
 @app.put('/api/clientes/<int:id>')
+@login_required
 def put_clientes(id: int):
     item = request.get_json(force=True)
     cliente = Cliente.query.get(id)
@@ -373,6 +460,7 @@ def put_clientes(id: int):
 # ================================================================
 
 @app.delete('/api/clientes/<int:id>')
+@login_required
 def delete_clientes(id: int):
     cliente = Cliente.query.get(id)
     if not cliente:
@@ -410,6 +498,7 @@ def _apply_maquina_fields(maquina, item):
 # ================================================================
 
 @app.post('/api/maquinas')
+@login_required
 def post_maquinas():
     item = request.get_json(force=True)
     if not item:
@@ -437,6 +526,7 @@ def post_maquinas():
 # ================================================================
 
 @app.put('/api/maquinas/<int:id>')
+@login_required
 def put_maquinas(id: int):
     item = request.get_json(force=True)
     maquina = Maquina.query.get(id)
@@ -452,6 +542,7 @@ def put_maquinas(id: int):
 # ================================================================
 
 @app.delete('/api/maquinas/<int:id>')
+@login_required
 def delete_maquinas(id: int):
     maquina = Maquina.query.get(id)
     if not maquina:
@@ -465,6 +556,7 @@ def delete_maquinas(id: int):
 # ================================================================
 
 @app.post('/api/usuarios')
+@login_required
 def post_usuarios():
     item = request.get_json(force=True)
     if not item:
@@ -506,6 +598,7 @@ def post_usuarios():
 
 
 @app.put('/api/usuarios/<int:id>')
+@login_required
 def put_usuarios(id: int):
     item = request.get_json(force=True)
     user = Usuario.query.get(id)
@@ -527,6 +620,7 @@ def put_usuarios(id: int):
 
 
 @app.delete('/api/usuarios/<int:id>')
+@admin_required
 def delete_usuarios(id: int):
     user = Usuario.query.get(id)
     if not user:
@@ -540,6 +634,7 @@ def delete_usuarios(id: int):
 # ================================================================
 
 @app.post('/api/<collection>')
+@login_required
 def post_json_collection(collection: str):
     """Upsert a single item in a JSON collection (used by frontend syncSave)."""
     if collection not in JSON_COLLECTIONS:
@@ -569,6 +664,7 @@ def post_json_collection(collection: str):
 
 
 @app.delete('/api/<collection>/<int:item_id>')
+@login_required
 def delete_json_collection_item(collection: str, item_id: int):
     """Delete an item from a JSON collection by ID."""
     if collection not in JSON_COLLECTIONS:
@@ -589,6 +685,7 @@ VALID_KEYS = [
 ]
 
 @app.post('/api/migration/receive')
+@admin_required
 def migration_receive():
     data = request.get_json(force=True)
     print('Receiving migration data...')
@@ -621,6 +718,7 @@ def migration_receive():
 # ================================================================
 
 @app.get('/api/db/backup')
+@admin_required
 def db_backup():
     backup = {
         'clientes': [c.to_dict() for c in Cliente.query.order_by(Cliente.id).all()],
@@ -639,6 +737,7 @@ def db_backup():
 # ================================================================
 
 @app.post('/api/db/normalize-case')
+@admin_required
 def db_normalize_case():
     for c in Cliente.query.all():
         if c.nombre:       c.nombre      = c.nombre.upper()
@@ -658,6 +757,7 @@ def db_normalize_case():
 # ================================================================
 
 @app.post('/api/db/reset-balances')
+@admin_required
 def db_reset_balances():
     for c in Cliente.query.all():
         c.saldo       = 0.0
@@ -769,6 +869,7 @@ def get_tarifas():
 
 
 @app.put('/api/tarifas')
+@admin_required
 def put_tarifas():
     data = request.get_json(force=True)
     if not data:

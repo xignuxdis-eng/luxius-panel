@@ -177,7 +177,7 @@ class ApiService {
 
   constructor() {
     // Recuperar token del localStorage
-    this.token = localStorage.getItem('token');
+    this.token = localStorage.getItem('luxius_auth_token');
   }
 
   private getHeaders(): HeadersInit {
@@ -194,7 +194,7 @@ class ApiService {
   }
 
   private getToken(): string | null {
-    return localStorage.getItem('token');
+    return localStorage.getItem('luxius_auth_token');
   }
 
   private async request<T>(
@@ -233,7 +233,7 @@ class ApiService {
     });
 
     this.token = response.token;
-    localStorage.setItem('token', response.token);
+    localStorage.setItem('luxius_auth_token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
 
     return response;
@@ -256,7 +256,7 @@ class ApiService {
     });
 
     this.token = response.token;
-    localStorage.setItem('token', response.token);
+    localStorage.setItem('luxius_auth_token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
 
     return response;
@@ -271,7 +271,7 @@ class ApiService {
 
   logout(): void {
     this.token = null;
-    localStorage.removeItem('token');
+    localStorage.removeItem('luxius_auth_token');
     localStorage.removeItem('user');
   }
 

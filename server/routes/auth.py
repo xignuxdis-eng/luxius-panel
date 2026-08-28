@@ -1,30 +1,22 @@
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario
 from middleware.auth import generate_token
 from routes import auth_bp
 
-DEV_MODE = True
-
 
 def _verify_user_password(user, password):
+    """Verify password using ONLY secure hash comparison."""
     if not user:
         return False
 
-    expected_pwd = (user.extra or {}).get('password')
-    if expected_pwd and expected_pwd == password:
-        return True
+    if not user.password_hash:
+        return False
 
-    if user.password_hash:
-        if user.password_hash == password:
-            return True
-        try:
-            if check_password_hash(user.password_hash, password):
-                return True
-        except Exception:
-            pass
-
-    return False
+    try:
+        return check_password_hash(user.password_hash, password)
+    except Exception:
+        return False
 
 
 @auth_bp.post('/login')

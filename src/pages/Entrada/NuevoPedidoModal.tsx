@@ -1007,7 +1007,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 fileName: file.name,
                                 previewUrl: '',
                                 metadata: { width: 0, height: 0, dpi: 72, format: '', colorMode: '' },
-                                confirmed: false,
+                                confirmed: true,
                                 copias: 1,
                                 material: watchedMaterial || ''
                             };
@@ -1019,7 +1019,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 setBatchItems(prev => prev.map(it => it.id === placeholder.id ? {
                                     ...it,
                                     previewUrl: meta.thumbnailUrl || url,
-                                    metadata: meta
+                                    metadata: meta,
+                                    confirmed: true
                                 } : it));
                             });
                         } catch (e) {
@@ -1319,12 +1320,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
 
     const isBatchValid = () => {
-        const confirmedItems = batchItems.filter(i => i.confirmed);
-        if (confirmedItems.length === 0) return true;
+        const confirmedItems = batchItems.filter(i => i.confirmed !== false);
+        if (confirmedItems.length === 0) return false;
         // Check for basic data AND valid dimensions
         return confirmedItems.every(i =>
             i.copias > 0 &&
-            i.material !== '' &&
+            Boolean(i.material) &&
             i.metadata.width > 0 &&
             i.metadata.height > 0
         );
@@ -1365,9 +1366,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
         try {
             if (activeTab === 'lote') {
-                const confirmedItems = batchItems.filter(i => i.confirmed)
+                const confirmedItems = batchItems.filter(i => i.confirmed !== false)
                 if (confirmedItems.length === 0) {
-                    alert('No hay archivos confirmados para guardar')
+                    alert('No hay archivos seleccionados para guardar')
                     return
                 }
 
@@ -2146,13 +2147,25 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             <div style={{
                                                 marginTop: '14px',
                                                 display: 'flex',
-                                                justifyContent: 'flex-end',
+                                                justifyContent: 'space-between',
                                                 alignItems: 'center',
                                                 background: 'var(--bg-card)',
                                                 padding: '10px 14px',
                                                 borderRadius: 'var(--radius-md)',
                                                 border: '1px solid var(--border)'
                                             }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                                        checked={batchItems.length > 0 && batchItems.every(i => i.confirmed !== false)}
+                                                        onChange={(e) => {
+                                                            const checkAll = e.target.checked;
+                                                            setBatchItems(prev => prev.map(i => ({ ...i, confirmed: checkAll })));
+                                                        }}
+                                                    />
+                                                    Seleccionar todos ({batchItems.filter(i => i.confirmed !== false).length} de {batchItems.length})
+                                                </label>
                                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                                                     📦 {batchItems.length} ítem(s) en lote
                                                 </span>
@@ -2168,14 +2181,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 paddingRight: '8px'
                                             }}>
                                             {batchItems.map((item) => (
-                                                <div key={item.id} className={`batch-item ${item.confirmed ? 'confirmed' : ''}`} style={{
+                                                <div key={item.id} className={`batch-item ${item.confirmed !== false ? 'confirmed' : ''}`} style={{
                                                     display: 'flex',
                                                     flexDirection: 'column',
                                                     gap: '8px',
                                                     background: 'var(--bg-sidebar)',
                                                     padding: '10px',
                                                     borderRadius: 'var(--radius-md)',
-                                                    border: item.confirmed ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                                    border: item.confirmed !== false ? '1px solid var(--accent)' : '1px solid var(--border)',
                                                     outline: (saving && !item.material) ? '2px solid #ef4444' : 'none', // Highlight missing data
                                                     position: 'relative',
                                                     minWidth: 0,
@@ -2201,8 +2214,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                             <input
                                                                 type="checkbox"
                                                                 style={{ position: 'absolute', bottom: '2px', left: '2px', width: '16px', height: '16px', zIndex: 10, cursor: 'pointer' }}
-                                                                checked={item.confirmed}
-                                                                onChange={() => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, confirmed: !i.confirmed } : i))}
+                                                                checked={item.confirmed !== false}
+                                                                onChange={() => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, confirmed: i.confirmed === false ? true : false } : i))}
                                                             />
                                                         </div>
                                                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -2442,9 +2455,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             variant="primary"
                             type="submit"
                             size="sm"
-                            disabled={saving || (activeTab === 'lote' && (batchItems.length === 0 || !batchItems.some(i => i.confirmed) || !isBatchValid()))}
+                            disabled={saving || (activeTab === 'lote' && (batchItems.length === 0 || !batchItems.some(i => i.confirmed !== false) || !isBatchValid()))}
                         >
-                            {saving ? 'Procesando...' : (order ? 'Guardar Cambios' : activeTab === 'lote' ? `Cargar ${batchItems.filter(i => i.confirmed).length} items al pedido` : 'Cargar Pedido')}
+                            {saving ? 'Procesando...' : (order ? 'Guardar Cambios' : activeTab === 'lote' ? `Cargar ${batchItems.filter(i => i.confirmed !== false).length} items al pedido` : 'Cargar Pedido')}
                         </Button>
                     </div>
                 </form>

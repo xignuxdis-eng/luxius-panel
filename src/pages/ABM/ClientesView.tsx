@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { getClientes, deleteCliente } from '@data/db'
+import { useState, useEffect } from 'react'
+import { getClientes, deleteCliente, refreshCollection } from '@data/db'
 import Button from '@components/ui/Button'
 import NuevoClienteModal from './NuevoClienteModal'
 import ClienteReporteModal from './ClienteReporteModal'
@@ -13,7 +13,13 @@ export default function ClientesView() {
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
 
     // Load clients
-    const [clientes, setClientes] = useState(getClientes())
+    const [clientes, setClientes] = useState<Cliente[]>(getClientes())
+
+    useEffect(() => {
+        refreshCollection('clientes').then(() => {
+            setClientes(getClientes())
+        })
+    }, [])
 
     const filteredClientes = clientes.filter(c =>
         c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -22,7 +28,9 @@ export default function ClientesView() {
     )
 
     const handleRefresh = () => {
-        setClientes(getClientes())
+        refreshCollection('clientes').then(() => {
+            setClientes(getClientes())
+        })
     }
 
     const handleEdit = (cliente: Cliente) => {

@@ -7,10 +7,11 @@ LUXIUS FIELD — Endpoints de Sincronizacion
 """
 
 from datetime import datetime, timezone, date as date_type
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from sqlalchemy import and_
 
 from models import db, Presupuesto, SyncLog, Vendedor
+from middleware.auth import login_required, admin_required, ADMIN_ROLES
 
 sync_bp = Blueprint('sync', __name__, url_prefix='/api/sync')
 
@@ -20,6 +21,7 @@ sync_bp = Blueprint('sync', __name__, url_prefix='/api/sync')
 # ================================================================
 
 @sync_bp.post('/push')
+@login_required
 def push():
     data = request.get_json(force=True)
     cambios = data.get('cambios', [])
@@ -72,6 +74,7 @@ def push():
 # ================================================================
 
 @sync_bp.get('/pull')
+@login_required
 def pull():
     since_str = request.args.get('since')
     vendedor_id = request.args.get('vendedor_id', type=int)
@@ -141,11 +144,8 @@ def sugerir_sena():
 # ================================================================
 
 @sync_bp.post('/desbloquear/<presupuesto_id>')
+@admin_required
 def desbloquear(presupuesto_id):
-    data = request.get_json(force=True) or {}
-    if not data.get('es_admin'):
-        return jsonify({'error': 'Solo administradores pueden desbloquear'}), 403
-
     p = Presupuesto.query.get(presupuesto_id)
     if not p:
         return jsonify({'error': 'Presupuesto no encontrado'}), 404

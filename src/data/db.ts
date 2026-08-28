@@ -9,10 +9,11 @@
 
 // Types
 import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica } from '@/types'
-import { INITIAL_CLIENTES } from './initialClientes'
 
-// API Configuration
-export const API_URL = 'https://luxius-backend.onrender.com/api';
+// API Configuration: dynamic between local server and Render cloud
+export const API_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000/api'
+    : 'https://luxius-backend.onrender.com/api';
 
 export function resolveMediaUrl(fileStr: string): string {
     if (!fileStr) return ''
@@ -82,15 +83,13 @@ export const SESSION_LOGS_KEY = 'luxius_session_logs'
 
 
 // --- SYNC HELPERS ---
-function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record<string, string> {
+export function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record<string, string> {
     const headers = { ...baseHeaders };
     try {
-        const stored = localStorage.getItem('luxius_auth');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (parsed?.state?.token) {
-                headers['Authorization'] = `Bearer ${parsed.state.token}`;
-            }
+        // Primary: JWT token stored at login
+        const token = localStorage.getItem('luxius_auth_token');
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
         }
     } catch (_) { }
     return headers;
@@ -259,15 +258,23 @@ export async function getOrdenes(): Promise<Order[]> {
                     return apiOrder;
                 });
 
-                // Add local-only orders (not in API, e.g. recently created)
-                const uniqueLocal = localOrders.filter(o => !apiIds.has(normalizeId(o.id || o.ot)));
-                
-                // Auto-sync offline/local orders to the cloud backend
-                if (uniqueLocal.length > 0) {
-                    let updatedLocally = false;
-                    console.log(`[db] Found ${uniqueLocal.length} unsynced local orders. Uploading to backend...`);
-                    
-                    Promise.allSettled(uniqueLocal.map(async (order) => {
+                // Local-only orders: keep locally soft-deleted ones (for trash view)
+                // and VERY recently created ones (offline grace period).
+                // Old local ghosts that don't exist in API are discarded.
+                const TWO_MINUTES = 2 * 60 * 1000;
+                const now = Date.now();
+                const recentLocal = localOrders.filter(o => {
+                    if (apiIds.has(normalizeId(o.id || o.ot))) return false; // already in API
+                    // Always keep locally soft-deleted orders so they appear in the trash
+                    if (o.status === 'eliminado') return true;
+                    // Only keep if created very recently (offline grace period)
+                    const createdAt = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                    return (now - createdAt) < TWO_MINUTES;
+                });
+
+                if (recentLocal.length > 0) {
+                    console.log(`[db] ${recentLocal.length} orden(es) local(es) recientes (offline). Sincronizando...`);
+                    Promise.allSettled(recentLocal.map(async (order) => {
                         const localId = order.id || order.ot;
                         const method = order.id ? 'PUT' : 'POST';
                         const url = order.id ? `${API_URL}/orders/${order.id}` : `${API_URL}/orders`;
@@ -280,7 +287,6 @@ export async function getOrdenes(): Promise<Order[]> {
                             
                             if (res.ok) {
                                 const savedOrder = await res.json();
-                                // If backend assigned a new ID, update our local store so it doesn't duplicate!
                                 if (savedOrder.id && String(savedOrder.id) !== String(localId)) {
                                     const localJson = localStorage.getItem('luxius_session_ordenes') || '[]';
                                     let parsedLocal = JSON.parse(localJson);
@@ -295,9 +301,14 @@ export async function getOrdenes(): Promise<Order[]> {
                             console.warn('[db] Auto-sync failed for order:', localId);
                         }
                     }));
+                } else if (localOrders.length > apiIds.size) {
+                    const discarded = localOrders.filter(o => !apiIds.has(normalizeId(o.id || o.ot))).length;
+                    if (discarded > 0) {
+                        console.log(`[db] Descartando ${discarded} orden(es) fantasma local(es) que no existen en el servidor.`);
+                    }
                 }
 
-                const merged = [...mergedApi, ...uniqueLocal];
+                const merged = [...mergedApi, ...recentLocal];
                 localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
                 return merged;
             }
@@ -503,6 +514,7 @@ export async function saveBatchOrders(
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
 
+
     } else if (action === 'restore') {
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
@@ -515,6 +527,22 @@ export async function saveBatchOrders(
             });
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+        } catch (e) { }
+
+        // Remove from tombstone so restored orders become visible again
+        try {
+            const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
+            let hidden: string[] = JSON.parse(hiddenJson);
+            const before = hidden.length;
+            hidden = hidden.filter(h => {
+                return !ids.some(id => {
+                    const cleanId = String(id).trim().toLowerCase().replace(/^ot-/i, '');
+                    return h === cleanId;
+                });
+            });
+            if (hidden.length !== before) {
+                localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hidden));
+            }
         } catch (e) { }
     }
 
@@ -645,7 +673,6 @@ export async function getOrdenesPendientes(): Promise<Order[]> {
     return orders.filter(o => pendingStatuses.includes(o.status));
 }
 
-
 // ============================================================
 // Clientes (Sync/LocalStorage)
 // ============================================================
@@ -662,14 +689,15 @@ export function getClientes(): Cliente[] {
     if (sessionItemsJson) {
         try {
             const list = JSON.parse(sessionItemsJson) as Cliente[];
-            if (Array.isArray(list) && list.length > 0) {
+            if (Array.isArray(list)) {
                 return list;
             }
         } catch (e) { }
     }
 
-    localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(INITIAL_CLIENTES));
-    return INITIAL_CLIENTES;
+    // Trigger async server fetch in background if empty
+    refreshCollection('clientes');
+    return [];
 }
 
 export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {

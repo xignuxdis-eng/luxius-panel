@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Modal from '@components/ui/Modal'
 import { UniversalFilePreview } from '@components/UniversalFilePreview'
-import { API_URL, getServicios, resolveMediaUrl } from '@data/db'
+import { API_URL, getServicios, resolveMediaUrl, getAuthHeaders } from '@data/db'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
 import './FileViewerModal.css'
@@ -157,12 +157,15 @@ export default function SharedFileViewerModal({
                 url.includes('.r2.dev') ||
                 (url.includes('X-Amz-Signature') && url.includes('X-Amz-Credential'))
 
+            const token = localStorage.getItem('luxius_auth_token') || ''
+            const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
+
             if (isExternalStorage) {
                 // For R2/S3 presigned URLs, use server proxy (direct fetch fails due to CORS)
                 console.log('[Download] R2/S3 URL detected, using server proxy...')
-                const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+                const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}${tokenParam}`
                 try {
-                    const proxyResp = await fetch(proxyUrl)
+                    const proxyResp = await fetch(proxyUrl, { headers: getAuthHeaders() })
                     if (proxyResp.ok) {
                         const blob = await proxyResp.blob()
                         const blobUrl = URL.createObjectURL(blob)
@@ -193,7 +196,7 @@ export default function SharedFileViewerModal({
             }
 
             // For local/simple URLs, try direct fetch first
-            const response = await fetch(url, { method: 'GET', headers: {} })
+            const response = await fetch(url, { method: 'GET', headers: getAuthHeaders() })
             if (response.ok) {
                 const blob = await response.blob()
                 const blobUrl = URL.createObjectURL(blob)
@@ -219,7 +222,9 @@ export default function SharedFileViewerModal({
                 return
             }
             // Proxy endpoint as ultimate fallback
-            const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+            const token = localStorage.getItem('luxius_auth_token') || ''
+            const tokenParam = token ? `&token=${encodeURIComponent(token)}` : ''
+            const proxyUrl = `${API_URL}/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}${tokenParam}`
             window.open(proxyUrl, '_blank')
         } finally {
             setDownloading(null)
