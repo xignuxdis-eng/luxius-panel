@@ -4,12 +4,18 @@ import jwt
 import os
 import secrets
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
+
+# Ensure .env is loaded
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv()
 
 # ================================================================
 # SECURITY CONFIGURATION
 # ================================================================
 
-SECRET_KEY = os.environ.get('JWT_SECRET_KEY', os.environ.get('JWT_SECRET', ''))
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY', os.environ.get('JWT_SECRET', 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519'))
 
 # Auto-generate a strong secret if none is configured (log a warning)
 if not SECRET_KEY or SECRET_KEY == 'luxius-secret-key-change-in-production':
