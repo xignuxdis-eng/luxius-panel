@@ -1020,9 +1020,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 if (targetTab === 'unitario' || targetTab === 'promos') {
                     setCloudImportStatus('Descargando archivo (1/1)...');
                     const fileInfo = data.files[0];
-                    const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`, {
-                        headers: getAuthHeaders()
-                    });
+                    const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${baseUrl}${fileInfo.tempUrl}`;
+                    const blobRes = await fetch(fileUrl);
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
                     const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
@@ -1032,9 +1031,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         const fileInfo = data.files[i];
                         setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
                         try {
-                            const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`, {
-                                headers: getAuthHeaders()
-                            });
+                            const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${baseUrl}${fileInfo.tempUrl}`;
+                            const blobRes = await fetch(fileUrl);
                             if (!blobRes.ok) continue;
                             const blob = await blobRes.blob();
                             const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });

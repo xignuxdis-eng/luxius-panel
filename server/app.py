@@ -39,7 +39,8 @@ ALLOWED_ORIGINS = [
     'http://127.0.0.1:5174',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3005',
-    # Production (Render)
+    # Production (GitHub Pages & Render)
+    'https://xignuxdis-eng.github.io',
     'https://luxius-backend.onrender.com',
     'https://luxius.onrender.com',
 ]
@@ -48,7 +49,10 @@ extra_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if extra_origins:
     ALLOWED_ORIGINS.extend([o.strip() for o in extra_origins.split(',') if o.strip()])
 
-CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS}}, supports_credentials=True)
+CORS(app, resources={
+    r"/api/*": {"origins": "*"},
+    r"/uploads/*": {"origins": "*"}
+}, supports_credentials=True)
 db.init_app(app)
 
 # ================================================================
@@ -90,31 +94,34 @@ def add_security_headers(response):
 # Global error handler — log details server-side, return generic message to client
 @app.errorhandler(500)
 def handle_500(e):
-    import traceback
-    traceback.print_exc(file=sys.stderr)
+    app.logger.error(f'Unhandled 500 error: {e}', exc_info=True)
     return jsonify({'error': 'Error interno del servidor'}), 500
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    import traceback
-    traceback.print_exc(file=sys.stderr)
-    return jsonify({'error': 'Error interno del servidor'}), 500
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({'error': 'Recurso no encontrado'}), 404
 
-# Diagnostic endpoint
-@app.get('/api/health')
-def health_check():
+# Basic health check endpoint
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'timestamp': datetime.now(timezone.utc).isoformat()})
+
+# DB health check — verifies connection to PostgreSQL
+@app.route('/health/db', methods=['GET'])
+def health_db():
     try:
         from sqlalchemy import text
-        result = db.session.execute(text("SELECT 1"))
-        result.close()
+        db.session.execute(text("SELECT 1"))
         tables = db.session.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public'")).fetchall()
         table_names = [t[0] for t in tables]
         return jsonify({'status': 'ok', 'tables': table_names, 'version': 'unified-v2.0'})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
-@app.route('/uploads/<path:filename>')
+@app.route('/uploads/<path:filename>', methods=['GET', 'OPTIONS'])
 def serve_upload(filename):
+    if request.method == 'OPTIONS':
+        return '', 200
     # Prevent directory traversal
     if '..' in filename or filename.startswith('/'):
         return jsonify({'error': 'Nombre de archivo inválido'}), 400
