@@ -15,6 +15,18 @@ export default function ClientesView() {
     // Load clients
     const [clientes, setClientes] = useState<Cliente[]>(getClientes())
 
+    const filteredClientes = clientes.filter(c => {
+        if (!searchTerm.trim()) return true
+        const q = searchTerm.toLowerCase()
+        return (
+            (c.nombre || '').toLowerCase().includes(q) ||
+            (c.empresa || '').toLowerCase().includes(q) ||
+            (c.cuit || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q) ||
+            (c.telefono || '').toLowerCase().includes(q)
+        )
+    })
+
     const handleRefresh = (forceRemote = false) => {
         setClientes(getClientes())
         if (forceRemote) {
