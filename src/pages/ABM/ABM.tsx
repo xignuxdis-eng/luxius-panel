@@ -30,7 +30,6 @@ export default function ABM() {
                 <NavLink to="/abm/materiales" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Materiales</NavLink>
                 <NavLink to="/abm/calidades" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Calidades</NavLink>
                 <NavLink to="/abm/productos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Productos y Combos</NavLink>
-                <NavLink to="/abm/combos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Combos</NavLink>
                 <NavLink to="/abm/monedas" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Monedas</NavLink>
                 <NavLink to="/abm/cajas" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Cajas</NavLink>
                 <NavLink to="/abm/bancos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Bancos</NavLink>
@@ -48,7 +47,7 @@ export default function ABM() {
                     <Route path="calidades" element={<CalidadesView />} />
                     <Route path="logistica" element={<LogisticsView />} />
                     <Route path="productos" element={<CombosView />} />
-                    <Route path="combos" element={<CombosView />} />
+                    <Route path="combos" element={<Navigate to="/abm/productos" replace />} />
                     <Route path="monedas" element={<div className="p-20">Gestión de monedas próximamente...</div>} />
                     <Route path="cajas" element={<div className="p-20">Gestión de cajas próximamente...</div>} />
                     <Route path="bancos" element={<div className="p-20">Gestión de bancos próximamente...</div>} />
