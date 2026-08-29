@@ -6,7 +6,7 @@ El frontend React de Luxius espera objetos con la interfaz `Order`
 al formato que el frontend consume, y viceversa.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import jsonify, request
 from models import db, Presupuesto, Cliente, Vendedor
 from routes import orders_bp

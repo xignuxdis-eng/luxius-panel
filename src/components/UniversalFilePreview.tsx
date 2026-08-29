@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../data/db';
+import { API_URL, resolveMediaUrl } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../utils/vectorPreview';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -146,18 +146,50 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
             }
         } else if (fileUrl) {
             // Backend URL mode
-            let cleanUrl = fileUrl;
-            if (cleanUrl.startsWith(API_URL)) {
-                cleanUrl = cleanUrl.replace(API_URL, '');
+            const resolvedUrl = resolveMediaUrl(fileUrl);
+            const fileExt = getExtension(fileName || fileUrl);
+
+            if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(fileExt)) {
+                setImgSrc(resolvedUrl);
+            } else if (fileExt === 'pdf' || fileExt === 'ai') {
+                let isMounted = true;
+                (async () => {
+                    try {
+                        const response = await fetch(resolvedUrl);
+                        if (!response.ok) throw new Error(`Fetch failed HTTP ${response.status}`);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        if (pdf.numPages > 0) {
+                            const page = await pdf.getPage(1);
+                            const unscaled = page.getViewport({ scale: 1.0 });
+                            const targetMax = 1200;
+                            const scale = Math.max(1.5, Math.min(3.0, targetMax / Math.max(unscaled.width, unscaled.height)));
+                            const viewport = page.getViewport({ scale });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillRect(0, 0, viewport.width, viewport.height);
+                                await page.render({ canvasContext: ctx, viewport }).promise;
+                                if (isMounted) {
+                                    setImgSrc(canvas.toDataURL('image/webp', 0.92));
+                                    return;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[PDF Preview] Remote PDF fetch/render with PDF.js failed, using card fallback:', e);
+                    }
+                    if (isMounted) {
+                        setImgSrc(generateVectorCard(fileExt.toUpperCase(), displayName, dimensions, dpi));
+                    }
+                })();
+                return () => { isMounted = false; };
+            } else {
+                setImgSrc(generateVectorCard(fileExt.toUpperCase(), displayName, dimensions, dpi));
             }
-            if (cleanUrl.startsWith('/uploads/')) {
-                cleanUrl = cleanUrl.replace('/uploads/', '');
-            } else if (cleanUrl.startsWith('uploads/')) {
-                cleanUrl = cleanUrl.replace('uploads/', '');
-            }
-            
-            // Construct preview endpoint URL
-            setImgSrc(`${API_URL}/api/preview/${cleanUrl}`);
         } else {
             setImgSrc(null);
         }

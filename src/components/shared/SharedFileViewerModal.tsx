@@ -15,7 +15,13 @@ interface FileViewerModalProps {
 }
 
 function buildProductionFilename(order: Order, index: number, originalName: string): string {
-    const otNumber = order.ot || order.id || '0'
+    let otRaw = String(order.ot || order.id || '0').trim()
+    if (otRaw.toUpperCase().startsWith('OT-')) {
+        otRaw = otRaw.slice(3).trim()
+    } else if (otRaw.toUpperCase().startsWith('OT')) {
+        otRaw = otRaw.slice(2).trim()
+    }
+    const otNumber = otRaw || '0'
     const copias = order.copias || 1
     
     // 1. Resolve short material CODE
@@ -68,7 +74,7 @@ function buildProductionFilename(order: Order, index: number, originalName: stri
     const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
     const prefix = `OT-${otNumber}_x${copias}_${materialCode}${servicesStr}${dimString}`
 
-    if (originalName.startsWith(`OT-${otNumber}`)) {
+    if (originalName.startsWith(`OT-${otNumber}`) || originalName.startsWith('OT-')) {
         return originalName
     }
 
@@ -347,10 +353,6 @@ export default function SharedFileViewerModal({
                                             <div className="video-preview-box" style={{ width: '100%', padding: '4px' }}>
                                                 <video controls src={url} style={{ width: '100%', maxHeight: '220px', borderRadius: '8px', background: '#000' }} playsInline></video>
                                             </div>
-                                        ) : isPdf ? (
-                                            <div className="pdf-preview-box" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                <iframe src={url} title={`PDF ${originalName}`} style={{ width: '100%', height: '220px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', background: '#fff' }}></iframe>
-                                            </div>
                                         ) : isAudio ? (
                                             <div className="audio-preview-box" style={{ padding: '8px', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                                                 <span style={{ fontSize: '1.8rem' }}>🎙️</span>
@@ -358,12 +360,12 @@ export default function SharedFileViewerModal({
                                             </div>
                                         ) : (
                                             <UniversalFilePreview
-                                                fileUrl={file}
+                                                fileUrl={url}
                                                 fileName={originalName}
                                                 dimensions={order.ancho && order.alto ? { width: Number(order.ancho) * 100, height: Number(order.alto) * 100 } : undefined}
                                                 dpi={order.imgMetadata?.dpi}
                                                 colorMode={order.imgMetadata?.colorMode}
-                                                style={{ minHeight: '140px', maxHeight: '220px' }}
+                                                style={{ minHeight: '180px', maxHeight: '250px' }}
                                             />
                                         )}
                                         {!standardized && (

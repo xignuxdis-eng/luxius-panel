@@ -119,6 +119,7 @@ def health_db():
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/uploads/<path:filename>', methods=['GET', 'OPTIONS'])
+@app.route('/api/preview/<path:filename>', methods=['GET', 'OPTIONS'])
 def serve_upload(filename):
     if request.method == 'OPTIONS':
         return '', 200

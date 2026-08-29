@@ -21,6 +21,21 @@ export function resolveMediaUrl(fileStr: string): string {
 
     if (trimmed.startsWith('data:')) return trimmed
 
+    const baseUrl = API_URL.replace(/\/api\/?$/, '')
+
+    // Normalize localhost / 127.0.0.1 or cloud URLs to the active baseUrl
+    if (trimmed.includes('localhost:5000/uploads/') || trimmed.includes('127.0.0.1:5000/uploads/')) {
+        const parts = trimmed.split('/uploads/')
+        const filename = parts[parts.length - 1]
+        return `${baseUrl}/uploads/${filename}`
+    }
+
+    if (trimmed.includes('luxius-backend.onrender.com/uploads/')) {
+        const parts = trimmed.split('/uploads/')
+        const filename = parts[parts.length - 1]
+        return `${baseUrl}/uploads/${filename}`
+    }
+
     const httpIdx = trimmed.indexOf('http://')
     const httpsIdx = trimmed.indexOf('https://')
     const firstHttp = httpIdx !== -1 ? httpIdx : httpsIdx
@@ -28,9 +43,7 @@ export function resolveMediaUrl(fileStr: string): string {
         return trimmed.substring(firstHttp)
     }
 
-    const baseUrl = API_URL.replace(/\/api\/?$/, '')
     let cleanPath = trimmed.replace(/^\/+/, '')
-
     if (cleanPath.startsWith('uploads/')) {
         cleanPath = cleanPath.replace(/^uploads\//, '')
     }
