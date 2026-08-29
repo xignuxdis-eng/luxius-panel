@@ -12,9 +12,28 @@ export default function Presupuestador() {
 
     // Data lists
     const clientes = getClientes();
-    const materiales = getMateriales();
-    const calidades = getCalidades();
     const combos = getCombos().filter(c => c.activo !== false);
+
+    // Unify printable materials filtering (matching NuevoPedidoModal: exclude inks, solvents, liquids)
+    const printMaterials = useMemo(() => {
+        const raw = getMateriales().filter(m =>
+            m.habilitado !== false &&
+            !['tinta', 'solvente', 'insumo'].includes((m.tipo || '').toLowerCase())
+        );
+        const seen = new Set<string>();
+        return raw
+            .filter(m => {
+                const desc = m.descripcion || m.codigo;
+                if (seen.has(desc)) return false;
+                seen.add(desc);
+                return true;
+            })
+            .sort((a, b) => (a.descripcion || a.codigo).localeCompare(b.descripcion || b.codigo));
+    }, []);
+
+    const printCalidades = useMemo(() => {
+        return getCalidades().filter(c => c.habilitado !== false);
+    }, []);
 
     // Presupuesto Meta State
     const [selectedClientId, setSelectedClientId] = useState<number | ''>(clientes[0]?.id || '');
@@ -72,8 +91,14 @@ export default function Presupuestador() {
     }, [combos, comboCategoria, comboSearch]);
 
     // Catalog Form State
-    const [catMaterial, setCatMaterial] = useState<string>(materiales[0]?.descripcion || materiales[0]?.codigo || 'Lona Front 13oz');
-    const [catCalidad, setCatCalidad] = useState<string>(calidades[0]?.nombre || 'Estándar 720DPI');
+    const [catMaterial, setCatMaterial] = useState<string>(() => {
+        const initial = printMaterials[0];
+        return initial ? (initial.descripcion || initial.codigo) : 'Lona Front Light 13oz';
+    });
+    const [catCalidad, setCatCalidad] = useState<string>(() => {
+        const initial = printCalidades[0];
+        return initial ? initial.nombre : 'Estándar 720DPI';
+    });
     const [catAncho, setCatAncho] = useState<number>(1);
     const [catAlto, setCatAlto] = useState<number>(1);
     const [catCopias, setCatCopias] = useState<number>(1);
@@ -87,7 +112,8 @@ export default function Presupuestador() {
 
     // Auto-update Catalog M2 Price based on material selection
     useEffect(() => {
-        const mat = materiales.find(m => (m.descripcion || m.codigo) === catMaterial);
+        const allMats = getMateriales();
+        const mat = allMats.find(m => (m.descripcion || m.codigo) === catMaterial);
         if (mat && mat.precioM2) {
             setCatPrecioM2(mat.precioM2);
         }
@@ -374,7 +400,7 @@ export default function Presupuestador() {
                                             value={catMaterial}
                                             onChange={(e) => setCatMaterial(e.target.value)}
                                         >
-                                            {materiales.map(m => (
+                                            {printMaterials.map(m => (
                                                 <option key={m.id} value={m.descripcion || m.codigo}>{m.descripcion || m.codigo}</option>
                                             ))}
                                         </select>
@@ -386,7 +412,7 @@ export default function Presupuestador() {
                                             value={catCalidad}
                                             onChange={(e) => setCatCalidad(e.target.value)}
                                         >
-                                            {calidades.map(c => (
+                                            {printCalidades.map(c => (
                                                 <option key={c.id} value={c.nombre}>{c.nombre}</option>
                                             ))}
                                         </select>
