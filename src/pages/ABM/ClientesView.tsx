@@ -15,23 +15,18 @@ export default function ClientesView() {
     // Load clients
     const [clientes, setClientes] = useState<Cliente[]>(getClientes())
 
-    useEffect(() => {
-        refreshCollection('clientes').then(() => {
-            setClientes(getClientes())
-        })
-    }, [])
-
-    const filteredClientes = clientes.filter(c =>
-        c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.cuit?.includes(searchTerm)
-    )
-
-    const handleRefresh = () => {
-        refreshCollection('clientes').then(() => {
-            setClientes(getClientes())
-        })
+    const handleRefresh = (forceRemote = false) => {
+        setClientes(getClientes())
+        if (forceRemote) {
+            refreshCollection('clientes').then(() => {
+                setClientes(getClientes())
+            })
+        }
     }
+
+    useEffect(() => {
+        handleRefresh(true)
+    }, [])
 
     const handleEdit = (cliente: Cliente) => {
         setSelectedCliente(cliente)
@@ -124,7 +119,7 @@ export default function ClientesView() {
                 cliente={selectedCliente}
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSave={handleRefresh}
+                onSave={() => handleRefresh(false)}
             />
 
             <ClienteReporteModal

@@ -155,19 +155,19 @@ export default function Entrada() {
 
     const selectedTotals = {
         m2: Array.from(selectedIds).reduce((acc, id) => {
-            const o = orders.find(x => String(x.id) === String(id));
+            const o = orders.find(x => String(x.id || x.ot) === String(id));
             if (!o) return acc;
             const cons = getConsumption(o);
             return cons.unit === 'm²' ? acc + cons.value : acc;
         }, 0),
         ml: Array.from(selectedIds).reduce((acc, id) => {
-            const o = orders.find(x => String(x.id) === String(id));
+            const o = orders.find(x => String(x.id || x.ot) === String(id));
             if (!o) return acc;
             const cons = getConsumption(o);
             return cons.unit === 'ml' ? acc + cons.value : acc;
         }, 0),
         price: Array.from(selectedIds).reduce((acc, id) => {
-            const o = orders.find(x => String(x.id) === String(id));
+            const o = orders.find(x => String(x.id || x.ot) === String(id));
             return acc + (o ? calculateOrderPrice(o) : 0);
         }, 0)
     };
@@ -252,7 +252,7 @@ export default function Entrada() {
     }
 
     const toggleSelectAll = () => {
-        const displayedIds = displayedOrders.map(o => String(o.id));
+        const displayedIds = displayedOrders.map(o => String(o.id || o.ot));
         const currentSelected = new Set(selectedIds);
         const allSelected = displayedIds.length > 0 && displayedIds.every(id => currentSelected.has(id));
 
@@ -281,7 +281,7 @@ export default function Entrada() {
     }
 
     const handleExportClientReportPdf = () => {
-        const selectedList = displayedOrders.filter(o => selectedIds.has(String(o.id)));
+        const selectedList = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)));
         const ordersToExport = selectedList.length > 0 ? selectedList : displayedOrders;
 
         if (ordersToExport.length === 0) {
@@ -334,7 +334,7 @@ export default function Entrada() {
             const productionIds: string[] = []
 
             validIds.forEach(id => {
-                const o = orders.find(x => Number(x.id) === id)
+                const o = orders.find(x => String(x.id || x.ot) === String(id))
                 if (o) {
                     if (o.category === 'diseno') designIds.push(String(id))
                     else productionIds.push(String(id))
@@ -551,11 +551,11 @@ export default function Entrada() {
                                 }
 
                                 return (
-                                    <tr key={order.id || order.ot} className={`fade-in hover-row ${selectedIds.has(String(order.id)) ? 'selected-row' : ''}`} style={selectedIds.has(String(order.id)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
+                                    <tr key={order.id || order.ot} className={`fade-in hover-row ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''}`} style={selectedIds.has(String(order.id || order.ot)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
                                         <td>
                                             <input
                                                 type="checkbox"
-                                                checked={selectedIds.has(String(order.id))}
+                                                checked={selectedIds.has(String(order.id || order.ot))}
                                                 onChange={() => toggleSelection(order.id || order.ot || '')}
                                                 style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
                                             />

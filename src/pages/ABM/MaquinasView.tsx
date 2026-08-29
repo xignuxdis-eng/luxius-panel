@@ -14,22 +14,24 @@ export default function MaquinasView() {
         loadMaquinas()
     }, [])
 
-    const loadMaquinas = async () => {
+    const loadMaquinas = async (forceRemote = true) => {
         setMaquinas([...getMaquinas()])
-        await refreshCollection('maquinas')
-        setMaquinas([...getMaquinas()])
+        if (forceRemote) {
+            await refreshCollection('maquinas')
+            setMaquinas([...getMaquinas()])
+        }
     }
 
     const handleDelete = async (id: number) => {
         deleteMaquina(id)
-        await loadMaquinas()
+        await loadMaquinas(false)
     }
 
     const handleSave = async (maquina: Partial<Maquina>) => {
         saveMaquina(maquina)
         setIsModalOpen(false)
         setEditingMaquina(null)
-        await loadMaquinas()
+        await loadMaquinas(false)
     }
 
     const filteredMaquinas = maquinas.filter(m =>

@@ -167,7 +167,7 @@ class Presupuesto(db.Model):
 
     ESTADOS_BLOQUEADOS = {'senado', 'aprobado', 'en_taller'}
 
-    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id              = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     vendedor_id     = Column(Integer, ForeignKey('vendedores.id'), nullable=False)
     cliente_id      = Column(Integer, ForeignKey('clientes.id', ondelete='SET NULL'), nullable=True)
 

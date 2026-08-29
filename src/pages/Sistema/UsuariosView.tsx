@@ -9,10 +9,12 @@ export default function UsuariosView() {
     const [selectedUser, setSelectedUser] = useState<any | undefined>()
     const [usuarios, setUsuarios] = useState(getUsuarios())
 
-    const refreshUsers = async () => {
+    const refreshUsers = async (forceRemote = true) => {
         setUsuarios([...getUsuarios()])
-        await refreshCollection('usuarios')
-        setUsuarios([...getUsuarios()])
+        if (forceRemote) {
+            await refreshCollection('usuarios')
+            setUsuarios([...getUsuarios()])
+        }
     }
 
     useEffect(() => {
@@ -107,7 +109,7 @@ export default function UsuariosView() {
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false)
-                    refreshUsers()
+                    refreshUsers(false)
                 }}
                 user={selectedUser}
             />

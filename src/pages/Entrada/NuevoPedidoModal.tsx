@@ -1045,6 +1045,39 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const file = e.target.files?.[0]
         if (file) {
             setExtracting(true)
+            const ext = (file.name.split('.').pop()?.toUpperCase() || '');
+
+            // Pre-check multi-page PDF to explode and redirect to Batch Upload
+            if (ext === 'PDF') {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    let pageCount = 1;
+                    try {
+                        const pdfDoc = await PDFDocument.load(arrayBuffer.slice(0), { ignoreEncryption: true });
+                        pageCount = pdfDoc.getPageCount();
+                    } catch {
+                        try {
+                            const pjDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                            pageCount = pjDoc.numPages;
+                        } catch {}
+                    }
+
+                    if (pageCount > 1) {
+                        console.log(`[Luxius-UI] PDF multipágina detectado (${pageCount} páginas). Redirigiendo automáticamente a Carga por Lote...`);
+                        setSelectedFile(null);
+                        setFileName('');
+                        setPreviewUrl(null);
+                        setMetadata(null);
+                        if (e.target) e.target.value = '';
+                        setActiveTab('lote');
+                        await processBatchFiles([file]);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('[Luxius-UI] Error pre-verificando páginas PDF:', e);
+                }
+            }
+
             setSelectedFile(file)
             setFileName(file.name)
             const url = URL.createObjectURL(file)
@@ -1053,6 +1086,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
             try {
                 const meta = await extractMetadata(file, url)
+                if (meta.pageCount > 1) {
+                    console.log(`[Luxius-UI] PDF multipágina detectado en extractMetadata (${meta.pageCount} páginas). Redirigiendo a Carga por Lote...`);
+                    setSelectedFile(null);
+                    setFileName('');
+                    setPreviewUrl(null);
+                    setMetadata(null);
+                    if (e.target) e.target.value = '';
+                    setActiveTab('lote');
+                    await processBatchFiles([file]);
+                    return;
+                }
+
                 setMetadata(meta)
                 if (meta.width > 0) {
                     setValue('ancho', (meta.width / 100).toFixed(2))
@@ -1093,8 +1138,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     }, [watchedMaterial, setValue, getValues]);
 
 
-    const handleBatchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || [])
+    const processBatchFiles = async (files: File[]) => {
         if (files.length === 0) return;
         console.log(`[Luxius-Batch] Iniciando carga de ${files.length} archivos.`);
         setExtracting(true);
@@ -1251,32 +1295,26 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             }
 
                             if (pageFile) {
-                                const pUrl = URL.createObjectURL(pageFile);
-                                blobStore.set(pageName, pUrl);
+                                const pageUrl = URL.createObjectURL(pageFile);
+                                blobStore.set(pageName, pageUrl);
 
-                                // 2. Generate page thumbnail usando el archivo de página individual
-                                let thumbUrl: string | undefined = undefined;
-                                try {
-                                    const pBuf = await pageFile.arrayBuffer();
-                                    thumbUrl = await getPdfThumbnail(pBuf, 1, wCm, hCm);
-                                } catch (e) {
-                                    console.warn(`[Luxius-DEBUG] Error generando miniatura P${p} desde single-page PDF:`, e);
-                                }
-
-                                const pMeta = {
-                                    ...meta,
-                                    pageCount: 1,
-                                    width: wCm,
-                                    height: hCm,
-                                    thumbnailUrl: thumbUrl
-                                };
+                                // Render real high-res thumbnail for this exact page
+                                const thumb = await getPdfThumbnail(masterBuffer.slice(0), p, wCm, hCm);
 
                                 const pageItem: BatchItem = {
                                     id: itemId,
                                     file: pageFile,
                                     fileName: pageName,
-                                    previewUrl: thumbUrl || pUrl,
-                                    metadata: pMeta,
+                                    previewUrl: thumb || pageUrl,
+                                    metadata: {
+                                        width: wCm,
+                                        height: hCm,
+                                        dpi: meta.dpi || 72,
+                                        format: 'PDF',
+                                        colorMode: meta.colorMode || 'CMYK',
+                                        thumbnailUrl: thumb,
+                                        pageCount: 1
+                                    },
                                     confirmed: true,
                                     copias: inheritedCopias,
                                     material: inheritedMaterial,
@@ -1315,6 +1353,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             })();
         }
         setTimeout(() => setExtracting(false), 800);
+    }
+
+    const handleBatchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || [])
+        if (files.length === 0) return;
+        await processBatchFiles(files);
         if (batchInputRef.current) batchInputRef.current.value = '';
     }
 
