@@ -116,10 +116,90 @@ def import_from_cloud():
             }), 200
             
         elif 'we.tl' in url or 'wetransfer.com' in url:
-            return jsonify({"error": "La importación directa de WeTransfer está en desarrollo. Por favor descargue el archivo o use Google Drive."}), 400
+            from transferwee import transferwee
+            import zipfile
+            import requests
+            from urllib.parse import unquote, urlparse
+
+            wt_dir = os.path.join(temp_dir, f"wt_{file_id}")
+            os.makedirs(wt_dir, exist_ok=True)
+            
+            # 1. Resolve direct download link
+            direct_link = None
+            try:
+                direct_link = transferwee.download_url(url)
+            except Exception as wt_err:
+                print(f"[WeTransfer] transferwee error: {wt_err}")
+
+            if not direct_link:
+                return jsonify({"error": "No se pudo obtener el enlace de descarga de WeTransfer. Verifique que la transferencia no haya expirado y que el enlace sea válido."}), 400
+
+            # 2. Download file with stream
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+            r = requests.get(direct_link, stream=True, headers=headers, timeout=120)
+            if not r.ok:
+                return jsonify({"error": f"Error descargando archivo de WeTransfer (HTTP {r.status_code})"}), 400
+
+            # Determine filename from Content-Disposition header or URL path
+            cd = r.headers.get('content-disposition', '')
+            filename_match = re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^"\';]+)["\']?', cd, re.I)
+            if filename_match:
+                wt_filename = unquote(filename_match.group(1).strip())
+            else:
+                wt_filename = unquote(urlparse(direct_link).path.split('/')[-1]) or f"wetransfer_{file_id}"
+
+            downloaded_zip_or_file = os.path.join(wt_dir, wt_filename)
+            with open(downloaded_zip_or_file, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        f.write(chunk)
+
+            downloaded_paths = []
+            # Check if it is a zip archive
+            if zipfile.is_zipfile(downloaded_zip_or_file):
+                with zipfile.ZipFile(downloaded_zip_or_file, 'r') as zf:
+                    for member in zf.infolist():
+                        if member.is_dir() or member.filename.startswith('__MACOSX') or member.filename.startswith('.'):
+                            continue
+                        extracted_path = zf.extract(member, wt_dir)
+                        downloaded_paths.append(extracted_path)
+            else:
+                downloaded_paths.append(downloaded_zip_or_file)
+
+            processed_files = []
+            for path in downloaded_paths:
+                if not os.path.isfile(path):
+                    continue
+                original_filename = os.path.basename(path)
+                _, ext = os.path.splitext(original_filename)
+                if not ext:
+                    ext = ".pdf"
+                    
+                unique_filename = f"cloud_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}{ext}"
+                final_path = os.path.join(UPLOADS_DIR, unique_filename)
+                
+                os.replace(path, final_path)
+                file_size = os.path.getsize(final_path)
+                
+                processed_files.append({
+                    "fileName": unique_filename,
+                    "originalName": original_filename,
+                    "fileSize": file_size,
+                    "tempUrl": f"/uploads/{unique_filename}"
+                })
+
+            if not processed_files:
+                return jsonify({"error": "No se encontraron archivos válidos en la transferencia de WeTransfer."}), 400
+
+            return jsonify({
+                "status": "success",
+                "files": processed_files
+            }), 200
             
         else:
-            return jsonify({"error": "Proveedor no soportado. Actualmente se soportan enlaces públicos de Google Drive."}), 400
+            return jsonify({"error": "Proveedor no soportado. Actualmente se soportan enlaces de Google Drive y WeTransfer."}), 400
             
     except Exception as e:
         import traceback

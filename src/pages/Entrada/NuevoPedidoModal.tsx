@@ -994,7 +994,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const handleCloudImport = async () => {
         if (!cloudUrl) return;
         setIsCloudImporting(true);
-        setCloudImportStatus('Conectando con Google Drive...');
+        const isWeTransfer = cloudUrl.includes('we.tl') || cloudUrl.includes('wetransfer.com');
+        setCloudImportStatus(isWeTransfer ? 'Conectando con WeTransfer...' : 'Conectando con Google Drive...');
         try {
             const baseUrl = API_URL.replace(/\/api\/?$/, '');
             const res = await fetch(`${API_URL}/import-cloud`, {
@@ -2186,9 +2187,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
                                                         className="lux-btn lux-btn-secondary"
                                                         style={{ fontSize: '0.9rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: '6px', margin: '0 auto' }}
-                                                        title="Importar desde Google Drive"
+                                                        title="Importar desde Google Drive o WeTransfer"
                                                     >
-                                                        🔗 Importar desde Link de Google Drive
+                                                        🔗 Importar desde Drive o WeTransfer
                                                     </button>
                                                 ) : (
                                                     <div style={{ display: 'flex', gap: '8px', maxWidth: '400px', width: '100%', margin: '0 auto' }}>
@@ -2196,7 +2197,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                             type="text" 
                                                             value={cloudUrl} 
                                                             onChange={e => setCloudUrl(e.target.value)} 
-                                                            placeholder="Pegar enlace público de Google Drive..." 
+                                                            placeholder="Pegar enlace de Google Drive o WeTransfer..." 
                                                             className="lux-input"
                                                             style={{ flex: 1, fontSize: '0.9rem', padding: '6px 10px' }}
                                                         />
@@ -2694,9 +2695,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                     cursor: 'pointer',
                                                                     boxShadow: '0 2px 6px rgba(217, 70, 239, 0.3)'
                                                                 }}
-                                                                title="Importar archivo desde Google Drive"
+                                                                title="Importar archivo desde Google Drive o WeTransfer"
                                                             >
-                                                                🔗 Link...
+                                                                🔗 Link Nube
                                                             </button>
                                                         )}
                                                         {fileName ? (
@@ -2715,7 +2716,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 type="text" 
                                                                 value={cloudUrl} 
                                                                 onChange={e => setCloudUrl(e.target.value)} 
-                                                                placeholder="Pegar enlace público de Google Drive..." 
+                                                                placeholder="Pegar enlace de Google Drive o WeTransfer..." 
                                                                 className="lux-input"
                                                                 style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px' }}
                                                             />
