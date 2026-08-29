@@ -113,21 +113,26 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                     setImgSrc(generateVectorCard('EPS', file.name, dimensions, dpi));
                 });
             } else if (fileExt === 'ai' || fileExt === 'pdf') {
-                // Attempt PDFJS page 1 rendering for AI & PDF
+                // Attempt high-definition PDFJS rendering for AI & PDF
                 (async () => {
                     try {
                         const arrayBuffer = await file.arrayBuffer();
                         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                         if (pdf.numPages > 0) {
                             const page = await pdf.getPage(1);
-                            const viewport = page.getViewport({ scale: 0.5 });
+                            const unscaled = page.getViewport({ scale: 1.0 });
+                            const targetMax = 1200;
+                            const scale = Math.max(1.5, Math.min(3.0, targetMax / Math.max(unscaled.width, unscaled.height)));
+                            const viewport = page.getViewport({ scale });
                             const canvas = document.createElement('canvas');
                             canvas.width = viewport.width;
                             canvas.height = viewport.height;
                             const ctx = canvas.getContext('2d');
                             if (ctx) {
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillRect(0, 0, viewport.width, viewport.height);
                                 await page.render({ canvasContext: ctx, viewport }).promise;
-                                setImgSrc(canvas.toDataURL('image/webp', 0.85));
+                                setImgSrc(canvas.toDataURL('image/webp', 0.92));
                                 return;
                             }
                         }

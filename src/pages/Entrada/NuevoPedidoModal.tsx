@@ -376,21 +376,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     }, [order, reset, setValue])
 
     const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string> => {
-        const timeoutMs = 6000;
-        let pdfRendered = false;
+        const timeoutMs = 10000;
         try {
-            const w = 200, h = 260;
-            const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return '';
-
-            // 1. Base Paper Background
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, w, h);
-
-            // 2. Try to render real PDF content
             if (_file) {
                 try {
                     const renderPromise = (async () => {
@@ -399,93 +386,71 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         const pdf = await loadingTask.promise;
                         const page = await pdf.getPage(Math.min(pageNum, pdf.numPages));
 
-                        const viewport = page.getViewport({ scale: 1 });
-                        const scale = Math.min(w / viewport.width, h / viewport.height) * 0.9;
-                        const scaledViewport = page.getViewport({ scale });
+                        // High definition crisp resolution: target 1200px max dimension
+                        const unscaledViewport = page.getViewport({ scale: 1.0 });
+                        const targetMaxDim = 1200;
+                        const scale = Math.max(1.5, Math.min(3.0, targetMaxDim / Math.max(unscaledViewport.width, unscaledViewport.height)));
+                        const viewport = page.getViewport({ scale });
 
                         const renderCanvas = document.createElement('canvas');
+                        renderCanvas.width = viewport.width;
+                        renderCanvas.height = viewport.height;
                         const renderCtx = renderCanvas.getContext('2d');
                         if (renderCtx) {
-                            renderCanvas.width = scaledViewport.width;
-                            renderCanvas.height = scaledViewport.height;
+                            // Ensure crisp white background
+                            renderCtx.fillStyle = '#ffffff';
+                            renderCtx.fillRect(0, 0, viewport.width, viewport.height);
+
                             const renderTask = page.render({
                                 canvasContext: renderCtx,
-                                viewport: scaledViewport
+                                viewport: viewport
                             });
                             await renderTask.promise;
 
-                            // Draw onto main canvas centered
-                            const dx = (w - scaledViewport.width) / 2;
-                            const dy = (h - scaledViewport.height) / 2;
-
-                            // Subtle shadow for the rendering
-                            ctx.shadowColor = 'rgba(0,0,0,0.2)';
-                            ctx.shadowBlur = 10;
-                            ctx.shadowOffsetX = 2;
-                            ctx.shadowOffsetY = 2;
-                            ctx.drawImage(renderCanvas, dx, dy);
-                            ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; // Reset shadow
-                            return true;
+                            // Return high-definition lightweight WebP
+                            return renderCanvas.toDataURL('image/webp', 0.92);
                         }
-                        return false;
+                        return '';
                     })();
 
-                    const timeoutPromise = new Promise<boolean>((resolve) =>
-                        setTimeout(() => resolve(false), timeoutMs)
+                    const timeoutPromise = new Promise<string>((resolve) =>
+                        setTimeout(() => resolve(''), timeoutMs)
                     );
 
-                    pdfRendered = await Promise.race([renderPromise, timeoutPromise]);
-                    if (!pdfRendered) console.warn(`[Luxius-PDF] Renderizado de P${pageNum} abortado por timeout (${timeoutMs}ms) o error.`);
+                    const result = await Promise.race([renderPromise, timeoutPromise]);
+                    if (result) return result;
                 } catch (pdfErr) {
-                    console.warn("[Luxius-PDF] Falló renderizado real, usando placeholder", pdfErr);
+                    console.warn("[Luxius-PDF] Falló renderizado real HD, usando fallback", pdfErr);
                 }
             }
 
-            // 3. Fallback/Overlay Design
-            if (!pdfRendered) {
-                // Background icon area
-                ctx.fillStyle = '#f8f9fa';
-                ctx.fillRect(10, 10, w - 20, 60);
-                ctx.fillStyle = '#e94560';
-                ctx.font = 'bold 50px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('📄', w / 2, 60);
-
-                ctx.fillStyle = '#666';
-                ctx.font = '900 12px Arial';
-                ctx.fillText('VISTA TÉCNICA PDF', w / 2, 85);
-            }
-
-            // 4. Information Overlays (Always show for context)
-            // Semi-transparent bar for bottom info
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.fillRect(5, h - 50, w - 10, 45);
-
-            // Page Number Badge
+            // Fallback card if rendering failed
+            const w = 400, h = 500;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return '';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(20, 20, w - 40, 120);
             ctx.fillStyle = '#e94560';
-            ctx.beginPath();
-            ctx.roundRect(w - 55, 10, 45, 45, 8);
-            ctx.fill();
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 24px Arial';
+            ctx.font = 'bold 80px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(`P${pageNum}`, w - 32.5, 42);
-
-            // Dimensions Label
+            ctx.fillText('📄', w / 2, 110);
             ctx.fillStyle = '#333';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${widthCm} × ${heightCm} cm`, w / 2, h - 22);
-
-            // Border
-            ctx.strokeStyle = '#cccccc';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(1, 1, w - 2, h - 2);
-
-            return canvas.toDataURL('image/png');
+            ctx.font = 'bold 22px Arial';
+            ctx.fillText(`Página ${pageNum}`, w / 2, 220);
+            if (widthCm && heightCm) {
+                ctx.fillStyle = '#666';
+                ctx.font = '18px Arial';
+                ctx.fillText(`${widthCm} × ${heightCm} cm`, w / 2, 260);
+            }
+            return canvas.toDataURL('image/webp', 0.85);
         } catch (e) {
             console.warn('[Luxius-PDF] Error en generación de miniatura:', e);
-            return undefined;
+            return '';
         }
     };
 
@@ -2255,6 +2220,32 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 fileSize={item.file ? `${(item.file.size / (1024 * 1024)).toFixed(1)} MB` : undefined}
                                                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                             />
+                                                            {(!item.previewUrl || item.metadata.colorMode === 'Detectando...') && (
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    inset: 0,
+                                                                    background: 'rgba(15, 23, 42, 0.8)',
+                                                                    backdropFilter: 'blur(3px)',
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: '6px',
+                                                                    zIndex: 4
+                                                                }}>
+                                                                    <div style={{
+                                                                        width: '24px',
+                                                                        height: '24px',
+                                                                        border: '3px solid rgba(255, 255, 255, 0.15)',
+                                                                        borderTopColor: 'var(--accent)',
+                                                                        borderRadius: '50%',
+                                                                        animation: 'spin 0.8s linear infinite'
+                                                                    }} />
+                                                                    <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.4px' }}>
+                                                                        Procesando...
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                             <input
                                                                 type="checkbox"
                                                                 style={{ position: 'absolute', bottom: '2px', left: '2px', width: '16px', height: '16px', zIndex: 10, cursor: 'pointer' }}
