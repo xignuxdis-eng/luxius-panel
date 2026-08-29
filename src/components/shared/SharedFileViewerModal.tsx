@@ -31,29 +31,9 @@ function buildProductionFilename(order: Order, index: number, originalName: stri
             materialCode = foundMat.codigo.trim()
         }
     } catch (e) { }
-    // Clean spaces and special characters from material code
     materialCode = materialCode.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '')
 
-    // 2. Resolve short calidad
-    let rawCal = (order.calidad || 'STD').trim()
-    let calidad = rawCal
-    try {
-        const allCalidades = getCalidades()
-        const foundCal = allCalidades.find(c => 
-            c.nombre.toLowerCase() === rawCal.toLowerCase()
-        )
-        if (foundCal) {
-            calidad = foundCal.nombre.replace(/\s+/g, '-')
-        }
-    } catch (e) { }
-    // Clean and shorten calidad if verbose
-    if (calidad.toLowerCase().includes('alta') || calidad.includes('1440')) calidad = '1440DPI'
-    else if (calidad.toLowerCase().includes('est') || calidad.includes('720')) calidad = '720DPI'
-    else if (calidad.toLowerCase().includes('eco')) calidad = 'ECO'
-    else if (calidad.toLowerCase().includes('foto')) calidad = 'FOTO'
-    else calidad = calidad.replace(/[^a-zA-Z0-9_-]/g, '')
-
-    // 3. Resolve short service CODES
+    // 2. Resolve short service CODES
     const serviceCodes: string[] = []
     if (order.servicios && typeof order.servicios === 'object') {
         try {
@@ -86,7 +66,7 @@ function buildProductionFilename(order: Order, index: number, originalName: stri
     }
 
     const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
-    const prefix = `OT-${otNumber}_x${copias}_${materialCode}_${calidad}${servicesStr}${dimString}`
+    const prefix = `OT-${otNumber}_x${copias}_${materialCode}${servicesStr}${dimString}`
 
     if (originalName.startsWith(`OT-${otNumber}`)) {
         return originalName
