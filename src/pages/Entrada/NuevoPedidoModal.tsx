@@ -2273,7 +2273,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 }}>
                                                     {/* Header: Thumb and Title */}
                                                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                                        <div className="batch-item-thumb" style={{ position: 'relative', width: '100px', height: '100px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                                        <div className="batch-item-thumb" style={{ position: 'relative', width: '100px', height: '100px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', cursor: 'pointer' }}>
                                                             <button type="button"
                                                                 style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(239, 68, 68, 0.9)', border: 'none', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '12px', cursor: 'pointer', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                                 onClick={(e) => { e.stopPropagation(); setBatchItems(prev => prev.filter(i => i.id !== item.id)); }}

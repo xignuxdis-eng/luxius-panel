@@ -220,20 +220,23 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                             onError={() => setHasError(true)}
                         />
                         {enableModal && isHovered && (
-                            <div style={{
-                                position: 'absolute',
-                                inset: 0,
-                                background: 'rgba(15, 23, 42, 0.65)',
-                                backdropFilter: 'blur(2px)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#ffffff',
-                                transition: 'all 0.15s ease',
-                                pointerEvents: 'none',
-                                zIndex: 3
-                            }}>
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <div 
+                                onClick={handleOpenModal}
+                                style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'rgba(15, 23, 42, 0.65)',
+                                    backdropFilter: 'blur(2px)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#ffffff',
+                                    transition: 'all 0.15s ease',
+                                    cursor: 'pointer',
+                                    zIndex: 3
+                                }}
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                     <line x1="11" y1="8" x2="11" y2="14" />
