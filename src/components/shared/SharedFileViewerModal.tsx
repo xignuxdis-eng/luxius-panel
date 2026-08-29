@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Modal from '@components/ui/Modal'
 import { UniversalFilePreview } from '@components/UniversalFilePreview'
-import { API_URL, getServicios, resolveMediaUrl, getAuthHeaders } from '@data/db'
+import { API_URL, getServicios, getMateriales, getCalidades, resolveMediaUrl, getAuthHeaders } from '@data/db'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
 import './FileViewerModal.css'
@@ -17,18 +17,60 @@ interface FileViewerModalProps {
 function buildProductionFilename(order: Order, index: number, originalName: string): string {
     const otNumber = order.ot || order.id || '0'
     const copias = order.copias || 1
-    const materialCode = (order.material || 'MAT').trim()
-    const calidad = (order.calidad || 'STD').trim()
+    
+    // 1. Resolve short material CODE
+    let rawMat = (order.material || 'MAT').trim()
+    let materialCode = rawMat
+    try {
+        const allMaterials = getMateriales()
+        const foundMat = allMaterials.find(m => 
+            (m.codigo && m.codigo.toLowerCase() === rawMat.toLowerCase()) ||
+            (m.descripcion && m.descripcion.toLowerCase() === rawMat.toLowerCase())
+        )
+        if (foundMat && foundMat.codigo) {
+            materialCode = foundMat.codigo.trim()
+        }
+    } catch (e) { }
+    // Clean spaces and special characters from material code
+    materialCode = materialCode.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '')
 
+    // 2. Resolve short calidad
+    let rawCal = (order.calidad || 'STD').trim()
+    let calidad = rawCal
+    try {
+        const allCalidades = getCalidades()
+        const foundCal = allCalidades.find(c => 
+            c.nombre.toLowerCase() === rawCal.toLowerCase()
+        )
+        if (foundCal) {
+            calidad = foundCal.nombre.replace(/\s+/g, '-')
+        }
+    } catch (e) { }
+    // Clean and shorten calidad if verbose
+    if (calidad.toLowerCase().includes('alta') || calidad.includes('1440')) calidad = '1440DPI'
+    else if (calidad.toLowerCase().includes('est') || calidad.includes('720')) calidad = '720DPI'
+    else if (calidad.toLowerCase().includes('eco')) calidad = 'ECO'
+    else if (calidad.toLowerCase().includes('foto')) calidad = 'FOTO'
+    else calidad = calidad.replace(/[^a-zA-Z0-9_-]/g, '')
+
+    // 3. Resolve short service CODES
     const serviceCodes: string[] = []
     if (order.servicios && typeof order.servicios === 'object') {
         try {
             const allServices = getServicios()
             Object.entries(order.servicios).forEach(([sId, active]) => {
                 if (active) {
-                    const s = allServices.find((serv) => String(serv.id) === String(sId))
+                    const s = allServices.find((serv) => 
+                        String(serv.id) === String(sId) ||
+                        (serv.codigo && serv.codigo.toLowerCase() === String(sId).toLowerCase()) ||
+                        (serv.nombre && serv.nombre.toLowerCase() === String(sId).toLowerCase())
+                    )
                     if (s && s.codigo) {
-                        serviceCodes.push(s.codigo)
+                        serviceCodes.push(s.codigo.trim().replace(/[^a-zA-Z0-9_-]/g, ''))
+                    } else if (s && s.nombre) {
+                        serviceCodes.push(s.nombre.substring(0, 4).toUpperCase().trim().replace(/[^a-zA-Z0-9_-]/g, ''))
+                    } else if (typeof sId === 'string' && isNaN(Number(sId))) {
+                        serviceCodes.push(sId.substring(0, 4).toUpperCase().trim().replace(/[^a-zA-Z0-9_-]/g, ''))
                     }
                 }
             })
