@@ -616,12 +616,13 @@ export default function Entrada() {
                                         <td>
                                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                                                 {order.createdAt ? new Date(order.createdAt).toLocaleString('es-AR', {
+                                                    timeZone: 'America/Argentina/Buenos_Aires',
                                                     day: '2-digit',
                                                     month: '2-digit',
                                                     hour: '2-digit',
                                                     minute: '2-digit',
                                                     hour12: false
-                                                }) : '-'}
+                                                }) : (order.fechaCreacion || '-')}
                                             </span>
                                         </td>
                                         <td>

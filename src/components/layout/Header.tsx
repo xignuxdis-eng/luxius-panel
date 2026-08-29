@@ -20,8 +20,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
     const avatarUrl = dbUser?.avatar
 
     const now = new Date()
-    const timeString = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+    const timeString = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
     const dateString = now.toLocaleDateString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
         weekday: 'short',
         day: 'numeric',
         month: 'short',

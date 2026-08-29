@@ -178,6 +178,29 @@ def _presupuesto_to_order(p):
     alto_val = float(esp.get('alto') or medidas.get('alto', 0))
     copias_val = int(esp.get('copias') or primer_cartel.get('copias') or len(carteles) or 1)
 
+    # Convert timestamps to Argentina timezone (UTC-3)
+    AR_TZ = timezone(timedelta(hours=-3))
+    
+    created_at_dt = p.created_at
+    if created_at_dt:
+        if created_at_dt.tzinfo is None:
+            created_at_dt = created_at_dt.replace(tzinfo=timezone.utc)
+        created_at_ar = created_at_dt.astimezone(AR_TZ)
+        created_at_iso = created_at_ar.isoformat()
+        fecha_creacion_str = created_at_ar.strftime('%d/%m/%Y %H:%M')
+    else:
+        created_at_iso = None
+        fecha_creacion_str = ''
+
+    updated_at_dt = p.updated_at
+    if updated_at_dt:
+        if updated_at_dt.tzinfo is None:
+            updated_at_dt = updated_at_dt.replace(tzinfo=timezone.utc)
+        updated_at_ar = updated_at_dt.astimezone(AR_TZ)
+        updated_at_iso = updated_at_ar.isoformat()
+    else:
+        updated_at_iso = None
+
     return {
         'id': _uuid_to_int(p.id),
         'uuid': str(p.id),
@@ -187,8 +210,8 @@ def _presupuesto_to_order(p):
         'clienteNombre': cliente_nombre,
         'clientName': cliente_nombre,
         'vendedorId': p.vendedor_id,  # Exponer el vendedorId
-        'createdAt': p.created_at.isoformat() if p.created_at else None,
-        'updatedAt': p.updated_at.isoformat() if p.updated_at else None,
+        'createdAt': created_at_iso,
+        'updatedAt': updated_at_iso,
 
         # Material specs
         'material': mat_display,
@@ -214,7 +237,7 @@ def _presupuesto_to_order(p):
         'emergencia': False,
 
         # Dates
-        'fechaCreacion': p.created_at.strftime('%d/%m/%Y') if p.created_at else '',
+        'fechaCreacion': fecha_creacion_str,
         'fechaEntrega': p.fecha_entrega_estimada.strftime('%d/%m/%Y')
                         if p.fecha_entrega_estimada else '',
 
