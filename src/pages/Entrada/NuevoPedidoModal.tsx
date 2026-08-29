@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
@@ -6,7 +6,7 @@ import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { extractCdrThumbnail } from '@/utils/cdrPreview'
 import { generateVectorCard } from '@/utils/vectorPreview'
 import { PDFDocument } from 'pdf-lib'
-import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl } from '@data/db'
+import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, type ComboData } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -64,6 +64,31 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [cloudImportStatus, setCloudImportStatus] = useState<string>('')
     const [showCloudInput, setShowCloudInput] = useState(false)
     const [cloudUrl, setCloudUrl] = useState('')
+    const [selectedComboId, setSelectedComboId] = useState<number | null>(null)
+    const [comboSearch, setComboSearch] = useState('')
+    const [comboCategoriaFilter, setComboCategoriaFilter] = useState('todas')
+
+    const promoCategories = useMemo(() => {
+        const all = getCombos().filter(c => c.habilitado !== false);
+        const cats = new Set<string>();
+        all.forEach(c => { if (c.categoria) cats.add(c.categoria); });
+        return ['todas', ...Array.from(cats)];
+    }, [isOpen]);
+
+    const filteredPromos = useMemo(() => {
+        const all = getCombos().filter(c => c.habilitado !== false);
+        return all.filter(c => {
+            if (comboCategoriaFilter !== 'todas' && c.categoria !== comboCategoriaFilter) return false;
+            if (comboSearch.trim()) {
+                const q = comboSearch.toLowerCase();
+                const match = (c.nombre || '').toLowerCase().includes(q) ||
+                              (c.codigo || '').toLowerCase().includes(q) ||
+                              (c.descripcion || '').toLowerCase().includes(q);
+                if (!match) return false;
+            }
+            return true;
+        });
+    }, [comboCategoriaFilter, comboSearch, isOpen]);
 
     // --- Searchable Client Dropdown State ---
     const [clientSearch, setClientSearch] = useState('');
@@ -330,8 +355,52 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             const services = watch('servicios')
             const price = calculateItemPrice(watchedMaterial, w, h, c, services)
             setValue('subtotal', price)
+        } else if (activeTab === 'promos') {
+            const c = parseInt(watchedCopias) || 1
+            const currentCombo = getCombos().find(cb => cb.id === selectedComboId)
+            if (currentCombo) {
+                setValue('subtotal', Math.round((currentCombo.precioFinal || 0) * c))
+            }
         }
-    }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), activeTab, setValue])
+    }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), activeTab, selectedComboId, setValue])
+
+    const handleSelectCombo = (combo: ComboData) => {
+        if (selectedComboId === combo.id) {
+            setSelectedComboId(null);
+            return;
+        }
+        setSelectedComboId(combo.id);
+        if (combo.materialCodigo) {
+            setValue('material', combo.materialCodigo);
+        }
+        if (combo.ancho) {
+            setValue('ancho', String(combo.ancho));
+        }
+        if (combo.alto) {
+            setValue('alto', String(combo.alto));
+        }
+        const currentObs = getValues('observaciones') || '';
+        const tag = `[PROMO: ${combo.nombre} (${combo.codigo})]`;
+        if (!currentObs.includes(tag)) {
+            setValue('observaciones', currentObs ? `${tag} ${currentObs}` : tag);
+        }
+        // Pre-activate included services in form
+        if (combo.componentes && combo.componentes.length > 0) {
+            const currentServices = getValues('servicios') || {};
+            combo.componentes.forEach(comp => {
+                if (comp.tipo === 'servicio') {
+                    const matchedServ = getServicios().find(s => 
+                        s.nombre.toLowerCase().includes(comp.nombre.toLowerCase()) || 
+                        comp.nombre.toLowerCase().includes(s.nombre.toLowerCase())
+                    );
+                    if (matchedServ) {
+                        currentServices[matchedServ.id] = true;
+                    }
+                }
+            });
+            setValue('servicios', currentServices);
+        }
+    };
 
 
 
@@ -1674,40 +1743,39 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 </select>
                              </div>
 
-                            {/* Línea 2: Material y Calidad */}
-                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                <label>Material</label>
-                                <select {...register('material', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
-                                    <option value="">...</option>
-                                    {(() => {
-                                        // RESTORED: Filter out ink and solvent types
-                                        let mats = getMateriales().filter(m =>
-                                            m.habilitado !== false &&
-                                            !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase())
-                                        );
-                                        const seen = new Set();
-                                        return mats
-                                            .filter(m => {
-                                                if (seen.has(m.descripcion)) return false;
-                                                seen.add(m.descripcion);
-                                                return true;
-                                            })
-                                            .sort((a, b) => a.descripcion.localeCompare(b.descripcion))
-                                            .map(m => <option key={m.id} value={m.codigo}>{m.descripcion}</option>);
-                                    })()}
-                                </select>
-                            </div>
-                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                <label>Calidad</label>
-                                <select {...register('calidad', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
-                                    {getCalidades().filter(c => c.habilitado !== false).length > 1 && <option value="">...</option>}
-                                    {getCalidades().filter(c => c.habilitado !== false).map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-                                </select>
-                            </div>
-
-                            {/* Línea 3: Archivo e Info Imagen (Solo Unitario) */}
+                            {/* Sección Específica: Unitario */}
                             {activeTab === 'unitario' && (
                                 <>
+                                    {/* Línea 2: Material y Calidad */}
+                                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                        <label>Material</label>
+                                        <select {...register('material', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
+                                            <option value="">...</option>
+                                            {(() => {
+                                                // RESTORED: Filter out ink and solvent types
+                                                let mats = getMateriales().filter(m =>
+                                                    m.habilitado !== false &&
+                                                    !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase())
+                                                );
+                                                const seen = new Set();
+                                                return mats
+                                                    .filter(m => {
+                                                        if (seen.has(m.descripcion)) return false;
+                                                        seen.add(m.descripcion);
+                                                        return true;
+                                                    })
+                                                    .sort((a, b) => a.descripcion.localeCompare(b.descripcion))
+                                                    .map(m => <option key={m.id} value={m.codigo}>{m.descripcion}</option>);
+                                            })()}
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                        <label>Calidad</label>
+                                        <select {...register('calidad', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
+                                            {getCalidades().filter(c => c.habilitado !== false).length > 1 && <option value="">...</option>}
+                                            {getCalidades().filter(c => c.habilitado !== false).map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                                        </select>
+                                    </div>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                         <label>Archivo</label>
                                         <div className="compact-upload" onClick={() => !saving && fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}>
@@ -2389,6 +2457,210 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                         </div>
                                     </>
                                     )}
+                                </div>
+                            )}
+
+                            {/* TAB PROMOS / COMBOS */}
+                            {activeTab === 'promos' && (
+                                <div className="promos-tab-container">
+                                    {/* Promos Filter Bar */}
+                                    <div className="promos-filter-bar">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
+                                            <span style={{ fontSize: '1.1rem' }}>🔍</span>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="Buscar combo o promo por nombre o código..."
+                                                value={comboSearch}
+                                                onChange={(e) => setComboSearch(e.target.value)}
+                                                style={{ flex: 1 }}
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Categoría:</span>
+                                            {promoCategories.map(cat => (
+                                                <button
+                                                    key={cat}
+                                                    type="button"
+                                                    className={`lux-btn ${comboCategoriaFilter === cat ? 'lux-btn-primary' : 'lux-btn-secondary'}`}
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '12px',
+                                                        border: '1px solid var(--border)',
+                                                        background: comboCategoriaFilter === cat ? 'var(--accent)' : 'var(--bg-card)',
+                                                        color: comboCategoriaFilter === cat ? '#fff' : 'var(--text-secondary)',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={() => setComboCategoriaFilter(cat)}
+                                                >
+                                                    {cat === 'todas' ? 'Todas' : cat}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Grid of Combos / Promos */}
+                                    {filteredPromos.length === 0 ? (
+                                        <div style={{
+                                            padding: '24px',
+                                            textAlign: 'center',
+                                            background: 'var(--bg-sidebar)',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: '1px dashed var(--border)',
+                                            color: 'var(--text-muted)'
+                                        }}>
+                                            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏷️</span>
+                                            <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+                                                {getCombos().length === 0 ? 'No hay combos cargados en el sistema' : 'No se encontraron promociones con ese filtro'}
+                                            </p>
+                                            <p style={{ fontSize: '0.8rem', margin: 0 }}>
+                                                Puedes crear y gestionar combos desde <b style={{ color: 'var(--accent)' }}>ABM &gt; Combos / Tarifario</b>.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="promos-grid">
+                                            {filteredPromos.map(combo => {
+                                                const isSelected = selectedComboId === combo.id;
+                                                const matDesc = getMateriales().find(m => m.codigo === combo.materialCodigo)?.descripcion || combo.materialCodigo;
+                                                return (
+                                                    <div
+                                                        key={combo.id}
+                                                        className={`promo-card ${isSelected ? 'selected' : ''}`}
+                                                        onClick={() => handleSelectCombo(combo)}
+                                                    >
+                                                        <div>
+                                                            <div className="promo-card-header">
+                                                                <span className="promo-badge-cat">{combo.categoria || 'Promo'}</span>
+                                                                {combo.destacado && <span className="promo-badge-featured">⭐ DESTACADO</span>}
+                                                            </div>
+                                                            <div className="promo-title">{combo.nombre}</div>
+                                                            <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 600, marginBottom: '4px' }}>{combo.codigo}</div>
+                                                            {combo.descripcion && <div className="promo-desc">{combo.descripcion}</div>}
+                                                        </div>
+
+                                                        <div className="promo-specs">
+                                                            {combo.ancho && combo.alto && (
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                    <span>📐 Medidas:</span>
+                                                                    <b>{combo.ancho}m × {combo.alto}m</b>
+                                                                </div>
+                                                            )}
+                                                            {matDesc && (
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                    <span>🏷️ Material:</span>
+                                                                    <b>{matDesc}</b>
+                                                                </div>
+                                                            )}
+                                                            {combo.componentes && combo.componentes.length > 0 && (
+                                                                <div style={{ marginTop: '2px', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '4px' }}>
+                                                                    <span style={{ fontSize: '10px', opacity: 0.7 }}>Incluye: </span>
+                                                                    <span style={{ fontSize: '10px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                                                                        {combo.componentes.map(c => `${c.cantidad}x ${c.nombre}`).join(' + ')}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="promo-price-tag">
+                                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Precio Final:</span>
+                                                                ${(combo.precioFinal || 0).toLocaleString('es-AR')}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                className="promo-btn-select"
+                                                                onClick={(e) => { e.stopPropagation(); handleSelectCombo(combo); }}
+                                                            >
+                                                                {isSelected ? '✓ Promo Seleccionada' : 'Seleccionar Promo'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Upload and details for selected promo */}
+                                    <div style={{
+                                        marginTop: '10px',
+                                        background: 'var(--bg-card)',
+                                        padding: '12px 14px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--border)',
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(4, 1fr)',
+                                        gap: '10px'
+                                    }}>
+                                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                            <label>Archivo de Diseño / Gráfica para la Promo</label>
+                                            <div className="compact-upload" onClick={() => !saving && fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}>
+                                                <UniversalFilePreview
+                                                    file={selectedFile || undefined}
+                                                    fileUrl={previewUrl || undefined}
+                                                    fileName={fileName}
+                                                    dimensions={metadata ? { width: metadata.width, height: metadata.height } : undefined}
+                                                    dpi={metadata?.dpi}
+                                                    colorMode={metadata?.colorMode}
+                                                    fileSize={selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : undefined}
+                                                    className="upload-preview-thumb"
+                                                    style={{ width: '40px', height: '40px', marginRight: '8px' }}
+                                                />
+                                                <div className="upload-text-stack" style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span className="upload-text">{fileName || 'Seleccionar archivo para la promo...'}</span>
+                                                        {!showCloudInput && (
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
+                                                                className="lux-btn lux-btn-secondary"
+                                                                style={{ fontSize: '0.8rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: '4px' }}
+                                                                title="Importar desde Google Drive"
+                                                            >
+                                                                🔗 Importar Link
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    {showCloudInput && (
+                                                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }} onClick={e => e.stopPropagation()}>
+                                                            <input 
+                                                                type="text" 
+                                                                value={cloudUrl} 
+                                                                onChange={e => setCloudUrl(e.target.value)} 
+                                                                placeholder="Pegar enlace público de Google Drive..." 
+                                                                className="lux-input"
+                                                                style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px' }}
+                                                            />
+                                                            <Button type="button" variant="primary" onClick={handleCloudImport} disabled={isCloudImporting} style={{ padding: '4px 8px', fontSize: '0.8rem' }}>
+                                                                {isCloudImporting ? '⏳' : 'Cargar'}
+                                                            </Button>
+                                                            <button type="button" onClick={() => setShowCloudInput(false)} className="text-gray-400 hover:text-gray-600">❌</button>
+                                                        </div>
+                                                    )}
+                                                    {isCloudImporting && cloudImportStatus && (
+                                                        <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            {cloudImportStatus}
+                                                        </div>
+                                                    )}
+                                                    <span className="upload-subtext">Click para examinar PDF, TIFF, JPG, CDR, AI</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                                            <label>Cantidad de Promos / Packs</label>
+                                            <input type="number" min="1" {...register('copias')} className="input-field" />
+                                        </div>
+
+                                        <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                                            <label>Logística / Envío</label>
+                                            <select {...register('envio')} className="input-field">
+                                                <option value="">Seleccionar...</option>
+                                                {getLogisticas().map((l: any) => <option key={l.id} value={l.nombre}>{l.nombre}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
