@@ -222,20 +222,23 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                         {enableModal && isHovered && (
                             <div style={{
                                 position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                background: 'rgba(0, 0, 0, 0.45)',
+                                inset: 0,
+                                background: 'rgba(15, 23, 42, 0.65)',
+                                backdropFilter: 'blur(2px)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: '#ffffff',
-                                fontSize: '18px',
-                                transition: 'opacity 0.15s ease',
-                                pointerEvents: 'none'
+                                transition: 'all 0.15s ease',
+                                pointerEvents: 'none',
+                                zIndex: 3
                             }}>
-                                ðŸ”
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    <line x1="11" y1="8" x2="11" y2="14" />
+                                    <line x1="8" y1="11" x2="14" y2="11" />
+                                </svg>
                             </div>
                         )}
                     </>
