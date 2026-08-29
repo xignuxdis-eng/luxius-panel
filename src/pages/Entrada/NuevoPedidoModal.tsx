@@ -1790,19 +1790,62 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 className="upload-preview-thumb"
                                                 style={{ width: '40px', height: '40px', marginRight: '8px' }}
                                             />
-                                            <div className="upload-text-stack" style={{ flex: 1 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span className="upload-text">{fileName || 'Seleccionar archivo...'}</span>
+                                            <div className="upload-text-stack" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); !saving && fileInputRef.current?.click(); }}
+                                                        className="lux-btn"
+                                                        style={{ 
+                                                            fontSize: '0.82rem', 
+                                                            padding: '5px 12px', 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: '5px', 
+                                                            background: 'linear-gradient(135deg, #0891b2, #06b6d4)', 
+                                                            color: '#ffffff', 
+                                                            border: 'none', 
+                                                            borderRadius: '6px', 
+                                                            fontWeight: 600, 
+                                                            cursor: 'pointer',
+                                                            boxShadow: '0 2px 6px rgba(6, 182, 212, 0.3)'
+                                                        }}
+                                                        title="Seleccionar archivo desde el equipo"
+                                                    >
+                                                        📁 Archivo...
+                                                    </button>
                                                     {!showCloudInput && (
                                                         <button 
                                                             type="button" 
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
-                                                            className="lux-btn lux-btn-secondary"
-                                                            style={{ fontSize: '0.8rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: '4px' }}
-                                                            title="Importar desde Google Drive"
+                                                            className="lux-btn"
+                                                            style={{ 
+                                                                fontSize: '0.82rem', 
+                                                                padding: '5px 12px', 
+                                                                display: 'flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '5px', 
+                                                                background: 'linear-gradient(135deg, #c026d3, #d946ef)', 
+                                                                color: '#ffffff', 
+                                                                border: 'none', 
+                                                                borderRadius: '6px', 
+                                                                fontWeight: 600, 
+                                                                cursor: 'pointer',
+                                                                boxShadow: '0 2px 6px rgba(217, 70, 239, 0.3)'
+                                                            }}
+                                                            title="Importar archivo desde Google Drive"
                                                         >
-                                                            🔗 Importar Link
+                                                            🔗 Link...
                                                         </button>
+                                                    )}
+                                                    {fileName ? (
+                                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={fileName}>
+                                                            {fileName}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                                            Sin archivo
+                                                        </span>
                                                     )}
                                                 </div>
                                                 {showCloudInput && (
@@ -2606,19 +2649,62 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                     className="upload-preview-thumb"
                                                     style={{ width: '40px', height: '40px', marginRight: '8px' }}
                                                 />
-                                                <div className="upload-text-stack" style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <span className="upload-text">{fileName || 'Seleccionar archivo para la promo...'}</span>
+                                                <div className="upload-text-stack" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); !saving && fileInputRef.current?.click(); }}
+                                                            className="lux-btn"
+                                                            style={{ 
+                                                                fontSize: '0.82rem', 
+                                                                padding: '5px 12px', 
+                                                                display: 'flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '5px', 
+                                                                background: 'linear-gradient(135deg, #0891b2, #06b6d4)', 
+                                                                color: '#ffffff', 
+                                                                border: 'none', 
+                                                                borderRadius: '6px', 
+                                                                fontWeight: 600, 
+                                                                cursor: 'pointer',
+                                                                boxShadow: '0 2px 6px rgba(6, 182, 212, 0.3)'
+                                                            }}
+                                                            title="Seleccionar archivo desde el equipo"
+                                                        >
+                                                            📁 Archivo...
+                                                        </button>
                                                         {!showCloudInput && (
                                                             <button 
                                                                 type="button" 
                                                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCloudInput(true); }}
-                                                                className="lux-btn lux-btn-secondary"
-                                                                style={{ fontSize: '0.8rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: '4px' }}
-                                                                title="Importar desde Google Drive"
+                                                                className="lux-btn"
+                                                                style={{ 
+                                                                    fontSize: '0.82rem', 
+                                                                    padding: '5px 12px', 
+                                                                    display: 'flex', 
+                                                                    alignItems: 'center', 
+                                                                    gap: '5px', 
+                                                                    background: 'linear-gradient(135deg, #c026d3, #d946ef)', 
+                                                                    color: '#ffffff', 
+                                                                    border: 'none', 
+                                                                    borderRadius: '6px', 
+                                                                    fontWeight: 600, 
+                                                                    cursor: 'pointer',
+                                                                    boxShadow: '0 2px 6px rgba(217, 70, 239, 0.3)'
+                                                                }}
+                                                                title="Importar archivo desde Google Drive"
                                                             >
-                                                                🔗 Importar Link
+                                                                🔗 Link...
                                                             </button>
+                                                        )}
+                                                        {fileName ? (
+                                                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={fileName}>
+                                                                {fileName}
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                                                Sin archivo
+                                                            </span>
                                                         )}
                                                     </div>
                                                     {showCloudInput && (
