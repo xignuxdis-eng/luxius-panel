@@ -49,22 +49,36 @@ def import_from_cloud():
             if is_folder:
                 batch_dir = os.path.join(temp_dir, file_id)
                 os.makedirs(batch_dir, exist_ok=True)
-                downloaded_paths = gdown.download_folder(url=url, output=batch_dir, quiet=True, remaining_ok=True)
+                downloaded_paths = gdown.download_folder(url=url, output=batch_dir, quiet=True)
                 if not downloaded_paths:
                     return jsonify({"error": "No se pudo descargar la carpeta. Verifique que tenga permisos públicos de lectura ('Cualquiera con el enlace')."}), 403
             else:
                 drive_id = _extract_drive_id(url)
                 if not drive_id:
                     return jsonify({"error": "Enlace de Google Drive inválido. Copie el enlace completo que contenga /d/ID o id=ID."}), 400
-                    
-                download_url = f'https://drive.google.com/uc?id={drive_id}'
-                output_path = os.path.join(temp_dir, f"{file_id}_download")
-                downloaded_file = gdown.download(url=download_url, output=output_path, quiet=True, fuzzy=True)
                 
-                if not downloaded_file or not os.path.exists(downloaded_file):
+                single_dir = os.path.join(temp_dir, file_id)
+                os.makedirs(single_dir, exist_ok=True)
+                output_target = single_dir + os.sep
+
+                # Download using drive id with gdown
+                downloaded_file = gdown.download(id=drive_id, output=output_target, quiet=True)
+                
+                # Fallback to direct uc?id= URL if needed
+                if not downloaded_file or not os.path.exists(str(downloaded_file)):
+                    download_url = f'https://drive.google.com/uc?id={drive_id}'
+                    downloaded_file = gdown.download(url=download_url, output=output_target, quiet=True)
+                
+                # If downloaded_file is still not found, check if anything was written to single_dir
+                if not downloaded_file or not os.path.exists(str(downloaded_file)):
+                    files_in_dir = [os.path.join(single_dir, f) for f in os.listdir(single_dir) if os.path.isfile(os.path.join(single_dir, f))]
+                    if files_in_dir:
+                        downloaded_file = files_in_dir[0]
+
+                if not downloaded_file or not os.path.exists(str(downloaded_file)):
                     return jsonify({"error": "No se pudo descargar desde Google Drive. Asegúrese de que el archivo esté configurado como 'Cualquier persona con el enlace puede ver'."}), 403
                 
-                downloaded_paths = [downloaded_file]
+                downloaded_paths = [str(downloaded_file)]
                 
             processed_files = []
             
