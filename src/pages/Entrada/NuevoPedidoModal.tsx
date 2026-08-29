@@ -6,7 +6,7 @@ import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { extractCdrThumbnail } from '@/utils/cdrPreview'
 import { generateVectorCard } from '@/utils/vectorPreview'
 import { PDFDocument } from 'pdf-lib'
-import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, type ComboData } from '@data/db'
+import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, getAuthHeaders, type ComboData } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -999,28 +999,30 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             const baseUrl = API_URL.replace(/\/api\/?$/, '');
             const res = await fetch(`${API_URL}/import-cloud`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ url: cloudUrl })
             });
             let data;
             try {
                 data = await res.json();
             } catch (e) {
-                throw new Error("No se pudo parsear la respuesta del servidor");
+                throw new Error("No se pudo procesar la respuesta del servidor");
             }
             if (!res.ok) throw new Error(data?.error || 'Error al importar desde la nube');
 
             if (data.status === 'success' && data.files.length > 0) {
                 let targetTab = activeTab;
-                if (targetTab === 'unitario' && data.files.length > 1) {
+                if ((targetTab === 'unitario' || targetTab === 'promos') && data.files.length > 1) {
                     targetTab = 'lote';
                     setActiveTab('lote');
                 }
 
-                if (targetTab === 'unitario') {
+                if (targetTab === 'unitario' || targetTab === 'promos') {
                     setCloudImportStatus('Descargando archivo (1/1)...');
                     const fileInfo = data.files[0];
-                    const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`);
+                    const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`, {
+                        headers: getAuthHeaders()
+                    });
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
                     const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
@@ -1030,7 +1032,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         const fileInfo = data.files[i];
                         setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
                         try {
-                            const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`);
+                            const blobRes = await fetch(`${baseUrl}${fileInfo.tempUrl}`, {
+                                headers: getAuthHeaders()
+                            });
                             if (!blobRes.ok) continue;
                             const blob = await blobRes.blob();
                             const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
