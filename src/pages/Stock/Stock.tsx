@@ -103,6 +103,55 @@ export default function Stock() {
         </svg>
     )
 
+    const getStockStatus = (current: number, min: number = 10) => {
+        if (current <= 0) {
+            return {
+                level: 'out',
+                color: '#ef4444', // Red
+                bgColor: 'rgba(239, 68, 68, 0.10)',
+                borderColor: 'rgba(239, 68, 68, 0.40)',
+                label: 'Sin Stock',
+                icon: '🔴',
+                percent: 0,
+                desc: 'Agotado'
+            }
+        }
+        if (current <= Math.max(min, 15)) {
+            return {
+                level: 'low',
+                color: '#f97316', // Orange
+                bgColor: 'rgba(249, 115, 22, 0.10)',
+                borderColor: 'rgba(249, 115, 22, 0.40)',
+                label: 'Stock Crítico',
+                icon: '🟠',
+                percent: Math.min(Math.round((current / 50) * 100), 30),
+                desc: 'Resto'
+            }
+        }
+        if (current < 40) {
+            return {
+                level: 'medium',
+                color: '#eab308', // Yellow
+                bgColor: 'rgba(234, 179, 8, 0.08)',
+                borderColor: 'rgba(234, 179, 8, 0.35)',
+                label: 'Medio Rollo',
+                icon: '🟡',
+                percent: Math.min(Math.round((current / 50) * 100), 79),
+                desc: 'Medio'
+            }
+        }
+        return {
+            level: 'optimal',
+            color: '#10b981', // Emerald Green
+            bgColor: 'rgba(16, 185, 129, 0.08)',
+            borderColor: 'rgba(16, 185, 129, 0.35)',
+            label: 'Disponible',
+            icon: '🟢',
+            percent: Math.min(Math.round((current / 50) * 100), 100),
+            desc: 'Completo'
+        }
+    }
+
     const renderGrid = (items: Material[], title: string) => {
         const grouped = items.reduce((acc: any[], m) => {
             const lowTipo = m.tipo?.toLowerCase();
@@ -111,7 +160,6 @@ export default function Stock() {
             const isSubstrate = !isLiquid && !isRigid;
 
             if (!isSubstrate && !isLiquid) {
-                // For other items (like rigid sheets or misc), keep individual or basic grouping
                 acc.push({
                     ...m,
                     groupKey: `item-${m.id}`,
@@ -122,13 +170,11 @@ export default function Stock() {
                 return acc
             }
 
-            // For liquids and substrates, we group by description and quality
             const groupKey = `${m.descripcion}-${m.calidad}`
             const existing = acc.find(g => g.groupKey === groupKey)
 
             if (existing) {
                 existing.variants.push(m)
-                // Sort variants by width (if applicable)
                 if (isSubstrate) {
                     existing.variants.sort((a: any, b: any) => (a.ancho || 0) - (b.ancho || 0))
                 }
@@ -150,15 +196,17 @@ export default function Stock() {
             return acc
         }, [])
 
-        // If it's NOT the liquids section, we sort by low stock first
+        // If it's NOT the liquids section, sort out-of-stock and low stock first
         if (title.includes('Producción')) {
             grouped.sort((a, b) => {
-                const getIsLow = (g: any) => g.variants.some((v: Material) => (v.stockActual || 0) <= (v.stockMinimo || 10))
-                const aLow = getIsLow(a)
-                const bLow = getIsLow(b)
-                if (aLow && !bLow) return -1
-                if (!aLow && bLow) return 1
-                return 0
+                const getScore = (g: any) => {
+                    const maxStock = Math.max(...g.variants.map((v: Material) => v.stockActual || 0), 0)
+                    if (maxStock <= 0) return 0 // Most critical
+                    if (maxStock <= 15) return 1
+                    if (maxStock < 40) return 2
+                    return 3
+                }
+                return getScore(a) - getScore(b)
             })
         }
 
@@ -174,15 +222,24 @@ export default function Stock() {
                             group.tipo?.toLowerCase() === 'plancha' ? '⬛' : <RollIcon color={group.color} />
                         )
 
+                        // Calculate overall group health
+                        const groupMaxStock = Math.max(...group.variants.map((v: Material) => v.stockActual || 0), 0)
+                        const groupStatus = getStockStatus(groupMaxStock)
+
                         return (
                             <div
                                 key={group.groupKey || group.id}
-                                className={`stock-card type-${group.tipo?.toLowerCase()} ${group.variants.length > 1 ? 'is-grouped' : ''}`}
+                                className={`stock-card type-${group.tipo?.toLowerCase()} stock-status-${groupStatus.level} ${group.variants.length > 1 ? 'is-grouped' : ''}`}
                                 style={{ '--item-color': group.color } as React.CSSProperties}
                             >
                                 <div className="stock-header">
                                     <div className="stock-identity">
-                                        <span className="stock-code">{group.variants.length > 1 ? group.calidad : group.barcode || group.codigo}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                            <span className="stock-code">{group.variants.length > 1 ? group.calidad : group.barcode || group.codigo}</span>
+                                            <span className={`stock-level-badge level-${groupStatus.level}`}>
+                                                {groupStatus.icon} {groupStatus.label}
+                                            </span>
+                                        </div>
                                         <span className="stock-name-header" title={group.descripcion}>{group.descripcion}</span>
                                     </div>
                                     <span className="stock-type-icon" title={group.tipo}>
@@ -226,34 +283,63 @@ export default function Stock() {
                                         {group.variants.map((v: Material) => {
                                             const current = v.stockActual || 0
                                             const min = v.stockMinimo || 10
+                                            const vStatus = getStockStatus(current, min)
+                                            const standardRoll = 50
+                                            const fillPercent = Math.min(Math.round((current / standardRoll) * 100), 100)
 
                                             if (group.isSubstrate) {
                                                 return (
-                                                    <div key={v.id} className="roll-visual-wrapper" onClick={() => handleOpenAdjustment(v)}>
+                                                    <div 
+                                                        key={v.id} 
+                                                        className={`roll-visual-wrapper status-${vStatus.level}`} 
+                                                        onClick={() => handleOpenAdjustment(v)}
+                                                        style={{
+                                                            borderColor: vStatus.borderColor,
+                                                            background: vStatus.bgColor
+                                                        }}
+                                                    >
+                                                        <div 
+                                                            className="roll-progress-bar"
+                                                            style={{
+                                                                width: `${fillPercent}%`,
+                                                                backgroundColor: vStatus.color,
+                                                                opacity: 0.18
+                                                            }}
+                                                        />
+
                                                         <div className="roll-info">
                                                             <span className="roll-width">{v.ancho ? `${v.ancho}m` : v.codigo}</span>
-                                                            <span className="roll-stock">
-                                                                {current % 1 === 0 ? current : current.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
-                                                                <small> {v.unidad || 'mts'}</small>
-                                                            </span>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                                <span className="roll-stock" style={{ color: vStatus.color }}>
+                                                                    {current % 1 === 0 ? current : current.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                                    <small> {v.unidad || 'M Lineal'}</small>
+                                                                </span>
+                                                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: vStatus.color, opacity: 0.9 }}>
+                                                                    {fillPercent}% ({vStatus.desc})
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )
                                             }
 
-                                            const fillPercent = Math.min((current / (min * 4)) * 100, 100)
                                             return (
-                                                <div key={v.id} className="variant-row" onClick={() => handleOpenAdjustment(v)}>
+                                                <div 
+                                                    key={v.id} 
+                                                    className="variant-row" 
+                                                    onClick={() => handleOpenAdjustment(v)}
+                                                    style={{ borderColor: vStatus.borderColor }}
+                                                >
                                                     <div className="variant-info">
                                                         <span className="variant-width">
                                                             {v.codigo}
                                                         </span>
                                                         <div className="variant-meter">
-                                                            <div className="variant-progress" style={{ width: `${fillPercent}%`, backgroundColor: v.color || undefined }} />
+                                                            <div className="variant-progress" style={{ width: `${fillPercent}%`, backgroundColor: vStatus.color }} />
                                                         </div>
                                                     </div>
                                                     <div className="variant-values">
-                                                        <span className="variant-number">
+                                                        <span className="variant-number" style={{ color: vStatus.color }}>
                                                             {current % 1 === 0 ? current : current.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
                                                             <span className="variant-unit"> {v.unidad}</span>
                                                         </span>
@@ -273,6 +359,11 @@ export default function Stock() {
             </div>
         )
     }
+
+    const optimalCount = materiales.filter(m => (m.stockActual || 0) >= 40).length
+    const mediumCount = materiales.filter(m => (m.stockActual || 0) > 15 && (m.stockActual || 0) < 40).length
+    const lowCount = materiales.filter(m => (m.stockActual || 0) > 0 && (m.stockActual || 0) <= 15).length
+    const outCount = materiales.filter(m => (m.stockActual || 0) <= 0).length
 
     return (
         <div className="stock-page page animate-fade-in">
@@ -300,14 +391,24 @@ export default function Stock() {
                         <span className="label">{isRefreshing ? 'Sincronizando...' : 'Sincronizar'}</span>
                     </button>
                     <div className="stat-pill">
-                        <span className="label">Total Ítems:</span>
+                        <span className="label">Total:</span>
                         <span className="value">{materiales.length}</span>
                     </div>
-                    <div className="stat-pill warning">
-                        <span className="label">Stock Bajo:</span>
-                        <span className="value">
-                            {materiales.filter(m => (m.stockActual || 0) <= (m.stockMinimo || 0)).length}
-                        </span>
+                    <div className="stat-pill pill-optimal" title="Stock completo (40m+)">
+                        <span className="label">🟢 Disponibles:</span>
+                        <span className="value">{optimalCount}</span>
+                    </div>
+                    <div className="stat-pill pill-medium" title="Medio rollo (16m - 39m)">
+                        <span className="label">🟡 Medio:</span>
+                        <span className="value">{mediumCount}</span>
+                    </div>
+                    <div className="stat-pill pill-low" title="Stock crítico (1m - 15m)">
+                        <span className="label">🟠 Bajo:</span>
+                        <span className="value">{lowCount}</span>
+                    </div>
+                    <div className="stat-pill pill-out" title="Sin stock (0m)">
+                        <span className="label">🔴 Agotados:</span>
+                        <span className="value">{outCount}</span>
                     </div>
                 </div>
             </div>
