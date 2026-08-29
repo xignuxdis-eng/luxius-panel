@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getClientes, getMateriales, getCalidades, saveOrden } from '@/data/db';
+import { getClientes, getMateriales, getCalidades, saveOrden, getCombos, type ComboData } from '@/data/db';
 import { useAuthStore } from '@/store/authStore';
 import { downloadPresupuestoPDF, type PresupuestoItem, type PresupuestoData } from '@/utils/presupuestoPdf';
 import type { UnidadMedida } from '@/types/orden';
@@ -14,6 +14,7 @@ export default function Presupuestador() {
     const clientes = getClientes();
     const materiales = getMateriales();
     const calidades = getCalidades();
+    const combos = getCombos().filter(c => c.activo !== false);
 
     // Presupuesto Meta State
     const [selectedClientId, setSelectedClientId] = useState<number | ''>(clientes[0]?.id || '');
@@ -41,8 +42,34 @@ export default function Presupuestador() {
     // Item List
     const [items, setItems] = useState<PresupuestoItem[]>([]);
 
-    // Form Tab State: 'catalog' | 'custom'
-    const [activeTab, setActiveTab] = useState<'catalog' | 'custom'>('catalog');
+    // Form Tab State: 'catalog' | 'combos' | 'custom'
+    const [activeTab, setActiveTab] = useState<'catalog' | 'combos' | 'custom'>('catalog');
+
+    // Combos Form State
+    const [selectedComboId, setSelectedComboId] = useState<number | null>(null);
+    const [comboSearch, setComboSearch] = useState('');
+    const [comboCategoria, setComboCategoria] = useState('Todas');
+    const [comboCopias, setComboCopias] = useState<number>(1);
+    const [comboCustomPrecio, setComboCustomPrecio] = useState<number | ''>('');
+
+    const comboCategories = useMemo(() => {
+        const cats = new Set<string>();
+        combos.forEach(c => {
+            if (c.categoria) cats.add(c.categoria);
+        });
+        return ['Todas', ...Array.from(cats)];
+    }, [combos]);
+
+    const filteredCombos = useMemo(() => {
+        return combos.filter(c => {
+            const matchesCat = comboCategoria === 'Todas' || c.categoria === comboCategoria;
+            const matchesSearch = !comboSearch || 
+                c.nombre.toLowerCase().includes(comboSearch.toLowerCase()) || 
+                (c.descripcion || '').toLowerCase().includes(comboSearch.toLowerCase()) ||
+                (c.material || '').toLowerCase().includes(comboSearch.toLowerCase());
+            return matchesCat && matchesSearch;
+        });
+    }, [combos, comboCategoria, comboSearch]);
 
     // Catalog Form State
     const [catMaterial, setCatMaterial] = useState<string>(materiales[0]?.descripcion || materiales[0]?.codigo || 'Lona Front 13oz');
@@ -77,6 +104,36 @@ export default function Presupuestador() {
             unidadMedida: 'm2',
             cantidad: Math.round(areaM2 * catCopias * 100) / 100,
             precioUnitario: catPrecioM2,
+            subtotal: subtotal,
+            isCustom: false
+        };
+
+        setItems([...items, newItem]);
+    };
+
+    const handleSelectCombo = (combo: ComboData) => {
+        setSelectedComboId(combo.id);
+        setComboCustomPrecio(combo.precio);
+    };
+
+    const handleAddComboItem = (e: React.FormEvent) => {
+        e.preventDefault();
+        const combo = combos.find(c => c.id === selectedComboId);
+        if (!combo) {
+            alert('Por favor seleccione una promo o combo de la lista.');
+            return;
+        }
+
+        const unitPrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : combo.precio;
+        const qty = comboCopias > 0 ? comboCopias : 1;
+        const subtotal = qty * unitPrice;
+
+        const newItem: PresupuestoItem = {
+            id: `item-combo-${Date.now()}`,
+            concepto: `[PROMO] ${combo.nombre} (${combo.ancho}x${combo.alto}m - ${combo.material}${combo.servicios && combo.servicios.length > 0 ? ' + ' + combo.servicios.join(', ') : ''})`,
+            unidadMedida: 'u',
+            cantidad: qty,
+            precioUnitario: unitPrice,
             subtotal: subtotal,
             isCustom: false
         };
@@ -293,6 +350,13 @@ export default function Presupuestador() {
                             </button>
                             <button
                                 type="button"
+                                className={`item-tab-btn ${activeTab === 'combos' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('combos')}
+                            >
+                                🎁 Promos y Combos ({combos.length})
+                            </button>
+                            <button
+                                type="button"
                                 className={`item-tab-btn ${activeTab === 'custom' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('custom')}
                             >
@@ -376,6 +440,123 @@ export default function Presupuestador() {
                                     ➕ Agregar Ítem de Imprenta
                                 </button>
                             </form>
+                        ) : activeTab === 'combos' ? (
+                            <div className="presupuesto-combos-container">
+                                <div className="presupuesto-combos-search-bar">
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="🔍 Buscar combo o promo por nombre o material..."
+                                        value={comboSearch}
+                                        onChange={(e) => setComboSearch(e.target.value)}
+                                        style={{ flex: 1 }}
+                                    />
+                                </div>
+
+                                <div className="presupuesto-combos-categories">
+                                    {comboCategories.map(cat => (
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            className={`presupuesto-cat-pill ${comboCategoria === cat ? 'active' : ''}`}
+                                            onClick={() => setComboCategoria(cat)}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {filteredCombos.length === 0 ? (
+                                    <p style={{ color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '20px' }}>
+                                        No se encontraron combos o promociones con ese criterio.
+                                    </p>
+                                ) : (
+                                    <div className="presupuesto-combos-grid">
+                                        {filteredCombos.map(combo => {
+                                            const isSelected = selectedComboId === combo.id;
+                                            return (
+                                                <div
+                                                    key={combo.id}
+                                                    className={`presupuesto-combo-card ${isSelected ? 'selected' : ''}`}
+                                                    onClick={() => handleSelectCombo(combo)}
+                                                >
+                                                    <div className="presupuesto-combo-header">
+                                                        <h3 className="presupuesto-combo-name">
+                                                            {combo.icono || '🎁'} {combo.nombre}
+                                                        </h3>
+                                                        {combo.categoria && (
+                                                            <span className="presupuesto-combo-badge">{combo.categoria}</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="presupuesto-combo-details">
+                                                        <div>📐 <strong>Medida:</strong> {combo.ancho}m x {combo.alto}m</div>
+                                                        <div>🎨 <strong>Material:</strong> {combo.material}</div>
+                                                        {combo.servicios && combo.servicios.length > 0 && (
+                                                            <div>⚙️ <strong>Incluye:</strong> {combo.servicios.join(', ')}</div>
+                                                        )}
+                                                        {combo.descripcion && (
+                                                            <div style={{ fontStyle: 'italic', opacity: 0.8 }}>{combo.descripcion}</div>
+                                                        )}
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                                                        <span className="presupuesto-combo-price">
+                                                            ${combo.precio.toLocaleString('es-AR')}
+                                                        </span>
+                                                        <span style={{ fontSize: '12px', color: isSelected ? 'var(--primary-color, #6366f1)' : 'var(--text-secondary)', fontWeight: 600 }}>
+                                                            {isSelected ? '✓ Seleccionado' : 'Seleccionar'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {selectedComboId && (() => {
+                                    const currentCombo = combos.find(c => c.id === selectedComboId);
+                                    if (!currentCombo) return null;
+                                    const effectivePrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : currentCombo.precio;
+                                    const totalCombo = (comboCopias || 1) * effectivePrice;
+                                    return (
+                                        <form onSubmit={handleAddComboItem} className="presupuesto-combo-action-box">
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
+                                                Configurar Combo: <span style={{ color: 'var(--accent-color, #818cf8)' }}>{currentCombo.nombre}</span>
+                                            </div>
+                                            <div className="form-grid-2">
+                                                <div className="form-group">
+                                                    <label>Cantidad de Packs / Combos</label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        className="form-input"
+                                                        value={comboCopias}
+                                                        onChange={(e) => setComboCopias(Math.max(1, Number(e.target.value)))}
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>Precio Unitario Cotizado ($)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        value={comboCustomPrecio}
+                                                        onChange={(e) => setComboCustomPrecio(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                className="btn-add"
+                                                style={{ background: 'linear-gradient(135deg, #db2777, #ec4899)', marginTop: '8px' }}
+                                            >
+                                                🎁 Agregar Combo al Presupuesto (${totalCombo.toLocaleString('es-AR')})
+                                            </button>
+                                        </form>
+                                    );
+                                })()}
+                            </div>
                         ) : (
                             <form onSubmit={handleAddCustomItem}>
                                 <div className="form-group">
@@ -459,7 +640,9 @@ export default function Presupuestador() {
                                         <tr key={item.id}>
                                             <td>{index + 1}</td>
                                             <td>
-                                                {item.isCustom ? (
+                                                {item.concepto.startsWith('[PROMO]') ? (
+                                                    <span style={{ background: '#ec4899', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>PROMO</span>
+                                                ) : item.isCustom ? (
                                                     <span style={{ background: '#f59e0b', color: '#000', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>ESPECIAL</span>
                                                 ) : (
                                                     <span style={{ background: '#6366f1', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>CATÁLOGO</span>
