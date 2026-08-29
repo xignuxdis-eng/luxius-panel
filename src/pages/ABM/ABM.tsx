@@ -10,6 +10,9 @@ import MaquinasView from './MaquinasView'
 import LogisticsView from './LogisticsView'
 import TarifasXignuxView from './TarifasXignuxView'
 import CombosView from './CombosView'
+import MonedasView from './MonedasView'
+import CajasView from './CajasView'
+import BancosView from './BancosView'
 import './ABM.css'
 
 export default function ABM() {
@@ -48,9 +51,9 @@ export default function ABM() {
                     <Route path="logistica" element={<LogisticsView />} />
                     <Route path="productos" element={<CombosView />} />
                     <Route path="combos" element={<Navigate to="/abm/productos" replace />} />
-                    <Route path="monedas" element={<div className="p-20">Gestión de monedas próximamente...</div>} />
-                    <Route path="cajas" element={<div className="p-20">Gestión de cajas próximamente...</div>} />
-                    <Route path="bancos" element={<div className="p-20">Gestión de bancos próximamente...</div>} />
+                    <Route path="monedas" element={<MonedasView />} />
+                    <Route path="cajas" element={<CajasView />} />
+                    <Route path="bancos" element={<BancosView />} />
                     <Route path="*" element={<Navigate to="clientes" replace />} />
                 </Routes>
             </div>

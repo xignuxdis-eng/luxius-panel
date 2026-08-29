@@ -108,3 +108,57 @@ export interface Proveedor {
     notas: string
     habilitado: boolean
 }
+
+export interface MonedaConfig {
+    id: string
+    codigo: string // 'ARS' | 'USD' | 'EUR' | 'USDT'
+    nombre: string
+    simbolo: string
+    cotizacion: number // Cotización de mercado / oficial
+    cotizacionTaller: number // Cotización interna de taller
+    esBase: boolean
+    autoSync: boolean
+    margenSeguridad: number // % sobre cotización (ej: 2)
+    ultimaActualizacion: string
+}
+
+export interface Caja {
+    id: number
+    nombre: string
+    tipo: 'efectivo' | 'banco' | 'digital' | 'dolares'
+    moneda: string
+    saldoActual: number
+    responsable: string
+    estado: 'abierta' | 'cerrada'
+    descripcion?: string
+    habilitada: boolean
+}
+
+export interface MovimientoCaja {
+    id: number
+    cajaId: number
+    fecha: string
+    tipo: 'ingreso' | 'egreso' | 'ajuste' | 'apertura' | 'cierre'
+    categoria: string // 'Cobro Pedido' | 'Seña' | 'Insumos Taller' | 'Viáticos' | 'Retiro' | 'Flete' | 'Aporte Capital' | 'Otro'
+    concepto: string
+    monto: number
+    moneda: string
+    pedidoId?: number
+    comprobante?: string
+    usuario: string
+}
+
+export interface Banco {
+    id: number
+    nombre: string
+    tipoCuenta: 'corriente' | 'caja_ahorro' | 'virtual'
+    numeroCuenta: string
+    cbu: string
+    alias: string
+    titular: string
+    cuitTitular: string
+    saldoActual: number
+    moneda: string
+    habilitado: boolean
+}
+

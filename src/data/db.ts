@@ -8,7 +8,7 @@
 // import configData from './db/config.json' // Kept for config defaults if needed, but others should be server-only
 
 // Types
-import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica } from '@/types'
+import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica, MonedaConfig, Caja, MovimientoCaja, Banco } from '@/types'
 
 // API Configuration: dynamic between local server and Render cloud
 export const API_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -2153,4 +2153,370 @@ export async function getXanaPromptContext(): Promise<XanaPromptContext | null> 
         return await res.json();
     } catch { return null; }
 }
+
+// ==========================================
+// MONEDAS Y COTIZACIONES
+// ==========================================
+const SESSION_MONEDAS_KEY = 'luxius_monedas'
+
+export function getMonedas(): MonedaConfig[] {
+    const raw = localStorage.getItem(SESSION_MONEDAS_KEY)
+    if (raw) {
+        try { return JSON.parse(raw) } catch {}
+    }
+    const defaultMonedas: MonedaConfig[] = [
+        {
+            id: 'ARS',
+            codigo: 'ARS',
+            nombre: 'Peso Argentino',
+            simbolo: '$',
+            cotizacion: 1,
+            cotizacionTaller: 1,
+            esBase: true,
+            autoSync: false,
+            margenSeguridad: 0,
+            ultimaActualizacion: new Date().toISOString()
+        },
+        {
+            id: 'USD_BLUE',
+            codigo: 'USD',
+            nombre: 'Dólar Blue / Informal',
+            simbolo: 'US$',
+            cotizacion: 1380,
+            cotizacionTaller: 1400,
+            esBase: false,
+            autoSync: true,
+            margenSeguridad: 2.5,
+            ultimaActualizacion: new Date().toISOString()
+        },
+        {
+            id: 'USD_OFICIAL',
+            codigo: 'USD_OF',
+            nombre: 'Dólar Oficial (BNA)',
+            simbolo: 'US$ OF',
+            cotizacion: 1040,
+            cotizacionTaller: 1060,
+            esBase: false,
+            autoSync: true,
+            margenSeguridad: 2.0,
+            ultimaActualizacion: new Date().toISOString()
+        },
+        {
+            id: 'EUR',
+            codigo: 'EUR',
+            nombre: 'Euro',
+            simbolo: '€',
+            cotizacion: 1520,
+            cotizacionTaller: 1550,
+            esBase: false,
+            autoSync: false,
+            margenSeguridad: 2.0,
+            ultimaActualizacion: new Date().toISOString()
+        },
+        {
+            id: 'USDT',
+            codigo: 'USDT',
+            nombre: 'Dólar Cripto (USDT)',
+            simbolo: '₮',
+            cotizacion: 1390,
+            cotizacionTaller: 1420,
+            esBase: false,
+            autoSync: true,
+            margenSeguridad: 2.0,
+            ultimaActualizacion: new Date().toISOString()
+        }
+    ]
+    localStorage.setItem(SESSION_MONEDAS_KEY, JSON.stringify(defaultMonedas))
+    return defaultMonedas
+}
+
+export function saveMoneda(moneda: Partial<MonedaConfig>): MonedaConfig[] {
+    const list = getMonedas()
+    const idx = list.findIndex(m => m.id === moneda.id)
+    if (idx !== -1) {
+        list[idx] = { ...list[idx], ...moneda, ultimaActualizacion: new Date().toISOString() }
+    } else {
+        const newMoneda: MonedaConfig = {
+            id: moneda.id || `MON_${Date.now()}`,
+            codigo: moneda.codigo || 'DIV',
+            nombre: moneda.nombre || 'Nueva Moneda',
+            simbolo: moneda.simbolo || '$',
+            cotizacion: moneda.cotizacion || 1,
+            cotizacionTaller: moneda.cotizacionTaller || moneda.cotizacion || 1,
+            esBase: moneda.esBase || false,
+            autoSync: moneda.autoSync || false,
+            margenSeguridad: moneda.margenSeguridad || 0,
+            ultimaActualizacion: new Date().toISOString()
+        }
+        list.push(newMoneda)
+    }
+    localStorage.setItem(SESSION_MONEDAS_KEY, JSON.stringify(list))
+    return list
+}
+
+export async function fetchLiveDolarRates(): Promise<{ blue?: { venta: number, compra: number }, oficial?: { venta: number, compra: number }, cripto?: { venta: number, compra: number } }> {
+    try {
+        const res = await fetch('https://dolarapi.com/v1/dolares')
+        if (!res.ok) return {}
+        const data = await res.json()
+        const result: any = {}
+        data.forEach((item: any) => {
+            if (item.casa === 'blue') result.blue = { venta: item.venta, compra: item.compra }
+            if (item.casa === 'oficial') result.oficial = { venta: item.venta, compra: item.compra }
+            if (item.casa === 'cripto') result.cripto = { venta: item.venta, compra: item.compra }
+        })
+        return result
+    } catch {
+        return {}
+    }
+}
+
+// ==========================================
+// CAJAS Y FLUJO DE EFECTIVO
+// ==========================================
+const SESSION_CAJAS_KEY = 'luxius_cajas'
+const SESSION_MOV_CAJA_KEY = 'luxius_movimientos_caja'
+
+export function getCajas(): Caja[] {
+    const raw = localStorage.getItem(SESSION_CAJAS_KEY)
+    if (raw) {
+        try { return JSON.parse(raw) } catch {}
+    }
+    const defaultCajas: Caja[] = [
+        {
+            id: 1,
+            nombre: 'Caja Mostrador / Recepción',
+            tipo: 'efectivo',
+            moneda: 'ARS',
+            saldoActual: 85400,
+            responsable: 'Atención al Cliente',
+            estado: 'abierta',
+            descripcion: 'Cobros diarios en mostrador, señas en efectivo y cambio.',
+            habilitada: true
+        },
+        {
+            id: 2,
+            nombre: 'Caja Chica Taller',
+            tipo: 'efectivo',
+            moneda: 'ARS',
+            saldoActual: 32000,
+            responsable: 'Jefe de Taller',
+            estado: 'abierta',
+            descripcion: 'Gastos menores de ferretería, cinta, viáticos y fletes urgentes.',
+            habilitada: true
+        },
+        {
+            id: 3,
+            nombre: 'Caja Fuerte USD',
+            tipo: 'dolares',
+            moneda: 'USD',
+            saldoActual: 2450,
+            responsable: 'Administración',
+            estado: 'abierta',
+            descripcion: 'Reserva de dólares en efectivo para insumos y cabezales.',
+            habilitada: true
+        },
+        {
+            id: 4,
+            nombre: 'Mercado Pago / Digital',
+            tipo: 'digital',
+            moneda: 'ARS',
+            saldoActual: 148500,
+            responsable: 'Administración',
+            estado: 'abierta',
+            descripcion: 'Cobros QR, links de pago y transferencias directas.',
+            habilitada: true
+        }
+    ]
+    localStorage.setItem(SESSION_CAJAS_KEY, JSON.stringify(defaultCajas))
+    return defaultCajas
+}
+
+export function saveCaja(caja: Partial<Caja>): Caja {
+    const list = getCajas()
+    const idx = list.findIndex(c => c.id === caja.id)
+    let result: Caja
+    if (idx !== -1) {
+        list[idx] = { ...list[idx], ...caja } as Caja
+        result = list[idx]
+    } else {
+        const newCaja: Caja = {
+            id: caja.id || Math.floor(Math.random() * 90000) + 1000,
+            nombre: caja.nombre || 'Nueva Caja',
+            tipo: caja.tipo || 'efectivo',
+            moneda: caja.moneda || 'ARS',
+            saldoActual: caja.saldoActual || 0,
+            responsable: caja.responsable || 'General',
+            estado: caja.estado || 'abierta',
+            descripcion: caja.descripcion || '',
+            habilitada: caja.habilitada !== false
+        }
+        list.push(newCaja)
+        result = newCaja
+    }
+    localStorage.setItem(SESSION_CAJAS_KEY, JSON.stringify(list))
+    return result
+}
+
+export function deleteCaja(id: number) {
+    const list = getCajas().filter(c => c.id !== id)
+    localStorage.setItem(SESSION_CAJAS_KEY, JSON.stringify(list))
+}
+
+export function getMovimientosCaja(): MovimientoCaja[] {
+    const raw = localStorage.getItem(SESSION_MOV_CAJA_KEY)
+    if (raw) {
+        try { return JSON.parse(raw) } catch {}
+    }
+    const defaultMovs: MovimientoCaja[] = [
+        {
+            id: 1,
+            cajaId: 1,
+            fecha: new Date(Date.now() - 3600000 * 5).toISOString(),
+            tipo: 'apertura',
+            categoria: 'Apertura de Caja',
+            concepto: 'Apertura de caja con fondo para cambio',
+            monto: 30000,
+            moneda: 'ARS',
+            usuario: 'Recepción'
+        },
+        {
+            id: 2,
+            cajaId: 1,
+            fecha: new Date(Date.now() - 3600000 * 3).toISOString(),
+            tipo: 'ingreso',
+            categoria: 'Seña',
+            concepto: 'Seña 50% Orden #1042 (Lona Front)',
+            monto: 45400,
+            moneda: 'ARS',
+            pedidoId: 1042,
+            usuario: 'Ventas'
+        },
+        {
+            id: 3,
+            cajaId: 2,
+            fecha: new Date(Date.now() - 3600000 * 2).toISOString(),
+            tipo: 'egreso',
+            categoria: 'Insumos Taller',
+            concepto: 'Compra cinta bifaz y cutters ferretería',
+            monto: 8500,
+            moneda: 'ARS',
+            comprobante: 'Factura B #4492',
+            usuario: 'Taller'
+        }
+    ]
+    localStorage.setItem(SESSION_MOV_CAJA_KEY, JSON.stringify(defaultMovs))
+    return defaultMovs
+}
+
+export function saveMovimientoCaja(mov: Partial<MovimientoCaja>): MovimientoCaja {
+    const movs = getMovimientosCaja()
+    const newMov: MovimientoCaja = {
+        id: mov.id || Math.floor(Math.random() * 900000) + 1000,
+        cajaId: mov.cajaId || 1,
+        fecha: mov.fecha || new Date().toISOString(),
+        tipo: mov.tipo || 'ingreso',
+        categoria: mov.categoria || 'Otro',
+        concepto: mov.concepto || 'Movimiento de caja',
+        monto: Math.abs(mov.monto || 0),
+        moneda: mov.moneda || 'ARS',
+        pedidoId: mov.pedidoId,
+        comprobante: mov.comprobante,
+        usuario: mov.usuario || 'Sistema'
+    }
+    movs.unshift(newMov)
+    localStorage.setItem(SESSION_MOV_CAJA_KEY, JSON.stringify(movs))
+
+    // Update box current balance
+    const cajas = getCajas()
+    const cIdx = cajas.findIndex(c => c.id === newMov.cajaId)
+    if (cIdx !== -1) {
+        if (newMov.tipo === 'ingreso' || newMov.tipo === 'apertura') {
+            cajas[cIdx].saldoActual += newMov.monto
+        } else if (newMov.tipo === 'egreso') {
+            cajas[cIdx].saldoActual = Math.max(0, cajas[cIdx].saldoActual - newMov.monto)
+        } else if (newMov.tipo === 'ajuste') {
+            cajas[cIdx].saldoActual = newMov.monto
+        }
+        localStorage.setItem(SESSION_CAJAS_KEY, JSON.stringify(cajas))
+    }
+
+    return newMov
+}
+
+// ==========================================
+// BANCOS Y CUENTAS
+// ==========================================
+const SESSION_BANCOS_KEY = 'luxius_bancos'
+
+export function getBancos(): Banco[] {
+    const raw = localStorage.getItem(SESSION_BANCOS_KEY)
+    if (raw) {
+        try { return JSON.parse(raw) } catch {}
+    }
+    const defaultBancos: Banco[] = [
+        {
+            id: 1,
+            nombre: 'Banco Santander',
+            tipoCuenta: 'corriente',
+            numeroCuenta: '072-123456/7',
+            cbu: '0720072020000012345678',
+            alias: 'XIGNUX.PRODUCCION',
+            titular: 'Xignux Gráfica S.A.',
+            cuitTitular: '30-71234567-8',
+            saldoActual: 840000,
+            moneda: 'ARS',
+            habilitado: true
+        },
+        {
+            id: 2,
+            nombre: 'Banco Galicia',
+            tipoCuenta: 'caja_ahorro',
+            numeroCuenta: '4005678-1 089-2',
+            cbu: '0070089430004005678123',
+            alias: 'XIGNUX.TALLER',
+            titular: 'Xignux Gráfica S.A.',
+            cuitTitular: '30-71234567-8',
+            saldoActual: 320000,
+            moneda: 'ARS',
+            habilitado: true
+        }
+    ]
+    localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(defaultBancos))
+    return defaultBancos
+}
+
+export function saveBanco(banco: Partial<Banco>): Banco {
+    const list = getBancos()
+    const idx = list.findIndex(b => b.id === banco.id)
+    let result: Banco
+    if (idx !== -1) {
+        list[idx] = { ...list[idx], ...banco } as Banco
+        result = list[idx]
+    } else {
+        const newBanco: Banco = {
+            id: banco.id || Math.floor(Math.random() * 90000) + 1000,
+            nombre: banco.nombre || 'Nuevo Banco',
+            tipoCuenta: banco.tipoCuenta || 'corriente',
+            numeroCuenta: banco.numeroCuenta || '',
+            cbu: banco.cbu || '',
+            alias: banco.alias || '',
+            titular: banco.titular || '',
+            cuitTitular: banco.cuitTitular || '',
+            saldoActual: banco.saldoActual || 0,
+            moneda: banco.moneda || 'ARS',
+            habilitado: banco.habilitado !== false
+        }
+        list.push(newBanco)
+        result = newBanco
+    }
+    localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(list))
+    return result
+}
+
+export function deleteBanco(id: number) {
+    const list = getBancos().filter(b => b.id !== id)
+    localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(list))
+}
+
 
