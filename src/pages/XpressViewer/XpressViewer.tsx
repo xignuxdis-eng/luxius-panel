@@ -79,8 +79,77 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     // Config
     const [assumedDpi, setAssumedDpi] = useState<number>(300);
 
+    // Multipage PDF Navigation State
+    const [pdfDoc, setPdfDoc] = useState<any>(null);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [totalPages, setTotalPages] = useState<number>(1);
+    const [isRenderingPage, setIsRenderingPage] = useState<boolean>(false);
+
     const imageRef = useRef<HTMLImageElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
+
+    const handleClear = () => {
+        setFile(null);
+        setPreviewUrl(null);
+        setMetadata(null);
+        setPdfDoc(null);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setIsRenderingPage(false);
+        setToolMode('none');
+        setMeasureStart(null);
+        setMeasureEnd(null);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+    };
+
+    const goToPage = async (pageNumber: number) => {
+        if (!pdfDoc || isRenderingPage) return;
+        const targetPage = Math.max(1, Math.min(pageNumber, totalPages));
+        if (targetPage === currentPage && previewUrl) return;
+
+        setIsRenderingPage(true);
+        setStatusText(`Renderizando página ${targetPage} de ${totalPages}...`);
+        try {
+            const page = await pdfDoc.getPage(targetPage);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context!, viewport }).promise;
+            const newPreview = canvas.toDataURL('image/webp', 0.9);
+
+            setPreviewUrl(newPreview);
+            setCurrentPage(targetPage);
+            setMetadata((prev: any) => ({
+                ...prev,
+                currentPage: targetPage,
+                width: Math.round(viewport.width),
+                height: Math.round(viewport.height),
+                colors: undefined
+            }));
+        } catch (err) {
+            console.error('Error cambiando de página en PDF:', err);
+        } finally {
+            setIsRenderingPage(false);
+        }
+    };
+
+    // Keyboard navigation for multipage documents
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!pdfDoc || totalPages <= 1) return;
+            if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                goToPage(currentPage - 1);
+            } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+                goToPage(currentPage + 1);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [pdfDoc, currentPage, totalPages, isRenderingPage]);
 
     React.useEffect(() => {
         if (initialFile) {
@@ -180,6 +249,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 
             // 1. Bitmaps Nativos
             if (uploadedFile.type.startsWith('image/') && !['psd', 'cdr'].includes(ext || '')) {
+                setPdfDoc(null);
+                setTotalPages(1);
+                setCurrentPage(1);
                 setStatusText('Renderizando bitmap nativo...');
                 extractedPreview = URL.createObjectURL(uploadedFile);
                 
@@ -199,13 +271,18 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 setStatusText('Renderizando motor vectorial PDF...');
                 const arrayBuffer = await uploadedFile.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                const page = await pdf.getPage(1);
+                setPdfDoc(pdf);
+                setTotalPages(pdf.numPages);
+                setCurrentPage(1);
                 
                 meta.pages = pdf.numPages;
-                const viewport = page.getViewport({ scale: 1.5 });
+                meta.currentPage = 1;
+                meta.colorMode = 'Documento PDF';
+
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 2.0 });
                 meta.width = Math.round(viewport.width);
                 meta.height = Math.round(viewport.height);
-                meta.colorMode = 'Documento';
 
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
@@ -213,10 +290,13 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 canvas.width = viewport.width;
                 
                 await page.render({ canvasContext: context!, viewport: viewport }).promise;
-                extractedPreview = canvas.toDataURL('image/webp', 0.8);
+                extractedPreview = canvas.toDataURL('image/webp', 0.9);
             }
             // 3. CorelDRAW (JSZip)
             else if (ext === 'cdr') {
+                setPdfDoc(null);
+                setTotalPages(1);
+                setCurrentPage(1);
                 setStatusText('Extrayendo ZIP interno (Fast Preview CDR)...');
                 
                 try {
@@ -359,17 +439,6 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         onDrop,
         noClick: file !== null 
     });
-
-    const handleClear = () => {
-        setFile(null);
-        setPreviewUrl(null);
-        setMetadata(null);
-        setToolMode('none');
-        setMeasureStart(null);
-        setMeasureEnd(null);
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-    };
 
     // Herramientas Interactivas: Eventos
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -553,10 +622,64 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             </div>
                         )}
                         
+                        {totalPages > 1 && (
+                            <div className="xpress-pagination-bar">
+                                <button
+                                    type="button"
+                                    className="xpress-page-nav-btn"
+                                    disabled={currentPage <= 1 || isRenderingPage}
+                                    onClick={(e) => { e.stopPropagation(); goToPage(currentPage - 1); }}
+                                    title="Página Anterior (←)"
+                                >
+                                    ◀ Anterior
+                                </button>
+                                <span className="xpress-page-indicator">
+                                    Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
+                                </span>
+                                <button
+                                    type="button"
+                                    className="xpress-page-nav-btn"
+                                    disabled={currentPage >= totalPages || isRenderingPage}
+                                    onClick={(e) => { e.stopPropagation(); goToPage(currentPage + 1); }}
+                                    title="Página Siguiente (→)"
+                                >
+                                    Siguiente ▶
+                                </button>
+                            </div>
+                        )}
+
                         <div className="xpress-toolbar">
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.1, z - 0.2)); }} title="Alejar">➖</button>
                             <span style={{color: '#fff', fontSize: '0.8rem', minWidth: '40px', textAlign: 'center'}}>{Math.round(zoom * 100)}%</span>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(10, z + 0.2)); }} title="Acercar">➕</button>
+                            
+                            {totalPages > 1 && (
+                                <>
+                                    <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }}></div>
+                                    <button 
+                                        type="button"
+                                        className="xpress-tool-btn" 
+                                        disabled={currentPage <= 1 || isRenderingPage} 
+                                        onClick={(e) => { e.stopPropagation(); goToPage(currentPage - 1); }} 
+                                        title="Página Anterior (←)"
+                                    >
+                                        ◀
+                                    </button>
+                                    <span style={{ color: '#fff', fontSize: '0.8rem', minWidth: '36px', textAlign: 'center', fontWeight: 700 }}>
+                                        {currentPage}/{totalPages}
+                                    </span>
+                                    <button 
+                                        type="button"
+                                        className="xpress-tool-btn" 
+                                        disabled={currentPage >= totalPages || isRenderingPage} 
+                                        onClick={(e) => { e.stopPropagation(); goToPage(currentPage + 1); }} 
+                                        title="Página Siguiente (→)"
+                                    >
+                                        ▶
+                                    </button>
+                                </>
+                            )}
+
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button 
                                 className={`xpress-tool-btn ${toolMode === 'pan' ? 'active' : ''}`} 
@@ -655,12 +778,39 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                     <span className="xpress-meta-label">Color Original</span>
                                     <span className="xpress-meta-value">{metadata.colorMode}</span>
                                 </div>
-                                {metadata.pages && (
+                                {totalPages > 1 ? (
+                                    <div className="xpress-meta-row" style={{ alignItems: 'center' }}>
+                                        <span className="xpress-meta-label">Página</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <button 
+                                                type="button"
+                                                disabled={currentPage <= 1 || isRenderingPage}
+                                                onClick={() => goToPage(currentPage - 1)}
+                                                style={{ padding: '2px 8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
+                                                title="Página Anterior (←)"
+                                            >
+                                                ◀
+                                            </button>
+                                            <span className="xpress-meta-value" style={{ fontWeight: 700 }}>
+                                                {currentPage} / {totalPages}
+                                            </span>
+                                            <button 
+                                                type="button"
+                                                disabled={currentPage >= totalPages || isRenderingPage}
+                                                onClick={() => goToPage(currentPage + 1)}
+                                                style={{ padding: '2px 8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
+                                                title="Página Siguiente (→)"
+                                            >
+                                                ▶
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : metadata.pages ? (
                                     <div className="xpress-meta-row">
                                         <span className="xpress-meta-label">Páginas</span>
                                         <span className="xpress-meta-value">{metadata.pages}</span>
                                     </div>
-                                )}
+                                ) : null}
                                 <div className="xpress-meta-row" style={{ marginTop: '12px' }}>
                                     <span className="xpress-meta-label" style={{ fontSize: '0.8rem' }}>Motor de Preview:</span>
                                     <span className="xpress-meta-value" style={{ fontSize: '0.8rem', color: metadata.source.includes('Client') ? '#34d399' : '#fbbf24' }}>
