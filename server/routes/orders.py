@@ -162,6 +162,22 @@ def _presupuesto_to_order(p):
             archivos.append(a)
             archivos_originales.append(a.split('/')[-1])
 
+    # Direct files from especificaciones['archivos'] and especificaciones['archivosOriginales']
+    esp_archivos = esp.get('archivos') or []
+    esp_archivos_orig = esp.get('archivosOriginales') or []
+    for idx_f, f in enumerate(esp_archivos):
+        if f and f not in archivos:
+            archivos.append(f)
+            orig = esp_archivos_orig[idx_f] if idx_f < len(esp_archivos_orig) else (f.split('/')[-1] if isinstance(f, str) else 'archivo')
+            archivos_originales.append(orig)
+
+    mat_code = esp.get('material') or primer_cartel.get('tipo', '')
+    mat_display = MATERIAL_LABELS.get(mat_code, mat_code)
+
+    ancho_val = float(esp.get('ancho') or medidas.get('ancho', 0))
+    alto_val = float(esp.get('alto') or medidas.get('alto', 0))
+    copias_val = int(esp.get('copias') or primer_cartel.get('copias') or len(carteles) or 1)
+
     return {
         'id': _uuid_to_int(p.id),
         'uuid': str(p.id),
@@ -175,11 +191,11 @@ def _presupuesto_to_order(p):
         'updatedAt': p.updated_at.isoformat() if p.updated_at else None,
 
         # Material specs
-        'material': MATERIAL_LABELS.get(tipo_material, tipo_material.replace('_', ' ').title() if tipo_material else ''),
-        'calidad': 'Estándar',
-        'alto': float(medidas.get('alto', 0)),
-        'ancho': float(medidas.get('ancho', 0)),
-        'copias': len(carteles) or 1,
+        'material': mat_display,
+        'calidad': esp.get('calidad', 'Estándar'),
+        'alto': alto_val,
+        'ancho': ancho_val,
+        'copias': copias_val,
 
         # Financials
         'subtotal': float(p.subtotal or 0),
@@ -210,6 +226,9 @@ def _presupuesto_to_order(p):
         # Files
         'archivos': archivos,
         'archivosOriginales': archivos_originales,
+        'imgMetadata': esp.get('imgMetadata'),
+        'servicios': esp.get('servicios', {}),
+        'demasiasConfig': esp.get('demasiasConfig', {}),
 
         # Production
         'maquinaId': None,
@@ -287,7 +306,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = p.especificaciones or {}
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias'):
         if k in data:
             current_especs[k] = data[k]
     p.especificaciones = current_especs
@@ -406,7 +425,7 @@ def create_order():
         }]
         especs['carteles'] = carteles
 
-    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig'):
+    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias'):
         if k in data:
             especs[k] = data[k]
 
