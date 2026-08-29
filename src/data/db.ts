@@ -574,10 +574,13 @@ export async function uploadFile(
     // Get auth token
     let authToken = '';
     try {
-        const stored = localStorage.getItem('luxius_auth');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            authToken = parsed?.state?.token || '';
+        authToken = localStorage.getItem('luxius_auth_token') || '';
+        if (!authToken) {
+            const stored = localStorage.getItem('luxius_auth');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                authToken = parsed?.state?.token || '';
+            }
         }
     } catch (_) { /* no-op */ }
 
