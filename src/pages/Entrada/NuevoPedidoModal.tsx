@@ -1070,7 +1070,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setCloudUrl('');
             }
         } catch (err: any) {
-            alert(err.message);
+            console.error("Cloud Import Error:", err);
+            const msg = err?.message || '';
+            if (msg.includes('Failed to fetch') || err?.name === 'TypeError') {
+                alert("⚠️ Error de conexión con el servidor de importación en la nube. El servicio se está iniciando o la red tardó en responder. Por favor, reintenta en unos segundos.");
+            } else {
+                alert(`Error al importar: ${msg}`);
+            }
         } finally {
             setIsCloudImporting(false);
             setCloudImportStatus('');
