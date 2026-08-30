@@ -419,7 +419,7 @@ def create_order():
     else:
         cliente_id = None
 
-    desc = data.get('observaciones') or data.get('nombreTarea') or data.get('titulo') or 'Nuevo Pedido'
+    desc = data.get('observaciones') or data.get('nombreTarea') or data.get('titulo') or ''
 
     p = Presupuesto(
         vendedor_id=vendedor_id,

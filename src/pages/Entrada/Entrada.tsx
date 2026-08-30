@@ -520,10 +520,8 @@ export default function Entrada() {
                                         style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
                                     />
                                 </th>
-                                <th style={{ width: '60px' }}>Tipo</th>
-                                <th>N° OT</th>
+                                <th>N° OT / Trabajo</th>
                                 <th>Origen</th>
-                                <th>Descripción del Trabajo</th>
                                 <th>Creación</th>
                                 <th>Estado</th>
                                 <th>Cliente</th>
@@ -546,8 +544,8 @@ export default function Entrada() {
                                 const operarioNombre = order.operarioNombre || order.vendedorNombre || (order as any).vendedor?.nombre || (order as any).vendedorName || '';
                                 const otDisplay = order.ot || `OT-${order.id}`;
                                 let cleanDesc = (order.nombreTarea || order.observaciones || '').trim();
-                                if (!cleanDesc || cleanDesc.startsWith('Proyecto #') || cleanDesc.startsWith('Proyecto OT-')) {
-                                    cleanDesc = order.observaciones || order.material || 'Trabajo de Impresión';
+                                if (cleanDesc.startsWith('Proyecto #') || cleanDesc.startsWith('Proyecto OT-') || cleanDesc === 'Nuevo Pedido' || cleanDesc === 'Trabajo de Impresión') {
+                                    cleanDesc = '';
                                 }
 
                                 return (
@@ -561,16 +559,13 @@ export default function Entrada() {
                                             />
                                         </td>
                                         <td>
-                                            <div className="type-icon" title={statusLabels[order.status] || order.status}>
-                                                {['preorden', 'diseno'].includes(order.status) ? '🎨' :
-                                                    ['orden', 'impreso', 'post'].includes(order.status) ? '🖨️' :
-                                                        ['entregado', 'finalizado'].includes(order.status) ? '📦' :
-                                                            ['standby', 'anulado', 'rebotado'].includes(order.status) ? '⚠️' : '📄'}
-                                            </div>
-                                        </td>
-                                        <td>
                                             <div className="order-id">
                                                 <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.95rem' }}>{otDisplay}</span>
+                                                {cleanDesc && (
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cleanDesc}>
+                                                        {cleanDesc}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td>
@@ -605,13 +600,6 @@ export default function Entrada() {
                                                     💻 Sistema Web
                                                 </span>
                                             )}
-                                        </td>
-                                        <td>
-                                            <div style={{ maxWidth: '220px' }} title={cleanDesc}>
-                                                <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {cleanDesc}
-                                                </span>
-                                            </div>
                                         </td>
                                         <td>
                                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
