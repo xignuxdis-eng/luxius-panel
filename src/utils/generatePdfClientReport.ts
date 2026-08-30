@@ -1,5 +1,6 @@
 import type { Order } from '@/types'
 import { XIGNUX_LOGO_BASE64 } from './logoBase64'
+import { resolveMediaUrl } from '@/data/db'
 
 export interface ClientReportOptions {
     clienteNombre: string;
@@ -44,8 +45,17 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
 
     const mappedRows = orders.map(order => {
         const total = Number(order.total || order.subtotal || 0)
-        // Assume 50% deposit unless specified
-        const sena = (order as any).sena !== undefined ? Number((order as any).sena) : (order.status === 'entregado' || order.status === 'finalizado' ? total : total * 0.5)
+        
+        // Exact deposit tracking: only count if explicitly registered or 100% if finished/entregado
+        let sena = 0
+        if ((order as any).sena !== undefined && (order as any).sena !== null) {
+            sena = Number((order as any).sena)
+        } else if (order.status === 'entregado' || order.status === 'finalizado') {
+            sena = total
+        } else {
+            sena = 0
+        }
+        
         const saldo = Math.max(0, total - sena)
 
         totalGeneral += total
@@ -68,6 +78,18 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                            order.status === 'impreso' || order.status === 'post' ? 'Impreso' :
                            order.status === 'entregado' || order.status === 'finalizado' ? 'Entregado' : order.status
 
+        // Resolve thumbnail
+        let thumbUrl = ''
+        if (order.imgMetadata?.thumbnailUrl) {
+            thumbUrl = resolveMediaUrl(order.imgMetadata.thumbnailUrl)
+        } else if (order.archivos && order.archivos.length > 0) {
+            const firstFile = order.archivos[0]
+            const ext = firstFile.split('.').pop()?.toLowerCase() || ''
+            if (['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif'].includes(ext)) {
+                thumbUrl = resolveMediaUrl(firstFile)
+            }
+        }
+
         return {
             ot: otDisplay,
             fecha,
@@ -75,6 +97,9 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
             material: order.material || '-',
             copias: order.copias || 1,
             status: statusLabel,
+            rawStatus: order.status,
+            thumbUrl,
+            fileName: order.archivosOriginales?.[0] || '',
             total,
             sena,
             saldo
@@ -358,24 +383,35 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                     <table class="items-table">
                         <thead>
                             <tr>
-                                <th style="width: 10%;">N° OT</th>
-                                <th style="width: 11%;">Fecha</th>
-                                <th style="width: 35%;">Descripción del Trabajo</th>
-                                <th style="width: 14%;">Estado</th>
-                                <th class="text-right" style="width: 10%;">Importe</th>
-                                <th class="text-right" style="width: 10%;">Entregado</th>
-                                <th class="text-right" style="width: 10%;">Saldo</th>
+                                <th style="width: 8%;">N° OT</th>
+                                <th style="width: 10%;">Vista Previa</th>
+                                <th style="width: 10%;">Fecha</th>
+                                <th style="width: 32%;">Descripción del Trabajo</th>
+                                <th style="width: 12%;">Estado</th>
+                                <th class="text-right" style="width: 14%;">Importe</th>
+                                <th class="text-right" style="width: 14%;">Saldo</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${mappedRows.map(row => `
                                 <tr>
                                     <td style="font-weight: 700; color: #2563eb;">${row.ot}</td>
+                                    <td style="text-align: center;">
+                                        ${row.thumbUrl ? `
+                                            <img src="${row.thumbUrl}" alt="Arte" style="width: 38px; height: 38px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block; vertical-align: middle;" />
+                                        ` : `
+                                            <div style="width: 38px; height: 38px; background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: #94a3b8;">
+                                                🖼️
+                                            </div>
+                                        `}
+                                    </td>
                                     <td>${row.fecha}</td>
-                                    <td>${row.desc}</td>
+                                    <td>
+                                        <strong>${row.desc}</strong>
+                                        ${row.fileName ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">${row.fileName}</div>` : ''}
+                                    </td>
                                     <td><span class="badge-status">${row.status}</span></td>
                                     <td class="text-right" style="font-weight: 600;">${formatCurrency(row.total)}</td>
-                                    <td class="text-right" style="color: #166534;">${formatCurrency(row.sena)}</td>
                                     <td class="text-right" style="font-weight: 700; color: ${row.saldo > 0 ? '#dc2626' : '#166534'};">
                                         ${formatCurrency(row.saldo)}
                                     </td>
@@ -384,28 +420,56 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                         </tbody>
                     </table>
 
-                    <!-- Totals Summary Card -->
-                    <div class="summary-card">
-                        <table class="totals-table">
-                            <tr class="row-sub">
-                                <td>Total Contratado:</td>
-                                <td class="text-right" style="font-weight: 700;">${formatCurrency(totalGeneral)}</td>
-                            </tr>
-                            <tr class="row-sena">
-                                <td>Total Entregado / Señas:</td>
-                                <td class="text-right">${formatCurrency(totalSena)}</td>
-                            </tr>
-                            <tr class="row-saldo">
-                                <td>SALDO PENDIENTE:</td>
-                                <td class="text-right">${formatCurrency(totalSaldo)}</td>
-                            </tr>
-                        </table>
+                    <!-- Summary & Commercial Notes -->
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 20px;">
+                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; font-size: 11.5px; color: #1e40af; line-height: 1.45;">
+                            <strong style="display: block; margin-bottom: 4px; font-size: 12px;">💡 Condición de Pago y Seña</strong>
+                            Para confirmar órdenes en proceso de diseño o impresión, se sugiere abonar el <strong>50% en concepto de seña</strong>. Las órdenes en estado <em>Impreso</em> o <em>Entregado</em> corresponden a trabajos formalizados.
+                            <div style="margin-top: 8px; font-size: 10.5px; color: #334155; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                                <strong>CBU / Alias:</strong> <code>XIGNUX.GRAFICA</code> · Santander SRL
+                            </div>
+                        </div>
+
+                        <div class="summary-card" style="margin-bottom: 0;">
+                            <table class="totals-table" style="width: 100%;">
+                                <tr class="row-sub">
+                                    <td>Total Contratado:</td>
+                                    <td class="text-right" style="font-weight: 700;">${formatCurrency(totalGeneral)}</td>
+                                </tr>
+                                <tr class="row-sena">
+                                    <td>Total Abonado / Señas:</td>
+                                    <td class="text-right">${formatCurrency(totalSena)}</td>
+                                </tr>
+                                <tr class="row-saldo">
+                                    <td>SALDO PENDIENTE:</td>
+                                    <td class="text-right">${formatCurrency(totalSaldo)}</td>
+                                </tr>
+                            </table>
+                        </div>
                     </div>
+
+                    <!-- Visual Artwork Gallery Section -->
+                    ${mappedRows.some(r => r.thumbUrl) ? `
+                        <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
+                            <div style="font-size: 11px; font-weight: 800; color: #1e2433; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;">
+                                🎨 Grilla Visual de Trabajos a Imprimir
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                ${mappedRows.filter(r => r.thumbUrl).map(r => `
+                                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center;">
+                                        <img src="${r.thumbUrl}" alt="${r.ot}" style="width: 100%; height: 90px; object-fit: contain; border-radius: 4px; margin-bottom: 4px;" />
+                                        <div style="font-size: 10.5px; font-weight: 700; color: #2563eb;">${r.ot}</div>
+                                        <div style="font-size: 9.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.desc}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
 
                 <!-- Footer -->
                 <div class="footer-box">
-                    <div>XignuX System — Documento de estado de cuenta emitido electrónicamente.</div>
+                    <div>XignuX Gráfica — Documento de detalle de trabajos emitido electrónicamente.</div>
                     <div>Página 1 de 1</div>
                 </div>
             </div>

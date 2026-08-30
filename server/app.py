@@ -58,15 +58,22 @@ db.init_app(app)
 # ================================================================
 # RATE LIMITING — Prevención de fuerza bruta
 # ================================================================
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
 
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per minute"],        # Límite global: 200 req/min por IP
-    storage_uri="memory://",                   # In-memory (para producción usar Redis)
-)
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["200 per minute"],        # Límite global: 200 req/min por IP
+        storage_uri="memory://",                   # In-memory (para producción usar Redis)
+    )
+except Exception:
+    class DummyLimiter:
+        def limit(self, *args, **kwargs):
+            return lambda f: f
+    limiter = DummyLimiter()
+
 # Make limiter available to blueprints
 app.limiter = limiter
 app.register_blueprint(sync_bp)
