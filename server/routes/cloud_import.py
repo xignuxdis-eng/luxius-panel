@@ -116,7 +116,6 @@ def import_from_cloud():
             }), 200
             
         elif 'we.tl' in url or 'wetransfer.com' in url:
-            from transferwee import transferwee
             import zipfile
             import requests
             from urllib.parse import unquote, urlparse
@@ -124,21 +123,117 @@ def import_from_cloud():
             wt_dir = os.path.join(temp_dir, f"wt_{file_id}")
             os.makedirs(wt_dir, exist_ok=True)
             
-            # 1. Resolve direct download link
-            direct_link = None
-            try:
-                direct_link = transferwee.download_url(url)
-            except Exception as wt_err:
-                print(f"[WeTransfer] transferwee error: {wt_err}")
+            # Helper to resolve WeTransfer direct download link
+            def resolve_wetransfer(raw_url):
+                clean_url = raw_url.strip()
+                if not clean_url.startswith('http'):
+                    clean_url = 'https://' + clean_url
+                    
+                s = requests.Session()
+                s.headers.update({
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+                })
+                
+                # 1. Follow shortlink redirects
+                try:
+                    resp = s.get(clean_url, allow_redirects=True, timeout=25)
+                    final_url = resp.url
+                except Exception as req_e:
+                    print(f"[WeTransfer] Initial request failed: {req_e}")
+                    return None
 
+                # 2. Extract CSRF token
+                csrf_token = None
+                m_csrf = re.search(r'name="csrf-token"\s+content="([^"]+)"', resp.text)
+                if m_csrf:
+                    csrf_token = m_csrf.group(1)
+                else:
+                    m2 = re.search(r'"csrfToken":\s*"([^"]+)"', resp.text)
+                    if m2:
+                        csrf_token = m2.group(1)
+                    else:
+                        try:
+                            r_main = s.get("https://wetransfer.com/", timeout=10)
+                            m3 = re.search(r'name="csrf-token"\s+content="([^"]+)"', r_main.text)
+                            if m3: csrf_token = m3.group(1)
+                        except Exception:
+                            pass
+
+                # 3. Extract transfer_id and security_hash from path or HTML
+                parsed = urlparse(final_url)
+                path_parts = [p for p in parsed.path.split('/') if p]
+                
+                transfer_id = None
+                security_hash = None
+                recipient_id = None
+                
+                if 'downloads' in path_parts:
+                    idx = path_parts.index('downloads')
+                    remaining = path_parts[idx+1:]
+                    if len(remaining) >= 2:
+                        transfer_id = remaining[0]
+                        if len(remaining) == 2:
+                            security_hash = remaining[1]
+                        elif len(remaining) >= 3:
+                            recipient_id = remaining[1]
+                            security_hash = remaining[2]
+
+                if not transfer_id or not security_hash:
+                    m_trans = re.search(r'"transfer_id":\s*"([^"]+)"', resp.text)
+                    m_hash = re.search(r'"security_hash":\s*"([^"]+)"', resp.text)
+                    if m_trans: transfer_id = m_trans.group(1)
+                    if m_hash: security_hash = m_hash.group(1)
+
+                # Fallback to transferwee library if available
+                if not transfer_id or not security_hash:
+                    try:
+                        from transferwee import transferwee as tw
+                        return tw.download_url(clean_url)
+                    except Exception as tw_e:
+                        print(f"[WeTransfer] transferwee fallback failed: {tw_e}")
+                        return None
+
+                # 4. Request direct download link from WeTransfer API
+                download_api_url = f"https://wetransfer.com/api/v4/transfers/{transfer_id}/download"
+                api_headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept': 'application/json, text/plain, */*',
+                    'Content-Type': 'application/json',
+                    'Referer': final_url,
+                    'Origin': 'https://wetransfer.com',
+                    'x-requested-with': 'XMLHttpRequest'
+                }
+                if csrf_token:
+                    api_headers['x-csrf-token'] = csrf_token
+
+                payload = {
+                    "intent": "entire_transfer",
+                    "security_hash": security_hash
+                }
+                if recipient_id:
+                    payload["recipient_id"] = recipient_id
+
+                try:
+                    api_resp = s.post(download_api_url, json=payload, headers=api_headers, timeout=20)
+                    if api_resp.ok:
+                        data = api_resp.json()
+                        return data.get('direct_link')
+                except Exception as api_e:
+                    print(f"[WeTransfer] API post error: {api_e}")
+
+                return None
+
+            direct_link = resolve_wetransfer(url)
             if not direct_link:
                 return jsonify({"error": "No se pudo obtener el enlace de descarga de WeTransfer. Verifique que la transferencia no haya expirado y que el enlace sea válido."}), 400
 
             # 2. Download file with stream
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             }
-            r = requests.get(direct_link, stream=True, headers=headers, timeout=120)
+            r = requests.get(direct_link, stream=True, headers=headers, timeout=180)
             if not r.ok:
                 return jsonify({"error": f"Error descargando archivo de WeTransfer (HTTP {r.status_code})"}), 400
 
@@ -199,9 +294,16 @@ def import_from_cloud():
             }), 200
             
         else:
-            return jsonify({"error": "Proveedor no soportado. Actualmente se soportan enlaces de Google Drive y WeTransfer."}), 400
+            return jsonify({"error": "El enlace proporcionado no es compatible. Ingrese un enlace válido de Google Drive o WeTransfer."}), 400
             
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"Error procesando la descarga: {str(e)}"}), 500
+        print(f"[Cloud Import Error] {str(e)}", file=sys.stderr)
+        return jsonify({"error": f"Error procesando la importación: {str(e)}"}), 500
+        
+    finally:
+        # Cleanup temporary scratch files
+        if os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception as ce:
+                print(f"[Cloud Import Cleanup Error] {ce}", file=sys.stderr)
