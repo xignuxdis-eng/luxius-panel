@@ -2,6 +2,7 @@ import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import UsuariosView from './UsuariosView'
+import GoogleDriveView from './GoogleDriveView'
 import './Sistema.css'
 
 
@@ -300,6 +301,7 @@ export default function Sistema() {
             <nav className="abm-tabs">
                 <NavLink to="/sistema/usuarios" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Usuarios</NavLink>
                 <NavLink to="/sistema/permisos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Permisos</NavLink>
+                <NavLink to="/sistema/google-drive" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Google Drive</NavLink>
                 <NavLink to="/sistema/respaldo" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Respaldo Email</NavLink>
                 <NavLink to="/sistema/db" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Utilidades DB</NavLink>
                 <NavLink to="/sistema/mensajes" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Mensajes</NavLink>
@@ -309,6 +311,7 @@ export default function Sistema() {
                 <Routes>
                     <Route path="usuarios" element={<UsuariosView />} />
                     <Route path="permisos" element={<PermisosView />} />
+                    <Route path="google-drive" element={<GoogleDriveView />} />
                     <Route path="db" element={<UtilidadesDB />} />
                     <Route path="respaldo" element={<div className="p-40 text-muted">Configuración de emails...</div>} />
                     <Route path="*" element={<Navigate to="usuarios" replace />} />
@@ -317,3 +320,4 @@ export default function Sistema() {
         </div>
     )
 }
+

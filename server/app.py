@@ -13,8 +13,9 @@ from routes.operators import operators_bp
 from routes.tasks import tasks_bp
 from routes.orders import orders_bp
 from routes.xana import xana_bp
-from routes import import_bp
+from routes import import_bp, google_drive_bp
 import routes.cloud_import
+import routes.google_drive
 import io, json, os, sys
 from urllib.parse import urlparse
 from werkzeug.utils import secure_filename
@@ -83,6 +84,7 @@ app.register_blueprint(tasks_bp)
 app.register_blueprint(orders_bp)
 app.register_blueprint(xana_bp)
 app.register_blueprint(import_bp)
+app.register_blueprint(google_drive_bp)
 
 # Rate limits are configured directly on routes or via limiter default limits
 
