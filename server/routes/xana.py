@@ -38,10 +38,10 @@ DEFAULT_XANA_DATA = {
             "id": 1,
             "task_id": "TASK-001",
             "project": "LuXius Core",
-            "objective": "Integración y soporte de importación en la nube para Google Drive y WeTransfer con descompresión automática de archivos ZIP.",
+            "objective": "Integración y soporte de importación en la nube para Google Drive y WeTransfer con streaming, bypass CSRF y descompresión automática de ZIPs.",
             "status": "completed",
             "created_at": "2026-08-29T18:00:00-03:00",
-            "updated_at": "2026-08-29T20:45:00-03:00"
+            "updated_at": "2026-08-29T21:40:00-03:00"
         },
         {
             "id": 2,
@@ -82,11 +82,38 @@ DEFAULT_XANA_DATA = {
         {
             "id": 6,
             "task_id": "TASK-006",
-            "project": "LuXius Taller",
-            "objective": "Monitoreo en tiempo real de colas de impresión, mermas de tinta y estados de estaciones de trabajo.",
+            "project": "LuXius Entrada",
+            "objective": "Optimización visual de tabla de pedidos: eliminación de columnas redundantes y fusión de OT con títulos de proyecto.",
+            "status": "completed",
+            "created_at": "2026-08-29T21:00:00-03:00",
+            "updated_at": "2026-08-29T21:25:00-03:00"
+        },
+        {
+            "id": 7,
+            "task_id": "TASK-007",
+            "project": "LuXius Documentación PDF",
+            "objective": "Sistema de PDFs diferenciados: Presupuesto Comercial (seña sugerida 50%, sin saldo forzado) y Detalle de Impresión con grilla de miniaturas de artes gráficos.",
+            "status": "completed",
+            "created_at": "2026-08-29T21:45:00-03:00",
+            "updated_at": "2026-08-29T21:58:00-03:00"
+        },
+        {
+            "id": 8,
+            "task_id": "TASK-008",
+            "project": "LuXius Logística / Despacho",
+            "objective": "Roadmap Fase 1 a 3: Módulo de Etiquetas de Envío y Despacho en formato térmico 10x15cm con QR dinámico de tracking, bultos y multi-OT.",
+            "status": "pending",
+            "created_at": "2026-08-29T21:55:00-03:00",
+            "updated_at": "2026-08-29T22:00:00-03:00"
+        },
+        {
+            "id": 9,
+            "task_id": "TASK-009",
+            "project": "LuXius Cloud Storage",
+            "objective": "Automatización programada de purga y sincronización Cloudflare R2 a Google Drive cada 3 días vía sync_r2_to_drive.py.",
             "status": "in_progress",
-            "created_at": "2026-08-29T16:00:00-03:00",
-            "updated_at": "2026-08-29T20:55:00-03:00"
+            "created_at": "2026-08-29T20:30:00-03:00",
+            "updated_at": "2026-08-29T22:00:00-03:00"
         }
     ],
     "decisions": [
@@ -129,6 +156,36 @@ DEFAULT_XANA_DATA = {
             "alternatives_rejected": ["UTC puro sin conversión local"],
             "reason": "Evita discrepancias en fechas de pedidos creados cerca de la medianoche.",
             "created_at": "2026-08-29T20:30:00-03:00"
+        },
+        {
+            "id": 5,
+            "decision_id": "DEC-005",
+            "task_id": "TASK-007",
+            "topic": "Cálculo de Seña en Documentos PDF",
+            "choice": "Eliminación de la seña del 50% forzada en saldos. Se reemplazó por leyenda sugerida para presupuestos y supresión total en órdenes impresas.",
+            "alternatives_rejected": ["Asumir 50% pagado en todas las órdenes"],
+            "reason": "Generaba discrepancias contables al dar por cobrado dinero que aún no había ingresado.",
+            "created_at": "2026-08-29T21:48:00-03:00"
+        },
+        {
+            "id": 6,
+            "decision_id": "DEC-006",
+            "task_id": "TASK-007",
+            "topic": "Miniaturas gráficas en documentos",
+            "choice": "Inclusión de tarjetas y mosaico de imágenes de los artes en los PDFs de presupuesto y reportes de clientes.",
+            "alternatives_rejected": ["PDFs basados exclusivamente en texto"],
+            "reason": "Permite al cliente y al operario verificar visualmente las piezas a producir antes y durante la impresión.",
+            "created_at": "2026-08-29T21:55:00-03:00"
+        },
+        {
+            "id": 7,
+            "decision_id": "DEC-007",
+            "task_id": "TASK-008",
+            "topic": "Estándar de Etiquetas de Envío",
+            "choice": "Formato térmico industrial de 10x15cm con QR dinámico, código de barras y datos logísticos.",
+            "alternatives_rejected": ["Remitos en papel suelto A4"],
+            "reason": "Compatibilidad universal con impresoras térmicas adhesivas (Zebra, Brother) para despacho rápido.",
+            "created_at": "2026-08-29T22:00:00-03:00"
         }
     ],
     "sessions": [
@@ -144,11 +201,11 @@ DEFAULT_XANA_DATA = {
         {
             "id": 2,
             "session_id": "SES-XANA-20260829-02",
-            "task_id": "TASK-004",
+            "task_id": "TASK-007",
             "agent": "Xana AI LangGraph Engine",
             "model": "LangGraph Stateful Workflow",
-            "started_at": "2026-08-29T19:00:00-03:00",
-            "ended_at": "2026-08-29T20:30:00-03:00"
+            "started_at": "2026-08-29T21:45:00-03:00",
+            "ended_at": "2026-08-29T22:01:00-03:00"
         }
     ],
     "actions": [],

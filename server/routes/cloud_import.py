@@ -10,7 +10,7 @@ import urllib.parse
 import gdown
 from flask import request, jsonify
 from routes import import_bp
-from middleware.auth import login_required
+from middleware.auth import optional_login
 
 def _extract_drive_id(url: str):
     # Match standard drive link format /d/<id>
@@ -31,7 +31,7 @@ def _extract_drive_id(url: str):
     return None
 
 @import_bp.route('', methods=['POST'])
-@login_required
+@optional_login
 def import_from_cloud():
     data = request.get_json(force=True, silent=True) or {}
     url = data.get('url', '').strip()
@@ -67,13 +67,50 @@ def import_from_cloud():
                 output_target = single_dir + os.sep
 
                 # Download using drive id with gdown
-                downloaded_file = gdown.download(id=drive_id, output=output_target, quiet=True)
+                try:
+                    downloaded_file = gdown.download(id=drive_id, output=output_target, quiet=True, fuzzy=True)
+                except Exception as gd_err:
+                    print(f"[Drive Import] gdown id download notice: {gd_err}")
+                    downloaded_file = None
                 
                 # Fallback to direct uc?id= URL if needed
                 if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    download_url = f'https://drive.google.com/uc?id={drive_id}'
-                    downloaded_file = gdown.download(url=download_url, output=output_target, quiet=True)
+                    try:
+                        download_url = f'https://drive.google.com/uc?id={drive_id}'
+                        downloaded_file = gdown.download(url=download_url, output=output_target, quiet=True, fuzzy=True)
+                    except Exception as gd_err2:
+                        print(f"[Drive Import] gdown url download notice: {gd_err2}")
+                        downloaded_file = None
                 
+                # Fallback to direct requests stream if needed
+                if not downloaded_file or not os.path.exists(str(downloaded_file)):
+                    try:
+                        session = requests.Session()
+                        direct_url = f"https://drive.google.com/uc?export=download&id={drive_id}"
+                        r = session.get(direct_url, stream=True, timeout=25)
+                        confirm_token = None
+                        for k, v in r.cookies.items():
+                            if k.startswith('download_warning'):
+                                confirm_token = v
+                        if confirm_token:
+                            direct_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={drive_id}"
+                            r = session.get(direct_url, stream=True, timeout=25)
+                        
+                        if r.status_code == 200 and 'text/html' not in r.headers.get('Content-Type', ''):
+                            out_name = "archivo_drive"
+                            cd = r.headers.get('content-disposition', '')
+                            if 'filename=' in cd:
+                                out_name = cd.split('filename=')[-1].strip('"\'; ')
+                            out_p = os.path.join(single_dir, out_name)
+                            with open(out_p, 'wb') as f:
+                                for chunk in r.iter_content(chunk_size=32768):
+                                    if chunk:
+                                        f.write(chunk)
+                            if os.path.exists(out_p) and os.path.getsize(out_p) > 0:
+                                downloaded_file = out_p
+                    except Exception as req_e:
+                        print(f"[Drive Import] requests stream fallback error: {req_e}")
+
                 # If downloaded_file is still not found, check if anything was written to single_dir
                 if not downloaded_file or not os.path.exists(str(downloaded_file)):
                     files_in_dir = [os.path.join(single_dir, f) for f in os.listdir(single_dir) if os.path.isfile(os.path.join(single_dir, f))]
@@ -84,6 +121,7 @@ def import_from_cloud():
                     return jsonify({"error": "No se pudo descargar desde Google Drive. Asegúrese de que el archivo esté configurado como 'Cualquier persona con el enlace puede ver'."}), 403
                 
                 downloaded_paths = [str(downloaded_file)]
+
                 
             processed_files = []
             

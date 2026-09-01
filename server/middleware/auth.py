@@ -112,3 +112,22 @@ def operator_required(f):
             return jsonify({'error': 'Acceso denegado: se requiere rol de operario'}), 403
         return f(*args, **kwargs)
     return decorated
+
+
+def optional_login(f):
+    """Decorator: sets user context if token provided, but doesn't block if absent."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        payload = _resolve_payload(auth_header)
+        if payload:
+            g.user_id = payload['sub']
+            g.user_rol = payload['rol']
+            g.username = payload['username']
+        else:
+            g.user_id = None
+            g.user_rol = None
+            g.username = None
+        return f(*args, **kwargs)
+    return decorated
+

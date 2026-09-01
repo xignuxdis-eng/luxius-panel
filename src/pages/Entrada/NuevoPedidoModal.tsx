@@ -997,12 +997,33 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const isWeTransfer = cloudUrl.includes('we.tl') || cloudUrl.includes('wetransfer.com');
         setCloudImportStatus(isWeTransfer ? 'Conectando con WeTransfer...' : 'Conectando con Google Drive...');
         try {
-            const baseUrl = API_URL.replace(/\/api\/?$/, '');
-            const res = await fetch(`${API_URL}/import-cloud`, {
-                method: 'POST',
-                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-                body: JSON.stringify({ url: cloudUrl })
-            });
+            let activeBaseUrl = API_URL.replace(/\/api\/?$/, '');
+            let res: Response | null = null;
+
+            try {
+                res = await fetch(`${API_URL}/import-cloud`, {
+                    method: 'POST',
+                    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ url: cloudUrl })
+                });
+            } catch (fetchErr: any) {
+                // If local backend is down or unreachable, seamlessly fallback to the Render cloud backend
+                if (API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+                    console.warn('[CloudImport] Servidor local no disponible, intentando servidor en la nube de respaldo...');
+                    setCloudImportStatus('Conectando con servidor en la nube...');
+                    activeBaseUrl = 'https://luxius-backend.onrender.com';
+                    res = await fetch(`https://luxius-backend.onrender.com/api/import-cloud`, {
+                        method: 'POST',
+                        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                        body: JSON.stringify({ url: cloudUrl })
+                    });
+                } else {
+                    throw fetchErr;
+                }
+            }
+
+            if (!res) throw new Error('No se pudo establecer conexión con el servicio de importación.');
+
             let data;
             try {
                 data = await res.json();
@@ -1021,7 +1042,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 if (targetTab === 'unitario' || targetTab === 'promos') {
                     setCloudImportStatus('Descargando archivo (1/1)...');
                     const fileInfo = data.files[0];
-                    const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${baseUrl}${fileInfo.tempUrl}`;
+                    const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
                     const blobRes = await fetch(fileUrl);
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
@@ -1032,7 +1053,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         const fileInfo = data.files[i];
                         setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
                         try {
-                            const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${baseUrl}${fileInfo.tempUrl}`;
+                            const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
                             const blobRes = await fetch(fileUrl);
                             if (!blobRes.ok) continue;
                             const blob = await blobRes.blob();
