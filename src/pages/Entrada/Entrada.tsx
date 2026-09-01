@@ -945,9 +945,42 @@ export default function Entrada() {
                                                         </div>
                                                     </td>
                                                 )}
-                                                <td>
-                                                    <div className="date-cell" style={{ fontWeight: '600', color: 'var(--accent)' }}>
-                                                        {item.primaryOrder.fechaEntrega ? item.primaryOrder.fechaEntrega : <span className="text-muted italic">--</span>}
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                                        <div className="date-cell" style={{ fontWeight: '700', color: 'var(--accent)', fontSize: '0.85rem' }}>
+                                                            {item.primaryOrder.fechaEntrega ? (() => {
+                                                                const d = new Date(item.primaryOrder.fechaEntrega + 'T12:00:00');
+                                                                if (!isNaN(d.getTime())) {
+                                                                    const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
+                                                                    return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                                                                }
+                                                                return item.primaryOrder.fechaEntrega;
+                                                            })() : <span className="text-muted italic">--</span>}
+                                                        </div>
+                                                        {(() => {
+                                                            const envios = Array.from(new Set(item.orders.map(o => o.envio).filter(Boolean)));
+                                                            if (envios.length > 0) {
+                                                                return (
+                                                                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '2px' }}>
+                                                                        {envios.map(env => (
+                                                                            <span key={env} style={{
+                                                                                fontSize: '0.7rem',
+                                                                                fontWeight: 700,
+                                                                                padding: '1px 6px',
+                                                                                borderRadius: '4px',
+                                                                                background: 'rgba(245, 158, 11, 0.15)',
+                                                                                color: '#fbbf24',
+                                                                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                                                                whiteSpace: 'nowrap'
+                                                                            }}>
+                                                                                🚚 {env}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })()}
                                                     </div>
                                                 </td>
                                                 <td>
@@ -1119,8 +1152,32 @@ export default function Entrada() {
                                                                 </div>
                                                             </td>
                                                         )}
-                                                        <td>
-                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.fechaEntrega || '--'}</span>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                                    {order.fechaEntrega ? (() => {
+                                                                        const d = new Date(order.fechaEntrega + 'T12:00:00');
+                                                                        if (!isNaN(d.getTime())) {
+                                                                            return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                                                                        }
+                                                                        return order.fechaEntrega;
+                                                                    })() : '--'}
+                                                                </span>
+                                                                {order.envio && (
+                                                                    <span style={{
+                                                                        fontSize: '0.68rem',
+                                                                        fontWeight: 700,
+                                                                        padding: '1px 5px',
+                                                                        borderRadius: '4px',
+                                                                        background: 'rgba(245, 158, 11, 0.15)',
+                                                                        color: '#fbbf24',
+                                                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                                        whiteSpace: 'nowrap'
+                                                                    }}>
+                                                                        🚚 {order.envio}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td>
                                                             <div className="order-actions-row">
@@ -1327,13 +1384,32 @@ export default function Entrada() {
                                                 </div>
                                             </td>
                                         )}
-                                        <td>
-                                            <div className="date-cell" style={{ fontWeight: '600', color: 'var(--accent)' }}>
-                                                {order.fechaEntrega ? (() => {
-                                                    const d = new Date(order.fechaEntrega + 'T12:00:00');
-                                                    const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
-                                                    return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-                                                })() : <span className="text-muted italic">--</span>}
+                                        <td style={{ textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                                <div className="date-cell" style={{ fontWeight: '600', color: 'var(--accent)' }}>
+                                                    {order.fechaEntrega ? (() => {
+                                                        const d = new Date(order.fechaEntrega + 'T12:00:00');
+                                                        if (!isNaN(d.getTime())) {
+                                                            const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
+                                                            return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                                                        }
+                                                        return order.fechaEntrega;
+                                                    })() : <span className="text-muted italic">--</span>}
+                                                </div>
+                                                {order.envio && (
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 700,
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px',
+                                                        background: 'rgba(245, 158, 11, 0.15)',
+                                                        color: '#fbbf24',
+                                                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        🚚 {order.envio}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td>

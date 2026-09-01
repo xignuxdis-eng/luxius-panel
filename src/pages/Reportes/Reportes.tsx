@@ -575,16 +575,34 @@ export default function Reportes() {
                                                 )}
                                             </td>
                                             <td>
-                                                <span style={{
-                                                    padding: '3px 8px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 700,
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    color: 'var(--text-main)'
-                                                }}>
-                                                    {order.status}
-                                                </span>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                    <span style={{
+                                                        padding: '3px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 700,
+                                                        background: 'rgba(255, 255, 255, 0.08)',
+                                                        color: 'var(--text-main)',
+                                                        textAlign: 'center'
+                                                    }}>
+                                                        {order.status}
+                                                    </span>
+                                                    {order.envio && (
+                                                        <span style={{
+                                                            fontSize: '0.68rem',
+                                                            fontWeight: 700,
+                                                            padding: '1px 5px',
+                                                            borderRadius: '4px',
+                                                            background: 'rgba(245, 158, 11, 0.15)',
+                                                            color: '#fbbf24',
+                                                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                            whiteSpace: 'nowrap',
+                                                            textAlign: 'center'
+                                                        }}>
+                                                            🚚 {order.envio}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td style={{ textAlign: 'right', fontWeight: 600 }}>
                                                 ${tot.toLocaleString('es-AR', { minimumFractionDigits: 2 })}

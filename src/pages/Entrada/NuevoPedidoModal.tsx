@@ -1626,6 +1626,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 consumoEstimado: priceResult.consumoEstimado,
                                 precioMl: priceResult.precioMl,
                                 precioDetalle: priceResult.precioDetalle,
+                                envio: data.envio || '',
                                 servicios: item.servicios,
                                 demasiasConfig: isLonaOrNotVinilo(item.material) ? item.demasiasConfig : { top: false, bottom: false, left: false, right: false },
                                 imgMetadata: item.metadata,
@@ -1849,10 +1850,19 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 />
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                <label>Fecha Entrega</label>
+                                <label>📅 Fecha Entrega</label>
                                 <input type="date" {...register('fechaEntrega')} className="input-field" />
                             </div>
 
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>🚚 Logística / Envío</label>
+                                <select {...register('envio')} className="input-field">
+                                    <option value="">-- Retiro en Local / Sin especificar --</option>
+                                    {getLogisticas().filter(l => l.habilitado !== false).map((l: any) => (
+                                        <option key={l.id} value={l.nombre}>{l.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
 
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Vendedor Asignado</label>
@@ -2184,13 +2194,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     <div className="form-group">
                                         <label>Copias</label>
                                         <input type="number" {...register('copias')} className="input-field" />
-                                    </div>
-                                    <div className="form-group" style={{ gridColumn: 'span 3' }}>
-                                        <label>Logística / Envío</label>
-                                        <select {...register('envio')} className="input-field">
-                                            <option value="">Seleccionar...</option>
-                                            {getLogisticas().map((l: any) => <option key={l.id} value={l.nombre}>{l.nombre}</option>)}
-                                        </select>
                                     </div>
 
                                     {/* RESTORED: Demasias (Cruceta) con mejor estilo Dark */}

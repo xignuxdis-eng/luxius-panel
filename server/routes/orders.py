@@ -270,6 +270,9 @@ def _presupuesto_to_order(p):
         'precioMl': esp.get('precioMl') or (esp.get('precioDetalle') or {}).get('precioML'),
         'precioDetalle': esp.get('precioDetalle'),
 
+        # Logistics
+        'envio': esp.get('envio', ''),
+
         # Category
         'category': 'impresion' if status in ('orden', 'impreso', 'post') else 'diseno',
 
@@ -338,7 +341,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = p.especificaciones or {}
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio'):
         if k in data:
             current_especs[k] = data[k]
     p.especificaciones = current_especs

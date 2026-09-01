@@ -1797,19 +1797,30 @@ export function saveDashboardNotes(userId: number | string, notes: string) {
 
 // ============================================================
 // Logisticas (Sync)
-// ============================================
+// ============================================================
 
+const DEFAULT_LOGISTICAS: Logistica[] = [
+    { id: 1, nombre: 'Retiro en Local / Taller', descripcion: 'El cliente retira personalmente en taller', costo: 0, habilitado: true },
+    { id: 2, nombre: 'Vía Cargo', descripcion: 'Envío por encomienda Vía Cargo', costo: 0, habilitado: true },
+    { id: 3, nombre: 'Andreani', descripcion: 'Envío a sucursal o domicilio Andreani', costo: 0, habilitado: true },
+    { id: 4, nombre: 'Mensajería / Moto', descripcion: 'Cadetería o moto express', costo: 0, habilitado: true },
+    { id: 5, nombre: 'Flete / Transporte Propio', descripcion: 'Flete o logística propia', costo: 0, habilitado: true },
+]
 
 export function getLogisticas(): Logistica[] {
     const sessionItemsJson = localStorage.getItem(SESSION_LOGISTICAS_KEY)
 
     if (sessionItemsJson) {
         try {
-            return JSON.parse(sessionItemsJson) as Logistica[]
+            const parsed = JSON.parse(sessionItemsJson) as Logistica[]
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed
+            }
         } catch (e) { }
     }
 
-    return []
+    localStorage.setItem(SESSION_LOGISTICAS_KEY, JSON.stringify(DEFAULT_LOGISTICAS))
+    return DEFAULT_LOGISTICAS
 }
 
 export function saveLogistica(logistica: Partial<Logistica>): Logistica {
