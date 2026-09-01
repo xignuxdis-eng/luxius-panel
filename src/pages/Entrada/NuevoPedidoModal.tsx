@@ -261,15 +261,37 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [user, setValue]);
 
-    const calculateItemPrice = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>) => {
+    const calculateItemPriceDetailed = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>, clientIdParam?: string | number) => {
         const mat = getMateriales().find(m => m.codigo === materialCode)
-        if (!mat || h <= 0) return 0
+        if (!mat || h <= 0) return {
+            subtotal: 0,
+            consumoEstimado: 0,
+            bobinaAsignada: undefined as number | undefined,
+            precioMl: undefined as number | undefined,
+            precioDetalle: undefined as any
+        }
 
         const { tipoCobro, bobinas, precioM2 } = mat
         let basePrice = 0
+        let assignedBobina: number | undefined = undefined
+        let appliedPriceMl: number | undefined = undefined
+        let rotated = false
+        let linearMeters = 0
+
+        const cid = clientIdParam || watchedClientId
+        const cliente = getClientes().find(cl => cl.id === parseInt(String(cid)))
+        const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[materialCode] : null
 
         if (tipoCobro === 'ml') {
-            if (!bobinas || bobinas.length === 0) return 0
+            if (!bobinas || bobinas.length === 0) {
+                return {
+                    subtotal: 0,
+                    consumoEstimado: 0,
+                    bobinaAsignada: undefined,
+                    precioMl: undefined,
+                    precioDetalle: undefined
+                }
+            }
 
             const safetyMargin = 0.01
             const availableWidths = bobinas
@@ -277,13 +299,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 .filter((b: any) => b.usefulWidth > 0)
                 .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth)
 
-            const cliente = getClientes().find(cl => cl.id === parseInt(watchedClientId));
-            const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[materialCode] : null;
-
             let bestCost = Infinity
-            let rotated = false
 
-            // Original Orientation
+            // Original Orientation (width fits in roll useful width)
             for (const b of availableWidths) {
                 if (w <= b.usefulWidth) {
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
@@ -292,12 +310,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     if (cost < bestCost) {
                         bestCost = cost
                         rotated = false
+                        assignedBobina = b.ancho
+                        appliedPriceMl = priceToUse
+                        linearMeters = h * c
                     }
                     break
                 }
             }
 
-            // Rotated Orientation
+            // Rotated Orientation (height fits in roll useful width)
             for (const b of availableWidths) {
                 if (h <= b.usefulWidth) {
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
@@ -306,23 +327,31 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     if (cost < bestCost) {
                         bestCost = cost
                         rotated = true
+                        assignedBobina = b.ancho
+                        appliedPriceMl = priceToUse
+                        linearMeters = w * c
                     }
                     break
                 }
             }
 
+            // Fallback if item exceeds all widths: assign widest roll
+            if (bestCost === Infinity && availableWidths.length > 0) {
+                const widest = availableWidths[availableWidths.length - 1]
+                const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${widest.ancho}`] : null;
+                const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
+                bestCost = priceToUse * h * c
+                assignedBobina = widest.ancho
+                appliedPriceMl = priceToUse
+                linearMeters = h * c
+            }
+
             basePrice = bestCost === Infinity ? 0 : Math.round(bestCost)
-
-                // Temporary storage for orientation to use in services
-                ; (mat as any)._lastRotation = rotated
+            ; (mat as any)._lastRotation = rotated
         } else {
-            // Check for client-specific price toggle for M2
-            const cliente = getClientes().find(cl => cl.id === parseInt(watchedClientId));
-            const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[materialCode] : null;
-            const priceToUse = specialPrice || precioM2 || 0;
-
-            // Standard m2 logic
+            const priceToUse = specialPrice || precioM2 || 0
             basePrice = w > 0 ? Math.round(w * h * c * priceToUse) : 0
+            linearMeters = 0
         }
 
         // Add services
@@ -346,8 +375,33 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             })
         }
 
-        return basePrice + servicesTotal
+        const subtotal = basePrice + servicesTotal
+
+        return {
+            subtotal,
+            consumoEstimado: tipoCobro === 'ml' ? linearMeters : (w * h * c),
+            bobinaAsignada: assignedBobina,
+            precioMl: appliedPriceMl,
+            precioDetalle: tipoCobro === 'ml' ? {
+                tipoCobro: 'ml',
+                bobinaAncho: assignedBobina,
+                bobinaUsada: assignedBobina,
+                precioML: appliedPriceMl,
+                rotated,
+                consumoML: linearMeters,
+                costoBase: basePrice
+            } : {
+                tipoCobro: 'm2',
+                precioM2: specialPrice || precioM2 || 0,
+                costoBase: basePrice
+            }
+        }
     }
+
+    const calculateItemPrice = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>) => {
+        return calculateItemPriceDetailed(materialCode, w, h, c, services).subtotal
+    }
+
 
     useEffect(() => {
         if (activeTab === 'unitario') {
@@ -1511,7 +1565,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             // Convertir cm a metros para backend y cálculo de precio
                             const itemAncho = Number(item.metadata.width) / 100;
                             const itemAlto = Number(item.metadata.height) / 100;
-                            const itemSubtotal = calculateItemPrice(item.material, itemAncho, itemAlto, item.copias, item.servicios)
+                            const priceResult = calculateItemPriceDetailed(item.material, itemAncho, itemAlto, item.copias, item.servicios, data.clienteId)
+                            const itemSubtotal = priceResult.subtotal
 
                             // Upload file
                             let remoteFileName = item.fileName;
@@ -1558,6 +1613,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 copias: Number(item.copias),
                                 material: item.material,
                                 subtotal: itemSubtotal,
+                                bobinaAsignada: priceResult.bobinaAsignada,
+                                consumoEstimado: priceResult.consumoEstimado,
+                                precioMl: priceResult.precioMl,
+                                precioDetalle: priceResult.precioDetalle,
                                 servicios: item.servicios,
                                 demasiasConfig: isLonaOrNotVinilo(item.material) ? item.demasiasConfig : { top: false, bottom: false, left: false, right: false },
                                 imgMetadata: item.metadata,
@@ -1609,7 +1668,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         copias: Number(data.copias || 1),
                     }
 
-                    const subtotal = calculateItemPrice(data.material, numericData.ancho, numericData.alto, numericData.copias, data.servicios)
+                    const priceResult = calculateItemPriceDetailed(data.material, numericData.ancho, numericData.alto, numericData.copias, data.servicios, data.clienteId)
+                    const subtotal = priceResult.subtotal
 
                     let finalArchivos = fileName ? [fileName] : (order?.archivos || []);
                     let finalArchivosOriginales = order?.archivosOriginales || [];
@@ -1634,6 +1694,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         ...order,
                         ...numericData,
                         subtotal,
+                        bobinaAsignada: priceResult.bobinaAsignada,
+                        consumoEstimado: priceResult.consumoEstimado,
+                        precioMl: priceResult.precioMl,
+                        precioDetalle: priceResult.precioDetalle,
                         clienteNombre: cliente?.nombre || 'Desconocido',
                         archivos: finalArchivos,
                         archivosOriginales: finalArchivosOriginales,
@@ -1645,6 +1709,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         servicios: data.servicios
                     })
                     onClose(true)
+
                 } catch (err) {
                     console.error("Single save failed", err)
                     alert("Error al guardar pedido unitario.")

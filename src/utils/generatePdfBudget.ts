@@ -466,10 +466,12 @@ export function generatePdfBudget(order: Order) {
                             <tbody>
                                 ${items.map((it: any) => `
                                     <tr>
-                                        <td style="text-align: left;">
+                                        <td style="vertical-align: top;">
                                             <strong>${it.descripcion || `Cartel ${order.material || 'Lona Front'} ${order.ancho || 0}x${order.alto || 0}m`}</strong>
                                             <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
                                                 Material: ${order.material || 'Lona'} · Medida: ${order.ancho || 0}x${order.alto || 0}m
+                                                ${order.bobinaAsignada ? ` · Bobina: <strong>${order.bobinaAsignada}m</strong>` : ''}
+                                                ${order.consumoEstimado ? ` · Consumo: <strong>${Number(order.consumoEstimado).toFixed(2)} ml</strong>` : ''}
                                             </div>
                                         </td>
                                         <td style="text-align: center; font-weight: 700;">${it.cant || order.copias || 1}</td>
@@ -482,7 +484,7 @@ export function generatePdfBudget(order: Order) {
                     </div>
 
                     <!-- Technical Specifications -->
-                    ${hasMeta ? `
+                    ${(hasMeta || order.bobinaAsignada || order.consumoEstimado) ? `
                     <div class="tech-specs">
                         <div class="tech-specs-title">📐 Especificaciones Técnicas de Impresión</div>
                         <div class="tech-specs-grid">
@@ -506,9 +508,19 @@ export function generatePdfBudget(order: Order) {
                                 <span class="tech-spec-label">Medida Final</span>
                                 <span class="tech-spec-value">${printDimM}</span>
                             </div>` : ''}
+                            ${order.bobinaAsignada ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Bobina Asignada</span>
+                                <span class="tech-spec-value" style="color: #2563eb;">Rollo ${order.bobinaAsignada}m</span>
+                            </div>` : ''}
+                            ${order.consumoEstimado ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Consumo Lineal</span>
+                                <span class="tech-spec-value" style="color: #0284c7;">${Number(order.consumoEstimado).toFixed(2)} ml</span>
+                            </div>` : ''}
                             <div class="tech-spec-item">
                                 <span class="tech-spec-label">Copias</span>
-                                <span class="tech-spec-value">${order.copias || 1} u.</span>
+                                <span class="tech-spec-value">${order.copias || 1} un</span>
                             </div>
                         </div>
                     </div>

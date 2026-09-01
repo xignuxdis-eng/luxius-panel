@@ -264,6 +264,11 @@ def _presupuesto_to_order(p):
         'loteNombre': esp.get('loteNombre') or esp.get('batchName') or (p.descripcion.split(' - ')[0].strip() if (p.descripcion and ' - ' in p.descripcion and len(p.descripcion.split(' - ')[0].strip()) > 2 and not p.descripcion.startswith('Proyecto OT-')) else None),
         'descripcionItem': esp.get('descripcionItem') or (p.descripcion.split(' - ', 1)[1].strip() if (p.descripcion and ' - ' in p.descripcion and len(p.descripcion.split(' - ')[0].strip()) > 2 and not p.descripcion.startswith('Proyecto OT-')) else None),
 
+        # Linear roll and pricing info
+        'bobinaAsignada': esp.get('bobinaAsignada') or (esp.get('precioDetalle') or {}).get('bobinaAncho'),
+        'consumoEstimado': esp.get('consumoEstimado') or (esp.get('precioDetalle') or {}).get('consumoML'),
+        'precioMl': esp.get('precioMl') or (esp.get('precioDetalle') or {}).get('precioML'),
+        'precioDetalle': esp.get('precioDetalle'),
 
         # Category
         'category': 'impresion' if status in ('orden', 'impreso', 'post') else 'diseno',
@@ -286,9 +291,9 @@ def _apply_order_to_presupuesto(p, data):
             if p.deleted_at is not None:
                 p.deleted_at = None
 
-    if 'observaciones' in data:
-        p.descripcion = data['observaciones']
-    elif 'nombreTarea' in data and not p.descripcion:
+    if 'descripcion' in data and data['descripcion']:
+        p.descripcion = data['descripcion']
+    elif 'nombreTarea' in data and data['nombreTarea']:
         p.descripcion = data['nombreTarea']
 
     if 'comments' in data:
@@ -333,7 +338,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = p.especificaciones or {}
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle'):
         if k in data:
             current_especs[k] = data[k]
     p.especificaciones = current_especs

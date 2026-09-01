@@ -124,11 +124,60 @@ export default function Entrada() {
 
         const matData = allMateriales.find(m => m.codigo === order.material);
         if (matData) {
+            const w = Number(order.ancho) || 0;
+            const h = Number(order.alto) || 0;
+            const c = Number(order.copias) || 1;
+
             if (matData.tipoCobro === 'ml' && matData.bobinas && matData.bobinas.length > 0) {
-                return 0;
+                const safetyMargin = 0.01;
+                const availableWidths = matData.bobinas
+                    .map((b: any) => ({ ...b, usefulWidth: b.ancho - safetyMargin }))
+                    .filter((b: any) => b.usefulWidth > 0)
+                    .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
+
+                const cliente = allClientes.find(cl => cl.id === order.clientId);
+                const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
+
+                let bestCost = Infinity;
+
+                // Original orientation
+                for (const b of availableWidths) {
+                    if (w <= b.usefulWidth) {
+                        const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
+                        const priceToUse = specialPriceWidth || specialPrice || b.precioML;
+                        const cost = priceToUse * h * c;
+                        if (cost < bestCost) bestCost = cost;
+                        break;
+                    }
+                }
+
+                // Rotated orientation
+                for (const b of availableWidths) {
+                    if (h <= b.usefulWidth) {
+                        const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
+                        const priceToUse = specialPriceWidth || specialPrice || b.precioML;
+                        const cost = priceToUse * w * c;
+                        if (cost < bestCost) bestCost = cost;
+                        break;
+                    }
+                }
+
+                // Fallback
+                if (bestCost === Infinity && availableWidths.length > 0) {
+                    const widest = availableWidths[availableWidths.length - 1];
+                    const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${widest.ancho}`] : null;
+                    const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
+                    bestCost = priceToUse * h * c;
+                }
+
+                return bestCost === Infinity ? 0 : Math.round(bestCost);
             }
+
             if (matData.precioM2) {
-                return Math.round(Number(order.ancho) * Number(order.alto) * Number(order.copias) * matData.precioM2);
+                const cliente = allClientes.find(cl => cl.id === order.clientId);
+                const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
+                const priceToUse = specialPrice || matData.precioM2 || 0;
+                return Math.round(w * h * c * priceToUse);
             }
         }
         return 0;
@@ -141,20 +190,74 @@ export default function Entrada() {
         const h = Number(order.alto) || 0;
         const c = Number(order.copias) || 1;
 
-        if (matData?.tipoCobro === 'ml') {
+        const isMl = matData?.tipoCobro === 'ml' || (matData?.bobinas && matData.bobinas.length > 0) || order.material === 'VV' || order.material === 'VVP';
+
+        if (isMl) {
             let val = order.consumoEstimado;
-            if (val === undefined) {
-                const isRotated = order.precioDetalle?.rotated;
-                val = isRotated ? (w * c) : (h * c);
+            let assignedBobina = order.bobinaAsignada || order.precioDetalle?.bobinaAncho || order.precioDetalle?.bobinaUsada;
+
+            if (val === undefined || !assignedBobina) {
+                if (matData?.bobinas && matData.bobinas.length > 0) {
+                    const safetyMargin = 0.01;
+                    const availableWidths = matData.bobinas
+                        .map((b: any) => ({ ...b, usefulWidth: b.ancho - safetyMargin }))
+                        .filter((b: any) => b.usefulWidth > 0)
+                        .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
+
+                    let bestMl = Infinity;
+                    let bestBobina = availableWidths[0]?.ancho;
+
+                    for (const b of availableWidths) {
+                        if (w <= b.usefulWidth) {
+                            const ml = h * c;
+                            if (ml < bestMl) {
+                                bestMl = ml;
+                                bestBobina = b.ancho;
+                            }
+                            break;
+                        }
+                    }
+
+                    for (const b of availableWidths) {
+                        if (h <= b.usefulWidth) {
+                            const ml = w * c;
+                            if (ml < bestMl) {
+                                bestMl = ml;
+                                bestBobina = b.ancho;
+                            }
+                            break;
+                        }
+                    }
+
+                    val = bestMl === Infinity ? (h * c) : bestMl;
+                    assignedBobina = bestBobina;
+                } else {
+                    // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
+                    if (w <= 1.36) {
+                        assignedBobina = 1.37;
+                        val = h * c;
+                    } else if (h <= 1.36 && (w * c) <= (h * c)) {
+                        assignedBobina = 1.37;
+                        val = w * c;
+                    } else if (w <= 1.51 || h <= 1.51) {
+                        assignedBobina = 1.52;
+                        val = (h <= 1.51 && (w * c) < (h * c)) ? (w * c) : (h * c);
+                    } else {
+                        assignedBobina = 1.52;
+                        val = h * c;
+                    }
+                }
             }
             return {
                 value: val,
-                unit: 'ml'
+                unit: 'ml',
+                bobina: assignedBobina ? `${assignedBobina}` : null
             };
         }
         return {
             value: w * h * c,
-            unit: 'm²'
+            unit: 'm²',
+            bobina: null
         };
     }
 
@@ -166,7 +269,11 @@ export default function Entrada() {
         orders: Order[];
         primaryOrder: Order;
         totalPrice: number;
-        totalConsumption: { m2: number; ml: number };
+        totalConsumption: {
+            m2: number;
+            ml: number;
+            mlByBobina: Record<string, number>;
+        };
         totalCopies: number;
         allSelected: boolean;
         someSelected: boolean;
@@ -265,12 +372,18 @@ export default function Entrada() {
                 let totalMl = 0;
                 let totalCopies = 0;
                 let selectedCount = 0;
+                const mlByBobina: Record<string, number> = {};
 
                 batchList.forEach(o => {
                     totalPrice += calculateOrderPrice(o);
                     const cons = getConsumption(o);
-                    if (cons.unit === 'ml') totalMl += cons.value;
-                    else totalM2 += cons.value;
+                    if (cons.unit === 'ml') {
+                        totalMl += cons.value;
+                        const bKey = cons.bobina ? `${cons.bobina}m` : 'Estándar';
+                        mlByBobina[bKey] = (mlByBobina[bKey] || 0) + cons.value;
+                    } else {
+                        totalM2 += cons.value;
+                    }
                     totalCopies += (o.copias || 1);
                     if (selectedIds.has(String(o.id || o.ot))) selectedCount++;
                 });
@@ -282,7 +395,7 @@ export default function Entrada() {
                     orders: batchList,
                     primaryOrder: batchList[0],
                     totalPrice,
-                    totalConsumption: { m2: totalM2, ml: totalMl },
+                    totalConsumption: { m2: totalM2, ml: totalMl, mlByBobina },
                     totalCopies,
                     allSelected: selectedCount === batchList.length && batchList.length > 0,
                     someSelected: selectedCount > 0 && selectedCount < batchList.length
@@ -294,6 +407,7 @@ export default function Entrada() {
 
         return result;
     }, [displayedOrders, selectedIds]);
+
 
 
 
@@ -788,9 +902,35 @@ export default function Entrada() {
                                                     <span style={{ color: 'var(--text-muted)' }}>—</span>
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <span className="m2-text font-mono text-muted" style={{ fontWeight: 700, color: '#e2e8f0' }}>
-                                                        {item.totalConsumption.m2 > 0 ? `${item.totalConsumption.m2.toFixed(2)} m²` : `${item.totalConsumption.ml.toFixed(2)} ml`}
-                                                    </span>
+                                                    {item.totalConsumption.ml > 0 ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                                            <span className="m2-text font-mono" style={{ fontWeight: 800, color: '#00daf3', fontSize: '0.92rem' }}>
+                                                                {item.totalConsumption.ml.toFixed(2)} <small>ml</small>
+                                                            </span>
+                                                            {item.totalConsumption.mlByBobina && Object.keys(item.totalConsumption.mlByBobina).length > 0 && (
+                                                                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', marginTop: '2px' }}>
+                                                                    {Object.entries(item.totalConsumption.mlByBobina).map(([bLabel, bVal]) => (
+                                                                        <span key={bLabel} style={{
+                                                                            fontSize: '0.72rem',
+                                                                            fontWeight: 700,
+                                                                            padding: '1px 6px',
+                                                                            borderRadius: '6px',
+                                                                            background: 'rgba(0, 218, 243, 0.12)',
+                                                                            color: '#67e8f9',
+                                                                            border: '1px solid rgba(0, 218, 243, 0.3)',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}>
+                                                                            {bVal.toFixed(2)} ml <span style={{ opacity: 0.8, fontSize: '0.68rem' }}>({bLabel})</span>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="m2-text font-mono text-muted" style={{ fontWeight: 700, color: '#e2e8f0' }}>
+                                                            {item.totalConsumption.m2.toFixed(2)} <small>m²</small>
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
                                                     <td>
@@ -938,9 +1078,31 @@ export default function Entrada() {
                                                             )}
                                                         </td>
                                                         <td style={{ textAlign: 'center' }}>
-                                                            <span className="m2-text font-mono text-muted">
-                                                                {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
-                                                            </span>
+                                                            {consumption.unit === 'ml' ? (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: '#00daf3', fontSize: '0.85rem' }}>
+                                                                        {consumption.value.toFixed(2)} <small>ml</small>
+                                                                    </span>
+                                                                    {consumption.bobina && (
+                                                                        <span style={{
+                                                                            fontSize: '0.68rem',
+                                                                            fontWeight: 700,
+                                                                            padding: '1px 5px',
+                                                                            borderRadius: '4px',
+                                                                            background: 'rgba(59, 130, 246, 0.18)',
+                                                                            color: '#93c5fd',
+                                                                            border: '1px solid rgba(59, 130, 246, 0.35)',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}>
+                                                                            Rollo {consumption.bobina}m
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="m2-text font-mono text-muted">
+                                                                    {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
                                                             <td>
@@ -1124,9 +1286,31 @@ export default function Entrada() {
                                             )}
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
-                                            <span className="m2-text font-mono text-muted">
-                                                {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
-                                            </span>
+                                            {consumption.unit === 'ml' ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: '#00daf3', fontSize: '0.85rem' }}>
+                                                        {consumption.value.toFixed(2)} <small>ml</small>
+                                                    </span>
+                                                    {consumption.bobina && (
+                                                        <span style={{
+                                                            fontSize: '0.68rem',
+                                                            fontWeight: 700,
+                                                            padding: '1px 5px',
+                                                            borderRadius: '4px',
+                                                            background: 'rgba(59, 130, 246, 0.18)',
+                                                            color: '#93c5fd',
+                                                            border: '1px solid rgba(59, 130, 246, 0.35)',
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            Rollo {consumption.bobina}m
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="m2-text font-mono text-muted">
+                                                    {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
+                                                </span>
+                                            )}
                                         </td>
                                         {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
                                             <td>

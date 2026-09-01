@@ -106,14 +106,20 @@ export interface Order {
     stockWarning?: boolean;
     dismissedStockWarning?: boolean;
     consumoEstimado?: number;
+    bobinaAsignada?: number | string;
     precioUnitarioUsado?: number;
+    precioMl?: number;
     precioDetalle?: {
-        bobinaUsada: number;
-        precioML: number;
-        costoBase: number;
-        rotated: boolean;
+        bobinaUsada?: number;
+        bobinaAncho?: number;
+        precioML?: number;
+        costoBase?: number;
+        rotated?: boolean;
+        tipoCobro?: 'ml' | 'm2';
+        consumoML?: number;
     };
 }
+
 
 export interface OrderFilters {
     general?: string
