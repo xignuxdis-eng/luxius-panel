@@ -205,20 +205,46 @@ export default function Entrada() {
         });
     }
 
+    const getBatchInfo = (order: Order) => {
+        if (order.batchId) {
+            return {
+                key: order.batchId,
+                name: order.loteNombre || order.nombreTarea || 'Lote de Impresión'
+            };
+        }
+
+        if (order.loteNombre && order.loteNombre.trim().length > 0) {
+            return {
+                key: `lote_${order.clientId || '0'}_${order.loteNombre.trim().toLowerCase()}`,
+                name: order.loteNombre.trim()
+            };
+        }
+
+        // Infer from nombreTarea / observaciones / description if it contains " - "
+        const text = (order.nombreTarea || order.observaciones || '').trim();
+        if (text && text.includes(' - ')) {
+            const prefix = text.split(' - ')[0].trim();
+            if (prefix.length > 2 && !prefix.startsWith('Proyecto #') && !prefix.startsWith('Proyecto OT-')) {
+                return {
+                    key: `lote_${order.clientId || '0'}_${prefix.toLowerCase()}`,
+                    name: prefix
+                };
+            }
+        }
+
+        return null;
+    };
+
     const groupedOrders = useMemo<GroupedItem[]>(() => {
-        const batchesMap = new Map<string, Order[]>();
+        const batchesMap = new Map<string, { name: string; orders: Order[] }>();
 
         displayedOrders.forEach(order => {
-            let bKey = order.batchId;
-            if (!bKey && order.loteNombre && order.loteNombre.trim().length > 0) {
-                bKey = `lote_${order.clientId || '0'}_${order.loteNombre.trim().toLowerCase()}`;
-            }
-
-            if (bKey) {
-                if (!batchesMap.has(bKey)) {
-                    batchesMap.set(bKey, []);
+            const bInfo = getBatchInfo(order);
+            if (bInfo) {
+                if (!batchesMap.has(bInfo.key)) {
+                    batchesMap.set(bInfo.key, { name: bInfo.name, orders: [] });
                 }
-                batchesMap.get(bKey)!.push(order);
+                batchesMap.get(bInfo.key)!.orders.push(order);
             }
         });
 
@@ -226,16 +252,14 @@ export default function Entrada() {
         const processedBatches = new Set<string>();
 
         displayedOrders.forEach(order => {
-            let bKey = order.batchId;
-            if (!bKey && order.loteNombre && order.loteNombre.trim().length > 0) {
-                bKey = `lote_${order.clientId || '0'}_${order.loteNombre.trim().toLowerCase()}`;
-            }
+            const bInfo = getBatchInfo(order);
 
-            if (bKey && (batchesMap.get(bKey)?.length || 0) > 1) {
-                if (processedBatches.has(bKey)) return;
-                processedBatches.add(bKey);
+            if (bInfo && (batchesMap.get(bInfo.key)?.orders.length || 0) > 1) {
+                if (processedBatches.has(bInfo.key)) return;
+                processedBatches.add(bInfo.key);
 
-                const batchList = batchesMap.get(bKey) || [];
+                const batchData = batchesMap.get(bInfo.key)!;
+                const batchList = batchData.orders;
                 let totalPrice = 0;
                 let totalM2 = 0;
                 let totalMl = 0;
@@ -251,12 +275,10 @@ export default function Entrada() {
                     if (selectedIds.has(String(o.id || o.ot))) selectedCount++;
                 });
 
-                const bName = batchList[0].loteNombre || batchList[0].nombreTarea || 'Lote de Impresión';
-
                 result.push({
                     isBatch: true,
-                    batchId: bKey,
-                    batchName: bName,
+                    batchId: bInfo.key,
+                    batchName: batchData.name,
                     orders: batchList,
                     primaryOrder: batchList[0],
                     totalPrice,
@@ -265,13 +287,14 @@ export default function Entrada() {
                     allSelected: selectedCount === batchList.length && batchList.length > 0,
                     someSelected: selectedCount > 0 && selectedCount < batchList.length
                 });
-            } else {
+            } else if (!bInfo || (batchesMap.get(bInfo.key)?.orders.length || 0) <= 1) {
                 result.push({ isBatch: false, order });
             }
         });
 
         return result;
     }, [displayedOrders, selectedIds]);
+
 
 
     const selectedTotals = {
@@ -837,7 +860,14 @@ export default function Entrada() {
                                             {isExpanded && item.orders.map(order => {
                                                 const consumption = getConsumption(order);
                                                 const otDisplay = order.ot || `OT-${order.id}`;
-                                                const childLabel = order.descripcionItem || order.archivosOriginales?.[0] || order.archivos?.[0] || order.nombreTarea || '';
+                                                let childLabel = order.descripcionItem;
+                                                if (!childLabel && order.nombreTarea && order.nombreTarea.includes(' - ')) {
+                                                    childLabel = order.nombreTarea.split(' - ').slice(1).join(' - ').trim();
+                                                }
+                                                if (!childLabel) {
+                                                    childLabel = order.archivosOriginales?.[0] || order.archivos?.[0] || order.nombreTarea || '';
+                                                }
+
 
                                                 return (
                                                     <tr key={order.id || order.ot} className={`batch-child-row fade-in ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''}`}>

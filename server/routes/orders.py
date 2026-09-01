@@ -260,9 +260,10 @@ def _presupuesto_to_order(p):
         # Title / Task Name & Batch grouping
         'nombreTarea': esp.get('nombreTarea') or p.descripcion or f"Proyecto OT-{str(p.id)[:8].upper()}",
         'titulo': esp.get('nombreTarea') or p.descripcion or f"Proyecto OT-{str(p.id)[:8].upper()}",
-        'batchId': esp.get('batchId') or esp.get('loteId'),
-        'loteNombre': esp.get('loteNombre') or esp.get('batchName'),
-        'descripcionItem': esp.get('descripcionItem'),
+        'batchId': esp.get('batchId') or esp.get('loteId') or (f"lote_{p.cliente_id}_{p.descripcion.split(' - ')[0].strip().lower()}" if (p.descripcion and ' - ' in p.descripcion and len(p.descripcion.split(' - ')[0].strip()) > 2 and not p.descripcion.startswith('Proyecto OT-')) else None),
+        'loteNombre': esp.get('loteNombre') or esp.get('batchName') or (p.descripcion.split(' - ')[0].strip() if (p.descripcion and ' - ' in p.descripcion and len(p.descripcion.split(' - ')[0].strip()) > 2 and not p.descripcion.startswith('Proyecto OT-')) else None),
+        'descripcionItem': esp.get('descripcionItem') or (p.descripcion.split(' - ', 1)[1].strip() if (p.descripcion and ' - ' in p.descripcion and len(p.descripcion.split(' - ')[0].strip()) > 2 and not p.descripcion.startswith('Proyecto OT-')) else None),
+
 
         # Category
         'category': 'impresion' if status in ('orden', 'impreso', 'post') else 'diseno',

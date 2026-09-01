@@ -481,49 +481,73 @@ export default function Reportes() {
                                                 {order.clienteNombre}
                                             </td>
                                             <td>
-                                                {order.loteNombre ? (
+                                                {(() => {
+                                                    const bInfo = (() => {
+                                                        if (order.batchId) return { key: order.batchId, name: order.loteNombre || order.nombreTarea || 'Lote' };
+                                                        if (order.loteNombre && order.loteNombre.trim().length > 0) return { key: `lote_${order.clientId || '0'}_${order.loteNombre.trim().toLowerCase()}`, name: order.loteNombre.trim() };
+                                                        const text = (order.nombreTarea || order.observaciones || '').trim();
+                                                        if (text && text.includes(' - ')) {
+                                                            const prefix = text.split(' - ')[0].trim();
+                                                            if (prefix.length > 2 && !prefix.startsWith('Proyecto #') && !prefix.startsWith('Proyecto OT-')) {
+                                                                return { key: `lote_${order.clientId || '0'}_${prefix.toLowerCase()}`, name: prefix };
+                                                            }
+                                                        }
+                                                        return null;
+                                                    })();
 
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                                        <span
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const batchOrders = filteredOrders.filter(o => o.batchId === order.batchId || (o.loteNombre && o.loteNombre === order.loteNombre));
-                                                                toggleSelectBatch(batchOrders);
-                                                            }}
-                                                            style={{
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                gap: '4px',
-                                                                padding: '2px 8px',
-                                                                borderRadius: '8px',
-                                                                background: 'rgba(37, 99, 235, 0.25)',
-                                                                border: '1px solid rgba(96, 165, 250, 0.4)',
-                                                                color: '#93c5fd',
-                                                                fontSize: '0.78rem',
-                                                                fontWeight: 700,
-                                                                cursor: 'pointer',
-                                                                width: 'fit-content'
-                                                            }}
-                                                            title="Haga clic para seleccionar/deseleccionar todo este lote de un tiro"
-                                                        >
-                                                            🏷️ {order.loteNombre}
-                                                        </span>
-                                                        {order.descripcionItem && (
-                                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                                                                ↳ {order.descripcionItem}
-                                                            </span>
-                                                        )}
-                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                            {order.material}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <div>
-                                                        <div style={{ fontWeight: 600 }}>{cleanDesc}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.material}</div>
-                                                    </div>
-                                                )}
+                                                    if (bInfo) {
+                                                        const childName = order.descripcionItem || (order.nombreTarea && order.nombreTarea.includes(' - ') ? order.nombreTarea.split(' - ').slice(1).join(' - ').trim() : '');
+                                                        return (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                                <span
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const batchOrders = filteredOrders.filter(o => {
+                                                                            if (o.batchId && order.batchId) return o.batchId === order.batchId;
+                                                                            const otherText = (o.nombreTarea || o.observaciones || '').trim();
+                                                                            return otherText.toLowerCase().startsWith(bInfo.name.toLowerCase());
+                                                                        });
+                                                                        toggleSelectBatch(batchOrders);
+                                                                    }}
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '8px',
+                                                                        background: 'rgba(37, 99, 235, 0.25)',
+                                                                        border: '1px solid rgba(96, 165, 250, 0.4)',
+                                                                        color: '#93c5fd',
+                                                                        fontSize: '0.78rem',
+                                                                        fontWeight: 700,
+                                                                        cursor: 'pointer',
+                                                                        width: 'fit-content'
+                                                                    }}
+                                                                    title="Haga clic para seleccionar/deseleccionar todo este lote de un tiro"
+                                                                >
+                                                                    🏷️ {bInfo.name}
+                                                                </span>
+                                                                {childName && (
+                                                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                                        ↳ {childName}
+                                                                    </span>
+                                                                )}
+                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                                    {order.material}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div>
+                                                            <div style={{ fontWeight: 600 }}>{cleanDesc}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.material}</div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
+
 
                                             <td>
                                                 {Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m ({order.copias} cop)
