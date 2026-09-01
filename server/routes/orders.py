@@ -257,9 +257,12 @@ def _presupuesto_to_order(p):
         'maquinaId': None,
         'artistaId': None,
 
-        # Title / Task Name
-        'nombreTarea': p.descripcion or f"Proyecto OT-{str(p.id)[:8].upper()}",
-        'titulo': p.descripcion or f"Proyecto OT-{str(p.id)[:8].upper()}",
+        # Title / Task Name & Batch grouping
+        'nombreTarea': esp.get('nombreTarea') or p.descripcion or f"Proyecto OT-{str(p.id)[:8].upper()}",
+        'titulo': esp.get('nombreTarea') or p.descripcion or f"Proyecto OT-{str(p.id)[:8].upper()}",
+        'batchId': esp.get('batchId') or esp.get('loteId'),
+        'loteNombre': esp.get('loteNombre') or esp.get('batchName'),
+        'descripcionItem': esp.get('descripcionItem'),
 
         # Category
         'category': 'impresion' if status in ('orden', 'impreso', 'post') else 'diseno',
@@ -329,7 +332,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = p.especificaciones or {}
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea'):
         if k in data:
             current_especs[k] = data[k]
     p.especificaciones = current_especs

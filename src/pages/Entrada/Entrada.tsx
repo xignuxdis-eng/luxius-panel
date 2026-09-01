@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import { statusColors, statusLabels } from '../../types/orden'
@@ -31,8 +31,9 @@ export default function Entrada() {
     const [orders, setOrders] = useState<Order[]>([])
     const [loading, setLoading] = useState(true)
 
-    // BATCH SELECTION STATE
+    // BATCH SELECTION STATE & ACCORDION EXPANSION STATE
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
 
     // VIEW TAB: 'active' (current OTs), 'history' (completed), or 'trash' (soft-deleted)
     const [viewTab, setViewTab] = useState<'active' | 'history' | 'trash'>('active')
@@ -73,7 +74,11 @@ export default function Entrada() {
             (order.clienteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
             (order.ot?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
             (order.id?.toString() || '').includes(searchTerm) ||
-            (order.material?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+            (order.material?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (order.nombreTarea?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (order.loteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (order.descripcionItem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (order.observaciones?.toLowerCase() || '').includes(searchTerm.toLowerCase());
 
         const matchesStatus = statusFilter === '' || order.status === statusFilter;
         const matchesCalidad = calidadFilter === '' || order.calidad === calidadFilter;
@@ -152,6 +157,122 @@ export default function Entrada() {
             unit: 'm²'
         };
     }
+
+    // ACCORDION / BATCH GROUPING TYPES & COMPUTATION
+    interface GroupedBatch {
+        isBatch: true;
+        batchId: string;
+        batchName: string;
+        orders: Order[];
+        primaryOrder: Order;
+        totalPrice: number;
+        totalConsumption: { m2: number; ml: number };
+        totalCopies: number;
+        allSelected: boolean;
+        someSelected: boolean;
+    }
+
+    interface GroupedSingle {
+        isBatch: false;
+        order: Order;
+    }
+
+    type GroupedItem = GroupedBatch | GroupedSingle;
+
+    const toggleExpandBatch = (batchId: string) => {
+        setExpandedBatches(prev => {
+            const next = new Set(prev);
+            if (next.has(batchId)) {
+                next.delete(batchId);
+            } else {
+                next.add(batchId);
+            }
+            return next;
+        });
+    }
+
+    const toggleSelectBatch = (batchOrders: Order[]) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            const batchIds = batchOrders.map(o => String(o.id || o.ot));
+            const allChecked = batchIds.every(id => next.has(id));
+            if (allChecked) {
+                batchIds.forEach(id => next.delete(id));
+            } else {
+                batchIds.forEach(id => next.add(id));
+            }
+            return next;
+        });
+    }
+
+    const groupedOrders = useMemo<GroupedItem[]>(() => {
+        const batchesMap = new Map<string, Order[]>();
+
+        displayedOrders.forEach(order => {
+            let bKey = order.batchId;
+            if (!bKey && order.loteNombre && order.loteNombre.trim().length > 0) {
+                bKey = `lote_${order.clientId || '0'}_${order.loteNombre.trim().toLowerCase()}`;
+            }
+
+            if (bKey) {
+                if (!batchesMap.has(bKey)) {
+                    batchesMap.set(bKey, []);
+                }
+                batchesMap.get(bKey)!.push(order);
+            }
+        });
+
+        const result: GroupedItem[] = [];
+        const processedBatches = new Set<string>();
+
+        displayedOrders.forEach(order => {
+            let bKey = order.batchId;
+            if (!bKey && order.loteNombre && order.loteNombre.trim().length > 0) {
+                bKey = `lote_${order.clientId || '0'}_${order.loteNombre.trim().toLowerCase()}`;
+            }
+
+            if (bKey && (batchesMap.get(bKey)?.length || 0) > 1) {
+                if (processedBatches.has(bKey)) return;
+                processedBatches.add(bKey);
+
+                const batchList = batchesMap.get(bKey) || [];
+                let totalPrice = 0;
+                let totalM2 = 0;
+                let totalMl = 0;
+                let totalCopies = 0;
+                let selectedCount = 0;
+
+                batchList.forEach(o => {
+                    totalPrice += calculateOrderPrice(o);
+                    const cons = getConsumption(o);
+                    if (cons.unit === 'ml') totalMl += cons.value;
+                    else totalM2 += cons.value;
+                    totalCopies += (o.copias || 1);
+                    if (selectedIds.has(String(o.id || o.ot))) selectedCount++;
+                });
+
+                const bName = batchList[0].loteNombre || batchList[0].nombreTarea || 'Lote de Impresión';
+
+                result.push({
+                    isBatch: true,
+                    batchId: bKey,
+                    batchName: bName,
+                    orders: batchList,
+                    primaryOrder: batchList[0],
+                    totalPrice,
+                    totalConsumption: { m2: totalM2, ml: totalMl },
+                    totalCopies,
+                    allSelected: selectedCount === batchList.length && batchList.length > 0,
+                    someSelected: selectedCount > 0 && selectedCount < batchList.length
+                });
+            } else {
+                result.push({ isBatch: false, order });
+            }
+        });
+
+        return result;
+    }, [displayedOrders, selectedIds]);
+
 
     const selectedTotals = {
         m2: Array.from(selectedIds).reduce((acc, id) => {
@@ -538,7 +659,327 @@ export default function Entrada() {
                             </tr>
                         </thead>
                         <tbody>
-                            {displayedOrders.map(order => {
+                            {groupedOrders.map(item => {
+                                if (item.isBatch) {
+                                    const isExpanded = expandedBatches.has(item.batchId);
+                                    return (
+                                        <>
+                                            {/* MASTER BATCH ROW */}
+                                            <tr
+                                                key={item.batchId}
+                                                className={`batch-row-master ${isExpanded ? 'is-expanded' : ''} ${item.allSelected ? 'selected-row' : ''}`}
+                                            >
+                                                <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="batch-expand-btn"
+                                                            onClick={() => toggleExpandBatch(item.batchId)}
+                                                            title={isExpanded ? "Contraer lote" : "Desplegar órdenes del lote"}
+                                                        >
+                                                            {isExpanded ? '▼' : '▶'}
+                                                        </button>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={item.allSelected}
+                                                            ref={el => { if (el) el.indeterminate = item.someSelected; }}
+                                                            onChange={() => toggleSelectBatch(item.orders)}
+                                                            style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
+                                                            title="Seleccionar todas las OTs del lote"
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="order-id" style={{ cursor: 'pointer' }} onClick={() => toggleExpandBatch(item.batchId)}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                            <span className="batch-badge-pill">🏷️ {item.batchName}</span>
+                                                            <span className="batch-count-pill">📦 {item.orders.length} OTs</span>
+                                                        </div>
+                                                        <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                                            {isExpanded ? '▼ Clic para contraer' : '▶ Clic para ver los archivos'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {item.primaryOrder.origen === 'mobile' ? (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(0, 218, 243, 0.15)', color: '#00daf3', border: '1px solid rgba(0, 218, 243, 0.4)' }}>
+                                                            📱 App Móvil
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: 'rgba(147, 51, 234, 0.15)', color: '#c084fc', border: '1px solid rgba(147, 51, 234, 0.3)' }}>
+                                                            💻 Sistema Web
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                                        {item.primaryOrder.createdAt ? new Date(item.primaryOrder.createdAt).toLocaleString('es-AR', {
+                                                            timeZone: 'America/Argentina/Buenos_Aires',
+                                                            day: '2-digit',
+                                                            month: '2-digit',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: false
+                                                        }) : (item.primaryOrder.fechaCreacion || '-')}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {(() => {
+                                                        const distinct = Array.from(new Set(item.orders.map(o => o.status)));
+                                                        if (distinct.length === 1) {
+                                                            const st = distinct[0];
+                                                            return (
+                                                                <span className="status-badge" style={{ backgroundColor: statusColors[st], boxShadow: `0 0 8px ${statusColors[st]}40` }}>
+                                                                    {statusLabels[st]}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <span className="status-badge" style={{ backgroundColor: '#64748b', fontSize: '0.72rem' }}>
+                                                                Mixto ({distinct.length})
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td>
+                                                    <div className="client-cell">
+                                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.primaryOrder.clienteNombre}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    {(() => {
+                                                        const mats = Array.from(new Set(item.orders.map(o => o.material)));
+                                                        if (mats.length === 1) {
+                                                            return <span className="material-tag-sm">{mats[0]}</span>;
+                                                        }
+                                                        return <span className="material-tag-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>{mats.length} mats</span>;
+                                                    })()}
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <span style={{ fontWeight: 700, color: '#60a5fa', fontSize: '0.85rem' }}>{item.orders.length} piezas</span>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <span className="copies-badge" style={{ background: 'rgba(37, 99, 235, 0.2)', color: '#93c5fd' }}>{item.totalCopies}</span>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <span className="m2-text font-mono text-muted" style={{ fontWeight: 700, color: '#e2e8f0' }}>
+                                                        {item.totalConsumption.m2 > 0 ? `${item.totalConsumption.m2.toFixed(2)} m²` : `${item.totalConsumption.ml.toFixed(2)} ml`}
+                                                    </span>
+                                                </td>
+                                                {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
+                                                    <td>
+                                                        <div className="price-cell" style={{ fontWeight: 800, color: '#10b981' }}>
+                                                            <span className="currency">$</span>
+                                                            <span className="amount">{item.totalPrice.toLocaleString()}</span>
+                                                        </div>
+                                                    </td>
+                                                )}
+                                                <td>
+                                                    <div className="date-cell" style={{ fontWeight: '600', color: 'var(--accent)' }}>
+                                                        {item.primaryOrder.fechaEntrega ? item.primaryOrder.fechaEntrega : <span className="text-muted italic">--</span>}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="order-actions-row">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon-action"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const clientObj = allClientes.find(c => c.id === item.primaryOrder.clientId);
+                                                                generatePdfClientReport(item.orders, {
+                                                                    clienteNombre: item.primaryOrder.clienteNombre,
+                                                                    clienteEmpresa: clientObj?.empresa,
+                                                                    clienteTelefono: clientObj?.telefono,
+                                                                    clienteEmail: clientObj?.email
+                                                                });
+                                                            }}
+                                                            title="Exportar Reporte PDF del Lote para el Cliente"
+                                                            style={{ background: 'rgba(37, 99, 235, 0.25)', border: '1px solid rgba(37, 99, 235, 0.6)' }}
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>📄</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon-action"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setStatusOrder(item.primaryOrder);
+                                                                setIsStatusModalOpen(true);
+                                                            }}
+                                                            title="Cambiar Estado al Lote"
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>⚙️</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon-action btn-danger-action"
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                if (confirm(`¿Mover las ${item.orders.length} órdenes del lote "${item.batchName}" a la papelera?`)) {
+                                                                    for (const o of item.orders) {
+                                                                        await handleSoftDeleteOrder(o);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            title="Enviar todo el Lote a Papelera"
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>🗑️</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            {/* EXPANDED CHILD ROWS */}
+                                            {isExpanded && item.orders.map(order => {
+                                                const consumption = getConsumption(order);
+                                                const otDisplay = order.ot || `OT-${order.id}`;
+                                                const childLabel = order.descripcionItem || order.archivosOriginales?.[0] || order.archivos?.[0] || order.nombreTarea || '';
+
+                                                return (
+                                                    <tr key={order.id || order.ot} className={`batch-child-row fade-in ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''}`}>
+                                                        <td style={{ verticalAlign: 'middle' }}>
+                                                            <div className="batch-child-indent">
+                                                                <span className="batch-child-connector">↳</span>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedIds.has(String(order.id || order.ot))}
+                                                                    onChange={() => toggleSelection(order.id || order.ot || '')}
+                                                                    style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.1)' }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="order-id" style={{ paddingLeft: '8px' }}>
+                                                                <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.9rem' }}>{otDisplay}</span>
+                                                                {childLabel && (
+                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={childLabel}>
+                                                                        {childLabel}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>—</span>
+                                                        </td>
+                                                        <td>
+                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                                {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className="status-badge" style={{
+                                                                backgroundColor: statusColors[order.status],
+                                                                boxShadow: `0 0 6px ${statusColors[order.status]}30`,
+                                                                fontSize: '0.72rem',
+                                                                padding: '2px 6px'
+                                                            }}>
+                                                                {statusLabels[order.status]}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>↳ {order.clienteNombre}</span>
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <span className="material-tag-sm">{order.material}</span>
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <span className="dims-text">{Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m</span>
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <span className="copies-badge">{order.copias}</span>
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) ? (
+                                                                <div className="demasia-indicator-group" style={{ margin: '0 auto', width: 'fit-content' }}>
+                                                                    <span className="demasia-arrows">
+                                                                        {order.demasiasConfig.top ? '↑' : ''}
+                                                                        {order.demasiasConfig.bottom ? '↓' : ''}
+                                                                        {order.demasiasConfig.left ? '←' : ''}
+                                                                        {order.demasiasConfig.right ? '→' : ''}
+                                                                    </span>
+                                                                    <span className="demasia-target">🎯</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <span className="m2-text font-mono text-muted">
+                                                                {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
+                                                            </span>
+                                                        </td>
+                                                        {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
+                                                            <td>
+                                                                <div className="price-cell">
+                                                                    <span className="currency">$</span>
+                                                                    <span className="amount">
+                                                                        {calculateOrderPrice(order).toLocaleString()}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        )}
+                                                        <td>
+                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.fechaEntrega || '--'}</span>
+                                                        </td>
+                                                        <td>
+                                                            <div className="order-actions-row">
+                                                                <button
+                                                                    className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); setChatOrder(order); setIsChatModalOpen(true); }}
+                                                                    title="Mensajería / Chat"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>💬</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); generatePdfBudget(order); }}
+                                                                    title="Presupuesto PDF"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>📄</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
+                                                                    title="Ver Detalle"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>👁️</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); setStatusOrder(order); setIsStatusModalOpen(true); }}
+                                                                    title="Estado"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>⚙️</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
+                                                                    title="Editar"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>✏️</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action btn-danger-action"
+                                                                    onClick={(e) => { e.stopPropagation(); handleSoftDeleteOrder(order); }}
+                                                                    title="Papelera"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>🗑️</span>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </>
+                                    );
+                                }
+
+                                // SINGLE NON-BATCH ORDER
+                                const order = item.order;
                                 const consumption = getConsumption(order);
                                 const isMobile = order.origen === 'mobile';
                                 const operarioNombre = order.operarioNombre || order.vendedorNombre || (order as any).vendedor?.nombre || (order as any).vendedorName || '';
@@ -761,6 +1202,7 @@ export default function Entrada() {
                                 );
                             })}
                         </tbody>
+
                     </table>
                 )}
             </div>

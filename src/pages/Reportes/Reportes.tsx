@@ -120,6 +120,8 @@ export default function Reportes() {
                                 (order.clienteNombre?.toLowerCase() || '').includes(q) ||
                                 (order.material?.toLowerCase() || '').includes(q) ||
                                 (order.nombreTarea?.toLowerCase() || '').includes(q) ||
+                                (order.loteNombre?.toLowerCase() || '').includes(q) ||
+                                (order.descripcionItem?.toLowerCase() || '').includes(q) ||
                                 (order.observaciones?.toLowerCase() || '').includes(q)
                 if (!matches) return false
             }
@@ -173,6 +175,18 @@ export default function Reportes() {
         setSelectedOrderIds(newSet)
     }
 
+    const toggleSelectBatch = (batchOrders: Order[]) => {
+        const newSet = new Set(selectedOrderIds)
+        const batchIds = batchOrders.map(o => o.id)
+        const allChecked = batchIds.every(id => newSet.has(id))
+        if (allChecked) {
+            batchIds.forEach(id => newSet.delete(id))
+        } else {
+            batchIds.forEach(id => newSet.add(id))
+        }
+        setSelectedOrderIds(newSet)
+    }
+
     const toggleSelectAll = () => {
         if (selectedOrderIds.size === filteredOrders.length) {
             setSelectedOrderIds(new Set())
@@ -180,6 +194,7 @@ export default function Reportes() {
             setSelectedOrderIds(new Set(filteredOrders.map(o => o.id)))
         }
     }
+
 
     // GENERATE CLIENT PDF
     const handleGeneratePdf = () => {
@@ -466,8 +481,50 @@ export default function Reportes() {
                                                 {order.clienteNombre}
                                             </td>
                                             <td>
-                                                {cleanDesc}
+                                                {order.loteNombre ? (
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                        <span
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const batchOrders = filteredOrders.filter(o => o.batchId === order.batchId || (o.loteNombre && o.loteNombre === order.loteNombre));
+                                                                toggleSelectBatch(batchOrders);
+                                                            }}
+                                                            style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '8px',
+                                                                background: 'rgba(37, 99, 235, 0.25)',
+                                                                border: '1px solid rgba(96, 165, 250, 0.4)',
+                                                                color: '#93c5fd',
+                                                                fontSize: '0.78rem',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer',
+                                                                width: 'fit-content'
+                                                            }}
+                                                            title="Haga clic para seleccionar/deseleccionar todo este lote de un tiro"
+                                                        >
+                                                            🏷️ {order.loteNombre}
+                                                        </span>
+                                                        {order.descripcionItem && (
+                                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                                                ↳ {order.descripcionItem}
+                                                            </span>
+                                                        )}
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                            {order.material}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <div style={{ fontWeight: 600 }}>{cleanDesc}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{order.material}</div>
+                                                    </div>
+                                                )}
                                             </td>
+
                                             <td>
                                                 {Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m ({order.copias} cop)
                                             </td>

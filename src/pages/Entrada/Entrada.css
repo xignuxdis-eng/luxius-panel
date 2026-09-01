@@ -290,3 +290,98 @@
     font-size: 1rem;
     filter: drop-shadow(0 0 4px var(--accent));
 }
+
+/* ================================================================
+   BATCH / LOTE GROUPING ACCORDION STYLES
+   ================================================================ */
+.batch-row-master {
+    background: rgba(37, 99, 235, 0.08) !important;
+    border-left: 4px solid var(--accent, #2563eb) !important;
+    font-weight: 500;
+    transition: background 0.2s ease;
+}
+
+.batch-row-master:hover td {
+    background: rgba(37, 99, 235, 0.14) !important;
+}
+
+.batch-row-master.is-expanded {
+    background: rgba(37, 99, 235, 0.12) !important;
+    border-bottom: 1px dashed rgba(37, 99, 235, 0.3) !important;
+}
+
+.batch-expand-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary, #fff);
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s ease;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.batch-expand-btn:hover {
+    background: var(--accent, #2563eb);
+    border-color: var(--accent, #2563eb);
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.batch-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(124, 58, 237, 0.25));
+    border: 1px solid rgba(96, 165, 250, 0.4);
+    color: #93c5fd;
+    letter-spacing: 0.3px;
+    text-shadow: 0 0 10px rgba(37, 99, 235, 0.3);
+}
+
+.batch-count-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    margin-left: 6px;
+}
+
+.batch-child-row {
+    background: rgba(15, 23, 42, 0.4) !important;
+    border-left: 3px solid rgba(96, 165, 250, 0.3) !important;
+    transition: background 0.15s ease;
+}
+
+.batch-child-row:hover td {
+    background: rgba(37, 99, 235, 0.08) !important;
+}
+
+.batch-child-indent {
+    display: flex;
+    align-items: center;
+    padding-left: 14px;
+    position: relative;
+}
+
+.batch-child-connector {
+    color: rgba(96, 165, 250, 0.5);
+    font-family: monospace;
+    font-size: 13px;
+    margin-right: 4px;
+    user-select: none;
+}

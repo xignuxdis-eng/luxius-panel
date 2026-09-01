@@ -31,6 +31,9 @@ export interface Order {
     clienteNombre: string
     clientName?: string // Optional for legacy
     nombreTarea?: string; // Nombre del proyecto o tarea relevada
+    batchId?: string; // ID único del lote para agrupar
+    loteNombre?: string; // Nombre del lote (ej. "Hilux Dixtron")
+    descripcionItem?: string; // Sub-descripción del archivo (ej. "Lateral Izquierdo")
     origen?: 'mobile' | 'web' | string; // 'mobile' (App Móvil) vs 'web' (Luxius Web)
     operarioNombre?: string;
     vendedorNombre?: string;

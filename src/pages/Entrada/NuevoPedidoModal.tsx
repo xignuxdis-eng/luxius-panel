@@ -41,9 +41,11 @@ interface BatchItem {
     confirmed: boolean
     copias: number
     material: string
+    descripcionItem?: string
     demasiasConfig?: DemasiasConfig
     servicios?: Record<string, boolean>
 }
+
 
 export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus }: NuevoPedidoModalProps) {
     const { user } = useAuthStore()
@@ -1497,6 +1499,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setSaveProgress({ current: 0, total: confirmedItems.length, errorCount: 0 })
                 const saveResults = []
 
+                const batchId = `lote_${Date.now()}`
+                const batchName = (data.nombreTarea || '').trim()
+
                 try {
                     for (let i = 0; i < confirmedItems.length; i++) {
                         const item = confirmedItems[i]
@@ -1532,11 +1537,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 }
                             }
 
+                            const rawName = item.fileName.replace(/\.[^/.]+$/, "");
+                            const itemDesc = (item.descripcionItem || '').trim() || rawName;
+                            const itemTarea = batchName ? `${batchName} - ${itemDesc}` : itemDesc;
+
                             const orderData = {
                                 ...data,
                                 id: undefined,
                                 clientId: parseInt(data.clienteId),
                                 clienteNombre: cliente?.nombre || 'Desconocido',
+                                batchId: batchId,
+                                loteNombre: batchName || `Lote ${new Date().toLocaleDateString('es-AR')}`,
+                                descripcionItem: itemDesc,
+                                nombreTarea: itemTarea,
+                                arch: remoteFileName,
                                 archivos: [remoteFileName],
                                 archivosOriginales: [item.fileName],
                                 ancho: itemAncho,
@@ -1563,6 +1577,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         // Breather between items
                         await new Promise(r => setTimeout(r, 50))
                     }
+
 
                     // POST-SAVE LOGIC: Safety Deletion
                     if (saveResults.length > 0) {
@@ -1750,9 +1765,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 )}
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>🏷️ Proyecto / Etiqueta / Nombre Trabajo</label>
+                                <input
+                                    type="text"
+                                    {...register('nombreTarea')}
+                                    placeholder="Ej: Hilux Dixtron, Cartel Local..."
+                                    className="input-field"
+                                    style={{ fontWeight: 600 }}
+                                />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Fecha Entrega</label>
                                 <input type="date" {...register('fechaEntrega')} className="input-field" />
                             </div>
+
 
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Vendedor Asignado</label>
@@ -2175,28 +2201,45 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             {/* Lote Tab */}
                             {activeTab === 'lote' && (
                                 <div className="form-group" style={{ gridColumn: 'span 4' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                                        <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🏷️ Material por defecto para el lote:</span>
-                                        <select
-                                            className="input-field"
-                                            style={{ padding: '6px 12px', width: 'auto', minWidth: '250px' }}
-                                            value={watchedMaterial || ''}
-                                            onChange={(e) => {
-                                                const selectedMat = e.target.value;
-                                                setValue('material', selectedMat);
-                                                if (selectedMat && batchItems.length > 0) {
-                                                    setBatchItems(prev => prev.map(item => ({ ...item, material: selectedMat })));
-                                                }
-                                            }}
-                                        >
-                                            <option value="">Seleccionar material (Obligatorio)...</option>
-                                            {getMateriales()
-                                                .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
-                                                .map(m => (
-                                                    <option key={m.id} value={m.codigo}>{m.descripcion}</option>
-                                                ))}
-                                        </select>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                                        <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                                            <span style={{ display: 'block', fontWeight: 600, color: 'var(--accent)', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                                🏷️ Nombre del Proyecto / Lote (Etiqueta Global):
+                                            </span>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej: Hilux Dixtron, Cartelería Centro, etc."
+                                                {...register('nombreTarea')}
+                                                className="input-field"
+                                                style={{ width: '100%', padding: '6px 12px', fontSize: '0.9rem', fontWeight: 600 }}
+                                            />
+                                        </div>
+                                        <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                                            <span style={{ display: 'block', fontWeight: 600, color: 'var(--accent)', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                                🏷️ Material por defecto para el lote:
+                                            </span>
+                                            <select
+                                                className="input-field"
+                                                style={{ padding: '6px 12px', width: '100%' }}
+                                                value={watchedMaterial || ''}
+                                                onChange={(e) => {
+                                                    const selectedMat = e.target.value;
+                                                    setValue('material', selectedMat);
+                                                    if (selectedMat && batchItems.length > 0) {
+                                                        setBatchItems(prev => prev.map(item => ({ ...item, material: selectedMat })));
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Seleccionar material (Obligatorio)...</option>
+                                                {getMateriales()
+                                                    .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
+                                                    .map(m => (
+                                                        <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                    ))}
+                                            </select>
+                                        </div>
                                     </div>
+
 
                                     <label>Carga masiva</label>
                                     <div className="batch-upload-zone"
@@ -2411,8 +2454,23 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 {item.metadata.colorMode && <span>🎨 {item.metadata.colorMode}</span>}
                                                                 {(item.metadata.pageCount || 0) > 1 && <span>📑 {item.metadata.pageCount} págs</span>}
                                                             </div>
+                                                            <div style={{ marginTop: '5px' }}>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Pieza (ej: Capot, Lateral...)"
+                                                                    value={item.descripcionItem || ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, descripcionItem: val } : i));
+                                                                    }}
+                                                                    className="input-field"
+                                                                    style={{ fontSize: '0.75rem', padding: '3px 6px', height: '24px', width: '100%' }}
+                                                                    title="Etiqueta individual para esta pieza"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
+
 
                                                     {/* Upload Progress for this Item */}
                                                     {uploadProgress && uploadProgress.fileName === item.fileName && (
