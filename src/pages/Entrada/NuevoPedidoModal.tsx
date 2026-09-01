@@ -261,8 +261,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [user, setValue]);
 
-    const calculateItemPriceDetailed = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>, clientIdParam?: string | number) => {
+    const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
+
+    const calculateItemPriceDetailed = (materialCode: string, rawW: number, rawH: number, c: number, services?: Record<string, boolean>, clientIdParam?: string | number) => {
         const mat = getMateriales().find(m => m.codigo === materialCode)
+        const w = round2(rawW)
+        const h = round2(rawH)
         if (!mat || h <= 0) return {
             subtotal: 0,
             consumoEstimado: 0,
@@ -295,7 +299,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
             const safetyMargin = 0.01
             const availableWidths = bobinas
-                .map((b: any) => ({ ...b, usefulWidth: b.ancho - safetyMargin }))
+                .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
                 .filter((b: any) => b.usefulWidth > 0)
                 .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth)
 
@@ -306,13 +310,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 if (w <= b.usefulWidth) {
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
                     const priceToUse = specialPriceWidth || specialPrice || b.precioML;
-                    const cost = priceToUse * h * c
+                    const ml = round2(h * c);
+                    const cost = Math.round(priceToUse * ml);
                     if (cost < bestCost) {
                         bestCost = cost
                         rotated = false
                         assignedBobina = b.ancho
                         appliedPriceMl = priceToUse
-                        linearMeters = h * c
+                        linearMeters = ml
                     }
                     break
                 }
@@ -323,13 +328,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 if (h <= b.usefulWidth) {
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
                     const priceToUse = specialPriceWidth || specialPrice || b.precioML;
-                    const cost = priceToUse * w * c
+                    const ml = round2(w * c);
+                    const cost = Math.round(priceToUse * ml);
                     if (cost < bestCost) {
                         bestCost = cost
                         rotated = true
                         assignedBobina = b.ancho
                         appliedPriceMl = priceToUse
-                        linearMeters = w * c
+                        linearMeters = ml
                     }
                     break
                 }
@@ -340,17 +346,19 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 const widest = availableWidths[availableWidths.length - 1]
                 const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${widest.ancho}`] : null;
                 const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
-                bestCost = priceToUse * h * c
+                const ml = round2(h * c);
+                bestCost = Math.round(priceToUse * ml);
                 assignedBobina = widest.ancho
                 appliedPriceMl = priceToUse
-                linearMeters = h * c
+                linearMeters = ml
             }
 
             basePrice = bestCost === Infinity ? 0 : Math.round(bestCost)
             ; (mat as any)._lastRotation = rotated
         } else {
             const priceToUse = specialPrice || precioM2 || 0
-            basePrice = w > 0 ? Math.round(w * h * c * priceToUse) : 0
+            const m2 = round2(w * h * c);
+            basePrice = w > 0 ? Math.round(m2 * priceToUse) : 0
             linearMeters = 0
         }
 
@@ -364,10 +372,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         const priceBase = parseFloat(s.precioBase as any) || 0
                         let multiplier = c
                         if (s.unidad === 'm2') {
-                            multiplier = w * h * c
+                            multiplier = round2(w * h * c)
                         } else if (s.unidad === 'metro') {
                             const isRotated = (mat as any)._lastRotation || false
-                            multiplier = (isRotated ? w : h) * c
+                            multiplier = round2((isRotated ? w : h) * c)
                         }
                         servicesTotal += Math.round(priceBase * multiplier)
                     }
@@ -379,7 +387,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
         return {
             subtotal,
-            consumoEstimado: tipoCobro === 'ml' ? linearMeters : (w * h * c),
+            consumoEstimado: tipoCobro === 'ml' ? linearMeters : round2(w * h * c),
             bobinaAsignada: assignedBobina,
             precioMl: appliedPriceMl,
             precioDetalle: tipoCobro === 'ml' ? {
@@ -397,6 +405,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             }
         }
     }
+
 
     const calculateItemPrice = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>) => {
         return calculateItemPriceDetailed(materialCode, w, h, c, services).subtotal
@@ -1562,9 +1571,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         setSaveProgress(prev => ({ ...prev, current: i + 1 }))
 
                         try {
-                            // Convertir cm a metros para backend y cálculo de precio
-                            const itemAncho = Number(item.metadata.width) / 100;
-                            const itemAlto = Number(item.metadata.height) / 100;
+                            // Convertir cm a metros para backend y cálculo de precio con precisión a 2 decimales (cm)
+                            const itemAncho = round2(Number(item.metadata.width) / 100);
+                            const itemAlto = round2(Number(item.metadata.height) / 100);
                             const priceResult = calculateItemPriceDetailed(item.material, itemAncho, itemAlto, item.copias, item.servicios, data.clienteId)
                             const itemSubtotal = priceResult.subtotal
 
@@ -1663,8 +1672,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     const numericData = {
                         ...data,
                         clientId: parseInt(data.clienteId),
-                        alto: Number(data.alto),
-                        ancho: Number(data.ancho),
+                        alto: round2(Number(data.alto)),
+                        ancho: round2(Number(data.ancho)),
                         copias: Number(data.copias || 1),
                     }
 

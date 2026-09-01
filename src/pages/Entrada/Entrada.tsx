@@ -118,20 +118,19 @@ export default function Entrada() {
             : filteredOrders.filter(o => !['entregado', 'finalizado', 'eliminado'].includes(o.status));
 
 
+    const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
+
     const calculateOrderPrice = (order: Order) => {
-        const price = order.subtotal || order.total || 0;
-        if (price > 0) return price;
-
         const matData = allMateriales.find(m => m.codigo === order.material);
-        if (matData) {
-            const w = Number(order.ancho) || 0;
-            const h = Number(order.alto) || 0;
-            const c = Number(order.copias) || 1;
+        const w = round2(Number(order.ancho) || 0);
+        const h = round2(Number(order.alto) || 0);
+        const c = Number(order.copias) || 1;
 
+        if (matData) {
             if (matData.tipoCobro === 'ml' && matData.bobinas && matData.bobinas.length > 0) {
                 const safetyMargin = 0.01;
                 const availableWidths = matData.bobinas
-                    .map((b: any) => ({ ...b, usefulWidth: b.ancho - safetyMargin }))
+                    .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
                     .filter((b: any) => b.usefulWidth > 0)
                     .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
@@ -145,7 +144,8 @@ export default function Entrada() {
                     if (w <= b.usefulWidth) {
                         const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
                         const priceToUse = specialPriceWidth || specialPrice || b.precioML;
-                        const cost = priceToUse * h * c;
+                        const ml = round2(h * c);
+                        const cost = Math.round(priceToUse * ml);
                         if (cost < bestCost) bestCost = cost;
                         break;
                     }
@@ -156,7 +156,8 @@ export default function Entrada() {
                     if (h <= b.usefulWidth) {
                         const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
                         const priceToUse = specialPriceWidth || specialPrice || b.precioML;
-                        const cost = priceToUse * w * c;
+                        const ml = round2(w * c);
+                        const cost = Math.round(priceToUse * ml);
                         if (cost < bestCost) bestCost = cost;
                         break;
                     }
@@ -167,40 +168,44 @@ export default function Entrada() {
                     const widest = availableWidths[availableWidths.length - 1];
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${widest.ancho}`] : null;
                     const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
-                    bestCost = priceToUse * h * c;
+                    const ml = round2(h * c);
+                    bestCost = Math.round(priceToUse * ml);
                 }
 
-                return bestCost === Infinity ? 0 : Math.round(bestCost);
+                if (bestCost !== Infinity) return bestCost;
             }
 
             if (matData.precioM2) {
                 const cliente = allClientes.find(cl => cl.id === order.clientId);
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
                 const priceToUse = specialPrice || matData.precioM2 || 0;
-                return Math.round(w * h * c * priceToUse);
+                const m2 = round2(w * h * c);
+                return Math.round(m2 * priceToUse);
             }
         }
-        return 0;
+
+        const price = order.subtotal || order.total || 0;
+        return price > 0 ? Math.round(price) : 0;
     }
 
     const getConsumption = (order: Order) => {
         const matData = allMateriales.find(m => m.codigo === order.material);
 
-        const w = Number(order.ancho) || 0;
-        const h = Number(order.alto) || 0;
+        const w = round2(Number(order.ancho) || 0);
+        const h = round2(Number(order.alto) || 0);
         const c = Number(order.copias) || 1;
 
         const isMl = matData?.tipoCobro === 'ml' || (matData?.bobinas && matData.bobinas.length > 0) || order.material === 'VV' || order.material === 'VVP';
 
         if (isMl) {
-            let val = order.consumoEstimado;
+            let val = order.consumoEstimado !== undefined ? round2(order.consumoEstimado) : undefined;
             let assignedBobina = order.bobinaAsignada || order.precioDetalle?.bobinaAncho || order.precioDetalle?.bobinaUsada;
 
             if (val === undefined || !assignedBobina) {
                 if (matData?.bobinas && matData.bobinas.length > 0) {
                     const safetyMargin = 0.01;
                     const availableWidths = matData.bobinas
-                        .map((b: any) => ({ ...b, usefulWidth: b.ancho - safetyMargin }))
+                        .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
                         .filter((b: any) => b.usefulWidth > 0)
                         .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
@@ -209,7 +214,7 @@ export default function Entrada() {
 
                     for (const b of availableWidths) {
                         if (w <= b.usefulWidth) {
-                            const ml = h * c;
+                            const ml = round2(h * c);
                             if (ml < bestMl) {
                                 bestMl = ml;
                                 bestBobina = b.ancho;
@@ -220,7 +225,7 @@ export default function Entrada() {
 
                     for (const b of availableWidths) {
                         if (h <= b.usefulWidth) {
-                            const ml = w * c;
+                            const ml = round2(w * c);
                             if (ml < bestMl) {
                                 bestMl = ml;
                                 bestBobina = b.ancho;
@@ -229,33 +234,33 @@ export default function Entrada() {
                         }
                     }
 
-                    val = bestMl === Infinity ? (h * c) : bestMl;
+                    val = bestMl === Infinity ? round2(h * c) : bestMl;
                     assignedBobina = bestBobina;
                 } else {
                     // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
                     if (w <= 1.36) {
                         assignedBobina = 1.37;
-                        val = h * c;
-                    } else if (h <= 1.36 && (w * c) <= (h * c)) {
+                        val = round2(h * c);
+                    } else if (h <= 1.36 && round2(w * c) <= round2(h * c)) {
                         assignedBobina = 1.37;
-                        val = w * c;
+                        val = round2(w * c);
                     } else if (w <= 1.51 || h <= 1.51) {
                         assignedBobina = 1.52;
-                        val = (h <= 1.51 && (w * c) < (h * c)) ? (w * c) : (h * c);
+                        val = (h <= 1.51 && round2(w * c) < round2(h * c)) ? round2(w * c) : round2(h * c);
                     } else {
                         assignedBobina = 1.52;
-                        val = h * c;
+                        val = round2(h * c);
                     }
                 }
             }
             return {
-                value: val,
+                value: round2(val),
                 unit: 'ml',
                 bobina: assignedBobina ? `${assignedBobina}` : null
             };
         }
         return {
-            value: w * h * c,
+            value: round2(w * h * c),
             unit: 'm²',
             bobina: null
         };
