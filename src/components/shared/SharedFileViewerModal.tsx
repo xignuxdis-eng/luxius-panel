@@ -340,12 +340,24 @@ export default function SharedFileViewerModal({
                                         {isImage ? (
                                             <img
                                                 src={url}
-                                                alt="preview"
+                                                alt={originalName}
                                                 className="img-preview"
                                                 onError={(e) => {
-                                                    console.warn('[Image Error] Fallback thumbnail:', url)
+                                                    console.warn('[Image Error] Fallback thumbnail or card:', url)
                                                     if (order.imgMetadata?.thumbnailUrl && e.currentTarget.src !== order.imgMetadata.thumbnailUrl) {
                                                         e.currentTarget.src = order.imgMetadata.thumbnailUrl
+                                                    } else {
+                                                        // Ocultar imagen rota y mostrar card universal
+                                                        e.currentTarget.style.display = 'none'
+                                                        const parent = e.currentTarget.parentElement
+                                                        if (parent && !parent.querySelector('.universal-preview-fallback')) {
+                                                            const fallbackDiv = document.createElement('div')
+                                                            fallbackDiv.className = 'universal-preview-fallback'
+                                                            fallbackDiv.style.padding = '20px'
+                                                            fallbackDiv.style.textAlign = 'center'
+                                                            fallbackDiv.innerHTML = `<div style="font-size: 2.5rem; margin-bottom: 8px;">🖼️</div><div style="font-size: 0.85rem; color: #94a3b8; word-break: break-all;">${originalName}</div>`
+                                                            parent.appendChild(fallbackDiv)
+                                                        }
                                                     }
                                                 }}
                                             />

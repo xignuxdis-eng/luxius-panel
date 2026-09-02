@@ -52,11 +52,23 @@ export default function Header({ title, subtitle }: HeaderProps) {
                     className="pixel-btn pixel-btn-info"
                     onClick={handleQuickSync}
                     disabled={isSyncing}
-                    title="Sincronizar datos y actualizar versión en vivo"
-                    style={{ fontSize: '11px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    title="Sincronizar datos de la base de datos y forzar actualización de versión"
+                    style={{ 
+                        fontSize: '11px', 
+                        padding: '6px 12px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                        color: '#ffffff',
+                        border: '1px solid #38bdf8',
+                        boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)',
+                        fontWeight: 700,
+                        letterSpacing: '0.5px'
+                    }}
                 >
                     <span style={{ display: 'inline-block', animation: isSyncing ? 'rotation 1s linear infinite' : 'none' }}>🔄</span>
-                    <span>{isSyncing ? 'SYNC...' : 'SYNC'}</span>
+                    <span>{isSyncing ? 'SINCRONIZANDO...' : 'SINCRONIZAR'}</span>
                 </button>
 
                 <button
