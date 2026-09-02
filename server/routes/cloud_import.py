@@ -11,7 +11,6 @@ import gdown
 from flask import request, jsonify
 from routes import import_bp
 from middleware.auth import optional_login
-from routes.google_drive import get_valid_access_token
 
 def _extract_drive_id(url: str):
     # Match standard drive link format /d/<id>
@@ -51,108 +50,40 @@ def import_from_cloud():
         if 'drive.google.com' in url or 'docs.google.com' in url:
             is_folder = '/folders/' in url
             downloaded_paths = []
-            oauth_token = get_valid_access_token()
-            drive_id = _extract_drive_id(url)
-
+            
             if is_folder:
                 batch_dir = os.path.join(temp_dir, file_id)
                 os.makedirs(batch_dir, exist_ok=True)
-                
-                # 1. Try Authenticated Google Drive API for corporate account
-                if oauth_token and drive_id:
-                    try:
-                        q_url = f"https://www.googleapis.com/drive/v3/files?q='{drive_id}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size)"
-                        f_res = requests.get(q_url, headers={'Authorization': f'Bearer {oauth_token}'}, timeout=20)
-                        if f_res.status_code == 200:
-                            items = f_res.json().get('files', [])
-                            for it in items:
-                                it_id = it.get('id')
-                                it_name = it.get('name', f"item_{it_id}")
-                                it_mime = it.get('mimeType', '')
-                                
-                                if it_mime == 'application/vnd.google-apps.folder':
-                                    continue
-                                
-                                target_path = os.path.join(batch_dir, it_name)
-                                if it_mime.startswith('application/vnd.google-apps.'):
-                                    # Export Google Docs/Sheets as PDF
-                                    target_path = os.path.join(batch_dir, f"{os.path.splitext(it_name)[0]}.pdf")
-                                    dl_url = f"https://www.googleapis.com/drive/v3/files/{it_id}/export?mimeType=application/pdf"
-                                else:
-                                    dl_url = f"https://www.googleapis.com/drive/v3/files/{it_id}?alt=media"
-                                
-                                r_dl = requests.get(dl_url, headers={'Authorization': f'Bearer {oauth_token}'}, stream=True, timeout=45)
-                                if r_dl.status_code == 200:
-                                    with open(target_path, 'wb') as f_out:
-                                        for chunk in r_dl.iter_content(chunk_size=65536):
-                                            if chunk:
-                                                f_out.write(chunk)
-                                    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
-                                        downloaded_paths.append(target_path)
-                    except Exception as e_f:
-                        print(f"[Drive Import] OAuth folder download notice: {e_f}")
-
-                # 2. Fallback to gdown folder download
+                downloaded_paths = gdown.download_folder(url=url, output=batch_dir, quiet=True)
                 if not downloaded_paths:
-                    downloaded_paths = gdown.download_folder(url=url, output=batch_dir, quiet=True)
-                
-                if not downloaded_paths:
-                    return jsonify({"error": "No se pudo descargar la carpeta de Drive. Verifique que la cuenta de la empresa tenga permisos de lectura o que el enlace sea público."}), 403
+                    return jsonify({"error": "No se pudo descargar la carpeta. Verifique que tenga permisos públicos de lectura ('Cualquiera con el enlace')."}), 403
             else:
+                drive_id = _extract_drive_id(url)
                 if not drive_id:
                     return jsonify({"error": "Enlace de Google Drive inválido. Copie el enlace completo que contenga /d/ID o id=ID."}), 400
                 
                 single_dir = os.path.join(temp_dir, file_id)
                 os.makedirs(single_dir, exist_ok=True)
-                downloaded_file = None
-
-                # 1. Try Authenticated Google Drive API with corporate account
-                if oauth_token:
-                    try:
-                        m_url = f"https://www.googleapis.com/drive/v3/files/{drive_id}?fields=id,name,mimeType,size"
-                        meta_res = requests.get(m_url, headers={'Authorization': f'Bearer {oauth_token}'}, timeout=15)
-                        if meta_res.status_code == 200:
-                            f_info = meta_res.json()
-                            f_name = f_info.get('name', 'archivo_drive')
-                            f_mime = f_info.get('mimeType', '')
-                            
-                            target_p = os.path.join(single_dir, f_name)
-                            if f_mime.startswith('application/vnd.google-apps.'):
-                                target_p = os.path.join(single_dir, f"{os.path.splitext(f_name)[0]}.pdf")
-                                dl_url = f"https://www.googleapis.com/drive/v3/files/{drive_id}/export?mimeType=application/pdf"
-                            else:
-                                dl_url = f"https://www.googleapis.com/drive/v3/files/{drive_id}?alt=media"
-
-                            dl_res = requests.get(dl_url, headers={'Authorization': f'Bearer {oauth_token}'}, stream=True, timeout=60)
-                            if dl_res.status_code == 200:
-                                with open(target_p, 'wb') as f_out:
-                                    for chunk in dl_res.iter_content(chunk_size=65536):
-                                        if chunk:
-                                            f_out.write(chunk)
-                                if os.path.exists(target_p) and os.path.getsize(target_p) > 0:
-                                    downloaded_file = target_p
-                    except Exception as e_oa:
-                        print(f"[Drive Import] OAuth single file download notice: {e_oa}")
-
-                # 2. Fallback to gdown (for public links or non-auth files)
                 output_target = single_dir + os.sep
-                if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    try:
-                        downloaded_file = gdown.download(id=drive_id, output=output_target, quiet=True, fuzzy=True)
-                    except Exception as gd_err:
-                        print(f"[Drive Import] gdown id download notice: {gd_err}")
-                        downloaded_file = None
+
+                # Download using drive id with gdown
+                try:
+                    downloaded_file = gdown.download(id=drive_id, output=output_target, quiet=True)
+                except Exception as gd_err:
+                    print(f"[Drive Import] gdown id download notice: {gd_err}")
+                    downloaded_file = None
                 
-                # 3. Fallback to direct uc?id= URL
+                # Fallback to direct uc?id= URL if needed
                 if not downloaded_file or not os.path.exists(str(downloaded_file)):
                     try:
                         download_url = f'https://drive.google.com/uc?id={drive_id}'
-                        downloaded_file = gdown.download(url=download_url, output=output_target, quiet=True, fuzzy=True)
+                        downloaded_file = gdown.download(url=download_url, output=output_target, quiet=True)
                     except Exception as gd_err2:
                         print(f"[Drive Import] gdown url download notice: {gd_err2}")
                         downloaded_file = None
+
                 
-                # 4. Fallback to direct requests stream
+                # Fallback to direct requests stream if needed
                 if not downloaded_file or not os.path.exists(str(downloaded_file)):
                     try:
                         session = requests.Session()
@@ -181,18 +112,16 @@ def import_from_cloud():
                     except Exception as req_e:
                         print(f"[Drive Import] requests stream fallback error: {req_e}")
 
-                # Check if single_dir has any file
+                # If downloaded_file is still not found, check if anything was written to single_dir
                 if not downloaded_file or not os.path.exists(str(downloaded_file)):
                     files_in_dir = [os.path.join(single_dir, f) for f in os.listdir(single_dir) if os.path.isfile(os.path.join(single_dir, f))]
                     if files_in_dir:
                         downloaded_file = files_in_dir[0]
 
                 if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    return jsonify({"error": "No se pudo descargar desde Google Drive. Asegúrese de que el archivo esté compartido con la cuenta de la empresa o que el enlace sea público ('Cualquier persona con el enlace')."}), 403
+                    return jsonify({"error": "No se pudo descargar desde Google Drive. Asegúrese de que el archivo esté configurado como 'Cualquier persona con el enlace puede ver'."}), 403
                 
                 downloaded_paths = [str(downloaded_file)]
-
-
                 
             processed_files = []
             

@@ -85,16 +85,45 @@ def create_smart_order_draft():
             # A. GOOGLE DRIVE
             if 'drive.google.com' in url or 'docs.google.com' in url:
                 if '/folders/' in url:
-                    gdown.download_folder(url=url, output=temp_dir, quiet=True)
+                    try:
+                        gdown.download_folder(url=url, output=temp_dir, quiet=True)
+                    except Exception as gd_f_err:
+                        print(f"[Drive Folder Import] gdown folder error: {gd_f_err}")
                 else:
                     drive_id = _extract_drive_id(url)
                     if not drive_id:
                         return jsonify({"error": "Enlace de Google Drive inválido. No se pudo extraer el ID del archivo."}), 400
+                    
+                    dl_file = None
                     try:
-                        gdown.download(id=drive_id, output=temp_dir + os.sep, quiet=True, fuzzy=True)
+                        dl_file = gdown.download(id=drive_id, output=temp_dir + os.sep, quiet=True)
                     except Exception:
-                        dl_url = f'https://drive.google.com/uc?id={drive_id}'
-                        gdown.download(url=dl_url, output=temp_dir + os.sep, quiet=True, fuzzy=True)
+                        pass
+
+                    if not dl_file or not os.path.exists(str(dl_file)):
+                        try:
+                            dl_url = f'https://drive.google.com/uc?id={drive_id}'
+                            dl_file = gdown.download(url=dl_url, output=temp_dir + os.sep, quiet=True)
+                        except Exception:
+                            pass
+
+                    # Fallback directo con requests
+                    if not dl_file or not os.path.exists(str(dl_file)):
+                        try:
+                            s = requests.Session()
+                            durl = f"https://drive.google.com/uc?export=download&id={drive_id}"
+                            r = s.get(durl, stream=True, timeout=45)
+                            cd = r.headers.get('content-disposition', '')
+                            out_name = f"drive_{drive_id}.jpg"
+                            if 'filename=' in cd:
+                                out_name = cd.split('filename=')[-1].strip('"\'; ')
+                            out_p = os.path.join(temp_dir, out_name)
+                            with open(out_p, 'wb') as f:
+                                for chunk in r.iter_content(chunk_size=65536):
+                                    if chunk: f.write(chunk)
+                        except Exception as req_e:
+                            print(f"[Drive Stream Fallback] Error: {req_e}")
+
 
             # B. WETRANSFER
             elif 'wetransfer.com' in url or 'we.tl' in url:
