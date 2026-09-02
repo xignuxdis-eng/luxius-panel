@@ -51,7 +51,7 @@ if extra_origins:
     ALLOWED_ORIGINS.extend([o.strip() for o in extra_origins.split(',') if o.strip()])
 
 CORS(app, resources={
-    r"/api/*": {"origins": "*"},
+    r"/api/*": {"origins": ALLOWED_ORIGINS},
     r"/uploads/*": {"origins": "*"}
 }, supports_credentials=True)
 db.init_app(app)
@@ -93,16 +93,26 @@ app.register_blueprint(smart_order_bp)
 # Rate limits are configured directly on routes or via limiter default limits
 
 # ================================================================
-# SECURITY HEADERS
+# SECURITY & CORS HEADERS
 # ================================================================
 @app.after_request
 def add_security_headers(response):
+    origin = request.headers.get('Origin')
+    if origin:
+        if any(origin.startswith(allowed) for allowed in ALLOWED_ORIGINS) or 'github.io' in origin or 'localhost' in origin:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Range'
+            response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Content-Disposition'
+
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     return response
+
 
 # Global error handler — log details server-side, return generic message to client
 @app.errorhandler(500)
