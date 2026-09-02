@@ -275,6 +275,11 @@ def create_smart_order_draft():
             parsed_items.append(cartel_dict)
             archivos_finales.append(unique_name)
             archivos_originales.append(orig_name)
+            
+            # Liberar memoria de imagen de forma inmediata (Zero OOM)
+            import gc
+            gc.collect()
+
 
         if not parsed_items:
             return jsonify({"error": "No se encontraron piezas gráficas válidas (PDF, JPG, PNG, TIF) en el enlace."}), 400

@@ -143,15 +143,24 @@ def analyze_file_dimensions(file_path: str, material_code: str = "VV", custom_fi
                 height_cm = round((px_h / dpi) * 2.54, 2)
                 color_mode = img.mode
 
-                # Generar Thumbnail
+                # Generar Thumbnail de bajo consumo de memoria (Draft Mode)
                 try:
                     from app import UPLOADS_DIR
-                    thumb_name = f"thumb_{int(os.path.getmtime(file_path))}_{os.path.splitext(os.path.basename(file_path))[0]}.jpg"
+                    thumb_name = f"thumb_{int(time.time()*1000)}_{os.path.splitext(os.path.basename(file_path))[0]}.jpg"
                     thumb_path = os.path.join(UPLOADS_DIR, thumb_name)
                     
-                    rgb_img = img.convert('RGB')
-                    rgb_img.thumbnail((400, 400))
-                    rgb_img.save(thumb_path, "JPEG", quality=85)
+                    try:
+                        # Intento con draft mode (decodifica directo a baja resolucion sin consumir RAM)
+                        with Image.open(file_path) as thumb_img:
+                            thumb_img.draft('RGB', (400, 400))
+                            rgb_thumb = thumb_img.convert('RGB')
+                            rgb_thumb.thumbnail((400, 400), Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.ANTIALIAS)
+                            rgb_thumb.save(thumb_path, "JPEG", quality=80, optimize=True)
+                    except Exception:
+                        # Fallback seguro
+                        img.thumbnail((400, 400))
+                        rgb_fallback = img.convert('RGB')
+                        rgb_fallback.save(thumb_path, "JPEG", quality=80)
                     
                     try:
                         from services.r2_storage import r2_storage
@@ -162,6 +171,8 @@ def analyze_file_dimensions(file_path: str, material_code: str = "VV", custom_fi
                     thumbnail_data_url = f"/uploads/{thumb_name}"
                 except Exception as img_thumb_err:
                     print(f"[Image Thumbnail] Error: {img_thumb_err}", file=sys.stderr)
+                    thumbnail_data_url = None
+
         except Exception as img_e:
             print(f"[Image Parse Error] {img_e}", file=sys.stderr)
 
