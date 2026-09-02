@@ -93,6 +93,14 @@ export const xanaKnowledgeBase = {
     {
       q: ["¿Cómo configuro el sistema?", "configuración", "ajustes"],
       a: "En 'Configuración' puedes modificar parámetros del sistema, roles, permisos y configuraciones generales de LuXius."
+    },
+    {
+      q: ["¿Cómo sincronizo los datos o actualizo la versión?", "sincronizar", "sync", "no veo cambios", "actualizar versión"],
+      a: "Haz clic en el botón '🔄 SINCRONIZAR' en la barra superior (Header). Esto limpia cachés obsoletos, purga ServiceWorkers y carga los datos y versiones más recientes desde la base de datos central en la nube."
+    },
+    {
+      q: ["¿Dónde se guardan los archivos y cómo funcionan las descargas y previews?", "archivos", "descargas", "preview", "cloudflare r2"],
+      a: "Todos los archivos adjuntos se sincronizan automáticamente con Cloudflare R2 (luxius-media). El sistema los transmite en tiempo real para previsualización y descarga segura desde cualquier dispositivo sin restricciones de dominio."
     }
   ]
 }; 
