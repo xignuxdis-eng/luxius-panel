@@ -7,11 +7,14 @@ import { getRecentLogs, clearLogs, RecordedError } from '../utils/errorRecorder'
 import { API_URL } from '../data/db';
 import './XanaAssistant.css';
 
+import XanaSmartOrderCard, { SmartDraftOrder } from './XanaSmartOrderCard';
+
 interface Message {
     role: 'user' | 'bot';
     text: string;
     isDiagnostic?: boolean;
     logsCount?: number;
+    smartDraftOrder?: SmartDraftOrder;
     time?: string;
 }
 
@@ -21,7 +24,7 @@ export default function XanaAssistant() {
     const [messages, setMessages] = useState<Message[]>([
         { 
             role: 'bot', 
-            text: '¡Hola! 👋 Soy **Xana AI**, tu copiloto de LuXius.\n\n¿En qué te puedo ayudar hoy? Puedes hacerme consultas, pedir cálculos de planchas o usar el menú **⚡ Acciones**.',
+            text: '¡Hola! 👋 Soy **Xana AI**, tu copiloto de LuXius.\n\n¿En qué te puedo ayudar hoy? Puedes pegarme directamente un enlace de **WeTransfer** o **Google Drive** y armaré tu orden cotizada al instante con análisis de bobinas.',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
     ]);
@@ -95,6 +98,54 @@ export default function XanaAssistant() {
         setIsLoading(true);
 
         try {
+            // DETECTAR ENLACE WETRANSFER O GOOGLE DRIVE PARA SMART ORDER
+            const urlMatch = textToSend.match(/https?:\/\/[^\s]+/i);
+            const isCloudLink = urlMatch && (
+                urlMatch[0].includes('wetransfer.com') || 
+                urlMatch[0].includes('we.tl') || 
+                urlMatch[0].includes('drive.google.com')
+            );
+
+            if (isCloudLink) {
+                const token = localStorage.getItem('luxius_token') || '';
+                const smartRes = await fetch(`${API_URL}/xana/smart-order`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify({
+                        url: urlMatch[0],
+                        observaciones: textToSend
+                    })
+                });
+
+                const smartData = await smartRes.json();
+                if (smartRes.ok && smartData.draft_order) {
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            role: 'bot',
+                            text: `✨ ¡Procesé el enlace con éxito! He descargado y analizado **${smartData.draft_order.carteles?.length || 1} archivo(s)**, extrayendo dimensiones, DPI y calculando el descarte óptimo de bobina.\n\nRevisa el borrador interactivo a continuación:`,
+                            smartDraftOrder: smartData.draft_order,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }
+                    ]);
+                    return;
+                } else if (smartData.error) {
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            role: 'bot',
+                            text: `⚠️ **Aviso de Importación:** ${smartData.error}`,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }
+                    ]);
+                    return;
+                }
+            }
+
+            // FLUJO CONVERSACIONAL ESTÁNDAR
             const history = messages.slice(-6).map(m => ({ role: m.role, content: m.text }));
             const payload = {
                 message: textToSend,
@@ -136,7 +187,7 @@ export default function XanaAssistant() {
                 ...prev, 
                 { 
                     role: 'bot', 
-                    text: '⚠️ No pude conectar con el cerebro de Xana en este momento. Por favor verifica tu conexión o intenta nuevamente en unos segundos.',
+                    text: '⚠️ No pude procesar tu solicitud en este momento. Por favor verifica tu conexión o intenta nuevamente.',
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }
             ]);
@@ -229,8 +280,25 @@ export default function XanaAssistant() {
 
                             {isMenuOpen && (
                                 <div className="xana-dropdown-menu">
-                                    <div className="dropdown-header">Consultas Rápidas</div>
+                                    <div className="dropdown-header">Consultas y Acciones</div>
                                     
+                                    {/* Pedido Inteligente con Link */}
+                                    <button 
+                                        className="dropdown-item item-smart-order"
+                                        onClick={() => {
+                                            const link = prompt("Pega aquí el enlace de WeTransfer o Google Drive para cotizar y crear el pedido:");
+                                            if (link && link.trim()) {
+                                                sendMessage(link.trim());
+                                            }
+                                        }}
+                                    >
+                                        <Sparkles size={15} className="icon-sparkle" />
+                                        <div>
+                                            <strong>Pedido Inteligente (Link)</strong>
+                                            <small>Pegar WeTransfer o Drive y cotizar</small>
+                                        </div>
+                                    </button>
+
                                     {/* Cálculo de imposición (Para todos) */}
                                     <button 
                                         className="dropdown-item item-calc"
@@ -345,12 +413,31 @@ export default function XanaAssistant() {
                                     <div className="xana-bubble-content">
                                         {renderFormattedText(msg.text)}
                                     </div>
+
+                                    {/* RENDER SMART ORDER CARD IF PRESENT */}
+                                    {msg.smartDraftOrder && (
+                                        <XanaSmartOrderCard 
+                                            initialDraft={msg.smartDraftOrder} 
+                                            onOrderConfirmed={(order) => {
+                                                setMessages(prev => [
+                                                    ...prev,
+                                                    {
+                                                        role: 'bot',
+                                                        text: `✅ **Orden N° ${order.numero_presupuesto || order.id?.slice(0, 8)} confirmada y encolada en producción.**\n\nEl archivo master y sus especificaciones técnicas ya están disponibles en el panel de Entrada y listos para el Daemon de Taller.`,
+                                                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                    }
+                                                ]);
+                                            }}
+                                        />
+                                    )}
+
                                     {msg.time && (
                                         <div className="xana-msg-time">{msg.time}</div>
                                     )}
                                 </div>
                             </div>
                         ))}
+
                         {isLoading && (
                             <div className="xana-msg-row xana-msg-bot">
                                 <div className="xana-loading">
