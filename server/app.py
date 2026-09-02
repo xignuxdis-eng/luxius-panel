@@ -127,59 +127,107 @@ def health_db():
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
+import mimetypes
+from urllib.parse import urlparse, unquote
+
 @app.route('/uploads/<path:filename>', methods=['GET', 'OPTIONS'])
 @app.route('/api/preview/<path:filename>', methods=['GET', 'OPTIONS'])
 def serve_upload(filename):
     if request.method == 'OPTIONS':
         return '', 200
-    # Prevent directory traversal
     if '..' in filename or filename.startswith('/'):
         return jsonify({'error': 'Nombre de archivo inválido'}), 400
-    return send_from_directory(UPLOADS_DIR, filename)
 
-# SSRF-safe download domains whitelist
-DOWNLOAD_ALLOWED_DOMAINS = {
-    '62e10a84196d5f6cfb46c97af6e5931d.r2.cloudflarestorage.com',
-    'pub-luxius-media.r2.dev',
-    'r2.cloudflarestorage.com',
-}
+    filename = unquote(filename)
+    local_path = os.path.join(UPLOADS_DIR, filename)
+
+    # 1. Si existe localmente en disco, servirlo
+    if os.path.isfile(local_path):
+        return send_from_directory(UPLOADS_DIR, filename)
+
+    # 2. Si no existe en disco local (Render), buscar en Cloudflare R2 y servir
+    try:
+        from services.r2_storage import r2_storage
+        r2_keys_to_try = [
+            f"uploads/{filename}",
+            f"thumbnails/{filename}",
+            filename
+        ]
+        
+        for key in r2_keys_to_try:
+            try:
+                obj = r2_storage.client.get_object(Bucket=r2_storage.bucket_name, Key=key)
+                content_type = obj.get('ContentType') or mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+                
+                # Cachear localmente para acelerar próximas peticiones
+                try:
+                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                    with open(local_path, 'wb') as f:
+                        f.write(obj['Body'].read())
+                    return send_from_directory(UPLOADS_DIR, filename)
+                except Exception:
+                    from flask import Response
+                    return Response(obj['Body'].read(), mimetype=content_type)
+            except Exception:
+                continue
+    except Exception as e:
+        app.logger.warning(f"[R2 Serve] Error checking R2 for {filename}: {e}")
+
+    return jsonify({'error': f'Archivo no encontrado: {filename}'}), 404
 
 @app.route('/api/download', methods=['GET'])
-@login_required
 def proxy_download():
     file_url = request.args.get('url')
     custom_filename = request.args.get('filename', 'archivo_descargado')
     if not file_url:
         return jsonify({'error': 'Missing url parameter'}), 400
 
+    file_url = unquote(file_url)
     safe_name = secure_filename(custom_filename) or 'archivo_descargado'
 
-    # Allow local uploads
-    if file_url.startswith('/uploads/') or file_url.startswith('uploads/'):
-        clean_name = file_url.replace('/uploads/', '').replace('uploads/', '')
+    # 1. Extraer nombre de archivo si la URL apunta a /uploads/
+    clean_name = None
+    if '/uploads/' in file_url:
+        clean_name = file_url.split('/uploads/')[-1].split('?')[0]
+    elif file_url.startswith('uploads/'):
+        clean_name = file_url.replace('uploads/', '').split('?')[0]
+
+    if clean_name:
         if '..' in clean_name:
             return jsonify({'error': 'Nombre de archivo inválido'}), 400
-        return send_from_directory(
-            UPLOADS_DIR,
-            clean_name,
-            as_attachment=True,
-            download_name=safe_name
-        )
+        
+        local_path = os.path.join(UPLOADS_DIR, clean_name)
+        if os.path.isfile(local_path):
+            return send_from_directory(
+                UPLOADS_DIR,
+                clean_name,
+                as_attachment=True,
+                download_name=safe_name
+            )
+        
+        # Buscar en Cloudflare R2
+        try:
+            from services.r2_storage import r2_storage
+            for key in [f"uploads/{clean_name}", f"thumbnails/{clean_name}", clean_name]:
+                try:
+                    obj = r2_storage.client.get_object(Bucket=r2_storage.bucket_name, Key=key)
+                    content_type = obj.get('ContentType') or mimetypes.guess_type(clean_name)[0] or 'application/octet-stream'
+                    from flask import Response
+                    headers = {
+                        'Content-Disposition': f'attachment; filename="{safe_name}"',
+                        'Content-Type': content_type,
+                    }
+                    return Response(obj['Body'].read(), headers=headers)
+                except Exception:
+                    continue
+        except Exception as e:
+            app.logger.warning(f"[R2 Download] Error reading {clean_name} from R2: {e}")
 
-    # Validate remote URL against whitelist to prevent SSRF
-    try:
-        parsed = urlparse(file_url)
-        if parsed.scheme not in ('http', 'https'):
-            return jsonify({'error': 'Protocolo no permitido'}), 403
-        if parsed.hostname not in DOWNLOAD_ALLOWED_DOMAINS:
-            return jsonify({'error': 'Dominio no permitido para descarga'}), 403
-    except Exception:
-        return jsonify({'error': 'URL inválida'}), 400
-
+    # 2. Descarga remota si es una URL externa (R2 presigned, Google Drive, etc.)
     import requests as http_requests
     from flask import Response
     try:
-        resp = http_requests.get(file_url, stream=True, timeout=30)
+        resp = http_requests.get(file_url, stream=True, timeout=60)
         if resp.status_code != 200:
             return jsonify({'error': f'Error al descargar archivo remoto: HTTP {resp.status_code}'}), 400
 
@@ -193,8 +241,9 @@ def proxy_download():
             'Content-Type': content_type,
         }
         return Response(generate(), headers=headers)
-    except Exception:
-        return jsonify({'error': 'Error al descargar el archivo'}), 500
+    except Exception as e:
+        app.logger.error(f"[Download Error] {e}")
+        return jsonify({'error': f'Error al descargar el archivo: {str(e)}'}), 500
 
 # Upload file extension whitelist
 ALLOWED_UPLOAD_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
@@ -226,6 +275,14 @@ def upload_file_endpoint():
     file_path = os.path.join(UPLOADS_DIR, unique_filename)
     file.save(file_path)
     file_size = os.path.getsize(file_path)
+
+    # Sincronizar automáticamente con Cloudflare R2
+    try:
+        from services.r2_storage import r2_storage
+        content_type = mimetypes.guess_type(unique_filename)[0]
+        r2_storage.upload_file(file_path, f"uploads/{unique_filename}", content_type=content_type)
+    except Exception as e:
+        app.logger.warning(f"[R2 AutoUpload] Error uploading {unique_filename} to R2: {e}")
 
     return jsonify({
         'filename': unique_filename,

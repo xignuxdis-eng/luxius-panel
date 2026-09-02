@@ -24,5 +24,13 @@ class Config:
         'pool_pre_ping': True,
         'pool_recycle': 300,
     }
-    SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'luxius-secret-key-change-in-production')
+    SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
+
+    # Cloudflare R2 Configuration
+    R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID', '62e10a84196d5f6cfb46c97af6e5931d')
+    R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '178b4702bd26eb05de12c6f9077a92f4')
+    R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '5d878d399c74a0d116b65097099d0664e269964c748924fa034c3268b3c0aecc')
+    R2_BUCKET_NAME = os.environ.get('R2_BUCKET_NAME', 'luxius-media')
+    R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL', 'https://62e10a84196d5f6cfb46c97af6e5931d.r2.cloudflarestorage.com')
+
