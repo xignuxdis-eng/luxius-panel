@@ -2,11 +2,15 @@ from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime,
-    ForeignKey, Text, BigInteger, Numeric, Date,
+    ForeignKey, Text, BigInteger, Numeric, Date, JSON,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
+
+# Universal JSONB alias that renders natively on SQLite and PostgreSQL
+JSONB = JSON
+
 
 db = SQLAlchemy()
 
@@ -258,3 +262,41 @@ class ConfigGlobal(db.Model):
             'valor': self.valor or {},
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+# ================================================================
+# BÓVEDA HISTÓRICA & AUDITORÍA DE RECONCILIACIÓN GOOGLE DRIVE / R2
+# ================================================================
+class DriveVaultAudit(db.Model):
+    __tablename__ = 'drive_vault_audits'
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    job_id           = Column(String(50), nullable=False, index=True)
+    status           = Column(String(30), default='completed')  # 'running', 'completed', 'failed'
+    total_r2_files   = Column(Integer, default=0)
+    total_drive_files= Column(Integer, default=0)
+    synced_matches   = Column(Integer, default=0)
+    missing_new      = Column(Integer, default=0)
+    hash_mismatches  = Column(Integer, default=0)
+    lifecycle_purged = Column(Integer, default=0)
+    details          = Column(JSON, default=list)
+    started_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    completed_at     = Column(DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'job_id': self.job_id,
+            'status': self.status,
+            'total_r2_files': self.total_r2_files,
+            'total_drive_files': self.total_drive_files,
+            'synced_matches': self.synced_matches,
+            'missing_new': self.missing_new,
+            'hash_mismatches': self.hash_mismatches,
+            'lifecycle_purged': self.lifecycle_purged,
+            'details': self.details or [],
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }
+

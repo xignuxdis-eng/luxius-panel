@@ -276,3 +276,83 @@ def disconnect():
         'success': True,
         'message': 'Cuenta de Google desvinculada exitosamente'
     }), 200
+
+
+# ================================================================
+# ENDPOINTS DE BÓVEDA HISTÓRICA & RECONCILIACIÓN CLASIFICADA
+# ================================================================
+from services.drive_reconciliation import (
+    drive_vault_service, run_reconciliation_audit, 
+    _ACTIVE_RECONCILE_JOBS, _RECONCILE_EXECUTOR
+)
+from models import DriveVaultAudit
+from config import Config
+
+
+@google_drive_bp.route('/vault/status', methods=['GET'])
+@optional_login
+def get_vault_status():
+    """Retorna las métricas actuales de la bóveda en Google Drive y Cloudflare R2."""
+    cfg = get_drive_config()
+    latest_audit = DriveVaultAudit.query.order_by(DriveVaultAudit.started_at.desc()).first()
+    
+    shared_drive_id = os.environ.get('GOOGLE_DRIVE_SHARED_DRIVE_ID', '').strip()
+    vault_folder_id = os.environ.get('GOOGLE_DRIVE_VAULT_FOLDER_ID', '').strip()
+
+    return jsonify({
+        'connected': bool(cfg['refresh_token'] or cfg['access_token']),
+        'email': cfg['email'],
+        'shared_drive_configured': bool(shared_drive_id),
+        'shared_drive_id': shared_drive_id,
+        'vault_folder_id': vault_folder_id,
+        'r2_bucket': Config.R2_BUCKET_NAME,
+        'latest_audit': latest_audit.to_dict() if latest_audit else None
+    }), 200
+
+
+@google_drive_bp.route('/vault/reconcile', methods=['POST'])
+@optional_login
+def trigger_reconciliation():
+    """Inicia un job asíncrono de auditoría y reconciliación clasificada."""
+    data = request.get_json(force=True, silent=True) or {}
+    auto_sync = data.get('auto_sync', True)
+    job_id = str(uuid.uuid4())[:8]
+
+    _ACTIVE_RECONCILE_JOBS[job_id] = {
+        'status': 'running',
+        'progress': 'Iniciando escaneo de integridad...',
+        'started_at': datetime.now(timezone.utc).isoformat()
+    }
+
+    _RECONCILE_EXECUTOR.submit(run_reconciliation_audit, job_id, auto_sync)
+
+    return jsonify({
+        'status': 'running',
+        'job_id': job_id,
+        'message': 'Auditoría de reconciliación iniciada en segundo plano.'
+    }), 202
+
+
+@google_drive_bp.route('/vault/reconcile/status/<job_id>', methods=['GET'])
+def get_reconcile_job_status(job_id):
+    """Retorna el progreso o resultado de un job de reconciliación."""
+    job = _ACTIVE_RECONCILE_JOBS.get(job_id)
+    if not job:
+        # Buscar en DB
+        rec = DriveVaultAudit.query.filter_by(job_id=job_id).first()
+        if rec:
+            return jsonify({'status': 'success', 'audit': rec.to_dict()}), 200
+        return jsonify({'error': 'Job de reconciliación no encontrado.'}), 404
+
+    return jsonify(job), 200
+
+
+@google_drive_bp.route('/vault/audit-history', methods=['GET'])
+@optional_login
+def get_audit_history():
+    """Retorna el historial de las últimas 15 auditorías de integridad."""
+    audits = DriveVaultAudit.query.order_by(DriveVaultAudit.started_at.desc()).limit(15).all()
+    return jsonify({
+        'history': [a.to_dict() for a in audits]
+    }), 200
+
