@@ -6,10 +6,12 @@ LuXius System - XignuX
 import os
 import re
 import sys
+import time
 import math
 import hashlib
 import mimetypes
 from PIL import Image
+
 try:
     import pypdfium2 as pdfium
 except ImportError:

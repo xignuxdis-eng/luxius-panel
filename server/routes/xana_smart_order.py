@@ -19,8 +19,19 @@ from flask import Blueprint, request, jsonify, g
 from middleware.auth import login_required, optional_login
 from services.dimension_analyzer import analyze_file_dimensions, compute_sha256
 from models import db, Cliente, Presupuesto
+from concurrent.futures import ThreadPoolExecutor
+
+_R2_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+
+def _bg_r2_upload(local_path, r2_key, ctype):
+    try:
+        from services.r2_storage import r2_storage
+        r2_storage.upload_file(local_path, r2_key, content_type=ctype)
+    except Exception as err:
+        print(f"[R2 Async Upload Error] {err}", file=sys.stderr)
 
 smart_order_bp = Blueprint('xana_smart_order', __name__, url_prefix='/api/xana/smart-order')
+
 
 PRIVATE_IP_PREFIXES = ('127.', '10.', '172.16.', '172.17.', '172.18.', '172.19.',
                        '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
@@ -219,18 +230,19 @@ def create_smart_order_draft():
             final_dest = os.path.join(UPLOADS_DIR, unique_name)
             shutil.copy2(fpath, final_dest)
             
-            # Subir a Cloudflare R2
+            # Subir a Cloudflare R2 en segundo plano (Non-blocking)
             try:
-                from services.r2_storage import r2_storage
                 import mimetypes
                 ctype = mimetypes.guess_type(final_dest)[0] or 'application/octet-stream'
-                r2_storage.upload_file(final_dest, f"uploads/{unique_name}", content_type=ctype)
+                _R2_EXECUTOR.submit(_bg_r2_upload, final_dest, f"uploads/{unique_name}", ctype)
             except Exception as r2_err:
                 print(f"[R2 Smart Order Upload] {r2_err}", file=sys.stderr)
+
 
             # Analizar dimensiones y heuristica 3D
             meta = analyze_file_dimensions(final_dest, material_code=material_code, custom_filename=orig_name)
             meta['sha256'] = sha256_anchor
+
 
             ancho_m = meta['final_width_cm'] / 100.0
             alto_m = meta['final_height_cm'] / 100.0
