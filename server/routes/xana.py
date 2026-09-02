@@ -111,9 +111,36 @@ DEFAULT_XANA_DATA = {
             "task_id": "TASK-009",
             "project": "LuXius Cloud Storage",
             "objective": "Automatización programada de purga y sincronización Cloudflare R2 a Google Drive cada 3 días vía sync_r2_to_drive.py.",
-            "status": "in_progress",
+            "status": "completed",
             "created_at": "2026-08-29T20:30:00-03:00",
-            "updated_at": "2026-08-29T22:00:00-03:00"
+            "updated_at": "2026-09-02T00:30:00-03:00"
+        },
+        {
+            "id": 10,
+            "task_id": "TASK-010",
+            "project": "Xana Smart Order & Análisis Gráfico",
+            "objective": "Borrador Inteligente Xana (POST /api/xana/smart-order): procesamiento asíncrono en background con job_id, análisis de DPI y dimensiones sin saturación de RAM con Pillow draft mode, miniaturas en R2 y heurística tridimensional anti-escalas 1:10.",
+            "status": "completed",
+            "created_at": "2026-09-01T22:00:00-03:00",
+            "updated_at": "2026-09-02T00:30:00-03:00"
+        },
+        {
+            "id": 11,
+            "task_id": "TASK-011",
+            "project": "LuXius Pricing & Metraje Unificado",
+            "objective": "Motor oficial unificado de cálculo de metros lineales y precios en pricingCalculator.ts: margen de seguridad de 1cm, evaluación dual de orientación normal vs rotada a 90° para ahorro de bobina y coincidencia 100% con NuevoPedidoModal.",
+            "status": "completed",
+            "created_at": "2026-09-02T00:32:00-03:00",
+            "updated_at": "2026-09-02T00:38:00-03:00"
+        },
+        {
+            "id": 12,
+            "task_id": "TASK-012",
+            "project": "Bóveda Google Drive Shared Drive (Fase 2)",
+            "objective": "Implementación de Bóveda Histórica en Google Workspace Shared Drive corporativo y motor de reconciliación clasificada (SYNCED_MATCH, MISSING_NEW, HASH_MISMATCH, LIFECYCLE_PURGED) con tabla DriveVaultAudit y panel interactivo en GoogleDriveView.",
+            "status": "completed",
+            "created_at": "2026-09-02T00:38:00-03:00",
+            "updated_at": "2026-09-02T00:43:00-03:00"
         }
     ],
     "decisions": [
@@ -186,9 +213,40 @@ DEFAULT_XANA_DATA = {
             "alternatives_rejected": ["Remitos en papel suelto A4"],
             "reason": "Compatibilidad universal con impresoras térmicas adhesivas (Zebra, Brother) para despacho rápido.",
             "created_at": "2026-08-29T22:00:00-03:00"
+        },
+        {
+            "id": 8,
+            "decision_id": "DEC-008",
+            "task_id": "TASK-010",
+            "topic": "Jerarquía de Autoridad Dual R2 vs Google Drive",
+            "choice": "Cloudflare R2 actúa como Autoridad Máster (capa caliente, zero egress), mientras que Google Drive Shared Drive actúa como Bóveda Fría de respaldo navegable.",
+            "alternatives_rejected": ["Drive como fuente única", "R2 sin respaldo en Drive"],
+            "reason": "Combina velocidad instantánea y costo cero de ancho de banda para el frontend y RIP con la seguridad de archivo corporativo en Google Workspace.",
+            "created_at": "2026-09-01T23:30:00-03:00"
+        },
+        {
+            "id": 9,
+            "decision_id": "DEC-009",
+            "task_id": "TASK-012",
+            "topic": "Reconciliación Clasificada de Integridad",
+            "choice": "Auditoría nocturna con categorización de discrepancias (SYNCED_MATCH, MISSING_NEW, HASH_MISMATCH, LIFECYCLE_PURGED). HASH_MISMATCH emite alerta crítica sin sobreescribir ciegamente.",
+            "alternatives_rejected": ["Reintento ciego con sobreescritura", "Sincronización unidireccional simple"],
+            "reason": "Evita la pérdida silenciosa de modificaciones deliberadas y garantiza trazabilidad criptográfica SHA-256.",
+            "created_at": "2026-09-02T00:35:00-03:00"
+        },
+        {
+            "id": 10,
+            "decision_id": "DEC-010",
+            "task_id": "TASK-011",
+            "topic": "Unificación de Cálculo de Metros Lineales y Rotación 90°",
+            "choice": "Algoritmo único en pricingCalculator.ts con margen de seguridad de 1 cm y evaluación simultánea de orientación normal vs rotada a 90°.",
+            "alternatives_rejected": ["Cálculos independientes en modal y asistente Xana"],
+            "reason": "Garantiza que la cotización inteligente de Xana y el modal de pedidos coincidan al centavo y en metros exactos.",
+            "created_at": "2026-09-02T00:38:00-03:00"
         }
     ],
     "sessions": [
+
         {
             "id": 1,
             "session_id": "SES-XANA-20260829-01",
