@@ -4,9 +4,11 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import './styles/index.css'
 import { initErrorRecorder } from './utils/errorRecorder'
+import { initVersionEngine } from './utils/versionCheck'
 
-// Inicializar diagnóstico de errores
+// Inicializar diagnóstico de errores y motor de versiones anti-caché
 initErrorRecorder()
+initVersionEngine()
 
 // Initial theme setup
 const savedTheme = localStorage.getItem('theme') || 'pixel'

@@ -20,5 +20,9 @@ class Config:
         print(f"[CONFIG] Using: {SQLALCHEMY_DATABASE_URI[:50]}...", file=sys.stderr)
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
     SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'luxius-secret-key-change-in-production')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB

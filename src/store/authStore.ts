@@ -11,17 +11,51 @@ interface AuthState {
     logout: () => void
     setUser: (user: User) => void
     clearStorage: () => void
+    validateSession: () => Promise<boolean>
 }
 
 export const useAuthStore = create<AuthState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             user: null,
             isAuthenticated: false,
 
+            validateSession: async () => {
+                const token = localStorage.getItem('luxius_auth_token');
+                if (!token) {
+                    if (get().isAuthenticated) {
+                        set({ user: null, isAuthenticated: false });
+                    }
+                    return false;
+                }
+
+                try {
+                    const res = await fetch(`${API_URL}/usuarios?_t=${Date.now()}`, {
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Cache-Control': 'no-cache'
+                        },
+                        cache: 'no-store',
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        console.warn('[authStore] Token expirado o inválido en el servidor. Cerrando sesión...');
+                        localStorage.removeItem('luxius_auth_token');
+                        set({ user: null, isAuthenticated: false });
+                        return false;
+                    }
+                    return true;
+                } catch {
+                    // Si el servidor está temporalmente offline, preservar sesión para permitir modo offline
+                    return get().isAuthenticated;
+                }
+            },
+
             clearStorage: () => {
                 const keys = [
-                    'luxius-auth-v2',
+                    'luxius-auth-v6',
+                    'luxius_auth_token',
+                    'luxius_session_ordenes',
                     'luxius_session_usuarios',
                     'luxius_session_roles',
                     'luxius_session_clientes',
@@ -34,9 +68,13 @@ export const useAuthStore = create<AuthState>()(
             login: async (credentials: LoginCredentials) => {
                 // Authenticate via secure backend API only
                 try {
-                    const res = await fetch(`${API_URL}/auth/login`, {
+                    const res = await fetch(`${API_URL}/auth/login?_t=${Date.now()}`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache'
+                        },
+                        cache: 'no-store',
                         body: JSON.stringify({
                             username: credentials.username,
                             password: credentials.password,
@@ -59,10 +97,13 @@ export const useAuthStore = create<AuthState>()(
                     // Store token securely
                     localStorage.setItem('luxius_auth_token', token);
 
-                    // Fetch full user list for local cache (now requires auth)
+                    // Fetch full user list for local cache
                     try {
-                        const usersRes = await fetch(`${API_URL}/usuarios`, {
-                            headers: { 'Authorization': `Bearer ${token}` },
+                        const usersRes = await fetch(`${API_URL}/usuarios?_t=${Date.now()}`, {
+                            headers: { 
+                                'Authorization': `Bearer ${token}`,
+                                'Cache-Control': 'no-cache'
+                            },
                             cache: 'no-store',
                         });
                         if (usersRes.ok) {
@@ -70,8 +111,9 @@ export const useAuthStore = create<AuthState>()(
                             localStorage.setItem('luxius_session_usuarios', JSON.stringify(serverUsers));
                         }
                     } catch {
-                        // Non-critical: local cache may be stale
+                        // Non-critical
                     }
+
                     // Map server user to local User type
                     const mappedUser: User = {
                         id: serverUser.id,
@@ -93,15 +135,15 @@ export const useAuthStore = create<AuthState>()(
 
             logout: () => {
                 localStorage.removeItem('luxius_auth_token');
-                set({ user: null, isAuthenticated: false })
+                set({ user: null, isAuthenticated: false });
             },
 
             setUser: (user: User) => {
-                set({ user })
+                set({ user });
             }
         }),
         {
-            name: 'luxius-auth-v6', // Force cache invalidation to purge old users
+            name: 'luxius-auth-v6',
         }
     )
 )

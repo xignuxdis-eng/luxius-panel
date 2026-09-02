@@ -1,5 +1,7 @@
-// Configuración de la API
-const API_BASE_URL = '/api';
+// Configuración dinámica de la API entre entorno local y la nube Render
+export const API_BASE_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/api'
+  : 'https://luxius-backend.onrender.com/api';
 
 // Tipos de datos
 export interface User {
@@ -201,21 +203,35 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const token = this.getToken();
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const cacheBusterUrl = `${API_BASE_URL}${endpoint}${separator}_t=${Date.now()}`;
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
       ...options.headers,
     };
 
-    if (this.token) {
-      (headers as any)['Authorization'] = `Bearer ${this.token}`;
+    if (token) {
+      (headers as any)['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(cacheBusterUrl, {
       ...options,
+      cache: 'no-store',
       headers,
     });
+
+    if (response.status === 401 || response.status === 403) {
+      console.warn(`[ApiService] 401/403 No autorizado en ${endpoint}. Limpiando token...`);
+      localStorage.removeItem('luxius_auth_token');
+      try {
+        const { useAuthStore } = await import('@store/authStore');
+        useAuthStore.getState().logout();
+      } catch { }
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Error desconocido' }));

@@ -17,15 +17,12 @@ load_dotenv()
 
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', os.environ.get('JWT_SECRET', 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519'))
 
-# Auto-generate a strong secret if none is configured (log a warning)
 if not SECRET_KEY or SECRET_KEY == 'luxius-secret-key-change-in-production':
-    SECRET_KEY = secrets.token_hex(32)
-    import sys
-    print("[SECURITY WARNING] JWT_SECRET_KEY not set or insecure. Using auto-generated secret. "
-          "Set a strong JWT_SECRET_KEY in .env for production.", file=sys.stderr)
+    SECRET_KEY = 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519'
 
 ALGORITHM = 'HS256'
-TOKEN_EXPIRY_HOURS = 72  # Tokens expire after 72 hours
+TOKEN_EXPIRY_HOURS = 720  # Tokens expire after 30 days (720 hours)
+
 
 # ================================================================
 # ADMIN ROLES — Roles considered privileged

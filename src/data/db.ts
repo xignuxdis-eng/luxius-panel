@@ -95,11 +95,14 @@ export const SESSION_CALENDAR_EVENTS_KEY = 'luxius_session_calendar_events'
 export const SESSION_LOGS_KEY = 'luxius_session_logs'
 
 
-// --- SYNC HELPERS ---
+/// --- SYNC HELPERS ---
 export function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record<string, string> {
-    const headers = { ...baseHeaders };
+    const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        ...baseHeaders
+    };
     try {
-        // Primary: JWT token stored at login
         const token = localStorage.getItem('luxius_auth_token');
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -110,11 +113,12 @@ export function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record
 
 const syncSave = (collection: string, data: any) => {
     console.log(`[Sync] Saving to ${collection}`, data);
-    fetch(`${API_URL}/${collection}`, {
+    fetch(`${API_URL}/${collection}?_t=${Date.now()}`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
-        keepalive: true
+        keepalive: true,
+        cache: 'no-store'
     }).then(res => {
         if (!res.ok) console.warn(`[Sync] Save failed ${collection}: ${res.status}`);
     }).catch(e => console.error(`[Sync] Network error [${collection}]:`, e));
@@ -122,22 +126,44 @@ const syncSave = (collection: string, data: any) => {
 
 const syncDelete = (collection: string, id: number) => {
     console.log(`[Sync] Deleting from ${collection} ID: ${id}`);
-    fetch(`${API_URL}/${collection}/${id}`, {
+    fetch(`${API_URL}/${collection}/${id}?_t=${Date.now()}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
-        keepalive: true
+        keepalive: true,
+        cache: 'no-store'
     }).then(res => {
         if (!res.ok) console.warn(`[Sync] Delete failed ${collection}: ${res.status}`);
     }).catch(e => console.error(`[Sync] Network error delete [${collection}]:`, e));
 };
 
-const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 60000) => {
+export const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 45000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const headers = getAuthHeaders(options.headers || {});
-        const response = await fetch(url, { ...options, headers, signal: controller.signal });
+        const separator = url.includes('?') ? '&' : '?';
+        const cacheBustedUrl = `${url}${separator}_t=${Date.now()}`;
+
+        const response = await fetch(cacheBustedUrl, {
+            ...options,
+            cache: 'no-store',
+            headers,
+            signal: controller.signal
+        });
         clearTimeout(id);
+
+        // Si la sesión expiró en el servidor (401 / 403), limpiar token e invocar logout
+        if (response.status === 401 || response.status === 403) {
+            console.warn(`[Auth] Sesión no autorizada o expirada (${response.status}) en ${url}`);
+            if (localStorage.getItem('luxius_auth_token')) {
+                localStorage.removeItem('luxius_auth_token');
+                try {
+                    const { useAuthStore } = await import('@store/authStore');
+                    useAuthStore.getState().logout();
+                } catch { }
+            }
+        }
+
         return response;
     } catch (error) {
         clearTimeout(id);
@@ -148,18 +174,18 @@ const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 6000
 export async function initializeData() {
     console.log("🔄 Syncing data from Server...");
 
-    // Clear legacy tombstone keys that cause data resurrection bugs (except for ordenes, which we need for offline/fallback deletion)
+    // Limpiar tumbas obsoletas de localStorage para evitar que filtren datos legítimos
     [
         'luxius_deleted_clientes', 'luxius_deleted_materiales', 'luxius_deleted_calidades',
         'luxius_deleted_maquinas', 'luxius_deleted_usuarios', 'luxius_deleted_proveedores',
         'luxius_deleted_servicios', 'luxius_deleted_logisticas', 'luxius_deleted_roles',
-        'luxius_deleted_combos'
+        'luxius_deleted_combos', 'luxius_deleted_ordenes'
     ].forEach(k => localStorage.removeItem(k));
 
     try {
         await Promise.all(COLLECTIONS_CONFIG.map(async (col) => {
             try {
-                const res = await fetchWithTimeout(`${API_URL}/${col.endpoint}`, { cache: 'no-store' }, 60000);
+                const res = await fetchWithTimeout(`${API_URL}/${col.endpoint}`, { cache: 'no-store' }, 45000);
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data)) {
@@ -178,7 +204,7 @@ export async function refreshCollection(endpoint: string) {
     if (!config) return;
 
     try {
-        const res = await fetchWithTimeout(`${API_URL}/${endpoint}`, { cache: 'no-store' }, 10000);
+        const res = await fetchWithTimeout(`${API_URL}/${endpoint}`, { cache: 'no-store' }, 15000);
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
@@ -187,8 +213,6 @@ export async function refreshCollection(endpoint: string) {
         }
     } catch (e) { }
 }
-
-
 
 export function matchesOrderId(order: { id?: number | string, ot?: string }, targetId: number | string): boolean {
     if (!order || targetId === undefined || targetId === null) return false;
@@ -211,123 +235,33 @@ export function matchesOrderId(order: { id?: number | string, ot?: string }, tar
 
 export const HIDDEN_ORDENES_KEY = 'luxius_deleted_ordenes';
 
-export async function getOrdenes(): Promise<Order[]> {
-    const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-    let hiddenCleanIds: Set<string> = new Set();
-    try {
-        const rawHidden = JSON.parse(hiddenJson) as any[];
-        rawHidden.forEach(item => {
-            const s = String(item).trim().toLowerCase().replace(/^ot-/i, '');
-            if (s) hiddenCleanIds.add(s);
-        });
-    } catch (e) { }
-
-    const isHidden = (o: Order) => {
-        if (!o) return false;
-        const idClean = String(o.id || '').trim().toLowerCase().replace(/^ot-/i, '');
-        const otClean = String(o.ot || '').trim().toLowerCase().replace(/^ot-/i, '');
-        return hiddenCleanIds.has(idClean) || hiddenCleanIds.has(otClean);
-    };
-
+export async function getOrdenes(forceRefresh = false): Promise<Order[]> {
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     let localOrders: Order[] = [];
     try {
         localOrders = JSON.parse(localOrdersJson);
-        localOrders = localOrders.filter(o => !isHidden(o));
     } catch (e) { }
 
-    // If localStorage was recently written (within 5 seconds), trust it fully
-    // to avoid race conditions where stale API data overwrites a just-saved/deleted order.
-    // IMPORTANT: Do NOT require localOrders.length > 0 — deletions can leave it empty.
+    // Si se guardó hace menos de 2 segundos y no se forza recarga, usar local para evitar parpadeos
     const lastSaveTs = Number(localStorage.getItem('luxius_ordenes_last_save') || '0');
     const timeSinceLastSave = Date.now() - lastSaveTs;
-    if (timeSinceLastSave < 5000) {
-        console.log('[db] getOrdenes: Usando localStorage reciente (guardado hace', timeSinceLastSave, 'ms). Orders:', localOrders.length);
+    if (!forceRefresh && timeSinceLastSave < 2000 && localOrders.length > 0) {
         return localOrders;
     }
 
     try {
-        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 30000);
+        const response = await fetchWithTimeout(`${API_URL}/orders`, { cache: 'no-store' }, 35000);
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
-                const normalizeId = (id: any) => String(id || '').trim().toLowerCase().replace(/^ot-/i, '');
-                
-                const activeApiOrders = apiOrders.filter((o: any) => !isHidden(o));
-                const apiIds = new Set(activeApiOrders.map((o: any) => normalizeId(o.id)));
-                const localById = new Map(localOrders.map(o => [normalizeId(o.id), o]));
-
-                // Merge: API orders win UNLESS local has a more recent status change
-                const mergedApi = activeApiOrders.map((apiOrder: any) => {
-                    const localVersion = localById.get(normalizeId(apiOrder.id));
-                    if (localVersion) {
-                        // If locally soft-deleted, preserve that status
-                        if (localVersion.status === 'eliminado' && apiOrder.status !== 'eliminado') {
-                            return localVersion;
-                        }
-                        // Keep local data that might have been edited (archivos, metadata, etc.)
-                        return { ...apiOrder, ...localVersion, id: apiOrder.id };
-                    }
-                    return apiOrder;
-                });
-
-                // Local-only orders: keep locally soft-deleted ones (for trash view)
-                // and VERY recently created ones (offline grace period).
-                // Old local ghosts that don't exist in API are discarded.
-                const TWO_MINUTES = 2 * 60 * 1000;
-                const now = Date.now();
-                const recentLocal = localOrders.filter(o => {
-                    if (apiIds.has(normalizeId(o.id || o.ot))) return false; // already in API
-                    // Always keep locally soft-deleted orders so they appear in the trash
-                    if (o.status === 'eliminado') return true;
-                    // Only keep if created very recently (offline grace period)
-                    const createdAt = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-                    return (now - createdAt) < TWO_MINUTES;
-                });
-
-                if (recentLocal.length > 0) {
-                    console.log(`[db] ${recentLocal.length} orden(es) local(es) recientes (offline). Sincronizando...`);
-                    Promise.allSettled(recentLocal.map(async (order) => {
-                        const localId = order.id || order.ot;
-                        const method = order.id ? 'PUT' : 'POST';
-                        const url = order.id ? `${API_URL}/orders/${order.id}` : `${API_URL}/orders`;
-                        try {
-                            const res = await fetchWithTimeout(url, {
-                                method,
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(order)
-                            }, 30000);
-                            
-                            if (res.ok) {
-                                const savedOrder = await res.json();
-                                if (savedOrder.id && String(savedOrder.id) !== String(localId)) {
-                                    const localJson = localStorage.getItem('luxius_session_ordenes') || '[]';
-                                    let parsedLocal = JSON.parse(localJson);
-                                    const idx = parsedLocal.findIndex((o: any) => (o.id || o.ot) === localId);
-                                    if (idx >= 0) {
-                                        parsedLocal[idx] = { ...parsedLocal[idx], ...savedOrder };
-                                        localStorage.setItem('luxius_session_ordenes', JSON.stringify(parsedLocal));
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('[db] Auto-sync failed for order:', localId);
-                        }
-                    }));
-                } else if (localOrders.length > apiIds.size) {
-                    const discarded = localOrders.filter(o => !apiIds.has(normalizeId(o.id || o.ot))).length;
-                    if (discarded > 0) {
-                        console.log(`[db] Descartando ${discarded} orden(es) fantasma local(es) que no existen en el servidor.`);
-                    }
-                }
-
-                const merged = [...mergedApi, ...recentLocal];
-                localStorage.setItem('luxius_session_ordenes', JSON.stringify(merged));
-                return merged;
+                // El servidor es la fuente única y autoritativa de verdad
+                localStorage.setItem('luxius_session_ordenes', JSON.stringify(apiOrders));
+                localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+                return apiOrders;
             }
         }
     } catch (error) {
-        console.warn('[db] Falló la obtención de órdenes remotas, usando locales:', error);
+        console.warn('[db] Falló la obtención remota de órdenes, usando copia offline:', error);
     }
     return localOrders;
 }
@@ -462,20 +396,9 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
         localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
     } catch (e) { }
 
-    // 2. Add to tombstone (luxius_deleted_ordenes) so it doesn't resurrect from API
+    // 2. Delete from remote backend API
     try {
-        const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-        const hidden: string[] = JSON.parse(hiddenJson);
-        const cleanId = String(id).trim().toLowerCase().replace(/^ot-/i, '');
-        if (!hidden.includes(cleanId)) {
-            hidden.push(cleanId);
-            localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hidden));
-        }
-    } catch (e) { }
-
-    // 3. Delete from remote backend API
-    try {
-        await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 60000);
+        await fetchWithTimeout(`${API_URL}/orders/${id}`, { method: 'DELETE' }, 45000);
     } catch (error) {
         console.warn('[db] API deleteOrden falló:', error);
     }
@@ -496,21 +419,6 @@ export async function saveBatchOrders(
             localOrders = localOrders.filter(o => !ids.some(id => matchesOrderId(o, id)));
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
-            
-            // Add to tombstone
-            const hiddenJson = localStorage.getItem(HIDDEN_ORDENES_KEY) || '[]';
-            const hidden: string[] = JSON.parse(hiddenJson);
-            let updated = false;
-            ids.forEach(id => {
-                const cleanId = String(id).trim().toLowerCase().replace(/^ot-/i, '');
-                if (!hidden.includes(cleanId)) {
-                    hidden.push(cleanId);
-                    updated = true;
-                }
-            });
-            if (updated) {
-                localStorage.setItem(HIDDEN_ORDENES_KEY, JSON.stringify(hidden));
-            }
         } catch (e) { }
 
     } else if (action === 'update' && data) {

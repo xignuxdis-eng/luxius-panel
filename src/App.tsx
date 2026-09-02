@@ -59,10 +59,11 @@ function App() {
                 document.body.classList.add('pixel-theme')
             }
 
-            // Force a minimum loading time to prevent flicker and ensure storage is ready
-            const minTime = new Promise(resolve => setTimeout(resolve, 800));
+            // Validar sesión activa contra el servidor y sincronizar datos
+            const authCheck = useAuthStore.getState().validateSession();
+            const minTime = new Promise(resolve => setTimeout(resolve, 600));
             const dataLoad = initializeData();
-            await Promise.all([dataLoad, minTime]);
+            await Promise.all([authCheck, dataLoad, minTime]);
             setIsInitializing(false);
         }
         init();

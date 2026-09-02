@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuthStore } from '@store/authStore'
-import { getUsuarios } from '@data/db'
+import { getUsuarios, initializeData } from '@data/db'
 import PerfilModal from '../../pages/Sistema/PerfilModal'
 import { ArcadeModal } from '@components/arcade/ArcadeModal'
 import './Header.css'
@@ -14,6 +14,17 @@ export default function Header({ title, subtitle }: HeaderProps) {
     const user = useAuthStore((state) => state.user)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isArcadeOpen, setIsArcadeOpen] = useState(false)
+    const [isSyncing, setIsSyncing] = useState(false)
+
+    const handleQuickSync = async () => {
+        setIsSyncing(true)
+        try {
+            await initializeData()
+            window.location.reload()
+        } catch {
+            setIsSyncing(false)
+        }
+    }
 
     // Get live Avatar from DB if possible
     const dbUser = user ? getUsuarios().find(u => u.id === user.id) : null
@@ -37,6 +48,17 @@ export default function Header({ title, subtitle }: HeaderProps) {
             </div>
 
             <div className="header-right">
+                <button
+                    className="pixel-btn pixel-btn-info"
+                    onClick={handleQuickSync}
+                    disabled={isSyncing}
+                    title="Sincronizar datos y actualizar versión en vivo"
+                    style={{ fontSize: '11px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                    <span style={{ display: 'inline-block', animation: isSyncing ? 'rotation 1s linear infinite' : 'none' }}>🔄</span>
+                    <span>{isSyncing ? 'SYNC...' : 'SYNC'}</span>
+                </button>
+
                 <button
                     className="pixel-btn pixel-btn-warning"
                     onClick={() => setIsArcadeOpen(true)}
