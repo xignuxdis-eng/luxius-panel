@@ -32,13 +32,45 @@ ADMIN_ROLES = {'administrador', 'principal', 'jefe_produccion'}
 OPERATOR_ROLES = ADMIN_ROLES | {'operario', 'vendedor', 'artista', 'disenador', 'impresion', 'impresor'}
 
 
-def generate_token(user_id, rol, username):
-    """Generate a JWT token with expiration."""
+import time
+
+# Cache local en proceso por usuario: { user_id: (token_version, timestamp) }
+_TOKEN_VERSION_CACHE = {}
+TOKEN_VERSION_CACHE_TTL = 60.0  # 60 segundos de TTL por usuario independiente
+
+def get_user_token_version(user_id):
+    now = time.time()
+    cached = _TOKEN_VERSION_CACHE.get(user_id)
+    if cached and (now - cached[1]) < TOKEN_VERSION_CACHE_TTL:
+        return cached[0]
+    
+    # Refrescar desde base de datos Neon PostgreSQL
+    try:
+        from models import Usuario, db
+        user = db.session.get(Usuario, user_id)
+        if user:
+            ver = getattr(user, 'token_version', 1) or 1
+            _TOKEN_VERSION_CACHE[user_id] = (ver, now)
+            return ver
+    except Exception:
+        pass
+    
+    return 1
+
+def invalidate_user_token_version(user_id):
+    _TOKEN_VERSION_CACHE.pop(user_id, None)
+
+def generate_token(user_id, rol, username, token_version=None):
+    """Generate a JWT token with expiration and token_version."""
+    if token_version is None:
+        token_version = get_user_token_version(user_id)
+        
     now = datetime.now(timezone.utc)
     payload = {
         'sub': str(user_id),
         'rol': rol,
         'username': username,
+        'token_version': token_version,
         'iat': now,
         'exp': now + timedelta(hours=TOKEN_EXPIRY_HOURS),
     }
@@ -64,11 +96,21 @@ def _resolve_payload(auth_header):
         return None
 
     try:
-        return decode_token(token)
+        payload = decode_token(token)
+        user_id = payload['sub']
+        token_ver = payload.get('token_version', 1)
+        
+        # Validar version de token (revocacion instantanea)
+        current_db_ver = get_user_token_version(user_id)
+        if token_ver < current_db_ver:
+            return None  # Token revocado
+            
+        return payload
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
         return None
+
 
 
 def login_required(f):

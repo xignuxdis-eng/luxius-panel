@@ -114,6 +114,7 @@ class Usuario(db.Model):
     rol           = Column(String(50), default='cliente')
     client_id     = Column(Integer, ForeignKey('clientes.id', ondelete='SET NULL'), nullable=True)
     habilitado    = Column(Boolean, default=True)
+    token_version = Column(Integer, default=1, nullable=False)
     extra         = Column(JSONB, default=dict)
     created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc),
@@ -126,9 +127,11 @@ class Usuario(db.Model):
             'id': self.id, 'nombre': self.nombre, 'username': self.username,
             'email': self.email, 'rol': self.rol, 'clientId': self.client_id,
             'habilitado': self.habilitado,
+            'tokenVersion': self.token_version,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
         }
+
 
 
 # ================================================================

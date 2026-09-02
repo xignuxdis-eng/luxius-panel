@@ -75,6 +75,8 @@ except Exception:
             return lambda f: f
     limiter = DummyLimiter()
 
+from routes.xana_smart_order import smart_order_bp
+
 # Make limiter available to blueprints
 app.limiter = limiter
 app.register_blueprint(sync_bp)
@@ -85,6 +87,8 @@ app.register_blueprint(orders_bp)
 app.register_blueprint(xana_bp)
 app.register_blueprint(import_bp)
 app.register_blueprint(google_drive_bp)
+app.register_blueprint(smart_order_bp)
+
 
 # Rate limits are configured directly on routes or via limiter default limits
 
