@@ -108,42 +108,77 @@ export default function XanaAssistant() {
 
             if (isCloudLink) {
                 const token = localStorage.getItem('luxius_token') || '';
-                const smartRes = await fetch(`${API_URL}/xana/smart-order`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': token ? `Bearer ${token}` : ''
-                    },
-                    body: JSON.stringify({
-                        url: urlMatch[0],
-                        observaciones: textToSend
-                    })
-                });
+                
+                // Mensaje provisional de progreso
+                const progressTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        role: 'bot',
+                        text: '⏳ **Descargando y analizando archivos desde el enlace...**\n\nExtrayendo dimensiones en cm, DPI, modo de color y evaluando bobinas óptimas...',
+                        time: progressTime
+                    }
+                ]);
 
-                const smartData = await smartRes.json();
-                if (smartRes.ok && smartData.draft_order) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutos de timeout para carpetas pesadas
+
+                try {
+                    const smartRes = await fetch(`${API_URL}/xana/smart-order`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        },
+                        body: JSON.stringify({
+                            url: urlMatch[0],
+                            observaciones: textToSend
+                        }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    const smartData = await smartRes.json();
+                    if (smartRes.ok && smartData.draft_order) {
+                        setMessages(prev => [
+                            ...prev.filter(m => !m.text.includes('Descargando y analizando archivos')),
+                            {
+                                role: 'bot',
+                                text: `✨ ¡Procesé el enlace con éxito! He descargado y analizado **${smartData.draft_order.carteles?.length || 1} archivo(s)**, extrayendo dimensiones, DPI y calculando el descarte óptimo de bobina.\n\nRevisa el borrador interactivo a continuación:`,
+                                smartDraftOrder: smartData.draft_order,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }
+                        ]);
+                        return;
+                    } else {
+                        const errMsg = smartData.error || `Error HTTP ${smartRes.status}`;
+                        setMessages(prev => [
+                            ...prev.filter(m => !m.text.includes('Descargando y analizando archivos')),
+                            {
+                                role: 'bot',
+                                text: `⚠️ **No se pudo procesar el enlace:** ${errMsg}`,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }
+                        ]);
+                        return;
+                    }
+                } catch (fetchErr: any) {
+                    clearTimeout(timeoutId);
+                    const isAbort = fetchErr.name === 'AbortError';
                     setMessages(prev => [
-                        ...prev,
+                        ...prev.filter(m => !m.text.includes('Descargando y analizando archivos')),
                         {
                             role: 'bot',
-                            text: `✨ ¡Procesé el enlace con éxito! He descargado y analizado **${smartData.draft_order.carteles?.length || 1} archivo(s)**, extrayendo dimensiones, DPI y calculando el descarte óptimo de bobina.\n\nRevisa el borrador interactivo a continuación:`,
-                            smartDraftOrder: smartData.draft_order,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }
-                    ]);
-                    return;
-                } else if (smartData.error) {
-                    setMessages(prev => [
-                        ...prev,
-                        {
-                            role: 'bot',
-                            text: `⚠️ **Aviso de Importación:** ${smartData.error}`,
+                            text: isAbort 
+                                ? '⏱️ La descarga tardó más de 3 minutos. Si la carpeta es muy pesada, intenta descargarla o pegar un enlace con menos archivos.'
+                                : `⚠️ Error al conectar con el servidor: ${fetchErr.message || 'Verifica tu conexión.'}`,
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         }
                     ]);
                     return;
                 }
             }
+
 
             // FLUJO CONVERSACIONAL ESTÁNDAR
             const history = messages.slice(-6).map(m => ({ role: m.role, content: m.text }));

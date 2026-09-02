@@ -155,14 +155,33 @@ def create_smart_order_draft():
         parsed_items = []
         archivos_finales = []
         archivos_originales = []
+        notas_adjuntas = []
 
         total_consumo_ml = 0.0
         total_m2 = 0.0
+
+        GRAPHIC_EXTS = {'.jpg', '.jpeg', '.png', '.tif', '.tiff', '.pdf', '.bmp', '.psd', '.eps', '.ai', '.cdr', '.webp'}
+        TEXT_EXTS = {'.txt', '.nfo', '.md', '.log'}
 
         for fpath in downloaded_files:
             orig_name = os.path.basename(fpath)
             ext = os.path.splitext(orig_name)[1].lower() or '.jpg'
             
+            # Si es archivo de texto (ej: metros.txt o instrucciones), extraer texto
+            if ext in TEXT_EXTS:
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as tf:
+                        content = tf.read().strip()
+                        if content:
+                            notas_adjuntas.append(f"[{orig_name}]: {content}")
+                except Exception:
+                    pass
+                continue
+
+            # Omitir archivos no graficos
+            if ext not in GRAPHIC_EXTS and ext not in ('.jpg', '.png', '.pdf'):
+                continue
+
             # Ancla de Verdad: Checksum SHA-256 en Punto de Entrada
             sha256_anchor = compute_sha256(fpath)
             
@@ -228,7 +247,15 @@ def create_smart_order_draft():
             archivos_finales.append(unique_name)
             archivos_originales.append(orig_name)
 
-        # 3. Resolucion de Cliente y Tarifas
+        if not parsed_items:
+            return jsonify({"error": "No se encontraron piezas gráficas válidas (PDF, JPG, PNG, TIF) en el enlace."}), 400
+
+        # Unificar notas
+        if notas_adjuntas:
+            nota_str = "\n".join(notas_adjuntas)
+            observaciones = f"{observaciones}\n{nota_str}".strip() if observaciones else nota_str
+
+        # 3. Resolucion Inteligente de Cliente y Tarifas
         cliente_id = None
         cliente_nombre = "CLIENTE GENERAL"
         precio_ml_base = 22000.0  # Tarifa base general
@@ -240,11 +267,20 @@ def create_smart_order_draft():
                     cliente_id = c.id
                     cliente_nombre = c.nombre
             else:
-                # Busqueda difusa por nombre
                 c = Cliente.query.filter(Cliente.nombre.ilike(f"%{str(cliente_input).strip()}%")).first()
                 if c:
                     cliente_id = c.id
                     cliente_nombre = c.nombre
+
+        # Si aún no se encontró cliente, intentar deducirlo de los nombres de archivo (ej: "mader hilux")
+        if not cliente_id and archivos_originales:
+            first_word = archivos_originales[0].replace('_', ' ').replace('-', ' ').split()[0]
+            if len(first_word) >= 3:
+                c_match = Cliente.query.filter(Cliente.nombre.ilike(f"%{first_word}%")).first()
+                if c_match:
+                    cliente_id = c_match.id
+                    cliente_nombre = c_match.nombre
+
 
         # Ajuste de precio segun material
         material_prices = {
