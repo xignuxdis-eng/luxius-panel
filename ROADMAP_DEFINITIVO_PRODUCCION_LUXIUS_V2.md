@@ -44,138 +44,101 @@ Para garantizar consistencia absoluta en el taller y en la nube, se establecen l
 
 ## 🤖 FASE 1: Xana Smart Orders & Motor Heurístico Anti-Escala
 
-### 1.1 Ingesta Cloud & Blindaje SSRF (`routes/cloud_import.py`)
+### 1.1 Ingesta Cloud, Checksum en Origen & Blindaje SSRF (`routes/cloud_import.py`)
+- **⚓ Ancla de Verdad: Checksum SHA-256 en Punto de Entrada:**
+  - En el **mismo instante** en que el stream de datos se descarga desde WeTransfer o Google Drive, se calcula y almacena el hash **`original_sha256`** antes de cualquier procesamiento o movimiento.
+  - Este hash viaja en el objeto de la orden (`especificaciones.archivos_metadata[i].sha256`) y actúa como la fuente inmutable contra la cual verificarán R2, Google Drive y el Daemon del RIP.
 - **Soporte de Enlaces:**
   - WeTransfer cortos (`we.tl/...`) y largos (`wetransfer.com/downloads/...`) vía `transferwee` + fallback HTTP directo.
   - Google Drive: Archivos individuales (`/file/d/...`) y Carpetas completas (`/folders/...`) vía `gdown`.
-  - Descompresión automática de `.zip` y `.rar` en memoria/disco temporal.
+  - Descompresión automática de `.zip` y `.rar`.
 - **🛡️ Blindaje SSRF Estricto:**
   - Validación de esquemas `https://` exclusivamente.
   - **Bloqueo de Redes Internas / Metadata Cloud:** Rechazo automático de URLs que resuelvan a `127.0.0.1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.169.254` (AWS/GCP/Render metadata endpoint) y `localhost`.
   - Tamaño máximo por lote: 500 MB (buffer controlado con streaming a R2).
 
-### 1.2 Motor Heurístico Anti-Escalas (1:10 / 1:20)
-*El mayor riesgo en gigantografía es interpretar un archivo de 100x30 cm a 300 DPI como tamaño final en lugar de una lona real de 10x3 metros.*
+### 1.2 Motor Heurístico Tridimensional Anti-Escalas (DPI $\times$ Tamaño $\times$ Uso/Material)
+*Para evitar la fatiga de alertas y falsos positivos en trabajos chicos legítimos (ej: calcomanías de 20x20 cm a 300 DPI), la heurística evalúa 3 dimensiones simultáneas:*
 
 ```mermaid
 flowchart TD
-    A[Archivo Importado PDF/JPG/TIF] --> B[Extraer DPI y Medidas en cm]
-    B --> C{¿DPI >= 250 y Medida < 2m?}
-    C -->|Sí| D[⚠️ Flag: Alta probabilidad Escala 1:10]
-    C -->|No| E[Verificar Nombre de Archivo]
-    E --> F{¿Nombre contiene '10x', '1-10', 'escala'? }
-    F -->|Sí| D
-    F -->|No| G[Analizar Texto en Capas de PDF]
-    G --> H{¿Contiene 'Escala' o '1:10'?}
-    H -->|Sí| D
-    H -->|No| I[Escala Inicial Propuesta 1:1]
-    D --> J[Tarjeta Xana: Alerta Amarilla + Multiplicador x10 preseleccionado]
-    I --> K[Tarjeta Xana: Medida estándar 1:1]
-    J --> L[👤 Human-in-the-Loop: Vendedor Confirma o Modifica]
-    K --> L
+    A[Archivo Importado] --> B[Extraer DPI, Medida cm y Material Solicitado]
+    B --> C{¿Material/Uso es Gigantografía / Cartel / Vehículo?}
+    C -->|No: Es Etiqueta/Calco/Vidriera Chica| D[✅ Medida 1:1 Válida - Sin Alerta]
+    C -->|Sí: Es Lona/Front/Back/Vehicular| E{¿DPI >= 250 y Medida < 2m?}
+    E -->|Sí| F[⚠️ ALERTA: Alta Probabilidad Escala 1:10]
+    E -->|No| G[Analizar Nombre: '10x', '1-10', 'esc']
+    G -->|Detectado| F
+    G -->|No Detectado| H[Proponer 1:1]
+    F --> I[Tarjeta Xana: Preseleccionar Escala 1:10 + Alerta Visible]
+    H --> J[Tarjeta Xana: Preseleccionar Escala 1:1]
+    I --> K[👤 Human-in-the-Loop: Vendedor Confirma o Modifica]
+    J --> K
 ```
 
-- **Reglas del Motor Heurístico:**
-  1. **Regla de Densidad Cruzada:** Si el archivo tiene $\ge 250\text{ DPI}$ y sus dimensiones de lienzo son menores a $200\text{ cm}$, pero el cliente cotiza vía pública o cartel grande $\rightarrow$ Sugerir automáticamente multiplicador $\times 10$.
-  2. **Análisis de Nomenclatura:** Detección de patrones regex en nombres (ej: `*10x3m*`, `*esc1-10*`, `*10%*`).
-  3. **OCR / Extracción de Capas PDF:** Búsqueda de strings textuales tipo *"Escala 1:10"* o *"Medida final: ..."*.
-  4. **Preferencia Guardada por Cliente:** Si un cliente habitual (ej: `AXIS`) siempre trabaja en 1:10, Xana lo recuerda y lo propone por defecto.
+- **Dimensiones de la Heurística:**
+  1. **Dimensión de Material/Familia:** Si el material es `LONA_FRONT`, `LONA_BACK`, `VINILO_VEHICULAR` o `CARTELERIA`, se activan los filtros de alerta. Si es `CALCOS`, `STICKERS` o `PAPEL_FOTOGRAFICO`, se permite alta resolución en tamaño pequeño sin disparar alertas molestas.
+  2. **Dimensión de Densidad:** $\text{DPI} \ge 250$ en lienzos $< 200\text{ cm}$ para gigantografía $\rightarrow$ Alerta activa.
+  3. **Dimensión Textual:** Coincidencia en nombre de archivo o capas de texto del PDF (*"Escala 1:10"*).
+  4. **Perfil del Cliente:** Si el cliente habitualmente trabaja a escala (ej: `AXIS`), el sistema recuerda su preferencia.
 
 ### 1.3 Human-in-the-Loop & Cotización Automática
-- **Cálculo de Bobinas:** Selección de la bobina de menor desperdicio ($1.00\text{m}, 1.37\text{m}, 1.52\text{m}, 1.60\text{m}, 1.80\text{m}, 3.20\text{m}$).
 - **Tarjeta Interactiva en Chat (`XanaAssistant.tsx`):**
-  - Muestra miniaturas, dimensiones reales calculadas y DPI.
-  - **Selector de Escala Obligatorio:** `[ 1:1 ]` `[ 1:10 (Recomendada) ]` `[ 1:20 ]` `[ Personalizada ]`.
-  - Desglose de metros lineales (ml), demasías, servicios y precio total.
-  - **`[ ✅ Confirmar y Crear ]`** $\rightarrow$ Inserta en `presupuestos` de PostgreSQL.
-  - **`[ ✏️ Abrir en Modal ]`** $\rightarrow$ Pasa el borrador a `NuevoPedidoModal` para edición manual.
+  - Muestra miniaturas, dimensiones calculadas y selector de escala obligatorio: `[ 1:1 ] [ 1:10 (Sugerida) ] [ 1:20 ] [ Personalizada ]`.
+  - Desglose de metros lineales (ml), demasías, bobina asignada y precio total.
+  - **`[ ✅ Confirmar y Crear ]`** $\rightarrow$ Inserta en `presupuestos` de PostgreSQL con su `original_sha256`.
 
 ---
 
-## ☁️ FASE 2: Bóveda Histórica en Google Drive con Shared Drive & Reconciliación
+## ☁️ FASE 2: Bóveda Histórica en Google Drive con Shared Drive & Reconciliación Clasificada
 
 ### 2.1 Google Workspace Shared Drive (Evitando el límite de 15 GB)
-- Las Service Accounts de Google tienen una cuota personal de solo 15 GB.
-- **Solución Implementada:** La Service Account se agrega como miembro con permisos de *"Administrador de contenido"* a una **Unidad Compartida (Shared Drive)** de la empresa (`GOOGLE_DRIVE_SHARED_DRIVE_ID`), permitiendo almacenamiento corporativo ilimitado.
+- La Service Account se añade a una **Unidad Compartida (Shared Drive)** de Workspace (`GOOGLE_DRIVE_SHARED_DRIVE_ID`), garantizando cuotas corporativas ilimitadas sin depender del espacio personal de 15 GB.
 
-### 2.2 Estructura Jerárquica y Versionado
-- Estructura en Google Drive:
-  ```
-  📁 00_LUXIUS_BOVEDA
-    └── 📁 2026
-        └── 📁 09_SEPTIEMBRE
-            └── 📁 AXIS
-                └── 📁 OT_AA559B46_MADER_HILUX
-                    ├── OT-AA559B46_x2_VV_ECO_1.310x1.150 --- techo.jpg
-                    ├── OT-AA559B46_x2_VV_ECO_1.310x1.150 --- techo_rev2.jpg  (Versionado)
-                    └── Presupuesto_OT-AA559B46.pdf
-  ```
-- **Control de Colisiones y Versiones:** Si un cliente envía un archivo corregido, no se sobreescribe a ciegas; se archiva como `_v2` / `_rev` y se actualiza el puntero activo en la base de datos para garantizar trazabilidad.
+### 2.2 Reconciliación Inteligente Clasificada (No Reintento Ciego)
+- El job nocturno de reconciliación (`reconcile_r2_drive.py`) audita la integridad comparando los hashes SHA-256 y clasifica las discrepancias en 3 categorías:
+  1. **`MISSING_NEW` (Falta de subida inicial por corte de red o cuota API):** Reintento automático en segundo plano.
+  2. **`HASH_MISMATCH` (Discrepancia de checksum entre R2 y Drive):** **NO sobreescribe a ciegas.** Emite alerta crítica en el panel de administración: `⚠️ Error de Integridad en OT-XXXX`.
+  3. **`LIFECYCLE_PURGED` (Archivo archivado deliberadamente tras 60 días):** Reconocido por la política de retención sin intentar re-subirlo a R2.
 
-### 2.3 Job de Reconciliación Anti-Drift (`reconcile_r2_drive.py`)
-- Un job programado (Cron nocturno o endpoint `/api/sync/reconcile`) realiza una auditoría cruzada:
-  1. Lista los registros de la tabla `presupuestos` de los últimos 30 días.
-  2. Verifica que cada archivo existente en Cloudflare R2 tenga su copia idéntica (mismo SHA-256) en la carpeta correspondiente de Google Drive.
-  3. Si detecta archivos faltantes (por caídas temporales de red o cuota de API de Google), los reencola y sincroniza automáticamente.
-- **Política de Ciclo de Vida (Lifecycle):** Opcional a los 60 días de entregada la orden: purgar el original pesado de R2 manteniendo el thumbnail web en R2 y el master de alta resolución en Google Drive.
+### 2.3 Versionado de Archivos
+- Si el cliente envía correcciones de un archivo, se almacena como `nombre_v2.jpg` en Drive y R2, preservando el historial de cambios y evitando que el RIP imprima la versión anterior por error.
 
 ---
 
-## 🖨️ FASE 3: Daemon de Taller & Hot Folder RIP Blindada
+## 🖨️ FASE 3: Daemon de Taller, Hot Folder RIP & Manejo de Timeouts
 
-### 3.1 Descarga Atómica a Staging (Cero Archivos Corruptos en el RIP)
-*Los RIPs como PhotoPrint y VersaWorks fallan si leen un archivo mientras se está escribiendo en disco.*
+### 3.1 Descarga Atómica a Staging
+- Descarga inicial a `C:\HotFolders\Staging\archivo.tmp`.
+- Validación de hash SHA-256 contra el `original_sha256` registrado en el punto de entrada.
+- Operación `os.replace()` atómica en el mismo sistema de archivos NTFS hacia `C:\HotFolders\EntradaRIP\`.
+
+### 3.2 Manejo de Lotes Multi-Archivo y Timeout de Seguridad
+*Evita que una orden de 5 archivos quede bloqueada indefinidamente si 1 archivo falla en la descarga.*
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant LuXius as Backend LuXius (R2)
-    participant Daemon as Daemon Local PC Taller
-    participant SQLite as SQLite Local (daemon_queue.db)
-    participant Staging as 📁 C:/HotFolders/Staging/
-    participant RIP_In as 📁 C:/HotFolders/EntradaRIP/
-    participant RIP as 🖨️ Software RIP (PhotoPrint)
-
-    LuXius->>Daemon: Orden OT-AA559B46 en estado 'impresion'
-    Daemon->>SQLite: ¿Ya fue procesada esta OT + Hash?
-    SQLite-->>Daemon: No procesada
-    Daemon->>Staging: Descargar a 'OT-AA559B46_...jpg.tmp'
-    Daemon->>Daemon: Validar tamaño y Hash SHA-256 vs R2
-    Note over Daemon,Staging: ¿Es orden multi-archivo? Esperar que todos bajen a Staging
-    Daemon->>RIP_In: os.rename() Atómico en NTFS (archivo .tmp -> .jpg)
-    Daemon->>SQLite: Registrar estado = 'EN_HOTFOLDER'
-    RIP->>RIP_In: Toma archivo y lo mueve a cola interna
-    Daemon->>RIP_In: Detecta que el archivo fue consumido por el RIP
-    Daemon->>SQLite: Registrar estado = 'CONSUMIDO_POR_RIP'
-    Daemon->>LuXius: POST /api/orders/AA559B46/rip-status { status: 'EN_RIP' }
+flowchart TD
+    A[Orden Multi-archivo OT-123: 5 piezas] --> B[Descargar piezas 1, 2, 3, 4, 5 a Staging]
+    B --> C{¿Se descargaron las 5 piezas con éxito?}
+    C -->|Sí| D[Liberar las 5 piezas juntas a EntradaRIP]
+    C -->|No: 1 pieza trabada| E{¿Tiempo de espera > 10 minutos?}
+    E -->|No| F[Reintentar descarga de pieza faltante]
+    F --> B
+    E -->|Sí: Timeout alcanzado| G[🚨 Alerta en Panel: 'OT-123 Incompleta 4/5 archivos']
+    G --> H[Operario elige: 'Reintentar Faltante' o 'Liberar Parcial al RIP']
 ```
 
-### 3.2 Componentes del Daemon Local (`server/daemon/luxius_daemon.py`)
-1. **SQLite Local (`daemon_queue.db`):**
-   - Tabla `queue_items`: `(id, order_id, file_name, file_hash, local_path, status, downloaded_at, consumed_at)`.
-   - Garantiza que reinicios de la PC o caídas de internet no dupliquen archivos en la cola de impresión.
-2. **Descarga Atómica en NTFS:**
-   - La carpeta `Staging/` y `EntradaRIP/` residen en la misma unidad de disco (`C:\` o `D:\`). El método `os.replace()` / `os.rename()` es una operación atómica a nivel de punteros del sistema de archivos; el RIP jamás ve un archivo incompleto.
-3. **Manejo de Órdenes Multi-archivo (Batch):**
-   - Si una orden tiene 5 piezas para un vehículo, el Daemon descarga las 5 en staging y las libera en bloque a la Hot Folder del RIP.
-4. **Watchdog de Cola Trabada:**
-   - Si un archivo pasa más de 20 minutos en la Hot Folder sin ser tomado por el RIP, el Daemon emite una alerta en el panel de LuXius: `⚠️ Alerta Taller: RIP detenido o cola trabada`.
+- **SQLite Local en Daemon (`daemon_queue.db`):** Persiste el estado de cada archivo de la orden para sobrevivir a reinicios de la PC.
+- **Detección de Consumo Real:** Monitorea cuando el software RIP mueve el archivo de la carpeta de entrada a su cola interna de ripeo, enviando la confirmación `CONSUMIDO_POR_RIP` a LuXius.
+- **Watchdog de Cola Trabada:** Alerta al panel si un archivo pasa >20 minutos en la Hot Folder sin ser procesado por el RIP.
 
 ---
 
-## 📊 3. Matriz de Riesgos & Mitigaciones
+## 🛡️ 4. Seguridad, Autenticación y Revocación JWT
 
-| Riesgo Técnico / Operativo | Impacto | Mitigación Implementada |
-| :--- | :---: | :--- |
-| **Error de escala (1:10 interpretado como 1:1)** | **CRÍTICO** | Motor heurístico de densidad cruzada (DPI vs cm) + selector de escala obligatorio en UI + confirmación humana. |
-| **RIP lee archivo a medio descargar** | **ALTO** | Descarga atómica a carpeta `Staging/` con extensión `.tmp` y `os.rename()` final en el mismo volumen NTFS. |
-| **Límite de 15 GB de Google Service Account** | **ALTO** | Integración obligatoria con Google Workspace **Shared Drive (Unidad Compartida)** corporativa. |
-| **Ataques SSRF vía Cloud Importer** | **ALTO** | Allowlist de esquemas HTTPS y bloqueo a nivel de socket de rangos IP privados (`10.x`, `192.168.x`, `169.254.x`). |
-| **Archivos duplicados al reiniciar PC de taller** | **MEDIO** | Mini base SQLite local en el Daemon con hash SHA-256 e historial de órdenes procesadas. |
-| **Pérdida de sincronización R2 ↔ Drive (Drift)** | **MEDIO** | Job nocturno de reconciliación que audita y repara discrepancias automáticamente. |
+1. **Mecanismo de Revocación de Sesiones:**
+   - Se incorpora la columna `token_version` (Integer, default 1) en la tabla `usuarios`.
+   - El payload del JWT incluye `{ user_id, token_version }`.
+   - El middleware valida que el `token_version` coincida con el de la base de datos.
+   - Si un usuario cambia su clave o el administrador lo da de baja, se incrementa `token_version = token_version + 1`, revocando de inmediato todas las sesiones activas en cualquier dispositivo.
 
----
-
-## 🎯 4. Conclusión para Revisión Externa
-
-Este roadmap resuelve tanto la **experiencia de usuario ágil** (vendedores creando pedidos en segundos pegando links) como la **seguridad operativa en fábrica** (cero impresiones fallidas por escalas erróneas y cero archivos corruptos en los RIPs).
