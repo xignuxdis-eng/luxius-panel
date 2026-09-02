@@ -66,32 +66,28 @@ def _extract_drive_id(url: str):
     if m: return m.group(1)
     return None
 
-@smart_order_bp.route('', methods=['POST'])
-@optional_login
-def create_smart_order_draft():
-    """
-    Ingesta enlaces WeTransfer / Google Drive o archivos, analiza dimensiones y cotiza orden.
-    """
-    data = request.get_json(force=True, silent=True) or {}
-    url = data.get('url', '').strip()
-    cliente_input = data.get('cliente', '') or data.get('cliente_nombre', '') or data.get('cliente_id', '')
-    material_code = data.get('material', 'VV').upper()
-    calidad_code = data.get('calidad', 'ECO').upper()
-    copias_default = int(data.get('copias', 1))
-    observaciones = data.get('observaciones', '')
-    uploaded_files = data.get('files', [])
+_SMART_JOBS = {}  # { job_id: { "status": "processing"|"success"|"error", "progress": str, "draft_order": dict, "error": str, "created_at": float } }
 
-    from app import UPLOADS_DIR
+def _cleanup_old_jobs():
+    now = time.time()
+    for jid in list(_SMART_JOBS.keys()):
+        if now - _SMART_JOBS[jid].get('created_at', now) > 3600:
+            _SMART_JOBS.pop(jid, None)
+
+def _execute_smart_order_process(url, cliente_input, material_code, calidad_code, copias_default, observaciones, uploaded_files, job_id=None):
+    from app import app, UPLOADS_DIR
     temp_dir = os.path.join(UPLOADS_DIR, 'temp_smart_order', str(uuid.uuid4())[:8])
     os.makedirs(temp_dir, exist_ok=True)
-
     downloaded_files = []
 
     try:
+        if job_id:
+            _SMART_JOBS[job_id] = {"status": "processing", "progress": "Descargando archivos desde el enlace...", "created_at": time.time()}
+
         # 1. Ingesta de enlaces Cloud
         if url:
             if not is_safe_url(url):
-                return jsonify({"error": "La URL proporcionada no es segura o apunta a una dirección IP no permitida (SSRF protection)."}), 403
+                raise ValueError("La URL proporcionada no es segura o apunta a una dirección IP no permitida (SSRF protection).")
 
             # A. GOOGLE DRIVE
             if 'drive.google.com' in url or 'docs.google.com' in url:
@@ -103,7 +99,7 @@ def create_smart_order_draft():
                 else:
                     drive_id = _extract_drive_id(url)
                     if not drive_id:
-                        return jsonify({"error": "Enlace de Google Drive inválido. No se pudo extraer el ID del archivo."}), 400
+                        raise ValueError("Enlace de Google Drive inválido. No se pudo extraer el ID del archivo.")
                     
                     dl_file = None
                     try:
@@ -135,17 +131,16 @@ def create_smart_order_draft():
                         except Exception as req_e:
                             print(f"[Drive Stream Fallback] Error: {req_e}")
 
-
             # B. WETRANSFER
             elif 'wetransfer.com' in url or 'we.tl' in url:
                 from routes.cloud_import import resolve_wetransfer
                 direct_link = resolve_wetransfer(url)
                 if not direct_link:
-                    return jsonify({"error": "No se pudo resolver el enlace de WeTransfer. Verifique que no haya expirado."}), 400
+                    raise ValueError("No se pudo resolver el enlace de WeTransfer. Verifique que no haya expirado.")
                 
                 r = requests.get(direct_link, stream=True, timeout=180)
                 if not r.ok:
-                    return jsonify({"error": f"Error al descargar de WeTransfer (HTTP {r.status_code})"}), 400
+                    raise ValueError(f"Error al descargar de WeTransfer (HTTP {r.status_code})")
 
                 wt_zip = os.path.join(temp_dir, f"wt_{int(time.time())}.zip")
                 with open(wt_zip, 'wb') as f:
@@ -187,9 +182,11 @@ def create_smart_order_draft():
                     if os.path.isfile(local_p):
                         downloaded_files.append(local_p)
 
-
         if not downloaded_files:
-            return jsonify({"error": "No se encontraron archivos válidos para procesar."}), 400
+            raise ValueError("No se encontraron archivos válidos para procesar en el enlace.")
+
+        if job_id:
+            _SMART_JOBS[job_id]["progress"] = f"Analizando {len(downloaded_files)} archivos..."
 
         # 2. Analisis Tecnico de cada archivo y subida a R2
         parsed_items = []
@@ -238,11 +235,9 @@ def create_smart_order_draft():
             except Exception as r2_err:
                 print(f"[R2 Smart Order Upload] {r2_err}", file=sys.stderr)
 
-
             # Analizar dimensiones y heuristica 3D
             meta = analyze_file_dimensions(final_dest, material_code=material_code, custom_filename=orig_name)
             meta['sha256'] = sha256_anchor
-
 
             ancho_m = meta['final_width_cm'] / 100.0
             alto_m = meta['final_height_cm'] / 100.0
@@ -292,9 +287,8 @@ def create_smart_order_draft():
             import gc
             gc.collect()
 
-
         if not parsed_items:
-            return jsonify({"error": "No se encontraron piezas gráficas válidas (PDF, JPG, PNG, TIF) en el enlace."}), 400
+            raise ValueError("No se encontraron piezas gráficas válidas (PDF, JPG, PNG, TIF) en el enlace.")
 
         # Unificar notas
         if notas_adjuntas:
@@ -304,31 +298,29 @@ def create_smart_order_draft():
         # 3. Resolucion Inteligente de Cliente y Tarifas
         cliente_id = None
         cliente_nombre = "CLIENTE GENERAL"
-        precio_ml_base = 22000.0  # Tarifa base general
+        precio_ml_base = 22000.0
 
-        if cliente_input:
-            if isinstance(cliente_input, int) or (isinstance(cliente_input, str) and cliente_input.isdigit()):
-                c = db.session.get(Cliente, int(cliente_input))
-                if c:
-                    cliente_id = c.id
-                    cliente_nombre = c.nombre
-            else:
-                c = Cliente.query.filter(Cliente.nombre.ilike(f"%{str(cliente_input).strip()}%")).first()
-                if c:
-                    cliente_id = c.id
-                    cliente_nombre = c.nombre
+        with app.app_context():
+            if cliente_input:
+                if isinstance(cliente_input, int) or (isinstance(cliente_input, str) and cliente_input.isdigit()):
+                    c = db.session.get(Cliente, int(cliente_input))
+                    if c:
+                        cliente_id = c.id
+                        cliente_nombre = c.nombre
+                else:
+                    c = Cliente.query.filter(Cliente.nombre.ilike(f"%{str(cliente_input).strip()}%")).first()
+                    if c:
+                        cliente_id = c.id
+                        cliente_nombre = c.nombre
 
-        # Si aún no se encontró cliente, intentar deducirlo de los nombres de archivo (ej: "mader hilux")
-        if not cliente_id and archivos_originales:
-            first_word = archivos_originales[0].replace('_', ' ').replace('-', ' ').split()[0]
-            if len(first_word) >= 3:
-                c_match = Cliente.query.filter(Cliente.nombre.ilike(f"%{first_word}%")).first()
-                if c_match:
-                    cliente_id = c_match.id
-                    cliente_nombre = c_match.nombre
+            if not cliente_id and archivos_originales:
+                first_word = archivos_originales[0].replace('_', ' ').replace('-', ' ').split()[0]
+                if len(first_word) >= 3:
+                    c_match = Cliente.query.filter(Cliente.nombre.ilike(f"%{first_word}%")).first()
+                    if c_match:
+                        cliente_id = c_match.id
+                        cliente_nombre = c_match.nombre
 
-
-        # Ajuste de precio segun material
         material_prices = {
             'VV': 22000.0,
             'VBB': 24000.0,
@@ -365,18 +357,88 @@ def create_smart_order_draft():
             }
         }
 
-        return jsonify({
-            "status": "success",
-            "draft_order": draft_order
-        }), 200
+        if job_id:
+            _SMART_JOBS[job_id] = {
+                "status": "success",
+                "draft_order": draft_order,
+                "created_at": time.time()
+            }
 
-    except Exception as e:
-        print(f"[Smart Order Error] {e}", file=sys.stderr)
-        return jsonify({"error": f"Error al generar el borrador inteligente: {str(e)}"}), 500
+        return draft_order
+
+    except Exception as err:
+        print(f"[Smart Order Async Job Error] {err}", file=sys.stderr)
+        if job_id:
+            _SMART_JOBS[job_id] = {
+                "status": "error",
+                "error": str(err),
+                "created_at": time.time()
+            }
+        raise err
     finally:
         if os.path.exists(temp_dir):
             try: shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception: pass
+
+
+@smart_order_bp.route('', methods=['POST'])
+@optional_login
+def create_smart_order_draft():
+    """
+    Ingesta enlaces WeTransfer / Google Drive o archivos.
+    Para enlaces, inicia un job asíncrono y retorna 202 con job_id para polling inmediato sin timeouts.
+    """
+    _cleanup_old_jobs()
+    data = request.get_json(force=True, silent=True) or {}
+    url = data.get('url', '').strip()
+    cliente_input = data.get('cliente', '') or data.get('cliente_nombre', '') or data.get('cliente_id', '')
+    material_code = data.get('material', 'VV').upper()
+    calidad_code = data.get('calidad', 'ECO').upper()
+    copias_default = int(data.get('copias', 1))
+    observaciones = data.get('observaciones', '')
+    uploaded_files = data.get('files', [])
+
+    if not url and not uploaded_files:
+        return jsonify({"error": "No se proporcionó enlace ni archivos para procesar."}), 400
+
+    job_id = uuid.uuid4().hex[:8]
+    _SMART_JOBS[job_id] = {
+        "status": "processing",
+        "progress": "Iniciando descarga y análisis...",
+        "created_at": time.time()
+    }
+
+    # Despachar proceso en background thread pool
+    _R2_EXECUTOR.submit(
+        _execute_smart_order_process,
+        url,
+        cliente_input,
+        material_code,
+        calidad_code,
+        copias_default,
+        observaciones,
+        uploaded_files,
+        job_id
+    )
+
+    return jsonify({
+        "status": "processing",
+        "job_id": job_id,
+        "message": "Descarga y análisis iniciados en segundo plano."
+    }), 202
+
+
+@smart_order_bp.route('/status/<job_id>', methods=['GET'])
+def get_smart_order_status(job_id):
+    """
+    Endpoint de sondeo (polling) ultra-ligero (<1ms) para obtener el estado del análisis de archivos.
+    """
+    job = _SMART_JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "Job no encontrado o expirado."}), 404
+
+    return jsonify(job), 200
+
 
 @smart_order_bp.route('/confirm', methods=['POST'])
 @login_required
