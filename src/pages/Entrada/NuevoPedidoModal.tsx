@@ -21,7 +21,9 @@ try {
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
 import type { Order, DemasiasConfig } from '@/types'
+import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, round2 } from '@/utils/pricingCalculator'
 import './NuevoPedidoModal.css'
+
 
 interface NuevoPedidoModalProps {
     isOpen: boolean
@@ -264,147 +266,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
 
     const calculateItemPriceDetailed = (materialCode: string, rawW: number, rawH: number, c: number, services?: Record<string, boolean>, clientIdParam?: string | number) => {
-        const mat = getMateriales().find(m => m.codigo === materialCode)
-        const w = round2(rawW)
-        const h = round2(rawH)
-        if (!mat || h <= 0) return {
-            subtotal: 0,
-            consumoEstimado: 0,
-            bobinaAsignada: undefined as number | undefined,
-            precioMl: undefined as number | undefined,
-            precioDetalle: undefined as any
+        const res = calcItemPriceDetailedUtil(materialCode, rawW, rawH, c, services, clientIdParam || watchedClientId, getValues('demasiasConfig'));
+        const mat = getMateriales().find(m => m.codigo === materialCode);
+        if (mat) {
+            (mat as any)._lastRotation = res.rotated;
         }
-
-        const { tipoCobro, bobinas, precioM2 } = mat
-        let basePrice = 0
-        let assignedBobina: number | undefined = undefined
-        let appliedPriceMl: number | undefined = undefined
-        let rotated = false
-        let linearMeters = 0
-
-        const cid = clientIdParam || watchedClientId
-        const cliente = getClientes().find(cl => cl.id === parseInt(String(cid)))
-        const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[materialCode] : null
-
-        if (tipoCobro === 'ml') {
-            if (!bobinas || bobinas.length === 0) {
-                return {
-                    subtotal: 0,
-                    consumoEstimado: 0,
-                    bobinaAsignada: undefined,
-                    precioMl: undefined,
-                    precioDetalle: undefined
-                }
-            }
-
-            const safetyMargin = 0.01
-            const availableWidths = bobinas
-                .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
-                .filter((b: any) => b.usefulWidth > 0)
-                .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth)
-
-            let bestCost = Infinity
-
-            // Original Orientation (width fits in roll useful width)
-            for (const b of availableWidths) {
-                if (w <= b.usefulWidth) {
-                    const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
-                    const priceToUse = specialPriceWidth || specialPrice || b.precioML;
-                    const ml = round2(h * c);
-                    const cost = Math.round(priceToUse * ml);
-                    if (cost < bestCost) {
-                        bestCost = cost
-                        rotated = false
-                        assignedBobina = b.ancho
-                        appliedPriceMl = priceToUse
-                        linearMeters = ml
-                    }
-                    break
-                }
-            }
-
-            // Rotated Orientation (height fits in roll useful width)
-            for (const b of availableWidths) {
-                if (h <= b.usefulWidth) {
-                    const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
-                    const priceToUse = specialPriceWidth || specialPrice || b.precioML;
-                    const ml = round2(w * c);
-                    const cost = Math.round(priceToUse * ml);
-                    if (cost < bestCost) {
-                        bestCost = cost
-                        rotated = true
-                        assignedBobina = b.ancho
-                        appliedPriceMl = priceToUse
-                        linearMeters = ml
-                    }
-                    break
-                }
-            }
-
-            // Fallback if item exceeds all widths: assign widest roll
-            if (bestCost === Infinity && availableWidths.length > 0) {
-                const widest = availableWidths[availableWidths.length - 1]
-                const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${widest.ancho}`] : null;
-                const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
-                const ml = round2(h * c);
-                bestCost = Math.round(priceToUse * ml);
-                assignedBobina = widest.ancho
-                appliedPriceMl = priceToUse
-                linearMeters = ml
-            }
-
-            basePrice = bestCost === Infinity ? 0 : Math.round(bestCost)
-            ; (mat as any)._lastRotation = rotated
-        } else {
-            const priceToUse = specialPrice || precioM2 || 0
-            const m2 = round2(w * h * c);
-            basePrice = w > 0 ? Math.round(m2 * priceToUse) : 0
-            linearMeters = 0
-        }
-
-        // Add services
-        let servicesTotal = 0
-        if (services) {
-            Object.entries(services).forEach(([sId, active]) => {
-                if (active) {
-                    const s = availableServices.find(serv => String(serv.id) === sId)
-                    if (s) {
-                        const priceBase = parseFloat(s.precioBase as any) || 0
-                        let multiplier = c
-                        if (s.unidad === 'm2') {
-                            multiplier = round2(w * h * c)
-                        } else if (s.unidad === 'metro') {
-                            const isRotated = (mat as any)._lastRotation || false
-                            multiplier = round2((isRotated ? w : h) * c)
-                        }
-                        servicesTotal += Math.round(priceBase * multiplier)
-                    }
-                }
-            })
-        }
-
-        const subtotal = basePrice + servicesTotal
-
-        return {
-            subtotal,
-            consumoEstimado: tipoCobro === 'ml' ? linearMeters : round2(w * h * c),
-            bobinaAsignada: assignedBobina,
-            precioMl: appliedPriceMl,
-            precioDetalle: tipoCobro === 'ml' ? {
-                tipoCobro: 'ml',
-                bobinaAncho: assignedBobina,
-                bobinaUsada: assignedBobina,
-                precioML: appliedPriceMl,
-                rotated,
-                consumoML: linearMeters,
-                costoBase: basePrice
-            } : {
-                tipoCobro: 'm2',
-                precioM2: specialPrice || precioM2 || 0,
-                costoBase: basePrice
-            }
-        }
+        return res;
     }
+
 
 
     const calculateItemPrice = (materialCode: string, w: number, h: number, c: number, services?: Record<string, boolean>) => {

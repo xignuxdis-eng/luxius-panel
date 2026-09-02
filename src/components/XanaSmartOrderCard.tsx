@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
     CheckCircle2, AlertTriangle, ExternalLink, RefreshCw, 
-    Layers, Image as ImageIcon, Sparkles, Edit3, ShieldCheck 
+    Layers, Image as ImageIcon, Sparkles, Edit3, ShieldCheck, DollarSign 
 } from 'lucide-react';
-import { API_URL } from '../data/db';
+import { API_URL, getMateriales, getCalidades } from '../data/db';
+import { calculateItemPriceDetailed, round2 } from '@/utils/pricingCalculator';
 import './XanaSmartOrderCard.css';
 
 export interface SmartCartelItem {
@@ -25,6 +26,8 @@ export interface SmartCartelItem {
     scaleAlert: boolean;
     scaleReason: string;
     sha256: string;
+    precioCalculado?: number;
+    rotated?: boolean;
 }
 
 export interface SmartDraftOrder {
@@ -62,58 +65,176 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
     initialDraft, 
     onOrderConfirmed 
 }) => {
-    const [draft, setDraft] = useState<SmartDraftOrder>(initialDraft);
+    const availableMaterials = useMemo(() => {
+        return getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
+    }, []);
+
+    const availableCalidades = useMemo(() => {
+        return getCalidades().filter(c => c.habilitado !== false);
+    }, []);
+
+    // Inicializar y recalcular con el motor oficial de NuevoPedidoModal
+    const [draft, setDraft] = useState<SmartDraftOrder>(() => {
+        const matCode = initialDraft.material || 'VV';
+        let totalCost = 0;
+        let totalML = 0;
+        let totalM2 = 0;
+
+        const recalculatedCarteles = (initialDraft.carteles || []).map(item => {
+            const calc = calculateItemPriceDetailed(
+                matCode,
+                item.medidas.ancho,
+                item.medidas.alto,
+                item.copias || 1,
+                {},
+                initialDraft.cliente_id || undefined
+            );
+
+            const itemM2 = round2(item.medidas.ancho * item.medidas.alto * (item.copias || 1));
+            totalCost += calc.subtotal;
+            totalML += calc.consumoEstimado;
+            totalM2 += itemM2;
+
+            return {
+                ...item,
+                bobinaAsignada: calc.bobinaAsignada || item.bobinaAsignada,
+                consumoEstimado: calc.consumoEstimado,
+                m2Estimado: itemM2,
+                precioCalculado: calc.subtotal,
+                rotated: calc.rotated
+            };
+        });
+
+        return {
+            ...initialDraft,
+            carteles: recalculatedCarteles,
+            bobinaAsignada: recalculatedCarteles[0]?.bobinaAsignada || initialDraft.bobinaAsignada,
+            consumoEstimado: round2(totalML),
+            totalM2: round2(totalM2),
+            total: totalCost > 0 ? totalCost : initialDraft.total
+        };
+    });
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Actualiza la escala de una pieza especifica y recalcula totales
+    // Recalcular todo ante cambio de material
+    const handleMaterialChange = (newMatCode: string) => {
+        setDraft(prev => {
+            let totalCost = 0;
+            let totalML = 0;
+            let totalM2 = 0;
+
+            const updatedCarteles = (prev.carteles || []).map(item => {
+                const calc = calculateItemPriceDetailed(
+                    newMatCode,
+                    item.medidas.ancho,
+                    item.medidas.alto,
+                    item.copias || 1,
+                    {},
+                    prev.cliente_id || undefined
+                );
+
+                const itemM2 = round2(item.medidas.ancho * item.medidas.alto * (item.copias || 1));
+                totalCost += calc.subtotal;
+                totalML += calc.consumoEstimado;
+                totalM2 += itemM2;
+
+                return {
+                    ...item,
+                    tipo: newMatCode,
+                    bobinaAsignada: calc.bobinaAsignada || item.bobinaAsignada,
+                    consumoEstimado: calc.consumoEstimado,
+                    m2Estimado: itemM2,
+                    precioCalculado: calc.subtotal,
+                    rotated: calc.rotated
+                };
+            });
+
+            return {
+                ...prev,
+                material: newMatCode,
+                carteles: updatedCarteles,
+                bobinaAsignada: updatedCarteles[0]?.bobinaAsignada || prev.bobinaAsignada,
+                consumoEstimado: round2(totalML),
+                totalM2: round2(totalM2),
+                total: totalCost
+            };
+        });
+    };
+
+    // Actualiza la escala de una pieza especifica y recalcula totales con el motor oficial
     const handleScaleChange = (index: number, newScale: number) => {
         setDraft(prev => {
+            const matCode = prev.material || 'VV';
             const updatedCarteles = [...prev.carteles];
             const item = { ...updatedCarteles[index] };
             
             item.scaleFactor = newScale;
             item.medidas = {
-                ancho: Number((item.raw_medidas.ancho * newScale).toFixed(3)),
-                alto: Number((item.raw_medidas.alto * newScale).toFixed(3))
+                ancho: round2(item.raw_medidas.ancho * newScale),
+                alto: round2(item.raw_medidas.alto * newScale)
             };
             
-            // Recalcular bobina optima
-            const minDim = Math.min(item.medidas.ancho, item.medidas.alto);
-            const maxDim = Math.max(item.medidas.ancho, item.medidas.alto);
+            const calc = calculateItemPriceDetailed(
+                matCode,
+                item.medidas.ancho,
+                item.medidas.alto,
+                item.copias || 1,
+                {},
+                prev.cliente_id || undefined
+            );
             
-            const rolls = [1.00, 1.05, 1.27, 1.37, 1.52, 1.60, 1.80, 2.20, 3.20];
-            let assigned = 1.37;
-            for (const r of rolls) {
-                if (r >= minDim) {
-                    assigned = r;
-                    break;
-                }
-            }
-            item.bobinaAsignada = assigned;
-            item.consumoEstimado = Number((maxDim * item.copias).toFixed(2));
-            item.m2Estimado = Number((item.medidas.ancho * item.medidas.alto * item.copias).toFixed(2));
+            item.bobinaAsignada = calc.bobinaAsignada || item.bobinaAsignada;
+            item.consumoEstimado = calc.consumoEstimado;
+            item.m2Estimado = round2(item.medidas.ancho * item.medidas.alto * (item.copias || 1));
+            item.precioCalculado = calc.subtotal;
+            item.rotated = calc.rotated;
             
             updatedCarteles[index] = item;
             
-            // Recalcular consumo total y precio
-            const totalConsumo = updatedCarteles.reduce((acc, c) => acc + c.consumoEstimado, 0);
-            const totalM2 = updatedCarteles.reduce((acc, c) => acc + c.m2Estimado, 0);
-            const newTotal = Number((totalConsumo * prev.precioMl).toFixed(2));
-            
+            let totalCost = 0;
+            let totalML = 0;
+            let totalM2 = 0;
+
+            updatedCarteles.forEach(c => {
+                const cCalc = calculateItemPriceDetailed(
+                    matCode,
+                    c.medidas.ancho,
+                    c.medidas.alto,
+                    c.copias || 1,
+                    {},
+                    prev.cliente_id || undefined
+                );
+                totalCost += cCalc.subtotal;
+                totalML += cCalc.consumoEstimado;
+                totalM2 += c.m2Estimado;
+            });
+
             return {
                 ...prev,
                 carteles: updatedCarteles,
                 ancho: updatedCarteles[0]?.medidas.ancho || prev.ancho,
                 alto: updatedCarteles[0]?.medidas.alto || prev.alto,
                 bobinaAsignada: updatedCarteles[0]?.bobinaAsignada || prev.bobinaAsignada,
-                consumoEstimado: Number(totalConsumo.toFixed(2)),
-                totalM2: Number(totalM2.toFixed(2)),
-                total: newTotal
+                consumoEstimado: round2(totalML),
+                totalM2: round2(totalM2),
+                total: totalCost
             };
         });
     };
+
+    // Desglose de consumo por bobina
+    const bobinasBreakdown = useMemo(() => {
+        const map = new Map<number, number>();
+        (draft.carteles || []).forEach(c => {
+            const b = c.bobinaAsignada || 1.37;
+            const current = map.get(b) || 0;
+            map.set(b, round2(current + c.consumoEstimado));
+        });
+        return Array.from(map.entries()).map(([bobina, ml]) => ({ bobina, ml }));
+    }, [draft.carteles]);
 
     const handleConfirmOrder = async () => {
         setIsSubmitting(true);
@@ -123,7 +244,7 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
             const token = localStorage.getItem('luxius_token') || '';
             const res = await fetch(`${API_URL}/xana/smart-order/confirm`, {
                 method: 'POST',
-                headers: {
+                headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : ''
                 },
@@ -198,7 +319,21 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
                     <Sparkles size={18} className="icon-sparkle" />
                     <h4>Borrador Inteligente Xana</h4>
                 </div>
-                <span className="badge-material">{draft.material} · {draft.calidad}</span>
+                
+                {/* Selector rápido de material */}
+                <div className="material-selector-box">
+                    <select 
+                        value={draft.material} 
+                        onChange={(e) => handleMaterialChange(e.target.value)}
+                        className="select-material-badge"
+                    >
+                        {availableMaterials.map(m => (
+                            <option key={m.codigo} value={m.codigo}>
+                                {m.descripcion || m.codigo}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             <div className="order-card-body">
@@ -273,7 +408,7 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
 
                                 <div className="cartel-calc-row">
                                     <span className="measure-tag">
-                                        📐 {item.medidas.ancho} x {item.medidas.alto} m
+                                        📐 {item.medidas.ancho} x {item.medidas.alto} m {item.rotated ? '(Rotado 90°)' : ''}
                                     </span>
                                     <span className="bobina-tag">
                                         🔄 Bobina: {item.bobinaAsignada}m
@@ -289,10 +424,20 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
                     ))}
                 </div>
 
-                {/* Resumen de Costo y Consumo */}
+                {/* Resumen de Costo y Consumo con Desglose de Bobinas */}
                 <div className="order-summary-box">
                     <div className="summary-row">
-                        <span>Consumo Lineal:</span>
+                        <span>Desglose por Bobina:</span>
+                        <div className="bobinas-chips-list">
+                            {bobinasBreakdown.map((b, bi) => (
+                                <span key={bi} className="bobina-chip">
+                                    {b.ml} ml en Bobina {b.bobina}m
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="summary-row">
+                        <span>Consumo Lineal Total:</span>
                         <strong>{draft.consumoEstimado} ml</strong>
                     </div>
                     <div className="summary-row">
@@ -301,7 +446,16 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
                     </div>
                     <div className="summary-row total-highlight">
                         <span>Precio Total Cotizado:</span>
-                        <span className="price-tag">${draft.total?.toLocaleString('es-AR')}</span>
+                        <div className="price-edit-box">
+                            <span className="currency-symbol">$</span>
+                            <input 
+                                type="number" 
+                                value={draft.total} 
+                                onChange={(e) => setDraft(prev => ({ ...prev, total: parseFloat(e.target.value) || 0 }))}
+                                className="input-price-edit"
+                                title="Precio editable antes de confirmar"
+                            />
+                        </div>
                     </div>
                 </div>
 
