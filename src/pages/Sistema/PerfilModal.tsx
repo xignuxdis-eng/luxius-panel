@@ -15,10 +15,13 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
     const { user: authUser, setUser } = useAuthStore()
     const { register, handleSubmit, reset, watch, setValue } = useForm<any>()
     const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         if (isOpen && authUser) {
+            setShowPassword(false)
             const dbUsers = getUsuarios()
             const fullUser = dbUsers.find(u => u.id === authUser.id)
 
@@ -56,30 +59,38 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
         }
     }
 
-    const onSubmit = (data: any) => {
+    const onSubmit = async (data: any) => {
         if (!authUser) return
+        setIsSaving(true)
 
-        const updateData: any = {
-            id: authUser.id,
-            avatar: data.avatar, // This will be the URL or Base64 string
-            bio: data.bio,
-            phone: data.phone
+        try {
+            const updateData: any = {
+                id: authUser.id,
+                avatar: data.avatar,
+                bio: data.bio,
+                phone: data.phone
+            }
+
+            if (data.password && data.password.trim() !== '') {
+                updateData.password = data.password.trim()
+            }
+
+            const updatedUser = await saveUsuario(updateData)
+
+            setUser({
+                ...authUser,
+                name: updatedUser.nombre,
+            })
+
+            alert('Perfil actualizado correctamente')
+            onClose()
+        } catch (err: any) {
+            alert('Error al guardar cambios: ' + (err.message || 'Error de conexión'))
+        } finally {
+            setIsSaving(false)
         }
-
-        if (data.password && data.password.trim() !== '') {
-            updateData.password = data.password
-        }
-
-        const updatedUser = saveUsuario(updateData)
-
-        setUser({
-            ...authUser,
-            name: updatedUser.nombre,
-        })
-
-        alert('Perfil actualizado correctamente')
-        onClose()
     }
+
 
     return (
         <Modal
@@ -180,14 +191,40 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                     <div className="form-group">
                         <label style={{ fontWeight: 600 }}>Contraseña</label>
-                        <input
-                            type="password"
-                            className="input-field"
-                            {...register('password')}
-                            placeholder="Nueva contraseña..."
-                            autoComplete="new-password"
-                        />
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                className="input-field"
+                                {...register('password')}
+                                placeholder="Nueva contraseña..."
+                                autoComplete="new-password"
+                                style={{ width: '100%', paddingRight: '42px' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '1.2rem',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: 0.8,
+                                    transition: 'opacity 0.2s',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                {showPassword ? '🙈' : '👁️'}
+                            </button>
+                        </div>
                     </div>
+
 
                     <div className="form-group">
                         <label style={{ fontWeight: 600 }}>Teléfono</label>

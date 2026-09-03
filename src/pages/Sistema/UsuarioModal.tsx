@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { saveUsuario, getRoles } from '@data/db'
@@ -15,8 +14,13 @@ interface UsuarioModalProps {
 export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProps) {
     const { register, handleSubmit, reset } = useForm<any>()
     const [roles, setRoles] = useState<RoleConfig[]>([])
+    const [showPassword, setShowPassword] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState('')
 
     useEffect(() => {
+        setError('')
+        setShowPassword(false)
         const allRoles = getRoles()
         const activeRoles = allRoles.filter(r => r.status === 'Activo')
 
@@ -30,37 +34,75 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
         setRoles(activeRoles)
 
         if (user) {
-            reset(user)
+            reset({
+                ...user,
+                password: '' // Security: Leave password input empty so user only fills it if changing
+            })
         } else {
             reset({
                 nombre: '',
                 username: '',
                 rol: activeRoles.length > 0 ? activeRoles[0].key : 'vendedor',
                 email: '',
+                password: '',
                 habilitado: true
             })
         }
     }, [user, reset, isOpen])
 
-    const onSubmit = (data: any) => {
-        // Enforce lowercase roles and usernames as per requirements
-        const cleanedData = {
-            ...data,
-            username: (data.username || '').toLowerCase(),
-            rol: (data.rol || 'vendedor').toLowerCase()
+    const onSubmit = async (data: any) => {
+        setIsSaving(true)
+        setError('')
+
+        try {
+            const cleanedData: any = {
+                ...data,
+                id: user?.id,
+                username: (data.username || '').toLowerCase().trim(),
+                rol: (data.rol || 'vendedor').toLowerCase().trim(),
+                email: (data.email || '').trim(),
+            }
+
+            if (data.password && data.password.trim() !== '') {
+                cleanedData.password = data.password.trim()
+            } else if (!user) {
+                setError('La contraseña es requerida para un nuevo usuario')
+                setIsSaving(false)
+                return
+            }
+
+            console.log('Saving user to DB:', cleanedData)
+            await saveUsuario(cleanedData)
+            onClose()
+        } catch (err: any) {
+            console.error('Error saving user:', err)
+            setError(err.message || 'Error al persistir usuario en el servidor')
+        } finally {
+            setIsSaving(false)
         }
-        console.log('Saving user:', cleanedData)
-        saveUsuario(cleanedData)
-        onClose()
     }
 
     return (
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={user ? 'Editar Usuario' : 'Nuevo Usuario'}
+            title={user ? `Editar Usuario: ${user.nombre || user.username}` : 'Nuevo Usuario'}
         >
             <form onSubmit={handleSubmit(onSubmit)} className="modal-form">
+                {error && (
+                    <div style={{
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#f87171',
+                        fontSize: '0.875rem',
+                        marginBottom: '12px'
+                    }}>
+                        ⚠️ {error}
+                    </div>
+                )}
+
                 <div className="form-group">
                     <label>Nombre Completo</label>
                     <input
@@ -104,14 +146,53 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
                     />
                 </div>
 
+                {/* Password input with toggle eye button */}
                 <div className="form-group">
-                    <label>Contraseña</label>
-                    <input
-                        type="password"
-                        className="input-field"
-                        {...register('password', { required: !user })} // Required only for new users
-                        placeholder={user ? "Dejar en blanco para mantener actual" : "********"}
-                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label>{user ? 'Cambiar Contraseña' : 'Contraseña'}</label>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.65 }}>
+                            {user ? '(Opcional)' : '(Requerida)'}
+                        </span>
+                    </div>
+
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            className="input-field"
+                            autoComplete="new-password"
+                            style={{ width: '100%', paddingRight: '42px' }}
+                            {...register('password', { required: !user })}
+                            placeholder={user ? "Dejar en blanco para conservar actual" : "Ingresa contraseña..."}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                            style={{
+                                position: 'absolute',
+                                right: '10px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '1.2rem',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: 0.8,
+                                transition: 'opacity 0.2s',
+                                userSelect: 'none'
+                            }}
+                        >
+                            {showPassword ? '🙈' : '👁️'}
+                        </button>
+                    </div>
+
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', marginTop: '4px', lineHeight: '1.3' }}>
+                        {user 
+                            ? '🔒 La contraseña actual está cifrada en la base de datos. Haz clic en el 👁️ para verificar la nueva contraseña antes de guardar.' 
+                            : '🔑 Haz clic en el 👁️ para verificar la contraseña antes de guardar.'}
+                    </p>
                 </div>
 
                 <div className="form-group-row">
@@ -120,15 +201,15 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
                         id="user-habilitado"
                         {...register('habilitado')}
                     />
-                    <label htmlFor="user-habilitado">Usuario Habilitado</label>
+                    <label htmlFor="user-habilitado">Usuario Habilitado (puede iniciar sesión)</label>
                 </div>
 
                 <div className="modal-footer">
-                    <Button variant="ghost" onClick={onClose} type="button">
+                    <Button variant="ghost" onClick={onClose} type="button" disabled={isSaving}>
                         Cancelar
                     </Button>
-                    <Button variant="primary" type="submit">
-                        {user ? 'Guardar Cambios' : 'Crear Usuario'}
+                    <Button variant="primary" type="submit" disabled={isSaving}>
+                        {isSaving ? 'Guardando en Base de Datos...' : (user ? 'Guardar Cambios' : 'Crear Usuario')}
                     </Button>
                 </div>
             </form>

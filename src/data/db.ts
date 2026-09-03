@@ -1159,44 +1159,105 @@ export function getUsuarioByUsername(username: string): Usuario | undefined {
     return getUsuarios().find(u => u.username?.toLowerCase() === username?.toLowerCase())
 }
 
-export function saveUsuario(usuario: Partial<Usuario>): Usuario {
+export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
     const sessionItems = getUsuarios();
 
-    const existingIndex = sessionItems.findIndex(u => (usuario.id && String(u.id) === String(usuario.id)) || (usuario.username && u.username.toLowerCase() === usuario.username.toLowerCase()))
-    let result: Usuario
+    const existingIndex = sessionItems.findIndex(u => 
+        (usuario.id && String(u.id) === String(usuario.id)) || 
+        (usuario.username && u.username.toLowerCase() === usuario.username.toLowerCase())
+    );
+    let result: Usuario;
 
     if (existingIndex !== -1) {
-        // Only update password if provided
-        const updatedUser = { ...sessionItems[existingIndex], ...usuario } as Usuario
+        const updatedUser = { ...sessionItems[existingIndex], ...usuario } as Usuario;
         if (!usuario.password) {
-            updatedUser.password = sessionItems[existingIndex].password
+            updatedUser.password = sessionItems[existingIndex].password;
         }
-        sessionItems[existingIndex] = updatedUser
-        result = sessionItems[existingIndex]
+        sessionItems[existingIndex] = updatedUser;
+        result = sessionItems[existingIndex];
     } else {
         const newUsuario: Usuario = {
-            id: usuario.id || Math.floor(Math.random() * 900000) + 100000,
+            id: usuario.id || 0,
             nombre: usuario.nombre || '',
             username: usuario.username || '',
             email: usuario.email || '',
             rol: usuario.rol || 'vendedor',
             habilitado: usuario.habilitado !== undefined ? usuario.habilitado : true,
-            password: usuario.password || '' // Save password for new user
-        }
-        sessionItems.unshift(newUsuario)
-        result = newUsuario
+            password: usuario.password || ''
+        };
+        sessionItems.unshift(newUsuario);
+        result = newUsuario;
     }
 
-    localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems))
-    syncSave('usuarios', result);
-    return result
+    // Save locally first for instant UI response
+    localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
+
+    // Persist directly to PostgreSQL database via API
+    try {
+        const payload: any = {
+            nombre: result.nombre,
+            username: result.username,
+            email: result.email,
+            rol: result.rol,
+            habilitado: result.habilitado,
+        };
+        if (result.id && result.id > 0) {
+            payload.id = result.id;
+        }
+        if (usuario.password && usuario.password.trim() !== '') {
+            payload.password = usuario.password.trim();
+        }
+
+        const res = await fetchWithTimeout(`${API_URL}/usuarios`, {
+            method: 'POST',
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload)
+        }, 15000);
+
+        if (res.ok) {
+            const serverUser = await res.json();
+            // Update local user with server data (including assigned DB id)
+            const currentUsers = getUsuarios();
+            const idx = currentUsers.findIndex(u => 
+                (serverUser.id && u.id === serverUser.id) || 
+                (u.username && u.username.toLowerCase() === serverUser.username.toLowerCase())
+            );
+            if (idx !== -1) {
+                currentUsers[idx] = { ...currentUsers[idx], ...serverUser };
+            } else {
+                currentUsers.unshift(serverUser);
+            }
+            localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(currentUsers));
+            result = serverUser;
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Error del servidor (${res.status})`);
+        }
+    } catch (e: any) {
+        console.error('[db] Error persistiendo usuario en servidor:', e);
+        throw e;
+    }
+
+    return result;
 }
 
-export function deleteUsuario(id: number) {
-    let sessionItems = getUsuarios()
-    sessionItems = sessionItems.filter(u => u.id !== id)
-    localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems))
-    syncDelete('usuarios', id);
+export async function deleteUsuario(id: number): Promise<void> {
+    let sessionItems = getUsuarios();
+    sessionItems = sessionItems.filter(u => u.id !== id);
+    localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
+
+    try {
+        const res = await fetchWithTimeout(`${API_URL}/usuarios/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        }, 10000);
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            console.warn('[db] Advertencia al eliminar usuario:', errData.error || res.status);
+        }
+    } catch (e) {
+        console.error('[db] Error eliminando usuario en backend:', e);
+    }
 }
 
 

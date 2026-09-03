@@ -39,10 +39,11 @@ export default function UsuariosView() {
 
     const handleDelete = async (id: number) => {
         if (window.confirm('¿Estás seguro de eliminar este usuario?')) {
-            deleteUsuario(id)
-            await refreshUsers()
+            await deleteUsuario(id)
+            await refreshUsers(true)
         }
     }
+
 
     return (
         <div className="abm-list-view">
@@ -109,10 +110,11 @@ export default function UsuariosView() {
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false)
-                    refreshUsers(false)
+                    refreshUsers(true)
                 }}
                 user={selectedUser}
             />
+
         </div>
     )
 }

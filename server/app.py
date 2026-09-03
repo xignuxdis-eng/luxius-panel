@@ -371,23 +371,27 @@ with app.app_context():
 
 def _apply_usuario_fields(user, item):
     from werkzeug.security import generate_password_hash
+    from middleware.auth import invalidate_user_token_version
     if 'nombre' in item and item['nombre']:
-        user.nombre = item['nombre']
+        user.nombre = item['nombre'].strip()
     if 'username' in item and item['username']:
-        user.username = item['username'].lower()
+        user.username = item['username'].lower().strip()
     if 'email' in item:
-        user.email = item['email']
+        user.email = (item['email'] or '').strip()
     if 'rol' in item and item['rol']:
-        user.rol = item['rol'].lower()
+        user.rol = item['rol'].lower().strip()
     if 'clientId' in item:
         user.client_id = item['clientId']
     if 'habilitado' in item:
         user.habilitado = bool(item['habilitado'])
 
-    password = item.get('password')
+    password = (item.get('password') or '').strip()
     if password:
         user.password_hash = generate_password_hash(password)
-        # SECURITY: Never store plaintext passwords
+        user.token_version = (getattr(user, 'token_version', 1) or 1) + 1
+        if getattr(user, 'id', None):
+            invalidate_user_token_version(user.id)
+
 
 
 # ================================================================
@@ -645,20 +649,22 @@ def post_usuarios():
 
     user = None
     if u_id:
-        user = Usuario.query.get(u_id)
+        try:
+            val_id = int(u_id)
+            if val_id > 0:
+                user = Usuario.query.get(val_id)
+        except (ValueError, TypeError):
+            user = None
+
     if not user and u_username:
         user = Usuario.query.filter_by(username=u_username).first()
 
     is_new = user is None
     if is_new:
-        if not u_id:
-            max_id = db.session.query(db.func.max(Usuario.id)).scalar() or 0
-            item['id'] = max(max_id + 1, 1000)
-        user = Usuario(id=item['id'])
+        user = Usuario()
+        db.session.add(user)
 
     _apply_usuario_fields(user, item)
-    if is_new:
-        db.session.add(user)
     db.session.commit()
 
     if user.rol in ('vendedor', 'principal', 'administrador'):
@@ -673,6 +679,7 @@ def post_usuarios():
         db.session.commit()
 
     return jsonify(user.to_dict())
+
 
 
 @app.put('/api/usuarios/<int:id>')
