@@ -1,7 +1,7 @@
 import Modal from '@components/ui/Modal'
 import { statusColors, statusLabels, type OrderStatus } from '../../types/orden'
 import type { Order } from '@/types'
-import { saveOrden, getUsuarios, deleteOrden } from '@data/db'
+import { saveOrden, getUsuarios, deleteOrden, saveBatchOrders } from '@data/db'
 import { useState, useMemo } from 'react'
 import { useAuthStore } from '@store/authStore'
 
@@ -9,6 +9,7 @@ interface StatusChangeModalProps {
     isOpen: boolean
     onClose: (updated?: boolean) => void
     order: Order | null
+    batchOrders?: Order[]
 }
 
 const statusOptions = [
@@ -22,7 +23,7 @@ const statusOptions = [
     { value: 'anulado', label: 'Anulado' }
 ]
 
-export default function StatusChangeModal({ isOpen, onClose, order }: StatusChangeModalProps) {
+export default function StatusChangeModal({ isOpen, onClose, order, batchOrders }: StatusChangeModalProps) {
     const [selectedArtistaId, setSelectedArtistaId] = useState<number | undefined>(order?.artistaId)
     const [selectedCategory, setSelectedCategory] = useState<'diseno' | 'impresion' | undefined>(order?.category)
     const [selectedFechaEntrega, setSelectedFechaEntrega] = useState<string>(order?.fechaEntrega || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
@@ -30,6 +31,7 @@ export default function StatusChangeModal({ isOpen, onClose, order }: StatusChan
 
     if (!order) return null
 
+    const isBatch = Array.isArray(batchOrders) && batchOrders.length > 1
     const isAdmin = user?.role === 'principal' || (user?.role as string) === 'administrador' || (user?.role as string) === 'admin' || (user?.role as string) === 'sistema'
     const canBounce = user?.role === 'artista' || user?.role === 'impresion' || isAdmin
 
@@ -39,15 +41,23 @@ export default function StatusChangeModal({ isOpen, onClose, order }: StatusChan
 
     const handleStatusChange = async (newStatus: string) => {
         try {
-            await saveOrden({
-                id: order.id,
-                status: newStatus as any,
-                archivos: order.archivos || [],
-                imgMetadata: order.imgMetadata,
-                artistaId: selectedArtistaId,
-                category: selectedCategory,
-                fechaEntrega: selectedFechaEntrega
-            })
+            if (isBatch && batchOrders) {
+                const ids = batchOrders.map(o => (o as any).uuid || o.id || o.ot);
+                await saveBatchOrders('update', ids, {
+                    status: newStatus as any,
+                    artistaId: selectedArtistaId,
+                    category: selectedCategory,
+                    fechaEntrega: selectedFechaEntrega
+                });
+            } else {
+                await saveOrden({
+                    ...order,
+                    status: newStatus as any,
+                    artistaId: selectedArtistaId,
+                    category: selectedCategory,
+                    fechaEntrega: selectedFechaEntrega
+                });
+            }
             onClose(true)
         } catch (e) {
             console.error('Error changing status:', e)
@@ -67,7 +77,12 @@ export default function StatusChangeModal({ isOpen, onClose, order }: StatusChan
 
     const handleDelete = async () => {
         try {
-            await deleteOrden(order.id)
+            if (isBatch && batchOrders) {
+                const ids = batchOrders.map(o => (o as any).uuid || o.id || o.ot);
+                await saveBatchOrders('delete', ids);
+            } else {
+                await deleteOrden((order as any).uuid || order.id)
+            }
             onClose(true)
         } catch (e) {
             console.error('Error deleting order:', e)
@@ -75,13 +90,35 @@ export default function StatusChangeModal({ isOpen, onClose, order }: StatusChan
         }
     }
 
+    const modalTitle = isBatch && batchOrders
+        ? `Operaciones del Lote: ${batchOrders[0]?.loteNombre || 'Lote'} (${batchOrders.length} piezas)`
+        : `Operaciones del Pedido - ${order.ot || `#${order.id}`}`;
+
     return (
         <Modal
             isOpen={isOpen}
             onClose={() => onClose(false)}
-            title={`Operaciones del Pedido - #${order.id}`}
+            title={modalTitle}
             size="md"
         >
+            {isBatch && batchOrders && (
+                <div style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    marginBottom: '16px',
+                    fontSize: '0.85rem',
+                    color: '#93c5fd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
+                    <span>📦</span>
+                    <span>Modificando simultáneamente las <strong>{batchOrders.length}</strong> órdenes agrupadas en este lote.</span>
+                </div>
+            )}
+
             <div className="modal-section">
                 <h4>Cambiar Estado</h4>
                 <div className="status-options-grid">

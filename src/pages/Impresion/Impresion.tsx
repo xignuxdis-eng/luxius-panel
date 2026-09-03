@@ -49,11 +49,11 @@ export default function Impresion() {
     }, [user])
 
     const handleMarkAsPrinted = async (order: Order) => {
-        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'impreso' } : o))
+        setOrders(prev => prev.map(o => (o.uuid || o.id) === (order.uuid || order.id) ? { ...o, status: 'impreso' } : o))
 
         try {
-            await saveOrden({ id: order.id, status: 'impreso' })
-            console.log(`Orden ${order.id} marcada como IMPRESA`)
+            await saveOrden({ ...order, status: 'impreso' })
+            console.log(`Orden ${order.ot || order.id} marcada como IMPRESA`)
         } catch (e) {
             console.error("Error updating status", e)
             alert("Error al actualizar estado")
@@ -63,7 +63,7 @@ export default function Impresion() {
 
     const handleRevert = async (order: Order) => {
         try {
-            await saveOrden({ id: order.id, status: 'orden' })
+            await saveOrden({ ...order, status: 'orden' })
             loadOrders()
         } catch (e) {
             console.error("Error reverting", e)
@@ -75,7 +75,7 @@ export default function Impresion() {
         const reason = window.prompt("Ingrese el motivo del rebote (volverá a Diseño):", "Error en archivo") || "Rebotado a Diseño"
 
         try {
-            await saveOrden({ id: order.id, status: 'preorden', comments: reason })
+            await saveOrden({ ...order, status: 'preorden', comments: reason })
             loadOrders()
         } catch (e) {
             console.error("Error bouncing", e)

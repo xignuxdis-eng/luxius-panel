@@ -213,10 +213,11 @@ export async function refreshCollection(endpoint: string) {
     } catch (e) { }
 }
 
-export function matchesOrderId(order: { id?: number | string, ot?: string }, targetId: number | string): boolean {
+export function matchesOrderId(order: { id?: number | string, ot?: string, uuid?: string }, targetId: number | string): boolean {
     if (!order || targetId === undefined || targetId === null) return false;
     const targetStr = String(targetId).trim().toLowerCase();
     const targetClean = targetStr.replace(/^ot-/i, '');
+    const targetHex = targetClean.replace(/-/g, '');
 
     const idStr = String(order.id || '').trim().toLowerCase();
     const idClean = idStr.replace(/^ot-/i, '');
@@ -224,11 +225,20 @@ export function matchesOrderId(order: { id?: number | string, ot?: string }, tar
     const otStr = String(order.ot || '').trim().toLowerCase();
     const otClean = otStr.replace(/^ot-/i, '');
 
+    const uuidStr = String((order as any).uuid || '').trim().toLowerCase();
+    const uuidHex = uuidStr.replace(/-/g, '');
+
     return (
         idStr === targetStr ||
         idClean === targetClean ||
         otStr === targetStr ||
-        otClean === targetClean
+        otClean === targetClean ||
+        (uuidStr !== '' && (uuidStr === targetStr || uuidStr === targetClean)) ||
+        (uuidHex !== '' && targetHex !== '' && (
+            uuidHex === targetHex ||
+            (targetHex.length >= 6 && uuidHex.startsWith(targetHex)) ||
+            (uuidHex.length >= 6 && targetHex.startsWith(uuidHex))
+        ))
     );
 }
 
@@ -289,11 +299,28 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     try { localOrders = JSON.parse(localOrdersJson); } catch (e) { }
 
     const now = new Date()
-    const nextSeqId = order.id || getNextSequentialId(localOrders)
-    const otCode = order.ot || `OT-${nextSeqId}`
 
-    const newOrder: Order = {
-        id: Number(nextSeqId),
+    // 1. Buscar si ya existe la orden localmente para preservar especificaciones, archivos y detalles
+    const targetLookup = (order as any).uuid || order.id || order.ot;
+    const existingIdx = targetLookup !== undefined && targetLookup !== null
+        ? localOrders.findIndex(o => matchesOrderId(o, targetLookup))
+        : -1;
+    const existing = existingIdx >= 0 ? localOrders[existingIdx] : undefined;
+
+    const nextSeqId = order.id || existing?.id || getNextSequentialId(localOrders)
+    const otCode = order.ot || existing?.ot || `OT-${nextSeqId}`
+
+    // Si ya existe la orden, mezclar encima de existing para NUNCA vaciar archivos, materiales ni subtotales
+    const newOrder: Order = existing ? {
+        ...existing,
+        ...order,
+        id: existing.id || order.id || Number(nextSeqId),
+        ot: existing.ot || order.ot || otCode,
+        status: (order.status || existing.status || 'orden') as any,
+        category: (order.category || existing.category || 'impresion') as any,
+        updatedAt: now.toISOString(),
+    } : {
+        id: Number(nextSeqId) || getNextSequentialId(localOrders),
         ot: otCode,
         nombreTarea: order.nombreTarea || (order as any).observaciones || '',
         clientId: Number(order.clientId) || 1,
@@ -326,11 +353,15 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         }
     } catch (e) { }
 
-    const idx = localOrders.findIndex(o => matchesOrderId(o, newOrder.id));
-    if (idx >= 0) {
-        localOrders[idx] = { ...localOrders[idx], ...newOrder };
+    if (existingIdx >= 0) {
+        localOrders[existingIdx] = newOrder;
     } else {
-        localOrders.unshift(newOrder);
+        const idx = localOrders.findIndex(o => matchesOrderId(o, newOrder.id));
+        if (idx >= 0) {
+            localOrders[idx] = newOrder;
+        } else {
+            localOrders.unshift(newOrder);
+        }
     }
     
     try {
@@ -351,8 +382,9 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     }
 
     try {
-        const method = order.id ? 'PUT' : 'POST';
-        const url = order.id ? `${API_URL}/orders/${order.id}` : `${API_URL}/orders`;
+        const backendTargetId = (newOrder as any).uuid || (existing as any)?.uuid || (order as any).uuid || order.id || existing?.id;
+        const method = backendTargetId ? 'PUT' : 'POST';
+        const url = backendTargetId ? `${API_URL}/orders/${backendTargetId}` : `${API_URL}/orders`;
 
         const response = await fetchWithTimeout(url, {
             method,
@@ -367,10 +399,11 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
             try {
                 const currentLocalStr = localStorage.getItem('luxius_session_ordenes') || '[]';
                 let currentLocal: Order[] = JSON.parse(currentLocalStr);
-                const localIdx = currentLocal.findIndex(o => (o.id || o.ot) === (newOrder.id || newOrder.ot));
+                const localIdx = currentLocal.findIndex(o => matchesOrderId(o, (serverOrder as any).uuid || serverOrder.id || serverOrder.ot || (newOrder as any).uuid || newOrder.id));
                 if (localIdx >= 0) {
                     currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverOrder };
                     localStorage.setItem('luxius_session_ordenes', JSON.stringify(currentLocal));
+                    localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
                 }
             } catch(e) { }
 
@@ -434,7 +467,6 @@ export async function saveBatchOrders(
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
 
-
     } else if (action === 'restore') {
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
@@ -466,16 +498,21 @@ export async function saveBatchOrders(
         } catch (e) { }
     }
 
-    // Sync with remote API in background (don't block UI)
-    fetchWithTimeout(`${API_URL}/orders/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ids, data, updateData: data }),
-    }, 60000).then(response => {
-        if (!response.ok) console.warn('[db] API saveBatchOrders respuesta no-ok:', response.status);
-    }).catch(e => {
+    // Await sync with remote API so caller's subsequent loadOrders() gets updated DB state
+    try {
+        const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ids, data, updateData: data }),
+        }, 60000);
+        if (!response.ok) {
+            console.warn('[db] API saveBatchOrders respuesta no-ok:', response.status);
+        } else {
+            localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+        }
+    } catch (e) {
         console.warn('[db] API saveBatchOrders falló, procesado localmente:', e);
-    });
+    }
 
     return { success: true, count: ids.length };
 }

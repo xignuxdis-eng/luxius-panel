@@ -22,6 +22,7 @@ export default function Entrada() {
     // Separate states for EACH activity to prevent crosstalk/crashes
     const [editingOrder, setEditingOrder] = useState<Order | null>(null)
     const [statusOrder, setStatusOrder] = useState<Order | null>(null)
+    const [statusBatchOrders, setStatusBatchOrders] = useState<Order[] | undefined>(undefined)
     const [previewOrder, setPreviewOrder] = useState<Order | null>(null)
     const [chatOrder, setChatOrder] = useState<Order | null>(null)
 
@@ -865,19 +866,28 @@ export default function Entrada() {
                                                         }) : (item.primaryOrder.fechaCreacion || '-')}
                                                     </span>
                                                 </td>
-                                                <td>
+                                                <td
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStatusOrder(item.primaryOrder);
+                                                        setStatusBatchOrders(item.orders);
+                                                        setIsStatusModalOpen(true);
+                                                    }}
+                                                    title="Click para cambiar el estado de todo el lote"
+                                                >
                                                     {(() => {
                                                         const distinct = Array.from(new Set(item.orders.map(o => o.status)));
                                                         if (distinct.length === 1) {
                                                             const st = distinct[0];
                                                             return (
-                                                                <span className="status-badge" style={{ backgroundColor: statusColors[st], boxShadow: `0 0 8px ${statusColors[st]}40` }}>
+                                                                <span className="status-badge" style={{ backgroundColor: statusColors[st], boxShadow: `0 0 8px ${statusColors[st]}40`, cursor: 'pointer' }}>
                                                                     {statusLabels[st]}
                                                                 </span>
                                                             );
                                                         }
                                                         return (
-                                                            <span className="status-badge" style={{ backgroundColor: '#64748b', fontSize: '0.72rem' }}>
+                                                            <span className="status-badge" style={{ backgroundColor: '#64748b', fontSize: '0.72rem', cursor: 'pointer' }}>
                                                                 Mixto ({distinct.length})
                                                             </span>
                                                         );
@@ -1009,6 +1019,7 @@ export default function Entrada() {
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setStatusOrder(item.primaryOrder);
+                                                                setStatusBatchOrders(item.orders);
                                                                 setIsStatusModalOpen(true);
                                                             }}
                                                             title="Cambiar Estado al Lote"
@@ -1078,12 +1089,22 @@ export default function Entrada() {
                                                                 {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                                                             </span>
                                                         </td>
-                                                        <td>
+                                                        <td
+                                                            style={{ cursor: 'pointer' }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setStatusOrder(order);
+                                                                setStatusBatchOrders(undefined);
+                                                                setIsStatusModalOpen(true);
+                                                            }}
+                                                            title="Click para cambiar el estado de este ítem"
+                                                        >
                                                             <span className="status-badge" style={{
                                                                 backgroundColor: statusColors[order.status],
                                                                 boxShadow: `0 0 6px ${statusColors[order.status]}30`,
                                                                 fontSize: '0.72rem',
-                                                                padding: '2px 6px'
+                                                                padding: '2px 6px',
+                                                                cursor: 'pointer'
                                                             }}>
                                                                 {statusLabels[order.status]}
                                                             </span>
@@ -1204,7 +1225,7 @@ export default function Entrada() {
                                                                 </button>
                                                                 <button
                                                                     className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); setStatusOrder(order); setIsStatusModalOpen(true); }}
+                                                                    onClick={(e) => { e.stopPropagation(); setStatusOrder(order); setStatusBatchOrders(undefined); setIsStatusModalOpen(true); }}
                                                                     title="Estado"
                                                                 >
                                                                     <span style={{ pointerEvents: 'none' }}>⚙️</span>
@@ -1308,10 +1329,20 @@ export default function Entrada() {
                                                 }) : (order.fechaCreacion || '-')}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setStatusOrder(order);
+                                                setStatusBatchOrders(undefined);
+                                                setIsStatusModalOpen(true);
+                                            }}
+                                            title="Click para cambiar el estado del pedido"
+                                        >
                                             <span className="status-badge" style={{
                                                 backgroundColor: statusColors[order.status],
-                                                boxShadow: `0 0 8px ${statusColors[order.status]}40`
+                                                boxShadow: `0 0 8px ${statusColors[order.status]}40`,
+                                                cursor: 'pointer'
                                             }}>
                                                 {statusLabels[order.status]}
                                             </span>
@@ -1469,6 +1500,7 @@ export default function Entrada() {
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setStatusOrder(order);
+                                                                setStatusBatchOrders(undefined);
                                                                 setIsStatusModalOpen(true);
                                                             }}
                                                             title="Operaciones / Estado"
@@ -1522,9 +1554,11 @@ export default function Entrada() {
                     <StatusChangeModal
                         isOpen={isStatusModalOpen}
                         order={statusOrder}
+                        batchOrders={statusBatchOrders}
                         onClose={(updated) => {
                             setIsStatusModalOpen(false)
                             setStatusOrder(null)
+                            setStatusBatchOrders(undefined)
                             if (updated) refreshOrders()
                         }}
                     />
