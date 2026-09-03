@@ -433,10 +433,26 @@ ALLOWED = ['clientes', 'maquinas', 'usuarios', 'vendedores', 'presupuestos', 'ma
 # Collections stored as JSON arrays in config_global (no dedicated DB model)
 JSON_COLLECTIONS = {'materiales', 'servicios', 'calidades', 'logisticas', 'proveedores', 'calendar', 'roles'}
 
+DEFAULT_ROLES_DATA = [
+    {'id': 1, 'name': 'Administrador', 'key': 'administrador', 'status': 'Activo'},
+    {'id': 2, 'name': 'Principal / Jefe de Producción', 'key': 'principal', 'status': 'Activo'},
+    {'id': 3, 'name': 'Vendedor', 'key': 'vendedor', 'status': 'Activo'},
+    {'id': 4, 'name': 'Operario', 'key': 'operario', 'status': 'Activo'},
+    {'id': 5, 'name': 'Impresión', 'key': 'impresion', 'status': 'Activo'},
+    {'id': 6, 'name': 'Artista / Diseño', 'key': 'artista', 'status': 'Activo'},
+    {'id': 7, 'name': 'Cliente', 'key': 'cliente', 'status': 'Activo'},
+]
+
 def _get_json_collection(name):
     """Read a JSON collection from config_global."""
     row = ConfigGlobal.query.filter_by(clave=f'collection_{name}').first()
-    return row.valor if row and row.valor else []
+    if not row or not row.valor:
+        if name == 'roles':
+            _save_json_collection('roles', DEFAULT_ROLES_DATA)
+            return DEFAULT_ROLES_DATA
+        return []
+    return row.valor
+
 
 def _save_json_collection(name, data):
     """Write a JSON collection to config_global."""

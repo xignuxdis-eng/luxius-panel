@@ -1663,25 +1663,29 @@ import type { RoleConfig, SystemLog } from '@/types/auth'
 
 
 
+export const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
+    { id: 1, name: 'Administrador', key: 'administrador', status: 'Activo' },
+    { id: 2, name: 'Principal / Jefe de Producción', key: 'principal', status: 'Activo' },
+    { id: 3, name: 'Vendedor', key: 'vendedor', status: 'Activo' },
+    { id: 4, name: 'Operario', key: 'operario', status: 'Activo' },
+    { id: 5, name: 'Impresión', key: 'impresion', status: 'Activo' },
+    { id: 6, name: 'Artista / Diseño', key: 'artista', status: 'Activo' },
+    { id: 7, name: 'Cliente', key: 'cliente', status: 'Activo' },
+];
+
 export function getRoles(): RoleConfig[] {
-    const sessionItemsJson = localStorage.getItem(SESSION_ROLES_KEY)
+    const sessionItemsJson = localStorage.getItem(SESSION_ROLES_KEY);
     if (sessionItemsJson) {
         try {
-            return JSON.parse(sessionItemsJson)
+            const parsed = JSON.parse(sessionItemsJson);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
         } catch (e) { }
     }
 
-    // Default Roles
-    const defaultRoles: RoleConfig[] = [
-        { id: 1, name: 'Principal', key: 'principal', status: 'Activo' },
-        { id: 2, name: 'Administración', key: 'administrador', status: 'Activo' },
-        { id: 3, name: 'Vendedor', key: 'vendedor', status: 'Activo' },
-        { id: 4, name: 'Cliente', key: 'cliente', status: 'Activo' },
-        { id: 5, name: 'Impresión', key: 'impresion', status: 'Activo' },
-        { id: 7, name: 'Artista', key: 'artista', status: 'Activo' },
-    ]
-    localStorage.setItem(SESSION_ROLES_KEY, JSON.stringify(defaultRoles))
-    return defaultRoles
+    localStorage.setItem(SESSION_ROLES_KEY, JSON.stringify(DEFAULT_SYSTEM_ROLES));
+    return DEFAULT_SYSTEM_ROLES;
 }
 
 export function saveRole(role: Partial<RoleConfig>): RoleConfig {

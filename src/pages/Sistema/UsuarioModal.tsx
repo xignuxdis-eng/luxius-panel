@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { saveUsuario, getRoles } from '@data/db'
+import { saveUsuario, getRoles, DEFAULT_SYSTEM_ROLES } from '@data/db'
 import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import type { RoleConfig } from '@/types/auth'
@@ -13,7 +13,7 @@ interface UsuarioModalProps {
 
 export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProps) {
     const { register, handleSubmit, reset } = useForm<any>()
-    const [roles, setRoles] = useState<RoleConfig[]>([])
+    const [roles, setRoles] = useState<RoleConfig[]>(DEFAULT_SYSTEM_ROLES)
     const [showPassword, setShowPassword] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState('')
@@ -21,28 +21,35 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
     useEffect(() => {
         setError('')
         setShowPassword(false)
-        const allRoles = getRoles()
+
+        const fetchedRoles = getRoles()
+        const allRoles = (Array.isArray(fetchedRoles) && fetchedRoles.length > 0)
+            ? fetchedRoles
+            : DEFAULT_SYSTEM_ROLES
+
         const activeRoles = allRoles.filter(r => r.status === 'Activo')
+        const finalActiveRoles = activeRoles.length > 0 ? activeRoles : DEFAULT_SYSTEM_ROLES
 
         // Always include the current user's role even if inactive, so it doesn't break editing
         if (user && user.rol) {
-            const currentRole = allRoles.find(r => r.key === user.rol || r.name.toLowerCase() === user.rol)
-            if (currentRole && !activeRoles.find(r => r.id === currentRole.id)) {
-                activeRoles.push(currentRole)
+            const currentRole = allRoles.find(r => r.key === user.rol || r.name.toLowerCase() === user.rol.toLowerCase())
+            if (currentRole && !finalActiveRoles.find(r => r.id === currentRole.id)) {
+                finalActiveRoles.push(currentRole)
             }
         }
-        setRoles(activeRoles)
+        setRoles(finalActiveRoles)
 
         if (user) {
             reset({
                 ...user,
+                rol: user.rol || 'vendedor',
                 password: '' // Security: Leave password input empty so user only fills it if changing
             })
         } else {
             reset({
                 nombre: '',
                 username: '',
-                rol: activeRoles.length > 0 ? activeRoles[0].key : 'vendedor',
+                rol: finalActiveRoles.length > 0 ? finalActiveRoles[0].key : 'vendedor',
                 email: '',
                 password: '',
                 habilitado: true
@@ -81,6 +88,8 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
             setIsSaving(false)
         }
     }
+
+    const availableRoles = roles && roles.length > 0 ? roles : DEFAULT_SYSTEM_ROLES
 
     return (
         <Modal
@@ -126,9 +135,9 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
 
                     <div className="form-group">
                         <label>Rol</label>
-                        <select className="input-field" {...register('rol')}>
-                            {roles.map(role => (
-                                <option key={role.id} value={role.key}>
+                        <select className="input-field" {...register('rol', { required: true })}>
+                            {availableRoles.map(role => (
+                                <option key={role.key || role.id} value={role.key}>
                                     {role.name}
                                 </option>
                             ))}
