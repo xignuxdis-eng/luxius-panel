@@ -83,7 +83,10 @@ export default function UsuarioModal({ isOpen, onClose, user }: UsuarioModalProp
             onClose()
         } catch (err: any) {
             console.error('Error saving user:', err)
-            setError(err.message || 'Error al persistir usuario en el servidor')
+            const msg = err.message === 'Failed to fetch'
+                ? 'No se pudo conectar con el servidor (Failed to fetch). Compruebe su conexión o intente nuevamente.'
+                : (err.message || 'Error al persistir usuario en el servidor');
+            setError(msg)
         } finally {
             setIsSaving(false)
         }

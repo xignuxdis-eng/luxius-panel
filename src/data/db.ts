@@ -99,7 +99,6 @@ export const SESSION_LOGS_KEY = 'luxius_session_logs'
 export function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record<string, string> {
     const headers: Record<string, string> = {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
         ...baseHeaders
     };
     try {
@@ -1216,6 +1215,9 @@ export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
 
         if (res.ok) {
             const serverUser = await res.json();
+            if (serverUser.newToken) {
+                localStorage.setItem('luxius_auth_token', serverUser.newToken);
+            }
             // Update local user with server data (including assigned DB id)
             const currentUsers = getUsuarios();
             const idx = currentUsers.findIndex(u => 

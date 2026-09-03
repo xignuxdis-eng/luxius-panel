@@ -210,7 +210,6 @@ class ApiService {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
       ...options.headers,
     };
 

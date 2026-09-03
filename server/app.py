@@ -34,7 +34,7 @@ CORS(app, resources={
     r"/api/*": {"origins": "*"},
     r"/uploads/*": {"origins": "*"},
     r"/health*": {"origins": "*"}
-}, supports_credentials=True)
+}, supports_credentials=True, allow_headers="*")
 db.init_app(app)
 
 
@@ -77,6 +77,12 @@ app.register_blueprint(smart_order_bp)
 # ================================================================
 # SECURITY & CORS HEADERS
 # ================================================================
+@app.before_request
+def handle_preflight():
+    if request.method == 'OPTIONS':
+        return app.make_default_options_response()
+
+
 @app.after_request
 def add_security_headers(response):
     origin = request.headers.get('Origin')
@@ -84,7 +90,11 @@ def add_security_headers(response):
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Range, Cache-Control, Accept'
+        req_headers = request.headers.get('Access-Control-Request-Headers')
+        if req_headers:
+            response.headers['Access-Control-Allow-Headers'] = req_headers
+        else:
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Range, Cache-Control, Pragma, Accept, Origin'
         response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Content-Disposition'
     else:
         response.headers['Access-Control-Allow-Origin'] = '*'
@@ -680,21 +690,35 @@ def post_usuarios():
         user = Usuario()
         db.session.add(user)
 
-    _apply_usuario_fields(user, item)
-    db.session.commit()
-
-    if user.rol in ('vendedor', 'principal', 'administrador'):
-        v = Vendedor.query.filter_by(usuario_id=user.id).first()
-        if not v:
-            v = Vendedor(usuario_id=user.id, nombre=user.nombre, email=user.email, activo=True, es_admin=(user.rol != 'vendedor'))
-            db.session.add(v)
-        else:
-            v.nombre = user.nombre
-            v.email = user.email
-            v.activo = user.habilitado
+    try:
+        _apply_usuario_fields(user, item)
         db.session.commit()
 
-    return jsonify(user.to_dict())
+        if user.rol in ('vendedor', 'principal', 'administrador'):
+            v = Vendedor.query.filter_by(usuario_id=user.id).first()
+            if not v:
+                v = Vendedor(usuario_id=user.id, nombre=user.nombre, email=user.email, activo=True, es_admin=(user.rol != 'vendedor'))
+                db.session.add(v)
+            else:
+                v.nombre = user.nombre
+                v.email = user.email
+                v.activo = user.habilitado
+            db.session.commit()
+
+        resp_data = user.to_dict()
+        from flask import g
+        current_uid = getattr(g, 'user_id', None)
+        if current_uid and str(user.id) == str(current_uid):
+            from middleware.auth import generate_token
+            resp_data['newToken'] = generate_token(user.id, user.rol, user.username, token_version=getattr(user, 'token_version', 1))
+
+        return jsonify(resp_data)
+    except Exception as e:
+        db.session.rollback()
+        err_msg = str(e)
+        if 'unique' in err_msg.lower() or 'duplicate' in err_msg.lower():
+            return jsonify({'error': 'El nombre de usuario o email ya está en uso'}), 409
+        return jsonify({'error': f'Error al guardar usuario en base de datos: {err_msg}'}), 500
 
 
 
@@ -705,19 +729,34 @@ def put_usuarios(id: int):
     user = Usuario.query.get(id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
-    _apply_usuario_fields(user, item)
-    user.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
 
-    if user.rol in ('vendedor', 'principal', 'administrador'):
-        v = Vendedor.query.filter_by(usuario_id=user.id).first()
-        if v:
-            v.nombre = user.nombre
-            v.email = user.email
-            v.activo = user.habilitado
-            db.session.commit()
+    try:
+        _apply_usuario_fields(user, item)
+        user.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
 
-    return jsonify(user.to_dict())
+        if user.rol in ('vendedor', 'principal', 'administrador'):
+            v = Vendedor.query.filter_by(usuario_id=user.id).first()
+            if v:
+                v.nombre = user.nombre
+                v.email = user.email
+                v.activo = user.habilitado
+                db.session.commit()
+
+        resp_data = user.to_dict()
+        from flask import g
+        current_uid = getattr(g, 'user_id', None)
+        if current_uid and str(user.id) == str(current_uid):
+            from middleware.auth import generate_token
+            resp_data['newToken'] = generate_token(user.id, user.rol, user.username, token_version=getattr(user, 'token_version', 1))
+
+        return jsonify(resp_data)
+    except Exception as e:
+        db.session.rollback()
+        err_msg = str(e)
+        if 'unique' in err_msg.lower() or 'duplicate' in err_msg.lower():
+            return jsonify({'error': 'El nombre de usuario o email ya está en uso'}), 409
+        return jsonify({'error': f'Error al actualizar usuario: {err_msg}'}), 500
 
 
 @app.delete('/api/usuarios/<int:id>')
