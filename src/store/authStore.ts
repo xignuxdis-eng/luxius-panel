@@ -67,9 +67,13 @@ export const useAuthStore = create<AuthState>()(
 
             login: async (credentials: LoginCredentials) => {
                 // Authenticate via secure backend API only
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for Render cold start
+
                 try {
                     const res = await fetch(`${API_URL}/auth/login?_t=${Date.now()}`, {
                         method: 'POST',
+                        signal: controller.signal,
                         headers: { 
                             'Content-Type': 'application/json',
                             'Cache-Control': 'no-cache'
@@ -81,8 +85,10 @@ export const useAuthStore = create<AuthState>()(
                         }),
                     });
 
+                    clearTimeout(timeoutId);
+
                     if (!res.ok) {
-                        const err = await res.json().catch(() => ({ error: 'Error de conexión' }));
+                        const err = await res.json().catch(() => ({ error: 'Error de autenticación' }));
                         return { success: false, message: err.error || 'Credenciales inválidas' };
                     }
 
@@ -128,10 +134,21 @@ export const useAuthStore = create<AuthState>()(
                     return { success: true };
 
                 } catch (e: any) {
-                    console.error('Login error:', e.message);
-                    return { success: false, message: 'Error de conexión con el servidor' };
+                    clearTimeout(timeoutId);
+                    console.error('Login error:', e?.message);
+                    if (e?.name === 'AbortError') {
+                        return { 
+                            success: false, 
+                            message: 'El servidor en la nube está tardando en responder. Intenta de nuevo en unos segundos.' 
+                        };
+                    }
+                    return { 
+                        success: false, 
+                        message: 'Error de conexión con el servidor. Si estuvo inactivo, espera 15 segundos y reintenta.' 
+                    };
                 }
             },
+
 
             logout: () => {
                 localStorage.removeItem('luxius_auth_token');

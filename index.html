@@ -17,7 +17,17 @@
 
 <body>
     <div id="root"></div>
+    <script>
+        // Pre-warm backend on page load to eliminate Render cold-start latency
+        try {
+            var apiUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                ? 'http://localhost:5000/api/health'
+                : 'https://luxius-backend.onrender.com/api/health';
+            fetch(apiUrl, { method: 'GET', mode: 'no-cors' }).catch(function(){});
+        } catch(e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
 </body>
+
 
 </html>

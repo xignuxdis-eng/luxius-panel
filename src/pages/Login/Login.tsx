@@ -11,6 +11,7 @@ export default function Login() {
 
     const buildTime = '2026-02-03 01:25'
     const [isLoading, setIsLoading] = useState(false)
+    const [isWakingServer, setIsWakingServer] = useState(false)
     const [error, setError] = useState('')
 
     const [showPassword, setShowPassword] = useState(false)
@@ -20,8 +21,15 @@ export default function Login() {
     const onSubmit = async (data: LoginCredentials) => {
         setIsLoading(true)
         setError('')
+        setIsWakingServer(false)
+
+        const wakeTimer = setTimeout(() => {
+            setIsWakingServer(true)
+        }, 2500)
 
         const result = await login(data)
+        clearTimeout(wakeTimer)
+        setIsWakingServer(false)
 
         if (result.success) {
             navigate('/')
@@ -31,6 +39,7 @@ export default function Login() {
 
         setIsLoading(false)
     }
+
 
     return (
         <div className="login-page">
@@ -120,7 +129,28 @@ export default function Login() {
                                 'Ingresar'
                             )}
                         </button>
+
+                        {isWakingServer && (
+                            <div style={{
+                                marginTop: '12px',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                color: '#93c5fd',
+                                fontSize: '0.8rem',
+                                textAlign: 'center',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                            }}>
+                                <span className="loading-spinner" style={{ width: '12px', height: '12px' }}></span>
+                                <span>Despertando servidor en la nube... Esto puede tomar unos segundos.</span>
+                            </div>
+                        )}
                     </form>
+
 
 
 

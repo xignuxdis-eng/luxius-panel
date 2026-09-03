@@ -29,32 +29,14 @@ app = Flask(__name__)
 app.config.from_object(Config)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB limit
 
-# CORS — Restrict to known origins (dev + production)
-ALLOWED_ORIGINS = [
-    # Development
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:3000',
-    'http://localhost:3005',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3005',
-    # Production (GitHub Pages & Render)
-    'https://xignuxdis-eng.github.io',
-    'https://luxius-backend.onrender.com',
-    'https://luxius.onrender.com',
-]
-# Allow adding extra origins via env var (comma-separated)
-extra_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-if extra_origins:
-    ALLOWED_ORIGINS.extend([o.strip() for o in extra_origins.split(',') if o.strip()])
-
+# CORS — Universal support for web, mobile and local network origins
 CORS(app, resources={
-    r"/api/*": {"origins": ALLOWED_ORIGINS},
-    r"/uploads/*": {"origins": "*"}
+    r"/api/*": {"origins": "*"},
+    r"/uploads/*": {"origins": "*"},
+    r"/health*": {"origins": "*"}
 }, supports_credentials=True)
 db.init_app(app)
+
 
 # ================================================================
 # RATE LIMITING — Prevención de fuerza bruta
@@ -99,12 +81,13 @@ app.register_blueprint(smart_order_bp)
 def add_security_headers(response):
     origin = request.headers.get('Origin')
     if origin:
-        if any(origin.startswith(allowed) for allowed in ALLOWED_ORIGINS) or 'github.io' in origin or 'localhost' in origin:
-            response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Range'
-            response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Content-Disposition'
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Range, Cache-Control, Accept'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Content-Disposition'
+    else:
+        response.headers['Access-Control-Allow-Origin'] = '*'
 
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
@@ -126,8 +109,10 @@ def handle_404(e):
 
 # Basic health check endpoint
 @app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'timestamp': datetime.now(timezone.utc).isoformat()})
+
 
 # DB health check — verifies connection to PostgreSQL
 @app.route('/health/db', methods=['GET'])
