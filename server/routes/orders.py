@@ -247,9 +247,15 @@ def _presupuesto_to_order(p):
         'ancho': ancho_val,
         'copias': copias_val,
 
-        # Financials
-        'subtotal': float(p.subtotal or 0),
-        'total': float(p.total or 0),
+        # Financials & Seña
+        'subtotal': float(p.subtotal or p.total or 0),
+        'total': float(p.total or p.subtotal or 0),
+        'sena': float(p.sena_monto or 0),
+        'senaMonto': float(p.sena_monto or 0),
+        'senaPorcentaje': float(p.sena_porcentaje or 0),
+        'senaMetodo': p.sena_metodo or 'pendiente',
+        'montoPagado': float(p.monto_pagado or p.sena_monto or 0),
+        'saldoPendiente': float(p.saldo_pendiente if p.saldo_pendiente is not None else max(0.0, float(p.total or p.subtotal or 0) - float(p.sena_monto or 0))),
         'demasias': 0,
 
         # Extras
@@ -342,6 +348,41 @@ def _apply_order_to_presupuesto(p, data):
         except (ValueError, TypeError):
             pass
 
+    # Synchronize total and subtotal if one is 0 and the other > 0
+    if float(p.total or 0) == 0 and float(p.subtotal or 0) > 0:
+        p.total = float(p.subtotal)
+    elif float(p.subtotal or 0) == 0 and float(p.total or 0) > 0:
+        p.subtotal = float(p.total)
+
+    # Seña / Depósito
+    if 'sena' in data or 'senaMonto' in data or 'sena_monto' in data:
+        try:
+            raw_sena = data.get('sena') if data.get('sena') is not None else (data.get('senaMonto') if data.get('senaMonto') is not None else data.get('sena_monto', 0))
+            s_val = max(0.0, float(raw_sena or 0))
+            p.sena_monto = s_val
+            p.monto_pagado = s_val
+            tot_ref = float(p.total or p.subtotal or 0)
+            p.saldo_pendiente = max(0.0, tot_ref - s_val)
+            if tot_ref > 0:
+                p.sena_porcentaje = round((s_val / tot_ref) * 100, 2)
+        except (ValueError, TypeError):
+            pass
+
+    if 'senaMetodo' in data or 'sena_metodo' in data:
+        p.sena_metodo = str(data.get('senaMetodo') or data.get('sena_metodo') or 'pendiente')
+
+    if 'senaPorcentaje' in data and data['senaPorcentaje'] is not None:
+        try:
+            p.sena_porcentaje = float(data['senaPorcentaje'])
+        except (ValueError, TypeError):
+            pass
+
+    if 'saldoPendiente' in data and data['saldoPendiente'] is not None:
+        try:
+            p.saldo_pendiente = max(0.0, float(data['saldoPendiente']))
+        except (ValueError, TypeError):
+            pass
+
     cid = data.get('clientId') or data.get('clienteId')
     if cid:
         try:
@@ -370,7 +411,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = dict(p.especificaciones or {})
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente'):
         if k in data:
             current_especs[k] = data[k]
 
@@ -463,14 +504,32 @@ def create_order():
 
     desc = data.get('observaciones') or data.get('nombreTarea') or data.get('titulo') or ''
 
+    tot_val = float(data.get('total') or data.get('subtotal') or 0)
+    sub_val = float(data.get('subtotal') or data.get('total') or 0)
+    if tot_val == 0 and sub_val > 0:
+        tot_val = sub_val
+    elif sub_val == 0 and tot_val > 0:
+        sub_val = tot_val
+
+    sena_raw = data.get('sena') if data.get('sena') is not None else (data.get('senaMonto') if data.get('senaMonto') is not None else data.get('sena_monto', 0))
+    sena_val = max(0.0, float(sena_raw or 0))
+    sena_metodo = str(data.get('senaMetodo') or data.get('sena_metodo') or 'pendiente')
+    saldo_val = max(0.0, tot_val - sena_val)
+    sena_pct = round((sena_val / tot_val * 100), 2) if tot_val > 0 else 0.0
+
     p = Presupuesto(
         vendedor_id=vendedor_id,
         cliente_id=cliente_id,
         estado=STATUS_TO_ESTADO.get(data.get('status', 'preorden'), 'borrador'),
         descripcion=desc,
         notas=data.get('comments', ''),
-        subtotal=data.get('subtotal', 0),
-        total=data.get('total', 0),
+        subtotal=sub_val,
+        total=tot_val,
+        sena_monto=sena_val,
+        sena_metodo=sena_metodo,
+        sena_porcentaje=sena_pct,
+        monto_pagado=sena_val,
+        saldo_pendiente=saldo_val,
         origen=data.get('origen', 'web'),
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
@@ -490,7 +549,7 @@ def create_order():
         }]
         especs['carteles'] = carteles
 
-    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias'):
+    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente'):
         if k in data:
             especs[k] = data[k]
 

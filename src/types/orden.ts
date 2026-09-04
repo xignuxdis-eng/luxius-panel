@@ -53,9 +53,15 @@ export interface Order {
     ancho: number   // meters
     copias: number
 
-    // Financials
+    // Financials & Payment Tracking
     subtotal: number
     total?: number // Optional for legacy
+    sena?: number // Monto entregado como seña / anticipo
+    senaMonto?: number // Alias compatible backend
+    senaPorcentaje?: number // Porcentaje de seña (0-100)
+    senaMetodo?: string // 'efectivo' | 'transferencia' | 'tarjeta' | 'mercadopago' | 'ctacte' | 'pendiente'
+    saldoPendiente?: number // Saldo restante por pagar (total - sena)
+    montoPagado?: number // Total abonado
     demasias: number // legacy numeric bleed
     demasiasConfig?: DemasiasConfig; // directional bleed
     servicios?: Record<string, boolean>; // dynamic services selection

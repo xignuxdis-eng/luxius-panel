@@ -46,17 +46,9 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
     const mappedRows = orders.map(order => {
         const total = Number(order.total || order.subtotal || 0)
         
-        // Exact deposit tracking: only count if explicitly registered or 100% if finished/entregado
-        let sena = 0
-        if ((order as any).sena !== undefined && (order as any).sena !== null) {
-            sena = Number((order as any).sena)
-        } else if (order.status === 'entregado' || order.status === 'finalizado') {
-            sena = total
-        } else {
-            sena = 0
-        }
-        
-        const saldo = Math.max(0, total - sena)
+        // Exact deposit tracking: use actual recorded sena/deposit
+        const sena = Number(order.sena ?? order.senaMonto ?? (order as any).sena_monto ?? 0)
+        const saldo = order.saldoPendiente !== undefined ? Number(order.saldoPendiente) : Math.max(0, total - sena)
 
         totalGeneral += total
         totalSena += sena

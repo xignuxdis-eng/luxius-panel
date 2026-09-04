@@ -145,8 +145,8 @@ export default function Reportes() {
 
         filteredOrders.forEach(o => {
             const tot = Number(o.total || o.subtotal || 0)
-            const sena = (o as any).sena !== undefined ? Number((o as any).sena) : (['entregado', 'finalizado'].includes(o.status) ? tot : tot * 0.5)
-            const saldo = Math.max(0, tot - sena)
+            const sena = Number(o.sena ?? o.senaMonto ?? (o as any).sena_monto ?? 0)
+            const saldo = o.saldoPendiente !== undefined ? Number(o.saldoPendiente) : Math.max(0, tot - sena)
 
             totalFacturado += tot
             totalSena += sena
@@ -231,8 +231,8 @@ export default function Reportes() {
 
         effectiveOrdersToExport.forEach(o => {
             const tot = Number(o.total || o.subtotal || 0)
-            const sena = (o as any).sena !== undefined ? Number((o as any).sena) : (['entregado', 'finalizado'].includes(o.status) ? tot : tot * 0.5)
-            const saldo = Math.max(0, tot - sena)
+            const sena = Number(o.sena ?? o.senaMonto ?? (o as any).sena_monto ?? 0)
+            const saldo = o.saldoPendiente !== undefined ? Number(o.saldoPendiente) : Math.max(0, tot - sena)
             const fecha = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '-'
 
             const row = [
@@ -453,8 +453,8 @@ export default function Reportes() {
                             <tbody>
                                 {filteredOrders.map(order => {
                                     const tot = Number(order.total || order.subtotal || 0)
-                                    const sena = (order as any).sena !== undefined ? Number((order as any).sena) : (['entregado', 'finalizado'].includes(order.status) ? tot : tot * 0.5)
-                                    const saldo = Math.max(0, tot - sena)
+                                    const sena = Number(order.sena ?? order.senaMonto ?? (order as any).sena_monto ?? 0)
+                                    const saldo = order.saldoPendiente !== undefined ? Number(order.saldoPendiente) : Math.max(0, tot - sena)
                                     const isSelected = selectedOrderIds.size === 0 || selectedOrderIds.has(order.id)
 
                                     let cleanDesc = (order.nombreTarea || order.observaciones || '').trim()

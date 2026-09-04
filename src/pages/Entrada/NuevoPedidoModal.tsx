@@ -94,6 +94,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         });
     }, [comboCategoriaFilter, comboSearch, isOpen]);
 
+    // --- Seña & Financial Tracking State ---
+    const [senaAmount, setSenaAmount] = useState<number>(0);
+    const [senaMetodo, setSenaMetodo] = useState<string>('efectivo');
+    const [senaPorcentajeOption, setSenaPorcentajeOption] = useState<'0' | '50' | '100' | 'custom'>('0');
+
     // --- Searchable Client Dropdown State ---
     const [clientSearch, setClientSearch] = useState('');
     const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -298,6 +303,51 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), activeTab, selectedComboId, setValue])
 
+    // Dynamic total for current active tab (unitario, lote, combos)
+    const orderTotal = useMemo(() => {
+        if (activeTab === 'unitario') {
+            const w = parseFloat(watchedAncho) || 0;
+            const h = parseFloat(watchedAlto) || 0;
+            const c = parseInt(watchedCopias) || 1;
+            const services = watch('servicios');
+            return calculateItemPrice(watchedMaterial, w, h, c, services);
+        } else if (activeTab === 'promos') {
+            const c = parseInt(watchedCopias) || 1;
+            const currentCombo = getCombos().find(cb => cb.id === selectedComboId);
+            return Math.round((currentCombo?.precioFinal || 0) * c);
+        } else if (activeTab === 'lote') {
+            return batchItems
+                .filter(item => item.confirmed !== false)
+                .reduce((acc, item) => {
+                    const itemAncho = round2(Number(item.metadata.width) / 100);
+                    const itemAlto = round2(Number(item.metadata.height) / 100);
+                    const priceRes = calculateItemPriceDetailed(item.material, itemAncho, itemAlto, item.copias, item.servicios, watchedClientId);
+                    return acc + priceRes.subtotal;
+                }, 0);
+        }
+        return 0;
+    }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), selectedComboId, batchItems, watchedClientId]);
+
+    const handleSetSenaPreset = (preset: '0' | '50' | '100') => {
+        setSenaPorcentajeOption(preset);
+        if (preset === '0') {
+            setSenaAmount(0);
+        } else if (preset === '50') {
+            setSenaAmount(Math.round(orderTotal * 0.5));
+        } else if (preset === '100') {
+            setSenaAmount(orderTotal);
+        }
+    };
+
+    const handleCustomSenaChange = (valStr: string) => {
+        setSenaPorcentajeOption('custom');
+        const num = parseFloat(valStr) || 0;
+        setSenaAmount(Math.max(0, num));
+    };
+
+    const saldoPendiente = Math.max(0, orderTotal - senaAmount);
+    const senaPorcentaje = orderTotal > 0 ? Math.min(100, Math.round((senaAmount / orderTotal) * 100)) : (senaAmount > 0 ? 100 : 0);
+
     const handleSelectCombo = (combo: ComboData) => {
         if (selectedComboId === combo.id) {
             setSelectedComboId(null);
@@ -347,6 +397,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         if (order) {
             setActiveTab('unitario')
             reset(order)
+            const initSena = Number(order.sena ?? order.senaMonto ?? (order as any).sena_monto ?? 0);
+            setSenaAmount(initSena);
+            setSenaMetodo(order.senaMetodo || 'efectivo');
+            const tot = Number(order.total || order.subtotal || 0);
+            if (initSena === 0) setSenaPorcentajeOption('0');
+            else if (tot > 0 && Math.abs(initSena - tot) < 1) setSenaPorcentajeOption('100');
+            else if (tot > 0 && Math.abs(initSena - tot * 0.5) < 2) setSenaPorcentajeOption('50');
+            else setSenaPorcentajeOption('custom');
+
             if (!order.calidad && defaultCalidad) {
                 setValue('calidad', defaultCalidad);
             }
@@ -371,6 +430,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 subtotal: 0,
                 demasiasConfig: { top: false, bottom: false, left: false, right: false }
             })
+            setSenaAmount(0)
+            setSenaMetodo('efectivo')
+            setSenaPorcentajeOption('0')
             setFileName('')
             setPreviewUrl(null)
             setMetadata(null)
@@ -1474,6 +1536,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             const itemDesc = (item.descripcionItem || '').trim() || rawName;
                             const itemTarea = batchName ? `${batchName} - ${itemDesc}` : itemDesc;
 
+                            const batchTotal = orderTotal || 1;
+                            const itemSena = batchTotal > 0 ? Math.round((itemSubtotal / batchTotal) * senaAmount * 100) / 100 : 0;
+                            const itemSaldo = Math.max(0, itemSubtotal - itemSena);
+
                             const orderData = {
                                 ...data,
                                 id: undefined,
@@ -1491,6 +1557,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 copias: Number(item.copias),
                                 material: item.material,
                                 subtotal: itemSubtotal,
+                                total: itemSubtotal,
+                                sena: itemSena,
+                                senaMonto: itemSena,
+                                senaPorcentaje: senaPorcentaje,
+                                senaMetodo: senaMetodo,
+                                saldoPendiente: itemSaldo,
+                                montoPagado: itemSena,
                                 bobinaAsignada: priceResult.bobinaAsignada,
                                 consumoEstimado: priceResult.consumoEstimado,
                                 precioMl: priceResult.precioMl,
@@ -1572,7 +1645,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     await saveOrden({
                         ...order,
                         ...numericData,
-                        subtotal,
+                        subtotal: subtotal || orderTotal,
+                        total: subtotal || orderTotal,
+                        sena: senaAmount,
+                        senaMonto: senaAmount,
+                        senaPorcentaje: senaPorcentaje,
+                        senaMetodo: senaMetodo,
+                        saldoPendiente: saldoPendiente,
+                        montoPagado: senaAmount,
                         bobinaAsignada: priceResult.bobinaAsignada,
                         consumoEstimado: priceResult.consumoEstimado,
                         precioMl: priceResult.precioMl,
@@ -2783,6 +2863,188 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     </div>
                                 </div>
                             )}
+
+                            {/* CONDICIONES COMERCIALES, SEÑA Y SALDO */}
+                            <div className="commercial-payment-card" style={{
+                                gridColumn: 'span 4',
+                                background: 'linear-gradient(145deg, rgba(26, 29, 36, 0.95), rgba(18, 20, 26, 0.95))',
+                                border: '1px solid rgba(96, 165, 250, 0.25)',
+                                borderRadius: '12px',
+                                padding: '16px 20px',
+                                marginTop: '12px',
+                                marginBottom: '8px',
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '1.2rem' }}>💰</span>
+                                        <div>
+                                            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#f8fafc' }}>
+                                                Condiciones Comerciales y Seña / Anticipo
+                                            </h4>
+                                            <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+                                                Defina el anticipo recibido y las condiciones de cobro del pedido
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Calculado</span>
+                                        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
+                                            ${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'center' }}>
+                                    {/* Col 1: Preset Buttons & Monto Seña */}
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px' }}>
+                                            Anticipo / Seña Registrada:
+                                        </label>
+                                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetSenaPreset('0')}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '6px 4px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    borderRadius: '6px',
+                                                    border: '1px solid',
+                                                    cursor: 'pointer',
+                                                    background: senaPorcentajeOption === '0' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.04)',
+                                                    borderColor: senaPorcentajeOption === '0' ? '#ef4444' : 'rgba(255,255,255,0.1)',
+                                                    color: senaPorcentajeOption === '0' ? '#fca5a5' : '#94a3b8'
+                                                }}
+                                            >
+                                                Sin Seña (0%)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetSenaPreset('50')}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '6px 4px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    borderRadius: '6px',
+                                                    border: '1px solid',
+                                                    cursor: 'pointer',
+                                                    background: senaPorcentajeOption === '50' ? 'rgba(192, 132, 252, 0.25)' : 'rgba(255,255,255,0.04)',
+                                                    borderColor: senaPorcentajeOption === '50' ? '#c084fc' : 'rgba(255,255,255,0.1)',
+                                                    color: senaPorcentajeOption === '50' ? '#e9d5ff' : '#94a3b8'
+                                                }}
+                                            >
+                                                50% Seña
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetSenaPreset('100')}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '6px 4px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    borderRadius: '6px',
+                                                    border: '1px solid',
+                                                    cursor: 'pointer',
+                                                    background: senaPorcentajeOption === '100' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255,255,255,0.04)',
+                                                    borderColor: senaPorcentajeOption === '100' ? '#22c55e' : 'rgba(255,255,255,0.1)',
+                                                    color: senaPorcentajeOption === '100' ? '#86efac' : '#94a3b8'
+                                                }}
+                                            >
+                                                100% Total
+                                            </button>
+                                        </div>
+                                        <div style={{ position: 'relative' }}>
+                                            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontWeight: 600 }}>$</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={senaAmount === 0 && senaPorcentajeOption === '0' ? '' : senaAmount}
+                                                onChange={e => handleCustomSenaChange(e.target.value)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '8px 12px 8px 24px',
+                                                    fontSize: '0.95rem',
+                                                    fontWeight: 700,
+                                                    background: 'rgba(0, 0, 0, 0.3)',
+                                                    border: '1px solid rgba(255,255,255,0.15)',
+                                                    borderRadius: '6px',
+                                                    color: '#f8fafc'
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Col 2: Método de Pago */}
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px' }}>
+                                            Método de Cobro / Anticipo:
+                                        </label>
+                                        <select
+                                            value={senaMetodo}
+                                            onChange={e => setSenaMetodo(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                fontSize: '0.88rem',
+                                                fontWeight: 500,
+                                                background: 'rgba(0, 0, 0, 0.3)',
+                                                border: '1px solid rgba(255,255,255,0.15)',
+                                                borderRadius: '6px',
+                                                color: '#f8fafc',
+                                                height: '40px'
+                                            }}
+                                        >
+                                            <option value="efectivo">💵 Efectivo en Mano</option>
+                                            <option value="transferencia">🏦 Transferencia Bancaria / CBU</option>
+                                            <option value="mercadopago">📱 Mercado Pago / QR</option>
+                                            <option value="tarjeta">💳 Tarjeta de Crédito / Débito</option>
+                                            <option value="ctacte">📁 Cuenta Corriente</option>
+                                            <option value="pendiente">⏳ Pendiente de Pago</option>
+                                        </select>
+                                        <span style={{ display: 'block', marginTop: '6px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                            {senaAmount > 0 ? `Abonado: ${senaPorcentaje}% del total` : 'Sin cobro inicial registrado'}
+                                        </span>
+                                    </div>
+
+                                    {/* Col 3: Saldo Pendiente Status Card */}
+                                    <div style={{
+                                        background: saldoPendiente === 0 && orderTotal > 0 ? 'rgba(34, 197, 94, 0.1)' : (senaAmount > 0 ? 'rgba(192, 132, 252, 0.1)' : 'rgba(239, 68, 68, 0.1)'),
+                                        border: `1px solid ${saldoPendiente === 0 && orderTotal > 0 ? 'rgba(34, 197, 94, 0.3)' : (senaAmount > 0 ? 'rgba(192, 132, 252, 0.3)' : 'rgba(239, 68, 68, 0.3)')}`,
+                                        borderRadius: '8px',
+                                        padding: '12px 16px',
+                                        textAlign: 'center'
+                                    }}>
+                                        <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' }}>
+                                            Saldo Pendiente
+                                        </span>
+                                        <div style={{
+                                            fontSize: '1.25rem',
+                                            fontWeight: 800,
+                                            color: saldoPendiente === 0 && orderTotal > 0 ? '#4ade80' : (senaAmount > 0 ? '#c084fc' : '#f87171'),
+                                            margin: '4px 0'
+                                        }}>
+                                            ${saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                        <span style={{
+                                            display: 'inline-block',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 700,
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            background: saldoPendiente === 0 && orderTotal > 0 ? 'rgba(34, 197, 94, 0.2)' : (senaAmount > 0 ? 'rgba(192, 132, 252, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+                                            color: saldoPendiente === 0 && orderTotal > 0 ? '#86efac' : (senaAmount > 0 ? '#e9d5ff' : '#fca5a5')
+                                        }}>
+                                            {saldoPendiente === 0 && orderTotal > 0 ? '✅ 100% CANCELADO' : (senaAmount > 0 ? `🟡 SEÑA DEL ${senaPorcentaje}%` : '⚠️ TOTAL PENDIENTE')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
 
                         </div> {/* Closes compact-grid */}
 
