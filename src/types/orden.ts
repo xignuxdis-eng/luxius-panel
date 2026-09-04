@@ -152,11 +152,11 @@ export const statusLabels: Record<OrderStatus, string> = {
 
 export const statusColors: Record<OrderStatus, string> = {
     relevamiento: '#0ea5e9', // cyan
-    diseno: '#8b5cf6',       // purple
-    preorden: '#3b82f6',     // blue
-    orden: '#f59e0b',        // amber/orange
-    impreso: '#fbbf24',      // amber
-    post: '#a855f7',         // magenta-purple
+    diseno: '#e879a8',       // soft magenta/pink
+    preorden: '#c084fc',     // soft purple
+    orden: '#f97316',        // orange (vivid)
+    impreso: '#4ade80',      // soft green
+    post: '#a855f7',         // purple
     completo: '#22c55e',     // green
     entregado: '#64748b',     // slate
     finalizado: '#94a3b8',    // slate-light
