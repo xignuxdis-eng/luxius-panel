@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from flask import request, jsonify
 from routes import google_drive_bp
 from models import db, ConfigGlobal
-from middleware.auth import optional_login
+from middleware.auth import login_required
 
 CONFIG_KEY = 'google_drive_oauth'
 
@@ -86,7 +86,7 @@ def get_valid_access_token():
     return access_token
 
 @google_drive_bp.route('/status', methods=['GET'])
-@optional_login
+@login_required
 def get_status():
     """Return current connection status and email."""
     cfg = get_drive_config()
@@ -113,7 +113,7 @@ def get_status():
     }), 200
 
 @google_drive_bp.route('/config', methods=['POST'])
-@optional_login
+@login_required
 def save_config():
     """Save or update Google OAuth Client ID and Client Secret."""
     data = request.get_json(force=True, silent=True) or {}
@@ -141,7 +141,7 @@ def save_config():
     }), 200
 
 @google_drive_bp.route('/auth-url', methods=['GET'])
-@optional_login
+@login_required
 def get_auth_url():
     """Generate the Google OAuth2 consent URL."""
     cfg = get_drive_config()
@@ -168,7 +168,7 @@ def get_auth_url():
     return jsonify({'authUrl': auth_url}), 200
 
 @google_drive_bp.route('/exchange-code', methods=['POST'])
-@optional_login
+@login_required
 def exchange_code():
     """Exchange authorization code for tokens and fetch user profile."""
     data = request.get_json(force=True, silent=True) or {}
@@ -256,7 +256,7 @@ def exchange_code():
         return jsonify({'error': f"Error al procesar la vinculación: {str(e)}"}), 500
 
 @google_drive_bp.route('/disconnect', methods=['POST'])
-@optional_login
+@login_required
 def disconnect():
     """Disconnect the Google Account and remove tokens."""
     row = ConfigGlobal.query.filter_by(clave=CONFIG_KEY).first()
@@ -290,7 +290,7 @@ from config import Config
 
 
 @google_drive_bp.route('/vault/status', methods=['GET'])
-@optional_login
+@login_required
 def get_vault_status():
     """Retorna las métricas actuales de la bóveda en Google Drive y Cloudflare R2."""
     cfg = get_drive_config()
@@ -311,7 +311,7 @@ def get_vault_status():
 
 
 @google_drive_bp.route('/vault/reconcile', methods=['POST'])
-@optional_login
+@login_required
 def trigger_reconciliation():
     """Inicia un job asíncrono de auditoría y reconciliación clasificada."""
     data = request.get_json(force=True, silent=True) or {}
@@ -348,7 +348,7 @@ def get_reconcile_job_status(job_id):
 
 
 @google_drive_bp.route('/vault/audit-history', methods=['GET'])
-@optional_login
+@login_required
 def get_audit_history():
     """Retorna el historial de las últimas 15 auditorías de integridad."""
     audits = DriveVaultAudit.query.order_by(DriveVaultAudit.started_at.desc()).limit(15).all()

@@ -12,6 +12,7 @@ Endpoint de Xana AI — Rutas para LangGraph, Memoria Persistente y Diagnóstico
 
 from flask import request, jsonify
 from routes import xana_bp
+from middleware.auth import login_required
 from datetime import datetime, timezone, timedelta
 import subprocess
 import sys
@@ -327,11 +328,13 @@ def _get_live_git_commits():
 # ================================================================
 
 @xana_bp.get('/tasks')
+@login_required
 def get_xana_tasks():
     store = _get_xana_store()
     return jsonify(store.get('tasks', []))
 
 @xana_bp.post('/tasks')
+@login_required
 def add_xana_task():
     data = request.get_json(force=True) or {}
     store = _get_xana_store()
@@ -352,11 +355,13 @@ def add_xana_task():
     return jsonify(task), 201
 
 @xana_bp.get('/decisions')
+@login_required
 def get_xana_decisions():
     store = _get_xana_store()
     return jsonify(store.get('decisions', []))
 
 @xana_bp.post('/decisions')
+@login_required
 def add_xana_decision():
     data = request.get_json(force=True) or {}
     store = _get_xana_store()
@@ -378,11 +383,13 @@ def add_xana_decision():
     return jsonify(decision), 201
 
 @xana_bp.get('/sessions')
+@login_required
 def get_xana_sessions():
     store = _get_xana_store()
     return jsonify(store.get('sessions', []))
 
 @xana_bp.get('/commits')
+@login_required
 def get_xana_commits():
     live_commits = _get_live_git_commits()
     store = _get_xana_store()
@@ -405,6 +412,7 @@ def get_xana_commits():
     return jsonify(combined if combined else DEFAULT_XANA_DATA["tasks"])
 
 @xana_bp.post('/commits')
+@login_required
 def add_xana_commit():
     data = request.get_json(force=True) or {}
     store = _get_xana_store()
@@ -426,11 +434,13 @@ def add_xana_commit():
     return jsonify(commit), 201
 
 @xana_bp.get('/actions')
+@login_required
 def get_xana_actions():
     store = _get_xana_store()
     return jsonify(store.get('actions', []))
 
 @xana_bp.get('/context/prompt')
+@login_required
 def get_xana_prompt_context():
     store = _get_xana_store()
     tasks = store.get('tasks', [])
@@ -476,6 +486,7 @@ def get_xana_prompt_context():
 # ================================================================
 
 @xana_bp.post('/chat')
+@login_required
 def xana_chat_endpoint():
     data = request.get_json(force=True) or {}
     message = data.get('message', '').strip()

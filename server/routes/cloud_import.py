@@ -10,7 +10,7 @@ import urllib.parse
 import gdown
 from flask import request, jsonify
 from routes import import_bp
-from middleware.auth import optional_login
+from middleware.auth import login_required
 
 def _extract_drive_id(url: str):
     # Match standard drive link format /d/<id>
@@ -31,7 +31,7 @@ def _extract_drive_id(url: str):
     return None
 
 @import_bp.route('', methods=['POST'])
-@optional_login
+@login_required
 def import_from_cloud():
     data = request.get_json(force=True, silent=True) or {}
     url = data.get('url', '').strip()

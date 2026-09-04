@@ -15,13 +15,23 @@ load_dotenv()
 # SECURITY CONFIGURATION
 # ================================================================
 
-SECRET_KEY = os.environ.get('JWT_SECRET_KEY', os.environ.get('JWT_SECRET', 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519'))
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
 
-if not SECRET_KEY or SECRET_KEY == 'luxius-secret-key-change-in-production':
-    SECRET_KEY = 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519'
+if not SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "CRITICAL: JWT_SECRET_KEY environment variable is not set! "
+        "The server will reject all authentication attempts. "
+        "Set a strong random secret: python -c \"import secrets; print(secrets.token_hex(64))\"",
+        RuntimeWarning
+    )
+    # Use a per-process random key so the server can still start, but all
+    # tokens become invalid on restart (fail-safe, not fail-open)
+    SECRET_KEY = secrets.token_hex(64)
 
 ALGORITHM = 'HS256'
-TOKEN_EXPIRY_HOURS = 720  # Tokens expire after 30 days (720 hours)
+TOKEN_EXPIRY_HOURS = 72  # Tokens expire after 3 days
+
 
 
 # ================================================================
@@ -85,12 +95,10 @@ def decode_token(token):
 
 
 def _resolve_payload(auth_header):
-    """Extract and validate JWT from Authorization header or query parameter."""
+    """Extract and validate JWT from Authorization header only."""
     token = None
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header[7:].strip()
-    elif request.args.get('token'):
-        token = request.args.get('token').strip()
 
     if not token:
         return None

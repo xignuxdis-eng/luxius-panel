@@ -16,7 +16,7 @@ import requests
 import gdown
 
 from flask import Blueprint, request, jsonify, g
-from middleware.auth import login_required, optional_login
+from middleware.auth import login_required
 from services.dimension_analyzer import analyze_file_dimensions, compute_sha256
 from models import db, Cliente, Presupuesto
 from concurrent.futures import ThreadPoolExecutor
@@ -382,7 +382,7 @@ def _execute_smart_order_process(url, cliente_input, material_code, calidad_code
 
 
 @smart_order_bp.route('', methods=['POST'])
-@optional_login
+@login_required
 def create_smart_order_draft():
     """
     Ingesta enlaces WeTransfer / Google Drive o archivos.

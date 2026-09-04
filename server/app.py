@@ -13,6 +13,7 @@ from routes.operators import operators_bp
 from routes.tasks import tasks_bp
 from routes.orders import orders_bp
 from routes.xana import xana_bp
+from routes.stats import stats_bp
 from routes import import_bp, google_drive_bp
 import routes.cloud_import
 import routes.google_drive
@@ -29,12 +30,20 @@ app = Flask(__name__)
 app.config.from_object(Config)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB limit
 
-# CORS — Universal support for web, mobile and local network origins
+# CORS — Restrict to known origins (no wildcard)
+ALLOWED_ORIGINS = [
+    'https://xignuxdis-eng.github.io',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:4173',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+]
 CORS(app, resources={
-    r"/api/*": {"origins": "*"},
-    r"/uploads/*": {"origins": "*"},
+    r"/api/*": {"origins": ALLOWED_ORIGINS},
+    r"/uploads/*": {"origins": ALLOWED_ORIGINS},
     r"/health*": {"origins": "*"}
-}, supports_credentials=True, allow_headers="*")
+}, supports_credentials=True, allow_headers=["Content-Type", "Authorization", "Cache-Control", "X-Requested-With"])
 db.init_app(app)
 
 
@@ -67,6 +76,7 @@ app.register_blueprint(operators_bp)
 app.register_blueprint(tasks_bp)
 app.register_blueprint(orders_bp)
 app.register_blueprint(xana_bp)
+app.register_blueprint(stats_bp)
 app.register_blueprint(import_bp)
 app.register_blueprint(google_drive_bp)
 app.register_blueprint(smart_order_bp)
@@ -86,7 +96,7 @@ def handle_preflight():
 @app.after_request
 def add_security_headers(response):
     origin = request.headers.get('Origin')
-    if origin:
+    if origin and origin in ALLOWED_ORIGINS:
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
@@ -96,8 +106,6 @@ def add_security_headers(response):
         else:
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Range, Cache-Control, Pragma, Accept, Origin'
         response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Content-Disposition'
-    else:
-        response.headers['Access-Control-Allow-Origin'] = '*'
 
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
@@ -124,8 +132,9 @@ def health():
     return jsonify({'status': 'ok', 'timestamp': datetime.now(timezone.utc).isoformat()})
 
 
-# DB health check — verifies connection to PostgreSQL
+# DB health check — verifies connection to PostgreSQL (admin only)
 @app.route('/health/db', methods=['GET'])
+@admin_required
 def health_db():
     try:
         from sqlalchemy import text

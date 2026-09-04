@@ -87,15 +87,42 @@ def _find_presupuesto(target_id):
     if not target_id:
         return None
     t_str = str(target_id).strip()
+    t_clean = t_str.upper().replace('OT-', '').replace('-', '')
+
     all_p = Presupuesto.query.all()
+
+    # 1. Exact UUID match (highest priority, unique primary key)
     for p in all_p:
-        if str(p.id).strip() == t_str:
+        p_uuid_str = str(p.id).strip()
+        p_uuid_clean = p_uuid_str.upper().replace('-', '')
+        if p_uuid_str.lower() == t_str.lower() or p_uuid_clean == t_clean:
             return p
+
+    # 2. Exact OT code match (e.g. OT-65BDB696)
+    for p in all_p:
+        p_uuid_str = str(p.id).strip()
+        ot_code = f"OT-{p_uuid_str[:8].upper()}"
+        if ot_code.upper() == t_str.upper() or ot_code.replace('OT-', '').upper() == t_clean:
+            return p
+
+    # 3. Exact Virtual Int ID match
+    for p in all_p:
         if str(_uuid_to_int(p.id)) == t_str:
             return p
-        ot_code = f"OT-{str(p.id)[:8].upper()}"
-        if ot_code.upper() == t_str.upper() or ot_code.replace('OT-', '').upper() == t_str.replace('OT-', '').upper():
-            return p
+
+    # 4. Hex Prefix match (at least 6 hex chars) - with collision guard
+    if len(t_clean) >= 6:
+        prefix_matches = []
+        for p in all_p:
+            p_uuid_clean = str(p.id).strip().upper().replace('-', '')
+            if p_uuid_clean.startswith(t_clean) or (len(t_clean) >= 8 and t_clean.startswith(p_uuid_clean[:8])):
+                prefix_matches.append(p)
+        if len(prefix_matches) == 1:
+            return prefix_matches[0]
+        elif len(prefix_matches) > 1:
+            print(f"[Warning] Ambiguous order ID prefix '{target_id}': matches {len(prefix_matches)} orders. Rejecting match to prevent accidental overwrite.")
+            return None
+
     return None
 
 
@@ -302,11 +329,18 @@ def _apply_order_to_presupuesto(p, data):
     if 'comments' in data:
         p.notas = data['comments']
 
-    if 'total' in data:
-        p.total = data['total']
+    # Semántica PATCH: solo actualizar si la clave fue enviada explícitamente en el payload
+    if 'total' in data and data['total'] is not None:
+        try:
+            p.total = float(data['total'])
+        except (ValueError, TypeError):
+            pass
 
-    if 'subtotal' in data:
-        p.subtotal = data['subtotal']
+    if 'subtotal' in data and data['subtotal'] is not None:
+        try:
+            p.subtotal = float(data['subtotal'])
+        except (ValueError, TypeError):
+            pass
 
     cid = data.get('clientId') or data.get('clienteId')
     if cid:
@@ -327,23 +361,19 @@ def _apply_order_to_presupuesto(p, data):
             pass
 
     if 'fechaEntrega' in data and data['fechaEntrega']:
-        try:
-            p.fecha_entrega_estimada = datetime.strptime(
-                data['fechaEntrega'], '%d/%m/%Y'
-            ).date()
-        except (ValueError, TypeError):
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d'):
             try:
-                p.fecha_entrega_estimada = datetime.strptime(
-                    data['fechaEntrega'], '%Y-%m-%d'
-                ).date()
+                p.fecha_entrega_estimada = datetime.strptime(data['fechaEntrega'], fmt).date()
+                break
             except (ValueError, TypeError):
                 pass
 
     from sqlalchemy.orm.attributes import flag_modified
-    current_especs = p.especificaciones or {}
+    current_especs = dict(p.especificaciones or {})
     for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio'):
         if k in data:
             current_especs[k] = data[k]
+
     p.especificaciones = current_especs
     flag_modified(p, 'especificaciones')
 
