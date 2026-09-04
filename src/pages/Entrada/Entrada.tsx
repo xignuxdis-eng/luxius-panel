@@ -138,42 +138,37 @@ export default function Entrada() {
                 const cliente = allClientes.find(cl => cl.id === order.clientId);
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
 
-                let bestCost = Infinity;
+                // Collect ALL valid bobina+orientation combos
+                type Candidate = { bobina: number; ml: number; cost: number };
+                const candidates: Candidate[] = [];
 
-                // Original orientation
                 for (const b of availableWidths) {
+                    const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
+                    const priceToUse = specialPriceWidth || specialPrice || b.precioML;
+
                     if (w <= b.usefulWidth) {
-                        const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
-                        const priceToUse = specialPriceWidth || specialPrice || b.precioML;
                         const ml = round2(h * c);
-                        const cost = Math.round(priceToUse * ml);
-                        if (cost < bestCost) bestCost = cost;
-                        break;
+                        candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml) });
                     }
-                }
-
-                // Rotated orientation
-                for (const b of availableWidths) {
                     if (h <= b.usefulWidth) {
-                        const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
-                        const priceToUse = specialPriceWidth || specialPrice || b.precioML;
                         const ml = round2(w * c);
-                        const cost = Math.round(priceToUse * ml);
-                        if (cost < bestCost) bestCost = cost;
-                        break;
+                        candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml) });
                     }
                 }
 
-                // Fallback
-                if (bestCost === Infinity && availableWidths.length > 0) {
+                // Minimize waste: smallest bobina first, then fewest ML
+                candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
+
+                if (candidates.length > 0) return candidates[0].cost;
+
+                // Fallback: widest bobina
+                if (availableWidths.length > 0) {
                     const widest = availableWidths[availableWidths.length - 1];
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${widest.ancho}`] : null;
                     const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
                     const ml = round2(h * c);
-                    bestCost = Math.round(priceToUse * ml);
+                    return Math.round(priceToUse * ml);
                 }
-
-                if (bestCost !== Infinity) return bestCost;
             }
 
             if (matData.precioM2) {
@@ -210,33 +205,29 @@ export default function Entrada() {
                         .filter((b: any) => b.usefulWidth > 0)
                         .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
-                    let bestMl = Infinity;
-                    let bestBobina = availableWidths[0]?.ancho;
+                    // Collect ALL valid bobina+orientation combos
+                    type Candidate = { bobina: number; ml: number };
+                    const candidates: Candidate[] = [];
 
                     for (const b of availableWidths) {
                         if (w <= b.usefulWidth) {
-                            const ml = round2(h * c);
-                            if (ml < bestMl) {
-                                bestMl = ml;
-                                bestBobina = b.ancho;
-                            }
-                            break;
+                            candidates.push({ bobina: b.ancho, ml: round2(h * c) });
                         }
-                    }
-
-                    for (const b of availableWidths) {
                         if (h <= b.usefulWidth) {
-                            const ml = round2(w * c);
-                            if (ml < bestMl) {
-                                bestMl = ml;
-                                bestBobina = b.ancho;
-                            }
-                            break;
+                            candidates.push({ bobina: b.ancho, ml: round2(w * c) });
                         }
                     }
 
-                    val = bestMl === Infinity ? round2(h * c) : bestMl;
-                    assignedBobina = bestBobina;
+                    // Minimize waste: smallest bobina first, then fewest ML
+                    candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
+
+                    if (candidates.length > 0) {
+                        val = candidates[0].ml;
+                        assignedBobina = candidates[0].bobina;
+                    } else {
+                        val = round2(h * c);
+                        assignedBobina = availableWidths[availableWidths.length - 1]?.ancho;
+                    }
                 } else {
                     // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
                     if (w <= 1.36) {

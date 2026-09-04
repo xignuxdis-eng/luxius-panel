@@ -94,45 +94,40 @@ export function calculateItemPriceDetailed(
             .filter((b: any) => b.usefulWidth > 0)
             .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
-        let bestCost = Infinity;
+        // Collect ALL valid bobina+orientation combos
+        type Candidate = { bobina: number; rotated: boolean; ml: number; cost: number; priceMl: number };
+        const candidates: Candidate[] = [];
 
-        // 1. Orientacion Normal (el ancho entra en el ancho util de la bobina)
         for (const b of availableWidths) {
+            const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
+            const priceToUse = specialPriceWidth || specialPrice || b.precioML;
+
+            // Normal orientation: ancho fits in bobina
             if (w <= b.usefulWidth) {
-                const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
-                const priceToUse = specialPriceWidth || specialPrice || b.precioML;
                 const ml = round2(h * c);
-                const cost = Math.round(priceToUse * ml);
-                if (cost < bestCost) {
-                    bestCost = cost;
-                    rotated = false;
-                    assignedBobina = b.ancho;
-                    appliedPriceMl = priceToUse;
-                    linearMeters = ml;
-                }
-                break;
+                candidates.push({ bobina: b.ancho, rotated: false, ml, cost: Math.round(priceToUse * ml), priceMl: priceToUse });
             }
-        }
 
-        // 2. Orientacion Rotada (el alto entra en el ancho util de la bobina)
-        for (const b of availableWidths) {
+            // Rotated orientation: alto fits in bobina
             if (h <= b.usefulWidth) {
-                const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${b.ancho}`] : null;
-                const priceToUse = specialPriceWidth || specialPrice || b.precioML;
                 const ml = round2(w * c);
-                const cost = Math.round(priceToUse * ml);
-                if (cost < bestCost) {
-                    bestCost = cost;
-                    rotated = true;
-                    assignedBobina = b.ancho;
-                    appliedPriceMl = priceToUse;
-                    linearMeters = ml;
-                }
-                break;
+                candidates.push({ bobina: b.ancho, rotated: true, ml, cost: Math.round(priceToUse * ml), priceMl: priceToUse });
             }
         }
 
-        // 3. Fallback si excede todas las bobinas: asignar la bobina mas ancha
+        // Sort by: 1) smallest bobina (minimize waste), 2) fewest ML (tiebreaker)
+        candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
+
+        if (candidates.length > 0) {
+            const best = candidates[0];
+            assignedBobina = best.bobina;
+            rotated = best.rotated;
+            linearMeters = best.ml;
+            appliedPriceMl = best.priceMl;
+            bestCost = best.cost;
+        }
+
+        // Fallback si excede todas las bobinas: asignar la bobina mas ancha
         if (bestCost === Infinity && availableWidths.length > 0) {
             const widest = availableWidths[availableWidths.length - 1];
             const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${widest.ancho}`] : null;
