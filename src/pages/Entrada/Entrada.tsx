@@ -56,7 +56,7 @@ export default function Entrada() {
     }, [])
 
     const [searchTerm, setSearchTerm] = useState('')
-    const [statusFilter, setStatusFilter] = useState('')
+    const [statusFilter, setStatusFilter] = useState('orden')
     const [calidadFilter] = useState('')
     const [materialFilter, setMaterialFilter] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
