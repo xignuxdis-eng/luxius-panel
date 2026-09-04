@@ -2140,7 +2140,7 @@ export interface XanaPromptContext {
 
 export async function getXanaTasks(): Promise<XanaTask[]> {
     try {
-        const res = await fetch(`${API_URL}/xana/tasks`);
+        const res = await fetch(`${API_URL}/xana/tasks`, { headers: getAuthHeaders() });
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -2148,7 +2148,7 @@ export async function getXanaTasks(): Promise<XanaTask[]> {
 
 export async function getXanaSessions(): Promise<XanaSession[]> {
     try {
-        const res = await fetch(`${API_URL}/xana/sessions`);
+        const res = await fetch(`${API_URL}/xana/sessions`, { headers: getAuthHeaders() });
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -2156,7 +2156,7 @@ export async function getXanaSessions(): Promise<XanaSession[]> {
 
 export async function getXanaDecisions(): Promise<XanaDecision[]> {
     try {
-        const res = await fetch(`${API_URL}/xana/decisions`);
+        const res = await fetch(`${API_URL}/xana/decisions`, { headers: getAuthHeaders() });
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -2164,7 +2164,7 @@ export async function getXanaDecisions(): Promise<XanaDecision[]> {
 
 export async function getXanaActions(): Promise<XanaAction[]> {
     try {
-        const res = await fetch(`${API_URL}/xana/actions`);
+        const res = await fetch(`${API_URL}/xana/actions`, { headers: getAuthHeaders() });
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -2172,7 +2172,7 @@ export async function getXanaActions(): Promise<XanaAction[]> {
 
 export async function getXanaCommits(): Promise<XanaCommit[]> {
     try {
-        const res = await fetch(`${API_URL}/xana/commits`);
+        const res = await fetch(`${API_URL}/xana/commits`, { headers: getAuthHeaders() });
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -2182,7 +2182,7 @@ export async function logXanaCommit(commit: Partial<XanaCommit>): Promise<boolea
     try {
         const res = await fetch(`${API_URL}/xana/commits`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(commit)
         });
         return res.ok;
@@ -2191,7 +2191,7 @@ export async function logXanaCommit(commit: Partial<XanaCommit>): Promise<boolea
 
 export async function getXanaPromptContext(): Promise<XanaPromptContext | null> {
     try {
-        const res = await fetch(`${API_URL}/xana/context/prompt`);
+        const res = await fetch(`${API_URL}/xana/context/prompt`, { headers: getAuthHeaders() });
         if (!res.ok) return null;
         return await res.json();
     } catch { return null; }

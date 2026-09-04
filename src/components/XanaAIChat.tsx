@@ -16,20 +16,42 @@ import { buscarRespuestaPredefinida, filtrarRespuestaPorRol } from "../utils/xan
 import { ChatMessage, UserContext } from "../config/xanaConfig";
 
 export default function XanaAIChat() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const XANA_CHAT_KEY = 'luxius_xana_chat_history';
+  const MAX_STORED_MESSAGES = 50;
+
+  const loadSavedMessages = (): ChatMessage[] => {
+    try {
+      const raw = localStorage.getItem(XANA_CHAT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+        }
+      }
+    } catch { /* corrupted — reset */ }
+    return [{
       id: '1',
       text: '¡Hola! Soy Xana AI, tu asistente virtual en LuXius. ¿En qué puedo ayudarte hoy?',
       sender: 'ai',
       timestamp: new Date()
-    }
-  ]);
+    }];
+  };
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadSavedMessages);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const toStore = messages.slice(-MAX_STORED_MESSAGES);
+      localStorage.setItem(XANA_CHAT_KEY, JSON.stringify(toStore));
+    } catch { /* storage full — ignore */ }
+  }, [messages]);
 
   // Obtener contexto del usuario desde localStorage
   const getUserContext = (): UserContext => {
