@@ -4,7 +4,7 @@ import SimpleMaterialSelector from "../../../components/SimpleMaterialSelector";
 import FileGrid from "../../../components/FileGrid";
 import ClientSelector from "../../../components/ClientSelector";
 import { getMaterialById } from "../../../utils/materialHelpers";
-import { getClientById } from "../../../data/clients";
+import { getClientes } from "../../../data/db";
 
 interface FileMetadata {
   colorSpace?: "RGB" | "CMYK" | "Grayscale" | "Unknown";
@@ -1632,7 +1632,8 @@ export default function UploadPage() {
                     <p className="text-sm text-gray-600 mb-2">{order.info.descripcion}</p>
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                       {(() => {
-                        const client = getClientById(order.info.clienteId);
+                        const allClients = getClientes() || [];
+                        const client = allClients.find((c: any) => String(c.id) === String(order.info.clienteId));
                         return client ? (
                           <span className="text-blue-600 font-medium">
                             Cliente: {client.name}

@@ -1,5 +1,10 @@
-import { UserContext, ROLE_RESPONSES, MOCK_DATA } from '../config/xanaConfig';
+import { UserContext, ROLE_RESPONSES } from '../config/xanaConfig';
+import { getOrdenes, getMateriales } from '../data/db';
 
+/**
+ * Generates contextual responses using REAL data from the local store
+ * (synced from the backend) instead of hardcoded MOCK_DATA.
+ */
 export function getContextualResponse(intent: string, context: UserContext): string {
   const rol = context.rol;
   const roleConfig = ROLE_RESPONSES[rol as keyof typeof ROLE_RESPONSES];
@@ -50,16 +55,38 @@ function getPedidosResponse(context: UserContext, roleConfig: any): string {
     return "No tienes permisos para ver información de pedidos.";
   }
 
-  const pedidos = MOCK_DATA.pedidos;
-  const pedidoId = context.idPedido || "12345";
-  const pedido = pedidos[pedidoId as keyof typeof pedidos];
+  // Use REAL orders from the synced store
+  const ordenes = getOrdenes() || [];
+  const pedidoId = context.idPedido;
 
-  if (pedido) {
-    const estado = pedido.estado === "en_produccion" ? "en producción" : pedido.estado;
-    return `Tu pedido #${pedidoId} está ${estado}. Se estima que esté listo el ${pedido.fecha_entrega}. Te enviaremos una notificación cuando esté completado.`;
+  if (pedidoId) {
+    const orden = ordenes.find((o: any) =>
+      String(o.ot) === String(pedidoId) ||
+      String(o.id) === String(pedidoId) ||
+      String(o.uuid) === String(pedidoId)
+    );
+    if (orden) {
+      const statusLabel: Record<string, string> = {
+        relevamiento: 'en relevamiento', diseno: 'en diseño', orden: 'lista para imprimir',
+        impreso: 'impresa', post: 'en terminaciones', completo: 'lista para entregar',
+        entregado: 'entregada', anulado: 'anulada', standby: 'en pausa'
+      };
+      const estado = statusLabel[(orden as any).status] || (orden as any).status;
+      const entrega = (orden as any).fechaEntrega ? ` | Entrega estimada: ${(orden as any).fechaEntrega}` : '';
+      return `Tu orden ${(orden as any).ot || pedidoId} está ${estado}${entrega}. Cliente: ${(orden as any).clienteNombre || 'N/A'}.`;
+    }
   }
 
-  return "No encontré información específica sobre tu pedido. ¿Podrías proporcionar el número de pedido?";
+  // Show summary of recent orders
+  const active = ordenes.filter((o: any) => !['entregado', 'anulado', 'eliminado', 'finalizado'].includes((o as any).status));
+  if (active.length > 0) {
+    const summary = active.slice(0, 3).map((o: any) =>
+      `• ${o.ot}: ${o.clienteNombre || 'Cliente'} — ${o.status}`
+    ).join('\n');
+    return `Tienes ${active.length} órdenes activas. Las más recientes:\n${summary}\n\n¿Necesitas detalles de alguna orden específica?`;
+  }
+
+  return "No encontré órdenes activas en el sistema. ¿Podrías proporcionar el número de orden?";
 }
 
 function getArchivosResponse(context: UserContext, roleConfig: any): string {
@@ -72,35 +99,56 @@ function getArchivosResponse(context: UserContext, roleConfig: any): string {
 
 function getStockResponse(context: UserContext, roleConfig: any): string {
   if (!roleConfig.canViewStock) {
-    return "Sí, tenemos disponibilidad para tu pedido. Nuestro equipo verificará el stock específico cuando proceses tu orden. Esto asegura que tengas la información más actualizada al momento de confirmar tu pedido.";
+    return "Sí, tenemos disponibilidad para tu pedido. Nuestro equipo verificará el stock específico cuando proceses tu orden.";
   }
 
-  const stock = MOCK_DATA.stock;
-  return `Stock actual disponible (verificado en tiempo real):
-• Vinilo blanco: ${stock.vinilo.blanco} metros (ideal para letreros y decoración interior)
-• Vinilo negro: ${stock.vinilo.negro} metros (perfecto para contraste en fondos claros)
-• Lona premium: ${stock.lona.premium} metros (resistente a la intemperie, ideal para exteriores)
-• Lona standard: ${stock.lona.standard} metros (económica para proyectos temporales)
-• Papel fotográfico: ${stock.papel.fotográfico} hojas (alta calidad para impresiones fotográficas)
+  // Use REAL materials from the synced store
+  const materiales = getMateriales() || [];
 
-Recomendación: Para exteriores usa lona premium por su durabilidad, para interiores el vinilo es más económico.`;
+  if (materiales.length === 0) {
+    return "No hay datos de stock cargados en el sistema. Sincroniza desde el menú Sistema.";
+  }
+
+  // Group materials by type
+  const byType: Record<string, { items: any[]; totalStock: number }> = {};
+  for (const m of materiales) {
+    const tipo = (m as any).tipo || (m as any).categoria || 'General';
+    if (!byType[tipo]) byType[tipo] = { items: [], totalStock: 0 };
+    byType[tipo].items.push(m);
+    byType[tipo].totalStock += Number((m as any).stockActual || (m as any).stock || 0);
+  }
+
+  const lines = Object.entries(byType)
+    .sort((a, b) => b[1].totalStock - a[1].totalStock)
+    .slice(0, 6)
+    .map(([tipo, data]) => {
+      const unit = tipo.toLowerCase().includes('tinta') ? 'L' : 'm²';
+      return `• ${tipo}: ${data.totalStock.toFixed(1)} ${unit} (${data.items.length} variantes)`;
+    });
+
+  return `Stock actual disponible (${materiales.length} materiales registrados):\n${lines.join('\n')}\n\nPara ver el detalle completo, ve a la sección de Stock.`;
 }
 
 function getPreciosResponse(context: UserContext, roleConfig: any): string {
   if (!roleConfig.canViewPrices) {
-    return "Los precios se calculan automáticamente según los materiales y dimensiones seleccionados. Puedes ver el costo total antes de confirmar tu pedido. Esto te permite comparar opciones y elegir la mejor relación calidad-precio.";
+    return "Los precios se calculan automáticamente según los materiales y dimensiones seleccionados. Puedes ver el costo total antes de confirmar tu pedido.";
   }
 
-  const precios = MOCK_DATA.precios;
-  return `Precios por metro cuadrado (actualizados):
-• Lona premium: $${precios.lona_premium} (resistente a la intemperie, 3 años de garantía)
-• Lona standard: $${precios.lona_standard} (económica, ideal para eventos temporales)
-• Vinilo blanco/negro: $${precios.vinilo_blanco} (versátil, perfecto para interiores)
-• Papel fotográfico: $${precios.papel_fotografico} (alta resolución, ideal para fotos)
+  // Use REAL materials for pricing
+  const materiales = getMateriales() || [];
+  const conPrecio = materiales.filter((m: any) => Number(m.precioML || m.precio || 0) > 0);
 
-Ejemplo: Un banner de 2x3 metros en lona premium costaría $${precios.lona_premium * 6} porque incluye material resistente y acabado profesional.
+  if (conPrecio.length === 0) {
+    return "No hay precios cargados en el sistema todavía. Los precios se configuran desde ABM Materiales.";
+  }
 
-Recomendación: Para exteriores invierte en lona premium por durabilidad, para interiores el vinilo es más económico.`;
+  const lines = conPrecio.slice(0, 6).map((m: any) => {
+    const precio = Number(m.precioML || m.precio || 0);
+    const unit = m.tipoCobro || 'm²';
+    return `• ${m.descripcion || m.nombre}: $${precio.toLocaleString()} /${unit}`;
+  });
+
+  return `Precios actualizados (${conPrecio.length} materiales con precio):\n${lines.join('\n')}\n\nLos precios se calculan automáticamente al crear un pedido según dimensiones y material.`;
 }
 
 function getNavegacionResponse(context: UserContext, roleConfig: any): string {
@@ -129,7 +177,7 @@ function getSoporteResponse(context: UserContext, roleConfig: any): string {
 1. Recargar la página (Ctrl+F5)
 2. Verificar tu conexión a internet
 3. Limpiar el caché del navegador
-4. Contactar soporte técnico en soporte@luxius.com
+4. Contactar soporte técnico
 
 ¿En qué puedo ayudarte específicamente?`;
 }
@@ -140,4 +188,4 @@ function getInformacionResponse(context: UserContext, roleConfig: any): string {
 
 function getDefaultResponse(context: UserContext): string {
   return "Entiendo tu consulta. ¿Podrías ser más específico? Puedo ayudarte con información sobre pedidos, archivos, materiales, precios, navegación del sistema o soporte técnico.";
-} 
+}
