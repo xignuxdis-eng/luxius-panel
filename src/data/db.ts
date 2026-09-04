@@ -386,10 +386,13 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         const method = backendTargetId ? 'PUT' : 'POST';
         const url = backendTargetId ? `${API_URL}/orders/${backendTargetId}` : `${API_URL}/orders`;
 
+        // Si es actualización, enviar únicamente los campos explícitos en `order` para no inventar valores por omisión
+        const payloadToSend = backendTargetId ? { ...order, id: backendTargetId } : newOrder;
+
         const response = await fetchWithTimeout(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newOrder),
+            body: JSON.stringify(payloadToSend),
         }, 60000);
 
         if (response.ok) {
@@ -408,6 +411,8 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
             } catch(e) { }
 
             return serverOrder;
+        } else {
+            console.error('[db] API saveOrden respondió con código no-ok:', response.status);
         }
     } catch (error) {
         console.warn('[db] API saveOrden falló o timeout, la orden se conservará localmente:', error);
@@ -506,12 +511,14 @@ export async function saveBatchOrders(
             body: JSON.stringify({ action, ids, data, updateData: data }),
         }, 60000);
         if (!response.ok) {
-            console.warn('[db] API saveBatchOrders respuesta no-ok:', response.status);
+            console.error('[db] API saveBatchOrders respuesta no-ok:', response.status);
+            throw new Error(`El servidor rechazó la operación por lote (código ${response.status})`);
         } else {
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         }
     } catch (e) {
-        console.warn('[db] API saveBatchOrders falló, procesado localmente:', e);
+        console.error('[db] API saveBatchOrders falló:', e);
+        throw e;
     }
 
     return { success: true, count: ids.length };

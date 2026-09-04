@@ -27,6 +27,7 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
     const [selectedArtistaId, setSelectedArtistaId] = useState<number | undefined>(order?.artistaId)
     const [selectedCategory, setSelectedCategory] = useState<'diseno' | 'impresion' | undefined>(order?.category)
     const [selectedFechaEntrega, setSelectedFechaEntrega] = useState<string>(order?.fechaEntrega || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+    const [saving, setSaving] = useState(false)
     const { user } = useAuthStore()
 
     if (!order) return null
@@ -40,6 +41,8 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
     }, [])
 
     const handleStatusChange = async (newStatus: string) => {
+        if (saving) return;
+        setSaving(true);
         try {
             if (isBatch && batchOrders) {
                 const ids = batchOrders.map(o => (o as any).uuid || o.id || o.ot);
@@ -51,7 +54,7 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                 });
             } else {
                 await saveOrden({
-                    ...order,
+                    id: (order as any).uuid || order.id,
                     status: newStatus as any,
                     artistaId: selectedArtistaId,
                     category: selectedCategory,
@@ -61,7 +64,9 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
             onClose(true)
         } catch (e) {
             console.error('Error changing status:', e)
-            alert('Error al actualizar el estado del pedido')
+            alert('Error al actualizar el estado: verifique la conexión con el servidor')
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -76,6 +81,8 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
     }
 
     const handleDelete = async () => {
+        if (saving) return;
+        setSaving(true);
         try {
             if (isBatch && batchOrders) {
                 const ids = batchOrders.map(o => (o as any).uuid || o.id || o.ot);
@@ -87,6 +94,8 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
         } catch (e) {
             console.error('Error deleting order:', e)
             alert('Error al eliminar el pedido')
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -125,11 +134,14 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                     {statusOptions.map(option => (
                         <button
                             key={option.value}
+                            disabled={saving}
                             className={`status-option-btn ${order.status === option.value ? 'active' : ''}`}
                             style={{
                                 borderColor: statusColors[option.value as OrderStatus],
                                 color: order.status === option.value ? 'white' : 'inherit',
-                                backgroundColor: order.status === option.value ? statusColors[option.value as OrderStatus] : 'transparent'
+                                backgroundColor: order.status === option.value ? statusColors[option.value as OrderStatus] : 'transparent',
+                                opacity: saving ? 0.6 : 1,
+                                cursor: saving ? 'not-allowed' : 'pointer'
                             } as any}
                             onClick={() => handleStatusChange(option.value)}
                         >
@@ -145,6 +157,7 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                         <h4>Categoría</h4>
                         <select
                             className="input-field"
+                            disabled={saving}
                             value={selectedCategory || ''}
                             onChange={(e) => setSelectedCategory(e.target.value as any)}
                         >
@@ -157,6 +170,7 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                         <h4>Asignar Artista</h4>
                         <select
                             className="input-field"
+                            disabled={saving}
                             value={selectedArtistaId || ''}
                             onChange={(e) => setSelectedArtistaId(Number(e.target.value) || undefined)}
                         >
@@ -172,6 +186,7 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                     <input
                         type="date"
                         className="input-field"
+                        disabled={saving}
                         value={selectedFechaEntrega}
                         onChange={(e) => setSelectedFechaEntrega(e.target.value)}
                     />
@@ -186,7 +201,9 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                     {isAdmin && (
                         <button
                             className="btn-op btn-delete"
+                            disabled={saving}
                             onClick={handleDelete}
+                            style={{ opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
                         >
                             🗑️ Eliminar
                         </button>
@@ -194,7 +211,9 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                     {canBounce && (
                         <button
                             className="btn-op btn-bounce"
+                            disabled={saving}
                             onClick={handleBounce}
+                            style={{ opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
                         >
                             ↩️ Rebotar
                         </button>
@@ -202,9 +221,11 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
                 </div>
                 <button
                     className="btn-save"
+                    disabled={saving}
                     onClick={() => handleStatusChange(order.status)}
+                    style={{ opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
                 >
-                    Guardar Cambios
+                    {saving ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
             </div>
 
