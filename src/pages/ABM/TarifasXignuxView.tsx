@@ -111,15 +111,32 @@ export default function TarifasXignuxView() {
         },
         {
             title: '🏗️ Infraestructura y Adicionales',
-            subtitle: 'Postes, columnas, luminarias y cableado',
-            items: [
-                { key: 'costo_poste_metal', label: 'Poste de Soporte (Metal)', unit: '/m' },
-                { key: 'costo_poste_madera', label: 'Poste de Soporte (Madera)', unit: '/m' },
-                { key: 'costo_poste_hormigon', label: 'Poste de Soporte (Hormigón)', unit: '/m' },
-                { key: 'costo_columna_m', label: 'Columna / Pilar (Ancho)', unit: '/m' },
-                { key: 'costo_luminaria_unidad', label: 'Luminaria / Foco', unit: '/unidad' },
-                { key: 'costo_cableado_m', label: 'Cableado / Obstáculo', unit: '/m' },
-            ]
+            subtitle: 'Postes, columnas, luminarias y cableado — sincronizados con ABM Servicios (categoría infraestructura)',
+            items: (() => {
+                const infraServicios = serviciosAbm.filter(s =>
+                    (s.categoria || '').toLowerCase() === 'infraestructura' ||
+                    (s.nombre || '').toLowerCase().includes('poste') ||
+                    (s.nombre || '').toLowerCase().includes('columna') ||
+                    (s.nombre || '').toLowerCase().includes('luminaria') ||
+                    (s.nombre || '').toLowerCase().includes('cableado')
+                );
+                if (infraServicios.length > 0) {
+                    return infraServicios.map(s => ({
+                        key: s.codigo?.toLowerCase() || s.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                        label: s.nombre,
+                        unit: `/${s.unidad || 'm'}`
+                    }));
+                }
+                // Fallback: show defaults until infra services are added to ABM
+                return [
+                    { key: 'costo_poste_metal', label: 'Poste de Soporte (Metal)', unit: '/m' },
+                    { key: 'costo_poste_madera', label: 'Poste de Soporte (Madera)', unit: '/m' },
+                    { key: 'costo_poste_hormigon', label: 'Poste de Soporte (Hormigón)', unit: '/m' },
+                    { key: 'costo_columna_m', label: 'Columna / Pilar (Ancho)', unit: '/m' },
+                    { key: 'costo_luminaria_unidad', label: 'Luminaria / Foco', unit: '/unidad' },
+                    { key: 'costo_cableado_m', label: 'Cableado / Obstáculo', unit: '/m' },
+                ];
+            })()
         }
     ]
 

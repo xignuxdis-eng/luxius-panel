@@ -2497,36 +2497,22 @@ export function getBancos(): Banco[] {
     if (raw) {
         try { return JSON.parse(raw) } catch {}
     }
-    const defaultBancos: Banco[] = [
-        {
-            id: 1,
-            nombre: 'Banco Santander',
-            tipoCuenta: 'corriente',
-            numeroCuenta: '072-123456/7',
-            cbu: '0720072020000012345678',
-            alias: 'XIGNUX.PRODUCCION',
-            titular: 'Xignux Gráfica S.A.',
-            cuitTitular: '30-71234567-8',
-            saldoActual: 840000,
-            moneda: 'ARS',
-            habilitado: true
-        },
-        {
-            id: 2,
-            nombre: 'Banco Galicia',
-            tipoCuenta: 'caja_ahorro',
-            numeroCuenta: '4005678-1 089-2',
-            cbu: '0070089430004005678123',
-            alias: 'XIGNUX.TALLER',
-            titular: 'Xignux Gráfica S.A.',
-            cuitTitular: '30-71234567-8',
-            saldoActual: 320000,
-            moneda: 'ARS',
-            habilitado: true
+    // No hardcoded defaults — sync from backend instead
+    syncBancosFromBackend()
+    return []
+}
+
+// Sync bancos from backend on load
+async function syncBancosFromBackend() {
+    try {
+        const res = await fetch(`${API_URL}/stats/bancos`, { headers: getAuthHeaders() })
+        if (res.ok) {
+            const data = await res.json()
+            if (Array.isArray(data) && data.length > 0) {
+                localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(data))
+            }
         }
-    ]
-    localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(defaultBancos))
-    return defaultBancos
+    } catch { /* offline — use local cache */ }
 }
 
 export function saveBanco(banco: Partial<Banco>): Banco {
@@ -2554,12 +2540,22 @@ export function saveBanco(banco: Partial<Banco>): Banco {
         result = newBanco
     }
     localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(list))
+    _pushBancosToBackend(list)
     return result
 }
 
 export function deleteBanco(id: number) {
     const list = getBancos().filter(b => b.id !== id)
     localStorage.setItem(SESSION_BANCOS_KEY, JSON.stringify(list))
+    _pushBancosToBackend(list)
+}
+
+function _pushBancosToBackend(list: Banco[]) {
+    fetch(`${API_URL}/stats/bancos`, {
+        method: 'PUT',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(list)
+    }).catch(() => { /* offline — will sync next time */ })
 }
 
 
