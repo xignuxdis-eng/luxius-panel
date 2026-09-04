@@ -24,6 +24,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check for case-sensitivity collisions
+        run: |
+          dupes=$(git ls-files | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "::error::Case-sensitivity collision detected in git index!"
+            echo "The following paths have duplicates differing only by casing:"
+            echo "$dupes"
+            echo ""
+            echo "This causes silent failures on Windows (NTFS)."
+            echo "Fix: git update-index --force-remove <wrong-case-path>"
+            exit 1
+          fi
+          echo "No case collisions found."
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
