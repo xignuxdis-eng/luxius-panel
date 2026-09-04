@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 import { hasRolePermission } from '@/types/auth'
 import ThemeToggle from '@components/ui/ThemeToggle'
+import ServerStatusLed from '@components/ui/ServerStatusLed'
 import { ArcadeModal } from '@components/arcade/ArcadeModal'
 import './Sidebar.css'
 
@@ -74,6 +75,7 @@ export default function Sidebar() {
             </nav>
 
             <div className="sidebar-footer">
+                <ServerStatusLed />
                 <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <ThemeToggle />
                     <button
