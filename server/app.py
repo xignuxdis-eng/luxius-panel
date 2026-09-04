@@ -35,9 +35,11 @@ ALLOWED_ORIGINS = [
     'https://xignuxdis-eng.github.io',
     'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:3005',
     'http://localhost:4173',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3005',
 ]
 CORS(app, resources={
     r"/api/*": {"origins": ALLOWED_ORIGINS},

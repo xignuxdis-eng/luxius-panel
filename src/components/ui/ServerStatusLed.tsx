@@ -14,7 +14,7 @@ export default function ServerStatusLed() {
             const controller = new AbortController()
             const timeout = setTimeout(() => controller.abort(), 8000)
 
-            const res = await fetch(`${API_URL.replace('/api', '')}/api/health`, {
+            const res = await fetch(`${API_URL}/health`, {
                 signal: controller.signal
             })
             clearTimeout(timeout)

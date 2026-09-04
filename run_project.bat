@@ -102,12 +102,8 @@ REM Wait for backend to boot
 echo  [LAUNCH] Esperando que el backend inicie...
 timeout /t 4 /nobreak >nul
 
-REM Start frontend
-start "Luxius Frontend (Vite :3005)" /D "%ROOT%" cmd /k "npm run dev"
-
-REM Wait for frontend to boot, then open browser
-timeout /t 3 /nobreak >nul
-start "" "http://localhost:3005"
+REM Start frontend (Vite opens browser automatically)
+start "Luxius Frontend (Vite :3005)" /D "%ROOT%" cmd /k "npm run dev -- --open"
 
 echo.
 echo  ============================================
