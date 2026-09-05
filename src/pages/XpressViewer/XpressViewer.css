@@ -1,10 +1,87 @@
 .xpress-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     height: calc(100vh - 80px); /* Adjust based on layout */
     width: 100%;
     background: #0f172a;
     color: #f8fafc;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Header de Navegación de Xpress (Visor vs Redrawer) */
+.xpress-header-nav {
+    height: 48px;
+    background: #090d16;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    flex-shrink: 0;
+    z-index: 50;
+}
+
+.xpress-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #f8fafc;
+}
+
+.xpress-nav-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.xpress-nav-tab {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.xpress-nav-tab:hover {
+    color: #f1f5f9;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.xpress-nav-tab.active {
+    background: #6366f1;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.xpress-tab-pill {
+    background: #f43f5e;
+    color: white;
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+.xpress-main-layout {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    height: calc(100% - 48px);
+    width: 100%;
     overflow: hidden;
     position: relative;
 }

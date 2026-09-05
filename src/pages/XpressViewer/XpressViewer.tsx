@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import './XpressViewer.css';
 import { API_URL } from '../../data/db';
@@ -7,6 +8,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../../utils/vectorPreview';
 import { extractCdrThumbnail } from '../../utils/cdrPreview';
+import { RedrawerStudio } from './RedrawerStudio';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -60,6 +62,10 @@ export interface XpressViewerProps {
 }
 
 export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, onClose }) => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : 'viewer';
+    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer'>(initialTab);
+
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -518,23 +524,106 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 
     return (
         <div className="xpress-container">
-            <div className="xpress-viewport" {...getRootProps()}>
-                <input {...getInputProps()} />
-                
-                {!file ? (
-                    <div className={`xpress-dropzone ${isDragActive ? 'active' : ''}`}>
-                        <div className="xpress-dropzone-icon">☁️</div>
-                        <p>Arrastra un archivo aquí o haz clic para explorar</p>
-                        <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '8px' }}>
-                            Soporta: CDR, AI, EPS, PDF, SVG, JPG, PNG, WEBP
+            {/* Header de Navegación de Xpress (Visor vs Redrawer) */}
+            <div className="xpress-header-nav">
+                <div className="xpress-nav-brand">
+                    <span className="xpress-brand-icon">👁️</span>
+                    <span className="xpress-brand-title">Xpress Studio</span>
+                </div>
+
+                <div className="xpress-nav-tabs">
+                    <button 
+                        type="button"
+                        className={`xpress-nav-tab ${activeTab === 'viewer' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('viewer');
+                            setSearchParams({});
+                        }}
+                    >
+                        👁️ Visor & Medición
+                    </button>
+                    <button 
+                        type="button"
+                        className={`xpress-nav-tab ${activeTab === 'redrawer' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('redrawer');
+                            setSearchParams({ tab: 'redrawer' });
+                        }}
+                    >
+                        ✏️ Redrawer & Vectorizador
+                        <span className="xpress-tab-pill">NUEVO</span>
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {file && (
+                        <span style={{ fontSize: '0.8rem', color: '#94a3b8', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
+                            📄 {file.name}
                         </span>
-                        <div style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
-                            <span className="xpress-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>⚡ Fast Preview</span>
-                            <span className="xpress-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>📏 Smart Measure</span>
-                            <span className="xpress-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>🎨 Auto Palette</span>
-                        </div>
-                    </div>
-                ) : (
+                    )}
+                    {onClose && (
+                        <button 
+                            type="button"
+                            onClick={onClose}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer', padding: '0 4px' }}
+                            title="Cerrar modal"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {activeTab === 'redrawer' ? (
+                <RedrawerStudio 
+                    initialImageUrl={previewUrl}
+                    initialFileName={file?.name ? file.name.replace(/\.[^/.]+$/, '') : (metadata?.name ? metadata.name.replace(/\.[^/.]+$/, '') : 'archivo')}
+                    onSendToViewer={(svgUrl, newFileName) => {
+                        setPreviewUrl(svgUrl);
+                        if (metadata) {
+                            setMetadata({
+                                ...metadata,
+                                name: newFileName,
+                                format: 'SVG',
+                                colorMode: 'Vector SVG (Redrawer)'
+                            });
+                        }
+                        setActiveTab('viewer');
+                        setSearchParams({});
+                    }}
+                    onClose={onClose}
+                />
+            ) : (
+                <div className="xpress-main-layout">
+                    <div className="xpress-viewport" {...getRootProps()}>
+                        <input {...getInputProps()} />
+                        
+                        {!file ? (
+                            <div className={`xpress-dropzone ${isDragActive ? 'active' : ''}`}>
+                                <div className="xpress-dropzone-icon">☁️</div>
+                                <p>Arrastra un archivo aquí o haz clic para explorar</p>
+                                <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '8px' }}>
+                                    Soporta: CDR, AI, EPS, PDF, SVG, JPG, PNG, WEBP
+                                </span>
+                                <div style={{ marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                    <span className="xpress-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>⚡ Fast Preview</span>
+                                    <span className="xpress-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>📏 Smart Measure</span>
+                                    <span className="xpress-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#f472b6' }}>🎨 Auto Palette</span>
+                                    <span 
+                                        className="xpress-badge" 
+                                        style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', cursor: 'pointer', border: '1px solid rgba(168, 85, 247, 0.4)' }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveTab('redrawer');
+                                            setSearchParams({ tab: 'redrawer' });
+                                        }}
+                                        title="Abrir Redrawer & Vectorizador"
+                                    >
+                                        ✏️ Redrawer Studio
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
                     <div className="xpress-preview-container">
                         {isProcessing ? (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
@@ -705,6 +794,31 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             >
                                 ✂️
                             </button>
+                            <button 
+                                type="button"
+                                className="xpress-tool-btn" 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setActiveTab('redrawer'); 
+                                    setSearchParams({ tab: 'redrawer' });
+                                }} 
+                                title="Abrir en Redrawer (Vectorizar y Redibujar)"
+                                style={{
+                                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                                    width: 'auto',
+                                    padding: '0 12px',
+                                    borderRadius: '18px',
+                                    fontWeight: 700,
+                                    fontSize: '0.78rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: '0 2px 10px rgba(79, 70, 229, 0.4)'
+                                }}
+                            >
+                                <span>✏️</span>
+                                <span>Redrawer</span>
+                            </button>
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>
                         </div>
@@ -858,6 +972,8 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 </div>
             </div>
         </div>
+    )}
+</div>
     );
 };
 
