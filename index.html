@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Luxius - Sistema de Gestión de Impresión Premium" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+    <title>Luxius | Gestión de Impresión</title>
+  <script type="module" crossorigin src="./assets/index-Bsde5hLJ-1788587264862.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-uzBLn4Iv.css">
+</head>
+
+<body>
+    <div id="root"></div>
+    <script>
+        // Pre-warm backend on page load to eliminate Render cold-start latency
+        try {
+            var apiUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                ? 'http://localhost:5000/api/health'
+                : 'https://luxius-backend.onrender.com/api/health';
+            fetch(apiUrl, { method: 'GET', mode: 'no-cors' }).catch(function(){});
+        } catch(e) {}
+    </script>
+</body>
+
+
+</html>
