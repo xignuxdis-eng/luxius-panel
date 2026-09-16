@@ -86,9 +86,50 @@ export async function forceCleanCacheAndReload(preserveAuth = true): Promise<voi
     window.location.replace(cleanUrl);
 }
 
+declare global {
+    interface Window {
+        __LUXIUS_MODAL_OPEN__?: boolean;
+        __LUXIUS_IS_BUSY__?: boolean;
+        __LUXIUS_UPDATE_PENDING__?: boolean;
+    }
+}
+
+/**
+ * Determina si es seguro recargar la página.
+ * Si el usuario tiene un modal abierto, está cargando una orden o descargando
+ * archivos grandes de la nube, la recarga se bloquea para evitar pérdida de datos.
+ */
+export function isSystemSafeToReload(): boolean {
+    if (typeof window === 'undefined') return true;
+    
+    // Si hay un flag explícito de modal abierto o proceso ocupado
+    if (window.__LUXIUS_MODAL_OPEN__ || window.__LUXIUS_IS_BUSY__) {
+        return false;
+    }
+
+    // Verificar en el DOM si hay algún modal montado o formulario activo
+    if (typeof document !== 'undefined') {
+        const activeModal = document.querySelector('.modal, .modal-backdrop, .luxius-modal, [role="dialog"], .pedido-form');
+        if (activeModal) return false;
+    }
+
+    return true;
+}
+
+/**
+ * Aplica una actualización pospuesta si el sistema ya está en reposo.
+ */
+export async function applyPendingUpdateIfSafe(): Promise<void> {
+    if (typeof window !== 'undefined' && window.__LUXIUS_UPDATE_PENDING__ && isSystemSafeToReload()) {
+        console.log('[VersionEngine] Aplicando actualización pospuesta...');
+        window.__LUXIUS_UPDATE_PENDING__ = false;
+        await checkServerVersion();
+    }
+}
+
 /**
  * Consulta la versión remota en version.json. Si difiere de la actual,
- * actualiza automáticamente el sistema.
+ * actualiza automáticamente el sistema únicamente si es seguro.
  */
 export async function checkServerVersion(): Promise<boolean> {
     try {
@@ -115,7 +156,15 @@ export async function checkServerVersion(): Promise<boolean> {
         }
 
         if (installedVersion !== serverBuild && CURRENT_BUILD !== serverBuild) {
-            console.log(`[VersionEngine] Nueva versión detectada: Server=${serverBuild}, Local=${installedVersion}. Actualizando...`);
+            console.log(`[VersionEngine] Nueva versión detectada: Server=${serverBuild}, Local=${installedVersion}.`);
+            
+            // Protección contra pérdida de trabajo en formularios/modales
+            if (!isSystemSafeToReload()) {
+                console.warn('[VersionEngine] Usuario trabajando con orden o descarga activa. Actualización automática pospuesta.');
+                if (typeof window !== 'undefined') window.__LUXIUS_UPDATE_PENDING__ = true;
+                return false;
+            }
+
             localStorage.setItem(VERSION_KEY, serverBuild);
             await purgeServiceWorkersAndCaches();
             window.location.reload();

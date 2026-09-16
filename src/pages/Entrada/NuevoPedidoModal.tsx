@@ -99,6 +99,36 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [senaMetodo, setSenaMetodo] = useState<string>('efectivo');
     const [senaPorcentajeOption, setSenaPorcentajeOption] = useState<'0' | '50' | '100' | 'custom'>('0');
 
+    // --- Precio Personalizado (Override Manual) ---
+    const [priceOverride, setPriceOverride] = useState<number | null>(null);
+    const [isPriceOverridden, setIsPriceOverridden] = useState<boolean>(false);
+
+    // --- Guardias de Ciclo de Vida: Prevenir refrescos automáticos de versión mientras el modal esté abierto ---
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.__LUXIUS_MODAL_OPEN__ = isOpen;
+        }
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.__LUXIUS_MODAL_OPEN__ = false;
+                window.__LUXIUS_IS_BUSY__ = false;
+                import('@/utils/versionCheck').then(m => m.applyPendingUpdateIfSafe()).catch(() => {});
+            }
+        };
+    }, [isOpen]);
+
+    // Prevenir pérdida de datos al recargar o cerrar pestaña si hay proceso activo
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isCloudImporting || saving) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isCloudImporting, saving]);
+
     // --- Searchable Client Dropdown State ---
     const [clientSearch, setClientSearch] = useState('');
     const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -303,8 +333,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), activeTab, selectedComboId, setValue])
 
-    // Dynamic total for current active tab (unitario, lote, combos)
-    const orderTotal = useMemo(() => {
+    // Dynamic calculated total according to pricing formulas
+    const calculatedOrderTotal = useMemo(() => {
         if (activeTab === 'unitario') {
             const w = parseFloat(watchedAncho) || 0;
             const h = parseFloat(watchedAlto) || 0;
@@ -327,6 +357,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
         return 0;
     }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), selectedComboId, batchItems, watchedClientId]);
+
+    // Dynamic total for current active tab (respeta monto manual personalizado si está activo)
+    const orderTotal = useMemo(() => {
+        if (isPriceOverridden && priceOverride !== null && priceOverride >= 0) {
+            return priceOverride;
+        }
+        return calculatedOrderTotal;
+    }, [isPriceOverridden, priceOverride, calculatedOrderTotal]);
 
     const handleSetSenaPreset = (preset: '0' | '50' | '100') => {
         setSenaPorcentajeOption(preset);
@@ -400,6 +438,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             const initSena = Number(order.sena ?? order.senaMonto ?? (order as any).sena_monto ?? 0);
             setSenaAmount(initSena);
             setSenaMetodo(order.senaMetodo || 'efectivo');
+
+            // Cargar y persistir precio personalizado si la orden ya tiene uno o si ya tenía un total histórico
+            const manualPrice = order.precioUnitarioManual ?? (order as any).precio_manual ?? (order as any).precioManual;
+            if (manualPrice !== undefined && manualPrice !== null && Number(manualPrice) > 0) {
+                setPriceOverride(Number(manualPrice));
+                setIsPriceOverridden(true);
+            } else if (order.total && Number(order.total) > 0) {
+                setPriceOverride(Number(order.total));
+                setIsPriceOverridden(true);
+            } else {
+                setPriceOverride(null);
+                setIsPriceOverridden(false);
+            }
+
             const tot = Number(order.total || order.subtotal || 0);
             if (initSena === 0) setSenaPorcentajeOption('0');
             else if (tot > 0 && Math.abs(initSena - tot) < 1) setSenaPorcentajeOption('100');
@@ -430,6 +482,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 subtotal: 0,
                 demasiasConfig: { top: false, bottom: false, left: false, right: false }
             })
+            setPriceOverride(null)
+            setIsPriceOverridden(false)
             setSenaAmount(0)
             setSenaMetodo('efectivo')
             setSenaPorcentajeOption('0')
@@ -990,6 +1044,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const handleCloudImport = async () => {
         if (!cloudUrl) return;
         setIsCloudImporting(true);
+        if (typeof window !== 'undefined') window.__LUXIUS_IS_BUSY__ = true;
         const isWeTransfer = cloudUrl.includes('we.tl') || cloudUrl.includes('wetransfer.com');
         setCloudImportStatus(isWeTransfer ? 'Conectando con WeTransfer...' : 'Conectando con Google Drive...');
         try {
@@ -1097,6 +1152,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         } finally {
             setIsCloudImporting(false);
             setCloudImportStatus('');
+            if (typeof window !== 'undefined') window.__LUXIUS_IS_BUSY__ = false;
         }
     }
 
@@ -1642,16 +1698,23 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         }
                     }
 
+                    const finalTotal = (isPriceOverridden && priceOverride !== null && priceOverride >= 0)
+                        ? priceOverride
+                        : (subtotal || orderTotal);
+                    const finalSaldo = Math.max(0, finalTotal - senaAmount);
+                    const finalSenaPorcentaje = finalTotal > 0 ? Math.min(100, Math.round((senaAmount / finalTotal) * 100)) : (senaAmount > 0 ? 100 : 0);
+
                     await saveOrden({
                         ...order,
                         ...numericData,
-                        subtotal: subtotal || orderTotal,
-                        total: subtotal || orderTotal,
+                        subtotal: finalTotal,
+                        total: finalTotal,
+                        precioUnitarioManual: isPriceOverridden ? priceOverride : undefined,
                         sena: senaAmount,
                         senaMonto: senaAmount,
-                        senaPorcentaje: senaPorcentaje,
+                        senaPorcentaje: finalSenaPorcentaje,
                         senaMetodo: senaMetodo,
-                        saldoPendiente: saldoPendiente,
+                        saldoPendiente: finalSaldo,
                         montoPagado: senaAmount,
                         bobinaAsignada: priceResult.bobinaAsignada,
                         consumoEstimado: priceResult.consumoEstimado,
@@ -1943,6 +2006,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                             type="text" 
                                                             value={cloudUrl} 
                                                             onChange={e => setCloudUrl(e.target.value)} 
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleCloudImport();
+                                                                }
+                                                            }}
                                                             placeholder="Pegar enlace público de Google Drive..." 
                                                             className="lux-input"
                                                             style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px' }}
@@ -2293,6 +2363,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                             type="text" 
                                                             value={cloudUrl} 
                                                             onChange={e => setCloudUrl(e.target.value)} 
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleCloudImport();
+                                                                }
+                                                            }}
                                                             placeholder="Pegar enlace de Google Drive o WeTransfer..." 
                                                             className="lux-input"
                                                             style={{ flex: 1, fontSize: '0.9rem', padding: '6px 10px' }}
@@ -2827,6 +2904,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 type="text" 
                                                                 value={cloudUrl} 
                                                                 onChange={e => setCloudUrl(e.target.value)} 
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleCloudImport();
+                                                                    }
+                                                                }}
                                                                 placeholder="Pegar enlace de Google Drive o WeTransfer..." 
                                                                 className="lux-input"
                                                                 style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px' }}
@@ -2887,11 +2971,75 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                             </p>
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Calculado</span>
-                                        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
-                                            ${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ fontSize: '0.72rem', color: isPriceOverridden ? '#f59e0b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                                                {isPriceOverridden ? 'Monto Acordado (Manual)' : 'Total Calculado'}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isPriceOverridden) {
+                                                        setIsPriceOverridden(false);
+                                                        setPriceOverride(null);
+                                                    } else {
+                                                        setIsPriceOverridden(true);
+                                                        setPriceOverride(orderTotal || calculatedOrderTotal || 0);
+                                                    }
+                                                }}
+                                                style={{
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: 600,
+                                                    padding: '3px 8px',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid',
+                                                    borderColor: isPriceOverridden ? '#f59e0b' : 'rgba(56,189,248,0.4)',
+                                                    background: isPriceOverridden ? 'rgba(245,158,11,0.18)' : 'rgba(56,189,248,0.1)',
+                                                    color: isPriceOverridden ? '#fbbf24' : '#38bdf8',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease'
+                                                }}
+                                                title={isPriceOverridden ? 'Volver al cálculo automático por medidas y material' : 'Personalizar el total manualmente'}
+                                            >
+                                                {isPriceOverridden ? '↺ Restaurar Fórmula' : '✏️ Personalizar Precio'}
+                                            </button>
                                         </div>
+                                        {isPriceOverridden ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fbbf24' }}>$</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={priceOverride === null ? '' : priceOverride}
+                                                    onChange={e => {
+                                                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                                        setPriceOverride(val);
+                                                    }}
+                                                    placeholder="0.00"
+                                                    style={{
+                                                        width: '150px',
+                                                        padding: '4px 8px',
+                                                        fontSize: '1.25rem',
+                                                        fontWeight: 800,
+                                                        color: '#fbbf24',
+                                                        background: 'rgba(0,0,0,0.45)',
+                                                        border: '1px solid #f59e0b',
+                                                        borderRadius: '6px',
+                                                        textAlign: 'right'
+                                                    }}
+                                                />
+                                                {calculatedOrderTotal > 0 && (
+                                                    <span style={{ fontSize: '0.75rem', color: '#64748b', textDecoration: 'line-through', marginLeft: '4px' }} title="Precio sugerido por cálculo original">
+                                                        ${calculatedOrderTotal.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
+                                                ${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

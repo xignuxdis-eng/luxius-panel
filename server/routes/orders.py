@@ -250,6 +250,7 @@ def _presupuesto_to_order(p):
         # Financials & Seña
         'subtotal': float(p.subtotal or p.total or 0),
         'total': float(p.total or p.subtotal or 0),
+        'precioUnitarioManual': esp.get('precioUnitarioManual') or esp.get('precio_manual') or esp.get('precioManual'),
         'sena': float(p.sena_monto or 0),
         'senaMonto': float(p.sena_monto or 0),
         'senaPorcentaje': float(p.sena_porcentaje or 0),
@@ -411,7 +412,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = dict(p.especificaciones or {})
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente', 'precioUnitarioManual'):
         if k in data:
             current_especs[k] = data[k]
 
@@ -549,7 +550,7 @@ def create_order():
         }]
         especs['carteles'] = carteles
 
-    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente'):
+    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente', 'precioUnitarioManual'):
         if k in data:
             especs[k] = data[k]
 
