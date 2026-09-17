@@ -392,14 +392,19 @@ export function generatePdfBudget(order: Order) {
                     .no-print-bar { display: none !important; }
                     html, body { background: #ffffff !important; }
                     .a4-page {
-                        width: 210mm !important;
-                        height: 297mm !important;
-                        min-height: 297mm !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: auto !important;
                         margin: 0 !important;
                         padding: 12mm 15mm 10mm 15mm !important;
                         box-shadow: none !important;
-                        page-break-after: avoid !important;
+                        overflow: visible !important;
                     }
+                    .artwork-and-items { break-inside: avoid; page-break-inside: avoid; }
+                    .tech-specs { break-inside: avoid; page-break-inside: avoid; }
+                    .bottom-blocks { break-inside: avoid; page-break-inside: avoid; }
+                    .fine-print { break-inside: avoid; page-break-inside: avoid; }
+                    .items-table tr { break-inside: avoid; page-break-inside: avoid; }
                 }
             </style>
         </head>

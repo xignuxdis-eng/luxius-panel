@@ -312,6 +312,27 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                     color: #64748b;
                 }
 
+                /* Thumbnail gallery */
+                .thumb-gallery {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 12px;
+                }
+                .thumb-card {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 6px;
+                    padding: 8px;
+                    text-align: center;
+                }
+                .thumb-card img {
+                    width: 100%;
+                    height: 90px;
+                    object-fit: contain;
+                    border-radius: 4px;
+                    margin-bottom: 4px;
+                }
+
                 @media print {
                     .no-print-bar { display: none !important; }
                     html, body { background: #ffffff !important; }
@@ -320,8 +341,15 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                         margin: 0 !important;
                         width: 100% !important;
                         min-height: auto !important;
+                        height: auto !important;
                         padding: 10mm 15mm !important;
+                        overflow: visible !important;
                     }
+                    .items-table tr { page-break-inside: avoid; break-inside: avoid; }
+                    .thumb-gallery { break-before: auto; }
+                    .thumb-card { break-inside: avoid; page-break-inside: avoid; }
+                    .footer-box { break-inside: avoid; page-break-inside: avoid; }
+                    .summary-grid { break-inside: avoid; page-break-inside: avoid; }
                 }
             </style>
         </head>
@@ -413,7 +441,7 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                     </table>
 
                     <!-- Summary & Commercial Notes -->
-                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 20px;">
+                    <div class="summary-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 20px;">
                         <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; font-size: 11.5px; color: #1e40af; line-height: 1.45;">
                             <strong style="display: block; margin-bottom: 4px; font-size: 12px;">💡 Condición de Pago y Seña</strong>
                             Para confirmar órdenes en proceso de diseño o impresión, se sugiere abonar el <strong>50% en concepto de seña</strong>. Las órdenes en estado <em>Impreso</em> o <em>Entregado</em> corresponden a trabajos formalizados.
@@ -446,10 +474,10 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                             <div style="font-size: 11px; font-weight: 800; color: #1e2433; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;">
                                 🎨 Grilla Visual de Trabajos a Imprimir
                             </div>
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                            <div class="thumb-gallery">
                                 ${mappedRows.filter(r => r.thumbUrl).map(r => `
-                                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center;">
-                                        <img src="${r.thumbUrl}" alt="${r.ot}" style="width: 100%; height: 90px; object-fit: contain; border-radius: 4px; margin-bottom: 4px;" />
+                                    <div class="thumb-card">
+                                        <img src="${r.thumbUrl}" alt="${r.ot}" />
                                         <div style="font-size: 10.5px; font-weight: 700; color: #2563eb;">${r.ot}</div>
                                         <div style="font-size: 9.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.desc}</div>
                                     </div>
