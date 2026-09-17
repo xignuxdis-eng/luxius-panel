@@ -69,6 +69,7 @@ export function calculateItemPriceDetailed(
     let appliedPriceMl: number | undefined = undefined;
     let rotated = false;
     let linearMeters = 0;
+    let bestCost = Infinity;
 
     let cliente = undefined;
     if (clientIdParam) {

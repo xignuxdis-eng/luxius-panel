@@ -513,6 +513,11 @@ export function generatePdfBudget(order: Order) {
                                 <span class="tech-spec-label">Medida Final</span>
                                 <span class="tech-spec-value">${printDimM}</span>
                             </div>` : ''}
+                            ${fileDimCm ? `
+                            <div class="tech-spec-item">
+                                <span class="tech-spec-label">Dimensión Archivo</span>
+                                <span class="tech-spec-value">${fileDimCm}</span>
+                            </div>` : ''}
                             ${order.bobinaAsignada ? `
                             <div class="tech-spec-item">
                                 <span class="tech-spec-label">Bobina Asignada</span>

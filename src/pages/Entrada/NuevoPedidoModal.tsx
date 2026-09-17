@@ -191,8 +191,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 }
 
                 // 2. Fondo: API para asegurar frescura
+                const token = localStorage.getItem('luxius_auth_token') || localStorage.getItem('token');
+                const authHeaders: Record<string, string> = { 'Cache-Control': 'no-cache' };
+                if (token) {
+                    authHeaders['Authorization'] = `Bearer ${token}`;
+                }
+
                 try {
-                    const res = await fetch(`${API_URL}/servicios`, { cache: 'no-store' });
+                    const res = await fetch(`${API_URL}/servicios`, { headers: authHeaders, cache: 'no-store' });
                     if (res.ok) {
                         const data = await res.json();
                         if (Array.isArray(data)) {
@@ -206,7 +212,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 }
 
                 try {
-                    const res = await fetch(`${API_URL}/vendedores`, { cache: 'no-store' });
+                    const res = await fetch(`${API_URL}/vendedores`, { headers: authHeaders, cache: 'no-store' });
                     if (res.ok) {
                         const data = await res.json();
                         if (Array.isArray(data)) {
