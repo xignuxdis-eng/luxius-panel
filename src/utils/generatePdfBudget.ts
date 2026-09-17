@@ -423,8 +423,8 @@ export function generatePdfBudget(order: Order) {
                         <div class="brand-left">
                             <img src="${XIGNUX_LOGO_BASE64}" class="brand-logo-img" alt="XignuX Logo" />
                             <div>
-                                <div class="brand-name">XIGNUX GRÁFICA</div>
-                                <div class="brand-sub">Jose V. Cardozo 912, Córdoba · Tel: +54 9 3517897667</div>
+                                <div class="brand-name" style="font-size: 15px; font-weight: 800; color: #1e2433;">Servicios Gráficos e Impresión Digital Profesional</div>
+                                <div class="brand-sub">José V. Cardozo 912, Córdoba · Tel: 3517897667/3517717071</div>
                             </div>
                         </div>
                         <div class="brand-right">
@@ -574,7 +574,7 @@ export function generatePdfBudget(order: Order) {
 
                 <!-- Fine Print Footer -->
                 <div class="fine-print">
-                    XignuX Soluciones Gráficas · Jose V. Cardozo 912, Córdoba · Presupuesto sujeto a confirmación técnica de archivos.
+                    XignuX Servicios Gráficos e Impresión Digital Profesional · José V. Cardozo 912, Córdoba · Tel: 3517897667/3517717071 · Presupuesto sujeto a confirmación técnica de archivos.
                 </div>
             </div>
         </body>

@@ -192,9 +192,8 @@ export function generatePresupuestoHTML(data: PresupuestoData): string {
 
     <div class="header">
         <img src="${LOGO_BASE64}" alt="XignuX Logo" />
-        <h1>XIGNUX GRÁFICA</h1>
-        <p>Jose V. Cardozo 912, Córdoba</p>
-        <p>Tel: +54 9 3517897667 · xignux.dis@gmail.com</p>
+        <h2 style="font-size: 14px; font-weight: 700; margin: 6px 0 3px 0; color: #1e2433;">Servicios Gráficos e Impresión Digital Profesional</h2>
+        <p>José V. Cardozo 912, Córdoba · Tel: 3517897667/3517717071 · xignux.dis@gmail.com</p>
     </div>
 
     <div class="divider"></div>

@@ -370,9 +370,8 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                         <div class="brand-left">
                             <img src="${XIGNUX_LOGO_BASE64}" alt="XignuX Logo" class="brand-logo-img">
                             <div class="brand-info">
-                                <span class="brand-title">XIGNUX PRINT DEN</span>
-                                <span class="brand-sub">Soluciones Gráficas e Impresión Digital</span>
-                                <span class="brand-sub">Eduardo Secchi 4438 | Tel: +54 9 351 234-5678</span>
+                                <span class="brand-sub" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 2px;">Servicios Gráficos e Impresión Digital Profesional</span>
+                                <span class="brand-sub">José V. Cardozo 912 | Tel: 3517897667/3517717071</span>
                             </div>
                         </div>
                         <div class="header-doc-info">
