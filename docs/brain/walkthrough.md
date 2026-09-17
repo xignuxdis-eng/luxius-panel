@@ -1,32 +1,24 @@
-# Luxius UI Refinement & Portability Walkthrough
+# Luxius System & Xana Memory Walkthrough
 
-I have completed the UI refinements to make Luxius more compact and professional, and prepared the project for transfer so you can continue working from home.
+## Actualizaciones Recientes y Fixes Críticos
 
-## UI Improvements
+### 1. Fix de Congelamiento en Carga de Órdenes (`ReferenceError: bestCost`)
+- **Problema**: Al cargar archivos o cotizar ítems en `NuevoPedidoModal`, la aplicación se colgaba completamente.
+- **Causa**: En `src/utils/pricingCalculator.ts`, `bestCost` no estaba declarado (`let bestCost = Infinity;`). En modo estricto de JS esto causaba un `ReferenceError` fatal no capturado.
+- **Solución**: Se inicializó `let bestCost = Infinity;`. Ahora el optimizador de bobinas y cálculo de metros corre sin interrupciones.
 
-### Compact Design System
-- Reduced border radii and input padding globally for a denser, more modern feel.
-- Shrunk modal headers and padding to maximize content visibility.
+### 2. Fix de Autenticación 401 en Sincronización de Servicios y Vendedores
+- **Problema**: En consola aparecían errores `401 Unauthorized` al consultar `/api/servicios` y `/api/vendedores`.
+- **Solución**: En `src/pages/Entrada/NuevoPedidoModal.tsx`, se incluyó la cabecera `Authorization: Bearer <token>` obtenida de la sesión activa en `localStorage`.
 
-### Page Specific Refinements
-- **Entrada**: Optimized the orders table with smaller rows and clearer status badges. Added a "results count" to the filters bar.
-- **Dashboard**: Compacted stat cards and sidebar widgets.
-- **ABM**: Reduced padding in tables and headers.
+### 3. Fix de Paginación y Desborde en PDFs con Miniaturas
+- **Problema**: Al generar PDFs o presupuestos con miniaturas de órdenes, el contenido se desbordaba y se cortaba.
+- **Solución**: En `src/utils/generatePdfBudget.ts` y `src/utils/presupuestoPdf.ts`, se eliminó el forzado de `height: 297mm !important` en `@media print`, configurando `height: auto` y clases con `page-break-inside: avoid` por cada miniatura para permitir paginación fluida.
 
-### Fixed Interactions
-- **Filters**: Fixed the filter bar logic. It now updates automatically as you change criteria.
-- **Nuevo Pedido**: The modal is now more compact, making it easier to use on smaller screens.
+### 4. Memoria Maestra de Xana Consolidada
+- Se creó **`XANA_MEMORIA_SISTEMA.md`** como documento maestro y fuente de la verdad para cualquier asistente de IA (Cursor, Windsurf, Claude Dev, Antigravity) o desarrollador.
+- Se actualizaron las instrucciones de agente en `.agents/rules/xana_agent.md` y `CONTINUAR_EN_CASA.md`.
 
-## Project Packaging
-I have created a ZIP file containing the entire source code and database, excluding `node_modules` to keep the size manageable.
-
-- **Project Location**: [luxius](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius)
-- **ZIP Package**: [luxius_project.zip](file:///C:/Users/Impresion/.gemini/antigravity/scratch/luxius_project.zip)
-
-> [!TIP]
-> When you set this up at home, simply run `npm install` (or use the `setup_env.ps1` script if available) to restore dependencies.
-
-## Verification
-- Verified that all pages load correctly with the new styling.
-- Tested the search and filter functionality on the `Entrada` page.
-- Confirmed that "Agregar Pedido" correctly saves new records to the session storage.
+## Despliegue y Estado
+- Rama `master` y `gh-pages` sincronizadas en GitHub (`https://xignuxdis-eng.github.io/luxius-panel/`).
+- Servidor local Nginx sincronizado en `D:\XignuX\luxius-panel\dist\`.
