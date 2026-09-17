@@ -68,6 +68,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [cloudImportStatus, setCloudImportStatus] = useState<string>('')
     const [showCloudInput, setShowCloudInput] = useState(false)
     const [cloudUrl, setCloudUrl] = useState('')
+    const cloudAbortControllerRef = useRef<AbortController | null>(null)
+
+    const handleCancelCloudImport = () => {
+        if (cloudAbortControllerRef.current) {
+            cloudAbortControllerRef.current.abort()
+            cloudAbortControllerRef.current = null
+        }
+        setIsCloudImporting(false)
+        setCloudImportStatus('')
+        if (typeof window !== 'undefined') window.__LUXIUS_IS_BUSY__ = false
+    }
+
     const [selectedComboId, setSelectedComboId] = useState<number | null>(null)
     const [comboSearch, setComboSearch] = useState('')
     const [comboCategoriaFilter, setComboCategoriaFilter] = useState('todas')
@@ -495,55 +507,58 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     }, [order, reset, setValue])
 
     const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string> => {
-        const timeoutMs = 10000;
+        const timeoutMs = 3500;
         try {
             if (_file) {
-                try {
-                    const renderPromise = (async () => {
-                        const data = (_file instanceof File) ? await _file.arrayBuffer() : _file.slice(0);
-                        const loadingTask = pdfjsLib.getDocument({ data });
-                        const pdf = await loadingTask.promise;
-                        const page = await pdf.getPage(Math.min(pageNum, pdf.numPages));
+                // For huge files (> 25MB), skip PDF.js canvas render in browser to prevent OOM hang
+                const isHugeFile = (_file instanceof File && _file.size > 25 * 1024 * 1024) ||
+                                  (!(_file instanceof File) && _file.byteLength > 25 * 1024 * 1024);
+                if (!isHugeFile) {
+                    try {
+                        const renderPromise = (async () => {
+                            const data = (_file instanceof File) ? await _file.arrayBuffer() : _file.slice(0);
+                            const loadingTask = pdfjsLib.getDocument({ data });
+                            const pdf = await loadingTask.promise;
+                            const page = await pdf.getPage(Math.min(pageNum, pdf.numPages));
 
-                        // High definition crisp resolution: target 1200px max dimension
-                        const unscaledViewport = page.getViewport({ scale: 1.0 });
-                        const targetMaxDim = 1200;
-                        const scale = Math.max(1.5, Math.min(3.0, targetMaxDim / Math.max(unscaledViewport.width, unscaledViewport.height)));
-                        const viewport = page.getViewport({ scale });
+                            // Lightweight thumbnail resolution: target 400px max dimension
+                            const unscaledViewport = page.getViewport({ scale: 1.0 });
+                            const targetMaxDim = 400;
+                            const scale = Math.min(1.5, Math.max(0.4, targetMaxDim / Math.max(unscaledViewport.width, unscaledViewport.height)));
+                            const viewport = page.getViewport({ scale });
 
-                        const renderCanvas = document.createElement('canvas');
-                        renderCanvas.width = viewport.width;
-                        renderCanvas.height = viewport.height;
-                        const renderCtx = renderCanvas.getContext('2d');
-                        if (renderCtx) {
-                            // Ensure crisp white background
-                            renderCtx.fillStyle = '#ffffff';
-                            renderCtx.fillRect(0, 0, viewport.width, viewport.height);
+                            const renderCanvas = document.createElement('canvas');
+                            renderCanvas.width = viewport.width;
+                            renderCanvas.height = viewport.height;
+                            const renderCtx = renderCanvas.getContext('2d');
+                            if (renderCtx) {
+                                renderCtx.fillStyle = '#ffffff';
+                                renderCtx.fillRect(0, 0, viewport.width, viewport.height);
 
-                            const renderTask = page.render({
-                                canvasContext: renderCtx,
-                                viewport: viewport
-                            });
-                            await renderTask.promise;
+                                const renderTask = page.render({
+                                    canvasContext: renderCtx,
+                                    viewport: viewport
+                                });
+                                await renderTask.promise;
 
-                            // Return high-definition lightweight WebP
-                            return renderCanvas.toDataURL('image/webp', 0.92);
-                        }
-                        return '';
-                    })();
+                                return renderCanvas.toDataURL('image/webp', 0.80);
+                            }
+                            return '';
+                        })();
 
-                    const timeoutPromise = new Promise<string>((resolve) =>
-                        setTimeout(() => resolve(''), timeoutMs)
-                    );
+                        const timeoutPromise = new Promise<string>((resolve) =>
+                            setTimeout(() => resolve(''), timeoutMs)
+                        );
 
-                    const result = await Promise.race([renderPromise, timeoutPromise]);
-                    if (result) return result;
-                } catch (pdfErr) {
-                    console.warn("[Luxius-PDF] Falló renderizado real HD, usando fallback", pdfErr);
+                        const result = await Promise.race([renderPromise, timeoutPromise]);
+                        if (result) return result;
+                    } catch (pdfErr) {
+                        console.warn("[Luxius-PDF] Falló renderizado real, usando fallback", pdfErr);
+                    }
                 }
             }
 
-            // Fallback card if rendering failed
+            // Fallback card if rendering failed, timed out or file was too large
             const w = 400, h = 500;
             const canvas = document.createElement('canvas');
             canvas.width = w;
@@ -908,89 +923,86 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     else if (fullText.includes('ColorMode>4') || fullText.includes('/DeviceCMYK')) colorMode = 'CMYK';
                 } catch (e) { }
 
-                // 2b. PDFJS Image Object & Viewport Effective DPI calculation
-                try {
-                    const pdfJsDoc = await Promise.race([
-                        pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise,
-                        new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 5000))
-                    ]);
-                    if (pdfJsDoc) {
-                        const pdfPage = await pdfJsDoc.getPage(Math.min(pageNum, pdfJsDoc.numPages));
-                        const viewport = pdfPage.getViewport({ scale: 1.0 });
+                // 2b. PDFJS Image Object & Viewport Effective DPI calculation (only if not found in XMP & lightweight)
+                if (dpi <= 72 && arrayBuffer.byteLength <= 20 * 1024 * 1024) {
+                    try {
+                        const pdfJsDoc = await Promise.race([
+                            pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise,
+                            new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 2500))
+                        ]);
+                        if (pdfJsDoc) {
+                            const pdfPage = await pdfJsDoc.getPage(Math.min(pageNum, pdfJsDoc.numPages));
+                            const viewport = pdfPage.getViewport({ scale: 1.0 });
 
-                        let detectedDpi = 0;
-                        const ops = await pdfPage.getOperatorList();
+                            let detectedDpi = 0;
+                            const ops = await Promise.race([
+                                pdfPage.getOperatorList(),
+                                new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout ops")), 2000))
+                            ]);
 
-                        // Track the Current Transformation Matrix (CTM) to calculate real image DPI.
-                        // In PDFs, images are placed via: save → transform [a,b,c,d,e,f] → paintImage → restore
-                        // The 'a' component = image width in PDF points, 'd' = height in points.
-                        // Real DPI = imagePixels / (placementPoints / 72)
-                        let lastTransformArgs: number[] | null = null;
-                        for (let k = 0; k < ops.fnArray.length; k++) {
-                            const fn = ops.fnArray[k];
+                            if (ops && ops.fnArray) {
+                                let lastTransformArgs: number[] | null = null;
+                                const maxScan = Math.min(ops.fnArray.length, 300);
+                                for (let k = 0; k < maxScan; k++) {
+                                    const fn = ops.fnArray[k];
 
-                            // Track the most recent transform before a paintImage operation
-                            if (fn === pdfjsLib.OPS.transform) {
-                                lastTransformArgs = ops.argsArray[k] as number[];
-                            }
-
-                            if (
-                                fn === pdfjsLib.OPS.paintImageXObject ||
-                                fn === pdfjsLib.OPS.paintInlineImageXObject ||
-                                fn === pdfjsLib.OPS.paintImageXObjectRepeat
-                            ) {
-                                const imgName = ops.argsArray[k][0];
-                                try {
-                                    let imgObj = null;
-                                    if (pdfPage.objs.has(imgName)) imgObj = pdfPage.objs.get(imgName);
-                                    else if (pdfPage.commonObjs.has(imgName)) imgObj = pdfPage.commonObjs.get(imgName);
-
-                                    if (imgObj && imgObj.width && imgObj.height) {
-                                        let calcDpi = 0;
-
-                                        if (lastTransformArgs && lastTransformArgs.length >= 4) {
-                                            // CTM: [a, b, c, d, e, f]
-                                            // a = horizontal scale (width in points), d = vertical scale (height in points)
-                                            // For rotated images, width might be in 'b'/'c' components
-                                            const a = Math.abs(lastTransformArgs[0]);
-                                            const b = Math.abs(lastTransformArgs[1]);
-                                            const c = Math.abs(lastTransformArgs[2]);
-                                            const d = Math.abs(lastTransformArgs[3]);
-
-                                            // Effective placement size in points (handle rotation)
-                                            const placementWidthPts = Math.max(a, b) || viewport.width;
-                                            const placementHeightPts = Math.max(c, d) || viewport.height;
-
-                                            const placementWidthInches = placementWidthPts / 72;
-                                            const placementHeightInches = placementHeightPts / 72;
-
-                                            const dpiX = Math.round(imgObj.width / placementWidthInches);
-                                            const dpiY = Math.round(imgObj.height / placementHeightInches);
-                                            calcDpi = Math.max(dpiX, dpiY);
-                                            console.log(`[Luxius-Meta] PDF Image CTM: a=${a.toFixed(1)} d=${d.toFixed(1)} → img ${imgObj.width}×${imgObj.height}px → ${calcDpi} DPI`);
-                                        } else {
-                                            // Fallback: use full page dimensions (less accurate)
-                                            const pageWidthInches = viewport.width / 72;
-                                            const pageHeightInches = viewport.height / 72;
-                                            const dpiX = Math.round(imgObj.width / pageWidthInches);
-                                            const dpiY = Math.round(imgObj.height / pageHeightInches);
-                                            calcDpi = Math.max(dpiX, dpiY);
-                                        }
-
-                                        if (calcDpi > detectedDpi) detectedDpi = calcDpi;
+                                    if (fn === pdfjsLib.OPS.transform) {
+                                        lastTransformArgs = ops.argsArray[k] as number[];
                                     }
-                                } catch (e) { }
-                                lastTransformArgs = null; // Reset after consuming
+
+                                    if (
+                                        fn === pdfjsLib.OPS.paintImageXObject ||
+                                        fn === pdfjsLib.OPS.paintInlineImageXObject ||
+                                        fn === pdfjsLib.OPS.paintImageXObjectRepeat
+                                    ) {
+                                        const imgName = ops.argsArray[k][0];
+                                        try {
+                                            let imgObj = null;
+                                            if (pdfPage.objs.has(imgName)) imgObj = pdfPage.objs.get(imgName);
+                                            else if (pdfPage.commonObjs.has(imgName)) imgObj = pdfPage.commonObjs.get(imgName);
+
+                                            if (imgObj && imgObj.width && imgObj.height) {
+                                                let calcDpi = 0;
+
+                                                if (lastTransformArgs && lastTransformArgs.length >= 4) {
+                                                    const a = Math.abs(lastTransformArgs[0]);
+                                                    const b = Math.abs(lastTransformArgs[1]);
+                                                    const c = Math.abs(lastTransformArgs[2]);
+                                                    const d = Math.abs(lastTransformArgs[3]);
+
+                                                    const placementWidthPts = Math.max(a, b) || viewport.width;
+                                                    const placementHeightPts = Math.max(c, d) || viewport.height;
+
+                                                    const placementWidthInches = placementWidthPts / 72;
+                                                    const placementHeightInches = placementHeightPts / 72;
+
+                                                    const dpiX = Math.round(imgObj.width / placementWidthInches);
+                                                    const dpiY = Math.round(imgObj.height / placementHeightInches);
+                                                    calcDpi = Math.max(dpiX, dpiY);
+                                                } else {
+                                                    const pageWidthInches = viewport.width / 72;
+                                                    const pageHeightInches = viewport.height / 72;
+                                                    const dpiX = Math.round(imgObj.width / pageWidthInches);
+                                                    const dpiY = Math.round(imgObj.height / pageHeightInches);
+                                                    calcDpi = Math.max(dpiX, dpiY);
+                                                }
+
+                                                if (calcDpi > detectedDpi) detectedDpi = calcDpi;
+                                            }
+                                        } catch (e) { }
+                                        lastTransformArgs = null;
+                                    }
+                                }
+
+                                if (detectedDpi > 0) {
+                                    dpi = detectedDpi;
+                                    console.log(`[Luxius-Meta] DPI real de imagen en PDF: ${dpi} DPI`);
+                                }
                             }
                         }
-
-                        if (detectedDpi > 0) {
-                            dpi = detectedDpi;
-                            console.log(`[Luxius-Meta] DPI real de imagen en PDF: ${dpi} DPI`);
-                        }
+                    } catch (pdfJsErr) {
+                        console.warn("[Luxius-Meta] Error o timeout en DPI de PDFJS", pdfJsErr);
                     }
-                } catch (pdfJsErr) {
-                    console.warn("[Luxius-Meta] Error al calcular DPI en PDFJS", pdfJsErr);
                 }
 
                 // 3. Page Thumbnail (Lazy call)
@@ -1044,6 +1056,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         if (!cloudUrl) return;
         setIsCloudImporting(true);
         if (typeof window !== 'undefined') window.__LUXIUS_IS_BUSY__ = true;
+
+        const abortController = new AbortController();
+        cloudAbortControllerRef.current = abortController;
+        const abortTimeout = setTimeout(() => {
+            abortController.abort();
+        }, 90000);
+
         const isWeTransfer = cloudUrl.includes('we.tl') || cloudUrl.includes('wetransfer.com');
         setCloudImportStatus(isWeTransfer ? 'Conectando con WeTransfer...' : 'Conectando con Google Drive...');
         try {
@@ -1054,9 +1073,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 res = await fetch(`${API_URL}/import-cloud`, {
                     method: 'POST',
                     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-                    body: JSON.stringify({ url: cloudUrl })
+                    body: JSON.stringify({ url: cloudUrl }),
+                    signal: abortController.signal
                 });
             } catch (fetchErr: any) {
+                if (abortController.signal.aborted) throw fetchErr;
                 // If local backend is down or unreachable, seamlessly fallback to the Render cloud backend
                 if (API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
                     console.warn('[CloudImport] Servidor local no disponible, intentando servidor en la nube de respaldo...');
@@ -1065,7 +1086,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     res = await fetch(`https://luxius-backend.onrender.com/api/import-cloud`, {
                         method: 'POST',
                         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-                        body: JSON.stringify({ url: cloudUrl })
+                        body: JSON.stringify({ url: cloudUrl }),
+                        signal: abortController.signal
                     });
                 } else {
                     throw fetchErr;
@@ -1090,17 +1112,22 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 }
 
                 // Helper: fetch with timeout to prevent indefinite hangs on slow downloads
-                const fetchWithTimeout = async (url: string, timeoutMs: number = 120000): Promise<Response> => {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                const fetchWithTimeout = async (url: string, timeoutMs: number = 90000): Promise<Response> => {
+                    const downloadCtrl = new AbortController();
+                    const timeoutId = setTimeout(() => downloadCtrl.abort(), timeoutMs);
+                    const onParentAbort = () => downloadCtrl.abort();
+                    abortController.signal.addEventListener('abort', onParentAbort);
+
                     try {
-                        const response = await fetch(url, { signal: controller.signal });
+                        const response = await fetch(url, { signal: downloadCtrl.signal });
                         clearTimeout(timeoutId);
+                        abortController.signal.removeEventListener('abort', onParentAbort);
                         return response;
                     } catch (err: any) {
                         clearTimeout(timeoutId);
+                        abortController.signal.removeEventListener('abort', onParentAbort);
                         if (err.name === 'AbortError') {
-                            throw new Error(`La descarga tardó demasiado (más de ${Math.round(timeoutMs / 1000)}s). Intente de nuevo.`);
+                            throw new Error(`La descarga tardó demasiado o fue cancelada.`);
                         }
                         throw err;
                     }
@@ -1110,7 +1137,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     setCloudImportStatus('Descargando archivo (1/1)...');
                     const fileInfo = data.files[0];
                     const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
-                    const blobRes = await fetchWithTimeout(fileUrl, 120000);
+                    const blobRes = await fetchWithTimeout(fileUrl, 90000);
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
                     const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
@@ -1118,11 +1145,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 } else if (targetTab === 'lote') {
                     let downloadErrors = 0;
                     for (let i = 0; i < data.files.length; i++) {
+                        if (abortController.signal.aborted) break;
                         const fileInfo = data.files[i];
                         setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
                         try {
                             const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
-                            const blobRes = await fetchWithTimeout(fileUrl, 120000);
+                            const blobRes = await fetchWithTimeout(fileUrl, 90000);
                             if (!blobRes.ok) { downloadErrors++; continue; }
                             const blob = await blobRes.blob();
                             const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
@@ -1141,14 +1169,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             
                             const url = URL.createObjectURL(file);
                             blobStore.set(file.name, url);
-                            extractMetadata(file, url).then(meta => {
-                                setBatchItems(prev => prev.map(it => it.id === placeholder.id ? {
-                                    ...it,
-                                    previewUrl: meta.thumbnailUrl || url,
-                                    metadata: meta,
-                                    confirmed: true
-                                } : it));
-                            });
+                            
+                            // Sequential metadata extraction with breathing room
+                            const meta = await extractMetadata(file, url);
+                            setBatchItems(prev => prev.map(it => it.id === placeholder.id ? {
+                                ...it,
+                                previewUrl: meta.thumbnailUrl || url,
+                                metadata: meta,
+                                confirmed: true
+                            } : it));
+
+                            await new Promise(r => setTimeout(r, 40));
                         } catch (e) {
                             downloadErrors++;
                             console.error("Error importando archivo del lote", fileInfo, e);
@@ -1165,12 +1196,16 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         } catch (err: any) {
             console.error("Cloud Import Error:", err);
             const msg = err?.message || '';
-            if (msg.includes('Failed to fetch') || err?.name === 'TypeError') {
+            if (abortController.signal.aborted || err?.name === 'AbortError') {
+                console.log('[CloudImport] Importación cancelada por el usuario o por límite de tiempo.');
+            } else if (msg.includes('Failed to fetch') || err?.name === 'TypeError') {
                 alert("⚠️ Error de conexión con el servidor de importación en la nube. El servicio se está iniciando o la red tardó en responder. Por favor, reintenta en unos segundos.");
             } else {
                 alert(`Error al importar: ${msg}`);
             }
         } finally {
+            clearTimeout(abortTimeout);
+            cloudAbortControllerRef.current = null;
             setIsCloudImporting(false);
             setCloudImportStatus('');
             if (typeof window !== 'undefined') window.__LUXIUS_IS_BUSY__ = false;
@@ -1241,20 +1276,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     setValue('alto', (meta.height / 100).toFixed(2))
                 }
                 if (meta.thumbnailUrl) {
-                    console.log(`[Luxius-Meta] Aplicando miniatura TIFF/PDF a previsualización: ${meta.thumbnailUrl.substring(0, 50)}...`)
+                    console.log(`[Luxius-Meta] Aplicando miniatura a previsualización: ${meta.thumbnailUrl.substring(0, 50)}...`)
                     setPreviewUrl(meta.thumbnailUrl)
-                } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-                    // Generate a visual fallback thumbnail for PDFs without a rendered preview
-                    try {
-                        const fallbackThumb = await getPdfThumbnail(file, 1, meta.width ? meta.width : 21, meta.height ? meta.height : 29.7);
-                        if (fallbackThumb) {
-                            setPreviewUrl(fallbackThumb);
-                        } else {
-                            setPreviewUrl(null);
-                        }
-                    } catch {
-                        setPreviewUrl(null);
-                    }
                 }
             } catch (err) {
                 console.error('[Luxius-Meta] Error fatal:', err)
@@ -1280,17 +1303,19 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         console.log(`[Luxius-Batch] Iniciando carga de ${files.length} archivos.`);
         setExtracting(true);
 
+        const availableMats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
+        const currentMat = getValues('material');
+        const initialMat = currentMat || watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
+
+        // STEP 1: ADD INSTANT PLACEHOLDER CARDS FOR ALL FILES
+        const queue: { file: File; fileId: string; ext: string; url: string; initialMat: string }[] = [];
+
         for (const file of files) {
             const fileId = Math.random().toString(36).substring(2, 9);
             const ext = (file.name.split('.').pop()?.toUpperCase() || '');
             const url = URL.createObjectURL(file);
             blobStore.set(file.name, url);
 
-            const availableMats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
-            const currentMat = getValues('material');
-            const initialMat = currentMat || watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
-
-            // STEP 1: ADD INSTANT PLACEHOLDER CARD
             const placeholder: BatchItem = {
                 id: fileId,
                 file: file,
@@ -1304,13 +1329,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 servicios: {}
             };
             setBatchItems(prev => [...prev, placeholder]);
+            queue.push({ file, fileId, ext, url, initialMat });
+        }
 
-            // STEP 2: BACKGROUND PROCESSING (IIFE to decouple from loop)
-            (async () => {
+        // STEP 2: SEQUENTIAL BACKGROUND QUEUE (processes files one-by-one to keep UI alive)
+        (async () => {
+            for (const item of queue) {
+                const { file, fileId, ext, url, initialMat } = item;
                 try {
-                    // CRITICAL: Read the file ONCE and keep a MASTER copy that is NEVER
-                    // passed directly to any library. PDFJS v5 transfers/neuters ArrayBuffers,
-                    // so every downstream consumer gets a fresh .slice(0) copy.
                     let masterBuffer: ArrayBuffer | undefined = undefined;
                     if (ext === 'PDF') {
                         masterBuffer = await file.arrayBuffer();
@@ -1320,18 +1346,16 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     // INITIAL DETECTION — pass a COPY of the buffer
                     const meta = await Promise.race([
                         extractMetadata(file, url, 1, masterBuffer ? masterBuffer.slice(0) : undefined),
-                        new Promise<BatchItem['metadata']>(r => setTimeout(() => r({ width: 0, height: 0, dpi: 72, format: ext, colorMode: 'RGB', pageCount: 0 }), 12000))
+                        new Promise<BatchItem['metadata']>(r => setTimeout(() => r({ width: 0, height: 0, dpi: 72, format: ext, colorMode: 'RGB', pageCount: 0 }), 8000))
                     ]);
                     let realPageCount = meta.pageCount || 1;
-                    console.log(`[Luxius-DEBUG] extractMetadata retornó pageCount=${meta.pageCount}, realPageCount=${realPageCount} para ${file.name}`);
 
                     // MULTI-ENGINE RE-CHECK for PDFs — always use copies from masterBuffer
-                    if (ext === 'PDF' && masterBuffer && masterBuffer.byteLength > 0) {
-                        // A. PDFJS with Timeout — fresh copy
+                    if (ext === 'PDF' && masterBuffer && masterBuffer.byteLength > 0 && masterBuffer.byteLength < 30 * 1024 * 1024) {
                         try {
                             const pdfjsDoc = await Promise.race([
                                 pdfjsLib.getDocument({ data: masterBuffer.slice(0) }).promise,
-                                new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 8000))
+                                new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 4000))
                             ]);
                             if (pdfjsDoc && pdfjsDoc.numPages > realPageCount) {
                                 console.warn(`[Luxius-DEBUG] PDFJS detectó ${pdfjsDoc.numPages} vs PDF-LIB ${realPageCount}. Actualizando.`);
@@ -1339,11 +1363,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             }
                         } catch (e) { console.warn("[Luxius-DEBUG] Backup PDFJS falló o timed out", e); }
 
-                        // B. RAW SCAN LAYER — fresh copy for TextDecoder
+                        // RAW SCAN LAYER for multi-page markers
                         if (realPageCount === 1) {
                             try {
                                 const decoder = new TextDecoder();
-                                const scanCopy = masterBuffer.slice(0, Math.min(masterBuffer.byteLength, 2097152));
+                                const scanCopy = masterBuffer.slice(0, Math.min(masterBuffer.byteLength, 1048576));
                                 const text = decoder.decode(new Uint8Array(scanCopy));
 
                                 const pageMatches = text.match(/\/Type\s*\/Page(?!s)\b/gi);
@@ -1361,11 +1385,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         }
                     }
 
-                    // EXPLOSION LOGIC — use fresh copies from masterBuffer
+                    // EXPLOSION LOGIC for multi-page PDF
                     if (realPageCount > 1 && ext === 'PDF' && masterBuffer && masterBuffer.byteLength > 0) {
                         console.log(`[Luxius-DEBUG] EXPLOTANDO EN BG: ${file.name} -> ${realPageCount} páginas.`);
 
-                        // INHERITANCE: Read from REF to get latest user input
                         const mother = batchItemsRef.current.find(it => it.id === fileId);
                         const inheritedMaterial = mother?.material || initialMat;
                         const inheritedCopias = mother?.copias || 1;
@@ -1383,7 +1406,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             const itemId = Math.random().toString(36).substring(2, 9);
                             const pageName = `${file.name.replace(/\.pdf$/i, '')}_P${p}.pdf`;
 
-                            // 1. Extract page p into a single-page PDF File first
                             let pageFile: File | null = null;
                             let wCm = meta.width || 21.0;
                             let hCm = meta.height || 29.7;
@@ -1404,38 +1426,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 }
                             }
 
-                            // Fallback Resurrection via PDFJS if PDF-LIB extraction failed
-                            if (!pageFile) {
-                                try {
-                                    const pjDoc = await pdfjsLib.getDocument({ data: masterBuffer.slice(0) }).promise;
-                                    if (p <= pjDoc.numPages) {
-                                        const page = await pjDoc.getPage(p);
-                                        const vp = page.getViewport({ scale: 2.0 });
-                                        const can = document.createElement('canvas');
-                                        const ctx = can.getContext('2d');
-                                        if (ctx) {
-                                            can.height = vp.height; can.width = vp.width;
-                                            await page.render({ canvasContext: ctx, viewport: vp }).promise;
-                                            const resDoc = await PDFDocument.create();
-                                            const resImg = await resDoc.embedPng(can.toDataURL('image/png'));
-                                            const resP = resDoc.addPage([resImg.width, resImg.height]);
-                                            resP.drawImage(resImg, { x: 0, y: 0, width: resImg.width, height: resImg.height });
-                                            const pdfBytes = await resDoc.save();
-                                            pageFile = new File([pdfBytes], pageName, { type: 'application/pdf' });
-                                            wCm = Math.round((vp.width * 2.54 / (72 * 2)) * 10) / 10;
-                                            hCm = Math.round((vp.height * 2.54 / (72 * 2)) * 10) / 10;
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.error(`[Luxius-DEBUG] Fallback PDFJS error P${p}:`, e);
-                                }
-                            }
-
                             if (pageFile) {
                                 const pageUrl = URL.createObjectURL(pageFile);
                                 blobStore.set(pageName, pageUrl);
 
-                                // Render real high-res thumbnail for this exact page
                                 const thumb = await getPdfThumbnail(masterBuffer.slice(0), p, wCm, hCm);
 
                                 const pageItem: BatchItem = {
@@ -1460,12 +1454,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 };
 
                                 setBatchItems(prev => [...prev, pageItem]);
-                            } else {
-                                console.error(`[Luxius-DEBUG] No se pudo crear el archivo para la página ${p}`);
                             }
 
-                            // Small pause between pages to keep UI responsive
-                            await new Promise(r => setTimeout(r, 20));
+                            // Breather between pages to keep UI 100% smooth
+                            await new Promise(r => setTimeout(r, 40));
                         }
                     } else {
                         // Update single file placeholder
@@ -1487,9 +1479,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 } catch (err) {
                     console.error(`[Luxius-DEBUG] Error procesando archivo: ${file.name}`, err);
                 }
-            })();
-        }
-        setTimeout(() => setExtracting(false), 800);
+
+                // Breather between batch items
+                await new Promise(r => setTimeout(r, 50));
+            }
+            setExtracting(false);
+        })();
     }
 
     const handleBatchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2045,9 +2040,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                     </div>
                                                 )}
                                                 {isCloudImporting && cloudImportStatus && (
-                                                    <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '6px 12px', borderRadius: '4px' }}>
-                                                        <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                        {cloudImportStatus}
+                                                    <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '6px 12px', borderRadius: '4px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            {cloudImportStatus}
+                                                        </div>
+                                                        <button type="button" onClick={handleCancelCloudImport} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>
+                                                            Cancelar
+                                                        </button>
                                                     </div>
                                                 )}
                                                 {selectedFile && (
@@ -2402,9 +2402,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                     </div>
                                                 )}
                                                 {isCloudImporting && cloudImportStatus && (
-                                                    <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
-                                                        <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                        {cloudImportStatus}
+                                                    <div style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(37,99,235,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                            {cloudImportStatus}
+                                                        </div>
+                                                        <button type="button" onClick={handleCancelCloudImport} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}>
+                                                            Cancelar
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
@@ -2943,9 +2948,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </div>
                                                     )}
                                                     {isCloudImporting && cloudImportStatus && (
-                                                        <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                            {cloudImportStatus}
+                                                        <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', background: 'rgba(37,99,235,0.1)', padding: '4px 8px', borderRadius: '4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                                                                {cloudImportStatus}
+                                                            </div>
+                                                            <button type="button" onClick={handleCancelCloudImport} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.7rem', cursor: 'pointer', fontWeight: 600 }}>
+                                                                Cancelar
+                                                            </button>
                                                         </div>
                                                     )}
                                                     <span className="upload-subtext">Click para examinar PDF, TIFF, JPG, CDR, AI</span>

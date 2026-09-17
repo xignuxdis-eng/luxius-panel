@@ -66,8 +66,8 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
         setHasError(false);
         let objectUrl: string | null = null;
 
-        // 1. Direct DataURL or pre-generated preview provided
-        if (fileUrl && fileUrl.startsWith('data:image/')) {
+        // 1. Direct DataURL or pre-generated preview provided (including blob preview URLs)
+        if (fileUrl && (fileUrl.startsWith('data:image/') || fileUrl.startsWith('blob:'))) {
             setImgSrc(fileUrl);
             return;
         }
@@ -113,16 +113,25 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                     setImgSrc(generateVectorCard('EPS', file.name, dimensions, dpi));
                 });
             } else if (fileExt === 'ai' || fileExt === 'pdf') {
-                // Attempt high-definition PDFJS rendering for AI & PDF
+                // If file is heavy (> 25MB), use vector card immediately to avoid browser freeze
+                if (file.size > 25 * 1024 * 1024) {
+                    setImgSrc(generateVectorCard(fileExt.toUpperCase(), file.name, dimensions, dpi));
+                    return;
+                }
+                // Attempt lightweight PDFJS rendering with timeout
                 (async () => {
                     try {
                         const arrayBuffer = await file.arrayBuffer();
-                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                        if (pdf.numPages > 0) {
+                        const loadPromise = pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        const pdf = await Promise.race([
+                            loadPromise,
+                            new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDF preview")), 4000))
+                        ]);
+                        if (pdf && pdf.numPages > 0) {
                             const page = await pdf.getPage(1);
                             const unscaled = page.getViewport({ scale: 1.0 });
-                            const targetMax = 1200;
-                            const scale = Math.max(1.5, Math.min(3.0, targetMax / Math.max(unscaled.width, unscaled.height)));
+                            const targetMax = 400; // Lightweight 400px thumbnail
+                            const scale = Math.min(1.5, targetMax / Math.max(unscaled.width, unscaled.height));
                             const viewport = page.getViewport({ scale });
                             const canvas = document.createElement('canvas');
                             canvas.width = viewport.width;
@@ -132,12 +141,12 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                                 ctx.fillStyle = '#ffffff';
                                 ctx.fillRect(0, 0, viewport.width, viewport.height);
                                 await page.render({ canvasContext: ctx, viewport }).promise;
-                                setImgSrc(canvas.toDataURL('image/webp', 0.92));
+                                setImgSrc(canvas.toDataURL('image/webp', 0.85));
                                 return;
                             }
                         }
                     } catch (e) {
-                        // PDFJS failed (e.g. pure PostScript .ai)
+                        // PDFJS failed or timed out
                     }
                     setImgSrc(generateVectorCard(fileExt.toUpperCase(), file.name, dimensions, dpi));
                 })();
