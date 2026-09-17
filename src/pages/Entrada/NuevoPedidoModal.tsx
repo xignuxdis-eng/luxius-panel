@@ -910,7 +910,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                 // 2b. PDFJS Image Object & Viewport Effective DPI calculation
                 try {
-                    await workerReady;
                     const pdfJsDoc = await Promise.race([
                         pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise,
                         new Promise<null>((_, rej) => setTimeout(() => rej(new Error("Timeout PDFJS")), 5000))
@@ -1090,23 +1089,41 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     setActiveTab('lote');
                 }
 
+                // Helper: fetch with timeout to prevent indefinite hangs on slow downloads
+                const fetchWithTimeout = async (url: string, timeoutMs: number = 120000): Promise<Response> => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                    try {
+                        const response = await fetch(url, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        return response;
+                    } catch (err: any) {
+                        clearTimeout(timeoutId);
+                        if (err.name === 'AbortError') {
+                            throw new Error(`La descarga tardó demasiado (más de ${Math.round(timeoutMs / 1000)}s). Intente de nuevo.`);
+                        }
+                        throw err;
+                    }
+                };
+
                 if (targetTab === 'unitario' || targetTab === 'promos') {
                     setCloudImportStatus('Descargando archivo (1/1)...');
                     const fileInfo = data.files[0];
                     const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
-                    const blobRes = await fetch(fileUrl);
+                    const blobRes = await fetchWithTimeout(fileUrl, 120000);
                     if (!blobRes.ok) throw new Error('Error al descargar el archivo del servidor temporal');
                     const blob = await blobRes.blob();
                     const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
                     handleFileChange({ target: { files: [file] } } as any);
                 } else if (targetTab === 'lote') {
+                    let downloadErrors = 0;
                     for (let i = 0; i < data.files.length; i++) {
                         const fileInfo = data.files[i];
                         setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
                         try {
                             const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
-                            const blobRes = await fetch(fileUrl);
-                            if (!blobRes.ok) continue;
+                            const blobRes = await fetchWithTimeout(fileUrl, 120000);
+                            if (!blobRes.ok) { downloadErrors++; continue; }
                             const blob = await blobRes.blob();
                             const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
 
@@ -1133,8 +1150,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 } : it));
                             });
                         } catch (e) {
+                            downloadErrors++;
                             console.error("Error importando archivo del lote", fileInfo, e);
                         }
+                    }
+                    if (downloadErrors > 0 && downloadErrors === data.files.length) {
+                        throw new Error('No se pudo descargar ningún archivo. Verifique su conexión e intente de nuevo.');
                     }
                 }
                 
