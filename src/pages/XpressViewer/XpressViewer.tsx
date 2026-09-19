@@ -157,17 +157,20 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [pdfDoc, currentPage, totalPages, isRenderingPage]);
 
+    const paramFileUrl = searchParams.get('fileUrl') || searchParams.get('url') || initialFileUrl;
+    const paramFileName = searchParams.get('fileName') || searchParams.get('name') || initialFileName;
+
     React.useEffect(() => {
         if (initialFile) {
             processFile(initialFile);
-        } else if (initialFileUrl) {
+        } else if (paramFileUrl) {
             const fetchFile = async () => {
                 setIsProcessing(true);
-                setStatusText('Descargando archivo original...');
+                setStatusText('Descargando archivo original para inspección...');
                 try {
-                    const res = await fetch(initialFileUrl);
+                    const res = await fetch(paramFileUrl);
                     const blob = await res.blob();
-                    const fileName = initialFileName || initialFileUrl.split('/').pop() || 'archivo_remoto';
+                    const fileName = paramFileName || paramFileUrl.split('/').pop()?.split('?')[0] || 'archivo_remoto';
                     const newFile = new File([blob], fileName, { type: blob.type });
                     processFile(newFile);
                 } catch (e) {
@@ -178,7 +181,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             };
             fetchFile();
         }
-    }, [initialFileUrl, initialFile]);
+    }, [paramFileUrl, initialFile, paramFileName]);
 
     const extractColorsFromImage = (img: HTMLImageElement) => {
         const canvas = document.createElement('canvas');

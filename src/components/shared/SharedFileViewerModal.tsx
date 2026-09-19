@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Modal from '@components/ui/Modal'
 import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { API_URL, getServicios, getMateriales, getCalidades, resolveMediaUrl, getAuthHeaders } from '@data/db'
@@ -88,6 +89,7 @@ export default function SharedFileViewerModal({
     onUpdate,
     showStandardize = false
 }: FileViewerModalProps) {
+    const navigate = useNavigate()
     const [renaming, setRenaming] = useState(false)
     const [downloading, setDownloading] = useState<string | null>(null)
 
@@ -398,7 +400,25 @@ export default function SharedFileViewerModal({
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="card-actions">
+                                        <div className="card-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            <button
+                                                type="button"
+                                                className="btn-download-premium"
+                                                onClick={() => {
+                                                    onClose()
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}`)
+                                                }}
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                                                    borderColor: '#0284c7',
+                                                    color: '#fff',
+                                                    cursor: 'pointer'
+                                                }}
+                                                title="Inspeccionar en Xpress Studio (Medir, demasías, vectorizar)"
+                                            >
+                                                <span className="icon">👁️</span>
+                                                Xpress Studio
+                                            </button>
                                             <button
                                                 type="button"
                                                 className="btn-download-premium"

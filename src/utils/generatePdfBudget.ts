@@ -1,13 +1,33 @@
 import type { Order } from '@/types'
 import { XIGNUX_LOGO_BASE64 } from './logoBase64'
 import { resolveMediaUrl } from '@/data/db'
+import { optimizePdfThumbnail } from './pdfImageOptimizer'
 
-export function generatePdfBudget(order: Order) {
+export async function generatePdfBudget(order: Order) {
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
         alert('Por favor permite las ventanas emergentes (popups) para abrir el PDF.')
         return
     }
+
+    // Mostrar pantalla de carga rápida mientras se optimiza la resolución
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Optimizando PDF...</title>
+            <style>
+                body { margin:0; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#1e2433; color:#f8fafc; font-family:sans-serif; }
+                .spinner { width:38px; height:38px; border:4px solid #334155; border-top-color:#38bdf8; border-radius:50%; animation:spin 0.8s linear infinite; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+            </style>
+        </head>
+        <body>
+            <div class="spinner"></div>
+            <p style="margin-top:14px; font-weight:600; font-size:13.5px; letter-spacing:0.3px;">Optimizando resolución de imagen y preparando documento...</p>
+        </body>
+        </html>
+    `)
 
     const isPrintedOrFinished = ['impreso', 'post', 'completo', 'entregado', 'finalizado'].includes(order.status)
     const docTitle = isPrintedOrFinished ? 'DETALLE DE IMPRESIÓN' : 'PRESUPUESTO COMERCIAL'
@@ -28,16 +48,22 @@ export function generatePdfBudget(order: Order) {
     const hasMeta = dpi > 0 || colorMode || fileFormat
 
     // Preview artwork URL
-    let previewImgUrl = ''
+    let rawPreviewImgUrl = ''
     if (meta?.thumbnailUrl) {
-        previewImgUrl = resolveMediaUrl(meta.thumbnailUrl)
+        rawPreviewImgUrl = resolveMediaUrl(meta.thumbnailUrl)
     } else if (order.archivos && order.archivos.length > 0) {
         const firstFile = order.archivos[0]
         const ext = firstFile.split('.').pop()?.toLowerCase() || ''
         if (['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif'].includes(ext)) {
-            previewImgUrl = resolveMediaUrl(firstFile)
+            rawPreviewImgUrl = resolveMediaUrl(firstFile)
         }
     }
+
+    // Optimizar resolución física de miniatura y logo en paralelo para que el PDF no pese de más
+    const [previewImgUrl, optimizedLogo] = await Promise.all([
+        rawPreviewImgUrl ? optimizePdfThumbnail(rawPreviewImgUrl, { maxWidth: 400, maxHeight: 400, quality: 0.75 }) : Promise.resolve(''),
+        optimizePdfThumbnail(XIGNUX_LOGO_BASE64, { maxWidth: 280, maxHeight: 120, quality: 0.85 })
+    ])
 
     const getDpiQuality = (d: number) => {
         if (d <= 0) return { label: 'Sin datos', color: '#94a3b8' }
@@ -421,7 +447,7 @@ export function generatePdfBudget(order: Order) {
                     <!-- Header Brand -->
                     <div class="header-brand">
                         <div class="brand-left">
-                            <img src="${XIGNUX_LOGO_BASE64}" class="brand-logo-img" alt="XignuX Logo" />
+                            <img src="${optimizedLogo || XIGNUX_LOGO_BASE64}" class="brand-logo-img" alt="XignuX Logo" />
                             <div>
                                 <div class="brand-name" style="font-size: 15px; font-weight: 800; color: #1e2433;">Servicios Gráficos e Impresión Digital Profesional</div>
                                 <div class="brand-sub">José V. Cardozo 912, Córdoba · Tel: 3517897667/3517717071</div>
@@ -581,6 +607,8 @@ export function generatePdfBudget(order: Order) {
         </html>
     `
 
+    printWindow.document.open()
     printWindow.document.write(htmlContent)
     printWindow.document.close()
+    printWindow.focus()
 }

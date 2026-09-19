@@ -159,7 +159,7 @@ function getNavegacionResponse(context: UserContext, roleConfig: any): string {
       return "Como cliente, puedes acceder a: 'Mis Pedidos' para ver tus pedidos, 'Subir Archivos' para cargar tus diseños, y 'Historial' para ver pedidos anteriores.";
     
     case "artista":
-      return "Como artista, puedes acceder a: 'Tareas de Diseño' para ver trabajos asignados, 'Briefs Recibidos' para ver especificaciones, y 'Tiempo de Trabajo' para gestionar tu tiempo.";
+      return "Como artista, puedes acceder a: 'Diseño' para ver tu cola de trabajos, 'Xpress Studio' para inspeccionar archivos HD, medir demasías y DPI, y 'Redrawer AI' para vectorizar logotipos con inteligencia artificial.";
     
     case "impresor":
       return "Como impresor, puedes acceder a: 'Trabajos Asignados' para ver pedidos en producción, 'Stock' para gestionar materiales, y 'Logística' para organizar entregas.";

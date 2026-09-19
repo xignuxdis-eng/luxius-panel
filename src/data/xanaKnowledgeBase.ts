@@ -49,6 +49,14 @@ export const xanaKnowledgeBase = {
     {
       q: ["¿Puedo comunicarme con el cliente?", "contactar cliente", "mensaje al cliente"],
       a: "Sí, puedes dejar comentarios en cada pedido que el cliente podrá ver. También puedes solicitar información adicional si es necesario."
+    },
+    {
+      q: ["¿Cómo uso Xpress Viewer o Redrawer?", "xpress viewer", "vectorizador", "medir demasías", "revisar dpi", "redrawer"],
+      a: "Puedes acceder a 'Xpress Studio' desde el menú lateral o haciendo clic en el botón '👁️ Xpress' en cada orden de Diseño. Permite inspeccionar archivos pesados, medir demasías en mm, analizar DPI a escala 1:1, ver canales CMYK y vectorizar logotipos automáticamente con el Redrawer AI."
+    },
+    {
+      q: ["¿Por qué los PDFs de presupuesto y reportes ahora descargan tan rápido?", "peso del pdf", "tamaño del pdf", "calidad pdf"],
+      a: "El sistema LuXius cuenta con un optimizador físico de resolución (pdfImageOptimizer) que re-escala las miniaturas de producción a 360px JPEG antes de incrustarlas. Esto reduce el peso del PDF en más de un 95% (de 100MB a ~400KB) manteniendo nitidez 100% fotográfica para impresión."
     }
   ],
   impresor: [

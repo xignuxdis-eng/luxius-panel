@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import { statusColors, statusLabels } from '@/types'
-import { getOrdenes } from '@data/db'
+import { getOrdenes, resolveMediaUrl } from '@data/db'
 
 import NuevoPedidoModal from '../Entrada/NuevoPedidoModal'
 import StatusChangeModal from '../Entrada/StatusChangeModal'
@@ -11,6 +12,7 @@ import type { Order } from '@/types'
 import './Diseno.css'
 
 export default function Diseno() {
+    const navigate = useNavigate()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -85,6 +87,74 @@ export default function Diseno() {
     return (
         <div className="diseno-page">
             <Header title="Artista" subtitle="Cola de trabajos y gestión de previews" />
+
+            {/* Quick Studio Bar for Artist */}
+            <div style={{
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: '10px',
+                padding: '12px 18px',
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '1.8rem' }}>👁️</span>
+                    <div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            Xpress Studio & Vectorizador AI
+                            <span style={{ fontSize: '0.7rem', background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>ROL ARTISTA</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+                            Visor HD de archivos pesados, calibrador de demasías/sangrado, paleta de colores CMYK y vectorizador ImageTracer.
+                        </div>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        onClick={() => navigate('/xpress-viewer')}
+                        style={{
+                            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.3)'
+                        }}
+                    >
+                        👁️ Abrir Visor HD
+                    </button>
+                    <button
+                        onClick={() => navigate('/xpress-viewer?tab=redrawer')}
+                        style={{
+                            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)'
+                        }}
+                    >
+                        ✨ Redrawer Studio
+                    </button>
+                </div>
+            </div>
 
             <div className="filters-bar">
                 <div className="filter-group">
@@ -161,24 +231,52 @@ export default function Diseno() {
                                         </div>
                                     </td>
                                     <td>
-                                        <button
-                                            className="file-preview-btn"
-                                            onClick={() => handleOpenPreview(order)}
-                                            style={{
-                                                border: '1px solid #333',
-                                                padding: '4px 8px',
-                                                borderRadius: '4px',
-                                                background: '#1a1a1a',
-                                                color: '#ccc',
-                                                fontSize: '0.8rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            {order.archivos && order.archivos.length > 0 ? '📄 Ver Archivos' : '⚠️ Sin Archivos'}
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                            <button
+                                                className="file-preview-btn"
+                                                onClick={() => handleOpenPreview(order)}
+                                                style={{
+                                                    border: '1px solid #333',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    background: '#1a1a1a',
+                                                    color: '#ccc',
+                                                    fontSize: '0.8rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {order.archivos && order.archivos.length > 0 ? '📄 Ver Archivos' : '⚠️ Sin Archivos'}
+                                            </button>
+                                            {order.archivos && order.archivos.length > 0 && (
+                                                <button
+                                                    onClick={() => {
+                                                        const firstFile = order.archivos![0]
+                                                        const url = resolveMediaUrl(firstFile)
+                                                        const name = order.archivosOriginales?.[0] || firstFile.split('/').pop()?.split('?')[0] || 'arte'
+                                                        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(name)}`)
+                                                    }}
+                                                    title="Inspeccionar directamente en Xpress Studio (DPI, medidas, demasías, vectorizar)"
+                                                    style={{
+                                                        border: '1px solid #0284c7',
+                                                        padding: '4px 8px',
+                                                        borderRadius: '4px',
+                                                        background: 'rgba(2, 132, 199, 0.15)',
+                                                        color: '#38bdf8',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 700,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    👁️ Xpress
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                     <td>
                                         {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) ? (

@@ -1,6 +1,7 @@
 import type { Order } from '@/types'
 import { XIGNUX_LOGO_BASE64 } from './logoBase64'
 import { resolveMediaUrl } from '@/data/db'
+import { optimizePdfThumbnail, batchOptimizePdfThumbnails } from './pdfImageOptimizer'
 
 export interface ClientReportOptions {
     clienteNombre: string;
@@ -15,12 +16,31 @@ export interface ClientReportOptions {
     tituloReporte?: string;
 }
 
-export function generatePdfClientReport(orders: Order[], options: ClientReportOptions) {
+export async function generatePdfClientReport(orders: Order[], options: ClientReportOptions) {
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
         alert('Por favor permite las ventanas emergentes (popups) para generar el PDF del reporte.')
         return
     }
+
+    // Mostrar pantalla de carga rápida mientras se optimiza la resolución
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Optimizando Reporte PDF...</title>
+            <style>
+                body { margin:0; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#1e2433; color:#f8fafc; font-family:sans-serif; }
+                .spinner { width:38px; height:38px; border:4px solid #334155; border-top-color:#38bdf8; border-radius:50%; animation:spin 0.8s linear infinite; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+            </style>
+        </head>
+        <body>
+            <div class="spinner"></div>
+            <p style="margin-top:14px; font-weight:600; font-size:13.5px; letter-spacing:0.3px;">Optimizando resolución de miniaturas y preparando PDF...</p>
+        </body>
+        </html>
+    `)
 
     const fechaEmision = new Date().toLocaleDateString('es-AR', {
         day: '2-digit',
@@ -95,6 +115,19 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
             total,
             sena,
             saldo
+        }
+    })
+
+    // Optimizar resolución física de todas las miniaturas y del logo en paralelo
+    const [optimizedThumbnails, optimizedLogo] = await Promise.all([
+        batchOptimizePdfThumbnails(mappedRows.map(r => r.thumbUrl), { maxWidth: 300, maxHeight: 300, quality: 0.72 }),
+        optimizePdfThumbnail(XIGNUX_LOGO_BASE64, { maxWidth: 280, maxHeight: 120, quality: 0.85 })
+    ])
+
+    // Reemplazar URLs pesadas con las miniaturas de bajo peso
+    mappedRows.forEach((row, idx) => {
+        if (optimizedThumbnails[idx]) {
+            row.thumbUrl = optimizedThumbnails[idx]
         }
     })
 
@@ -368,7 +401,7 @@ export function generatePdfClientReport(orders: Order[], options: ClientReportOp
                     <!-- Header Brand -->
                     <div class="header-brand">
                         <div class="brand-left">
-                            <img src="${XIGNUX_LOGO_BASE64}" alt="XignuX Logo" class="brand-logo-img">
+                            <img src="${optimizedLogo || XIGNUX_LOGO_BASE64}" alt="XignuX Logo" class="brand-logo-img">
                             <div class="brand-info">
                                 <span class="brand-sub" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 2px;">Servicios Gráficos e Impresión Digital Profesional</span>
                                 <span class="brand-sub">José V. Cardozo 912 | Tel: 3517897667/3517717071</span>

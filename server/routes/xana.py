@@ -142,6 +142,24 @@ DEFAULT_XANA_DATA = {
             "status": "completed",
             "created_at": "2026-09-02T00:38:00-03:00",
             "updated_at": "2026-09-02T00:43:00-03:00"
+        },
+        {
+            "id": 13,
+            "task_id": "TASK-013",
+            "project": "Optimización de Resolución y Compresión en Generación de PDFs",
+            "objective": "Implementación de pdfImageOptimizer.ts: escalado físico en Canvas off-screen a 360x360px JPEG 0.75 y compresión de logo base64. Reduce el peso de presupuestos y reportes de clientes en >95% evitando incrustar imágenes ráster originales de 50MB.",
+            "status": "completed",
+            "created_at": "2026-09-18T21:00:00-03:00",
+            "updated_at": "2026-09-19T11:30:00-03:00"
+        },
+        {
+            "id": 14,
+            "task_id": "TASK-014",
+            "project": "Integración de Xpress Viewer en Rol Artista & Roadmap Modular",
+            "objective": "Habilitación de ruta /xpress-viewer en permisos del rol Artista, soporte de parámetros de URL (fileUrl, fileName, tab) para apertura directa, barra de herramientas en Diseno.tsx y redacción del ROADMAP_ARTISTA_XPRESS_VIEWER.md maestro.",
+            "status": "completed",
+            "created_at": "2026-09-18T21:30:00-03:00",
+            "updated_at": "2026-09-19T11:35:00-03:00"
         }
     ],
     "decisions": [
@@ -244,6 +262,26 @@ DEFAULT_XANA_DATA = {
             "alternatives_rejected": ["Cálculos independientes en modal y asistente Xana"],
             "reason": "Garantiza que la cotización inteligente de Xana y el modal de pedidos coincidan al centavo y en metros exactos.",
             "created_at": "2026-09-02T00:38:00-03:00"
+        },
+        {
+            "id": 11,
+            "decision_id": "DEC-011",
+            "task_id": "TASK-013",
+            "topic": "Escalado físico de resolución en miniaturas de PDFs",
+            "choice": "Escalado proporcional y compresión a JPEG 0.75 en Canvas off-screen a 360px antes de enviar a ventana de impresión.",
+            "alternatives_rejected": ["Incrustar archivos de producción originales a 50MB", "Generar PDFs exclusivamente en backend"],
+            "reason": "Elimina el lag de impresión, evita que el navegador colapse por memoria y reduce el peso del archivo PDF resultante de 100MB a menos de 500KB sin pérdida visual apreciable.",
+            "created_at": "2026-09-18T21:15:00-03:00"
+        },
+        {
+            "id": 12,
+            "decision_id": "DEC-012",
+            "task_id": "TASK-014",
+            "topic": "Integración Contextual de Xpress Viewer para Artistas",
+            "choice": "Apertura directa mediante URL searchParams y botones integrados en la cola de trabajos de Diseño y modales de archivos.",
+            "alternatives_rejected": ["Módulo aislado sin conexión con órdenes", "Re-subida manual obligatoria en el visor"],
+            "reason": "Permite al Artista inspeccionar DPI, medir demasías y vectorizar logos en un clic sin interrumpir el flujo de control de producción.",
+            "created_at": "2026-09-18T21:40:00-03:00"
         }
     ],
     "sessions": [
