@@ -31,10 +31,11 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
    - Ambos remotos deben tener **el mismo SHA en `master`**. Fuente de verdad: el commit más reciente; nunca hacer force-push sobre uno solo.
    - Definir `$env:GIT_TERMINAL_PROMPT = '0'` antes de operaciones remotas en agentes/IDEs: evita que `git fetch/push` quede colgado esperando credenciales en una terminal no interactiva (incidente registrado en la bitácora, sección 6).
 4. **Despliegue a GitHub Pages**:
-   - Para que los cambios impacten en la versión web pública (`https://xignuxdis-eng.github.io/luxius-panel/`), la rama `gh-pages` debe actualizarse con el contenido de `dist/`:
+   - Para que los cambios impacten en la versión web pública (`https://xignuxdis-eng.github.io/luxius-panel/`), la rama `gh-pages` debe actualizarse con el contenido de `dist/`. Desde la Fase 1 (22/09/2026) `dist/` **ya no se versiona en `master`**, por lo que `git subtree split` dejó de funcionar. Usar:
      ```powershell
-     $split = git subtree split --prefix dist master; git push origin "${split}:gh-pages" --force
+     npm run build; .\scripts\deploy_gh_pages.ps1
      ```
+     El script crea un commit huérfano con el contenido de `dist/` y lo fuerza a `gh-pages` en GitHub y GitLab.
 5. **Sincronización Local (Nginx)**:
    - Copiar el contenido de `dist/` al servidor Nginx local de producción:
      ```powershell
@@ -167,8 +168,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
    npm run build
    ```
 4. **Desplegar Cambios**:
-   - `git add -A && git commit -m "..." && git push origin master`
-   - `git subtree split --prefix dist master` -> push a `gh-pages`
+   - `git add -A && git commit -m "..." && git push origin master` (publica en GitHub y GitLab a la vez)
+   - `npm run build; .\scripts\deploy_gh_pages.ps1` -> actualiza `gh-pages`
    - Copiar `dist/` a `D:\XignuX\luxius-panel\dist\` (si es la PC del taller).
 5. **Contexto Adicional**:
    - Para entender el agente Xana: revisar `.agents/rules/xana_agent.md` y `.agents/AGENTS.md`.
@@ -188,8 +189,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] Cerrar trabajo pendiente del logo SVG liviano en `generatePdfBudget.ts` y `generatePdfClientReport.ts`.
 - [x] Ampliar `.gitignore` (backups, `*.db`, `server/uploads/`, multimedia, PDFs de prueba, `build_log.txt`).
 - [x] Script `scripts/fase1_limpieza.ps1` (untrack de artefactos, reorganización, doble remoto, commit y push).
-- [~] **Ejecutar** `.\scripts\fase1_limpieza.ps1` (requiere terminal interactiva con credenciales de GitHub y GitLab cargadas en el credential manager). Marcar `[x]` cuando `git remote -v` muestre 2 push-URLs y ambos remotos tengan el mismo SHA.
-- [ ] Publicar `dist/` a `gh-pages` con `git subtree split` (ya no se versiona `dist/` en `master`).
+- [x] Ejecutado `.\scripts\fase1_limpieza.ps1` el 22/09/2026: commit `8c41d2c` (2516 archivos, -800k líneas) publicado en GitHub y GitLab con el mismo SHA. `origin` tiene 2 push-URLs.
+- [x] Publicar `dist/` a `gh-pages` con `scripts/deploy_gh_pages.ps1` (reemplaza a `git subtree split`, que ya no aplica porque `dist/` no se versiona en `master`).
 
 ### Fase 2: Seguridad (prioridad alta)
 - [ ] Sacar contraseñas hardcodeadas del seed `_seed_default_users()` en `server/app.py`; leerlas de variables de entorno (`SEED_*_PASSWORD`) o generarlas aleatorias y loguearlas una vez.
