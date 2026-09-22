@@ -1,7 +1,7 @@
 import type { Order } from '@/types'
-import { XIGNUX_LOGO_BASE64 } from './logoBase64'
+import { XIGNUX_LOGO_LIGHT } from './logoBase64Light'
 import { resolveMediaUrl } from '@/data/db'
-import { optimizePdfThumbnail, batchOptimizePdfThumbnails } from './pdfImageOptimizer'
+import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
 
 export interface ClientReportOptions {
     clienteNombre: string;
@@ -118,11 +118,12 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
         }
     })
 
-    // Optimizar resolución física de todas las miniaturas y del logo en paralelo
-    const [optimizedThumbnails, optimizedLogo] = await Promise.all([
-        batchOptimizePdfThumbnails(mappedRows.map(r => r.thumbUrl), { maxWidth: 300, maxHeight: 300, quality: 0.72 }),
-        optimizePdfThumbnail(XIGNUX_LOGO_BASE64, { maxWidth: 280, maxHeight: 120, quality: 0.85 })
-    ])
+    // Optimizar resolución física de todas las miniaturas. El logo ya es un SVG vectorial (~0.5KB)
+    const optimizedThumbnails = await batchOptimizePdfThumbnails(
+        mappedRows.map(r => r.thumbUrl),
+        { maxWidth: 300, maxHeight: 300, quality: 0.72 }
+    )
+    const optimizedLogo = XIGNUX_LOGO_LIGHT
 
     // Reemplazar URLs pesadas con las miniaturas de bajo peso
     mappedRows.forEach((row, idx) => {

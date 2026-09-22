@@ -1,5 +1,5 @@
 import type { Order } from '@/types'
-import { XIGNUX_LOGO_BASE64 } from './logoBase64'
+import { XIGNUX_LOGO_LIGHT } from './logoBase64Light'
 import { resolveMediaUrl } from '@/data/db'
 import { optimizePdfThumbnail } from './pdfImageOptimizer'
 
@@ -62,7 +62,7 @@ export async function generatePdfBudget(order: Order) {
     // Optimizar resolución física de miniatura y logo en paralelo para que el PDF no pese de más
     const [previewImgUrl, optimizedLogo] = await Promise.all([
         rawPreviewImgUrl ? optimizePdfThumbnail(rawPreviewImgUrl, { maxWidth: 400, maxHeight: 400, quality: 0.75 }) : Promise.resolve(''),
-        optimizePdfThumbnail(XIGNUX_LOGO_BASE64, { maxWidth: 280, maxHeight: 120, quality: 0.85 })
+        Promise.resolve(XIGNUX_LOGO_LIGHT)
     ])
 
     const getDpiQuality = (d: number) => {
@@ -109,14 +109,12 @@ export async function generatePdfBudget(order: Order) {
             <meta charset="utf-8">
             <title>${pdfFilename}</title>
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
                 @page {
                     size: A4 portrait;
                     margin: 0;
                 }
 
-                * { box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+                * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
 
                 html, body {
                     margin: 0;
@@ -416,7 +414,15 @@ export async function generatePdfBudget(order: Order) {
 
                 @media print {
                     .no-print-bar { display: none !important; }
-                    html, body { background: #ffffff !important; }
+                    html, body { background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    * {
+                        box-shadow: none !important;
+                        text-shadow: none !important;
+                        filter: none !important;
+                        -webkit-filter: none !important;
+                        backdrop-filter: none !important;
+                        -webkit-backdrop-filter: none !important;
+                    }
                     .a4-page {
                         width: 100% !important;
                         height: auto !important;
@@ -425,6 +431,11 @@ export async function generatePdfBudget(order: Order) {
                         padding: 12mm 15mm 10mm 15mm !important;
                         box-shadow: none !important;
                         overflow: visible !important;
+                        background: #ffffff !important;
+                    }
+                    img {
+                        max-width: 300px !important;
+                        max-height: 300px !important;
                     }
                     .artwork-and-items { break-inside: avoid; page-break-inside: avoid; }
                     .tech-specs { break-inside: avoid; page-break-inside: avoid; }
@@ -447,7 +458,7 @@ export async function generatePdfBudget(order: Order) {
                     <!-- Header Brand -->
                     <div class="header-brand">
                         <div class="brand-left">
-                            <img src="${optimizedLogo || XIGNUX_LOGO_BASE64}" class="brand-logo-img" alt="XignuX Logo" />
+                            <img src="${optimizedLogo || XIGNUX_LOGO_LIGHT}" class="brand-logo-img" alt="XignuX Logo" />
                             <div>
                                 <div class="brand-name" style="font-size: 15px; font-weight: 800; color: #1e2433;">Servicios Gráficos e Impresión Digital Profesional</div>
                                 <div class="brand-sub">José V. Cardozo 912, Córdoba · Tel: 3517897667/3517717071</div>

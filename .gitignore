@@ -26,8 +26,35 @@ venv/
 *.apk
 hs_err_pid*.log
 replay_pid*.log
+build_log.txt
 BACKUP_FEBRERO_TEMP/
 luxius_backup_*.zip
+
+# Backups locales (nunca versionar)
+backups/
+backup-luxius-*/
+
+# Datos locales del backend (BD SQLite, archivos subidos, logs de impresora)
+*.db
+*.sqlite
+*.sqlite3
+server/uploads/
+server/printer_logs/
+server/data/ordenes.json
+server/data/printer_stats.json
+server/data/logs_no_asociados.json
+server/data/upload.json
+server/data/luxius_data_export_*.json
+
+# Multimedia pesada (va a Cloudflare R2, no al repo)
+*.mp4
+*.mp3
+*.wav
+*.mov
+
+# Archivos de prueba binarios
+test*.pdf
+test*.cdr
 
 # IDEs & System
 .vscode/

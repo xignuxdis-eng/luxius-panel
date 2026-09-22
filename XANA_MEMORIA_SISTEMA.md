@@ -10,7 +10,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 | Componente | Repositorio GitHub | Entorno / Hosting | URL de Producción |
 | :--- | :--- | :--- | :--- |
-| **Frontend Panel** | `xignuxdis-eng/luxius-panel` | GitHub Pages + Servidor Local Nginx | Web: `https://xignuxdis-eng.github.io/luxius-panel/`<br>Local: `http://localhost/` (`D:\XignuX\luxius-panel\dist`) |
+| **Frontend Panel** | `xignuxdis-eng/luxius-panel`<br>**Espejo GitLab:** `luxius-group/luxius-panel` (project id `86780561`) | GitHub Pages + Servidor Local Nginx | Web: `https://xignuxdis-eng.github.io/luxius-panel/`<br>Local: `http://localhost/` (`D:\XignuX\luxius-panel\dist`) |
 | **Backend API** | `luXius-Backend` | Render (Python Web Service) | `https://luxius-backend.onrender.com` |
 | **Landing Web** | `xignux-landing` | GitHub Pages / Hosting Web | Dominio oficial XignuX |
 | **App Móvil** | `XignuX Workfield Manager` | Capacitor + Vanilla JS (Híbrida Android) | APK / AAB para técnicos de campo y colocadores |
@@ -21,8 +21,15 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 1. **Autonomía y Auto-Aprobación**: Ejecutar directamente todas las tareas, comandos de terminal, compilaciones y despliegues sin detenerse a solicitar confirmaciones al usuario.
 2. **Compilación y Build Frontend**: Cada cambio en el frontend (`f:\Sitio XignuX`) debe compilarse con `npm run build`.
-3. **Sincronización Inmediata a GitHub**:
+3. **Sincronización Inmediata a GitHub y GitLab (doble remoto)**:
    - `git add -A && git commit -m "..." && git push origin master`
+   - `origin` tiene **dos push-URLs** (GitHub y GitLab), configuradas por `scripts/fase1_limpieza.ps1`. Un solo `git push origin master` publica en ambos. Verificar con `git remote -v` (deben aparecer 2 líneas `push`). Si falta, reconfigurar:
+     ```powershell
+     git remote set-url --add --push origin https://github.com/xignuxdis-eng/luxius-panel.git
+     git remote set-url --add --push origin https://gitlab.com/luxius-group/luxius-panel.git
+     ```
+   - Ambos remotos deben tener **el mismo SHA en `master`**. Fuente de verdad: el commit más reciente; nunca hacer force-push sobre uno solo.
+   - Definir `$env:GIT_TERMINAL_PROMPT = '0'` antes de operaciones remotas en agentes/IDEs: evita que `git fetch/push` quede colgado esperando credenciales en una terminal no interactiva (incidente registrado en la bitácora, sección 6).
 4. **Despliegue a GitHub Pages**:
    - Para que los cambios impacten en la versión web pública (`https://xignuxdis-eng.github.io/luxius-panel/`), la rama `gh-pages` debe actualizarse con el contenido de `dist/`:
      ```powershell
@@ -68,7 +75,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 - **Optimización Crítica de Resolución y Peso**:
   - Anteriormente, los PDFs incrustaban imágenes de producción a resolución completa (archivos de 10MB a 50MB), provocando que un presupuesto o reporte pesara más de 100 MB.
   - Se implementó `src/utils/pdfImageOptimizer.ts` (`optimizePdfThumbnail` y `batchOptimizePdfThumbnails`).
-  - **Mecanismo**: Antes de renderizar la ventana de impresión, escala físicamente la imagen en un Canvas off-screen a un máximo de 360x360px con compresión JPEG calidad 0.72 - 0.75. Reduce el peso de cada miniatura a ~15-25 KB y el logotipo base64 a ~20 KB. El resultado es una **reducción de peso del PDF superior al 95%** manteniendo nitidez 100% fotográfica para impresión.
+  - **Mecanismo**: Antes de renderizar la ventana de impresión, escala físicamente la imagen en un Canvas off-screen a un máximo de 360x360px con compresión JPEG calidad 0.72 - 0.75. Reduce el peso de cada miniatura a ~15-25 KB. El resultado es una **reducción de peso del PDF superior al 95%** manteniendo nitidez 100% fotográfica para impresión.
+  - **Logo liviano (Sept 2026)**: el PNG base64 de 967 KB (`src/utils/logoBase64.ts`) fue reemplazado en ambos generadores de PDF por `XIGNUX_LOGO_LIGHT` (`src/utils/logoBase64Light.ts`), un SVG vectorial de ~0.5 KB generado con `node scripts/compressLogo.mjs`. `logoBase64.ts` se conserva solo para la UI; **no importarlo en generadores de PDF**.
 - **Lógica de Impresión / Exportación**:
   - Usa estilos `@media print` que **no deben restringir la altura fija** (`height: auto !important`) para permitir multipaginación fluida.
   - Contenedores clave usan `break-inside: avoid; page-break-inside: avoid;`.
@@ -136,6 +144,9 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Caché persistente en navegadores de clientes** | Los bundles antiguos quedaban en la memoria del navegador de los operarios. | Sistema de handshake de versiones (`version.json` + `versionCheck.ts`) que recarga automáticamente ante nuevo release. | `src/utils/versionCheck.ts` |
 | **PDFs resultantes pesaban más de 100MB** | El navegador incrustaba imágenes de producción a resolución nativa completa (10MB-50MB por archivo) en lugar de resolución miniatura. | Se implementó `src/utils/pdfImageOptimizer.ts` con escalado físico en Canvas (360x360px JPEG 0.75) y logo comprimido, logrando >95% de reducción de peso. | `src/utils/pdfImageOptimizer.ts`<br>`src/utils/generatePdfBudget.ts`<br>`src/utils/generatePdfClientReport.ts` |
 | **Artista no tenía acceso a Xpress Viewer ni herramientas de inspección rápida** | `/xpress-viewer` no estaba en `rolePermissions.artista` ni había enlaces contextuales desde las órdenes. | Se activó la ruta para Artista, soporte de `searchParams` en `XpressViewer.tsx` y botones `👁️ Xpress Studio` en `Diseno.tsx` y modales. | `src/types/auth.ts`<br>`src/pages/XpressViewer/XpressViewer.tsx`<br>`src/pages/Diseno/Diseno.tsx` |
+| **Logo PNG de 967 KB seguía incrustándose en reportes de cliente** | `generatePdfClientReport.ts` importaba `XIGNUX_LOGO_BASE64` y lo recomprimía en canvas en cada PDF. | Se reemplazó por `XIGNUX_LOGO_LIGHT` (SVG ~0.5 KB) y se eliminó la recompresión del logo. Trabajo iniciado el 19/09 y cerrado el 22/09/2026. | `src/utils/generatePdfClientReport.ts`<br>`src/utils/logoBase64Light.ts`<br>`scripts/compressLogo.mjs` |
+| **Repo con 300+ MB de basura versionada** | `.venv`, `__pycache__`, `dist/`, `luxius-panel.zip`, `server/luxius.db`, `server/uploads/`, backups y `.mp4/.mp3` fueron agregados antes de las reglas de `.gitignore`, por lo que seguían trackeados. | `scripts/fase1_limpieza.ps1`: `git rm --cached` de todo lo anterior (se conserva en disco), `.gitignore` ampliado, raíz reorganizada en `scripts/tests/`, `docs/roadmaps/`, `docs/xana/`, `docs/legacy/`. | `.gitignore`<br>`scripts/fase1_limpieza.ps1` |
+| **Terminal del agente IA quedó colgada de forma permanente** | Un `git fetch gitlab` en shell no interactivo se quedó esperando usuario/contraseña por stdin; todos los comandos posteriores expiraron. | Regla: exportar `GIT_TERMINAL_PROMPT=0` antes de cualquier `fetch/push` desde agentes. El script de Fase 1 lo hace y además mata procesos `git` huérfanos y borra `index.lock`. Si ocurre, reiniciar la terminal del IDE. | `scripts/fase1_limpieza.ps1`<br>Sección 2, regla 3 |
 
 ---
 
@@ -160,7 +171,46 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
    - `git subtree split --prefix dist master` -> push a `gh-pages`
    - Copiar `dist/` a `D:\XignuX\luxius-panel\dist\` (si es la PC del taller).
 5. **Contexto Adicional**:
-   - Para entender el agente Xana: revisar `.agents/rules/xana_agent.md`.
-   - Para el Roadmap del Artista y Xpress Viewer: revisar `ROADMAP_ARTISTA_XPRESS_VIEWER.md`.
-   - Para la app móvil: revisar `XANA_MEMORIA_APP_MOVIL.md`.
+   - Para entender el agente Xana: revisar `.agents/rules/xana_agent.md` y `.agents/AGENTS.md`.
+   - Para el Roadmap del Artista y Xpress Viewer: revisar `docs/roadmaps/ROADMAP_ARTISTA_XPRESS_VIEWER.md`.
+   - Para la app móvil: revisar `docs/xana/XANA_MEMORIA_APP_MOVIL.md`.
    - Para la arquitectura general de infraestructura: revisar `ESPECIFICACION_TECNICA_ECOSISTEMA_LUXIUS.md`.
+   - Para el estado del plan de mejoras: sección 8 de este documento (es la **única lista de tareas vigente**; actualizarla en cada commit relevante).
+6. **Al hacer `git pull` en una máquina que ya tenía el repo antes de la Fase 1** (22/09/2026): git eliminará del disco `server/uploads/`, `server/luxius.db`, `dist/` y `backup-luxius-*/` porque dejaron de estar versionados. Hacer copia previa si esa máquina tiene datos locales en esas rutas (la PC del taller, por ejemplo).
+
+---
+
+## 8. 🗺️ Plan de Mejoras Vigente (Roadmap Técnico) y Estado
+
+> Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
+
+### Fase 1: Higiene del repositorio (22/09/2026)
+- [x] Cerrar trabajo pendiente del logo SVG liviano en `generatePdfBudget.ts` y `generatePdfClientReport.ts`.
+- [x] Ampliar `.gitignore` (backups, `*.db`, `server/uploads/`, multimedia, PDFs de prueba, `build_log.txt`).
+- [x] Script `scripts/fase1_limpieza.ps1` (untrack de artefactos, reorganización, doble remoto, commit y push).
+- [~] **Ejecutar** `.\scripts\fase1_limpieza.ps1` (requiere terminal interactiva con credenciales de GitHub y GitLab cargadas en el credential manager). Marcar `[x]` cuando `git remote -v` muestre 2 push-URLs y ambos remotos tengan el mismo SHA.
+- [ ] Publicar `dist/` a `gh-pages` con `git subtree split` (ya no se versiona `dist/` en `master`).
+
+### Fase 2: Seguridad (prioridad alta)
+- [ ] Sacar contraseñas hardcodeadas del seed `_seed_default_users()` en `server/app.py`; leerlas de variables de entorno (`SEED_*_PASSWORD`) o generarlas aleatorias y loguearlas una vez.
+- [ ] Rotar en Neon las contraseñas de `sistema`, `adrian`, `admin`, `impresion`, `diseño`, `vendedor` (están expuestas en el historial Git).
+- [ ] Confirmar que `JWT_SECRET_KEY` en Render no es el valor por defecto de `config.py`.
+- [ ] Rate limiter: pasar de `memory://` a Redis (Render Key Value) para que persista entre reinicios y workers.
+- [ ] Correr `gitleaks` sobre el historial y purgar secretos si aparecen (`git filter-repo`).
+
+### Fase 3: Deuda técnica del backend
+- [ ] Decidir el destino de `server/index.js` (Express legacy, 1237 líneas) e `install_service.js`: extraer `logParser.js` a un servicio propio si las impresoras lo usan, o eliminarlos.
+- [ ] Reemplazar `db.create_all()` por migraciones con Flask-Migrate/Alembic.
+- [ ] Partir `server/app.py` (>1000 líneas) en blueprints: `routes/clientes.py`, `routes/maquinas.py`, `routes/usuarios.py`, `routes/tarifas.py`, `routes/analytics.py`.
+- [ ] Unificar `luXius-Backend` y `server/` (submódulo Git o repo único) para eliminar la copia manual de `run_project.bat`.
+
+### Fase 4: Calidad y CI/CD
+- [ ] `vitest` para `src/utils/pricingCalculator.ts` (asignación de bobina por menor desperdicio, precios especiales por cliente).
+- [ ] `pytest` para `routes/orders.py` y `sync_routes.py`.
+- [ ] `.gitlab-ci.yml` con etapas `lint`, `test`, `build` y despliegue automático a `gh-pages`; habilitar SAST y Secret Detection.
+- [ ] Migrar `scripts/tests/*.cjs` a tests reales o eliminarlos.
+
+### Fase 5: Producto (ver `ESPECIFICACION_TECNICA_ECOSISTEMA_LUXIUS.md`)
+- [ ] Módulo 1: Smart Order de Xana (`/api/xana/smart-order`) end-to-end con tarjeta interactiva.
+- [ ] Módulo 2: Bóveda Drive con cron nocturno y `drive_folder_id` en `presupuestos`.
+- [ ] Módulo 3: Daemon Hot Folder RIP con `POST /api/orders/{id}/rip-status`.
