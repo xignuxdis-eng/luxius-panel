@@ -15,6 +15,8 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $env:GIT_TERMINAL_PROMPT = '0'
+$env:GCM_INTERACTIVE = 'never'
+$env:GIT_ASKPASS = ''
 
 if (-not (Test-Path dist/index.html)) {
     Write-Host "dist/index.html no existe. Ejecutar 'npm run build' primero." -ForegroundColor Red
