@@ -47,23 +47,41 @@ export async function generatePdfBudget(order: Order) {
     const printDimM = (order.ancho && order.alto) ? `${Number(order.ancho).toFixed(2)} × ${Number(order.alto).toFixed(2)} m` : ''
     const hasMeta = dpi > 0 || colorMode || fileFormat
 
-    // Preview artwork URL
-    let rawPreviewImgUrl = ''
-    if (meta?.thumbnailUrl) {
-        rawPreviewImgUrl = resolveMediaUrl(meta.thumbnailUrl)
-    } else if (order.archivos && order.archivos.length > 0) {
-        const firstFile = order.archivos[0]
-        const ext = firstFile.split('.').pop()?.toLowerCase() || ''
-        if (['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif'].includes(ext)) {
-            rawPreviewImgUrl = resolveMediaUrl(firstFile)
-        }
+    // Artwork files processing: support all files of the order
+    interface OrderArtworkFile {
+        url: string;
+        name: string;
+    }
+    const rawArtworkFiles: OrderArtworkFile[] = []
+
+    if (order.archivos && order.archivos.length > 0) {
+        order.archivos.forEach((file, index) => {
+            const orig = order.archivosOriginales?.[index] || file.split('/').pop() || `Archivo ${index + 1}`
+            rawArtworkFiles.push({
+                url: resolveMediaUrl(file),
+                name: orig
+            })
+        })
+    } else if (meta?.thumbnailUrl) {
+        rawArtworkFiles.push({
+            url: resolveMediaUrl(meta.thumbnailUrl),
+            name: order.archivosOriginales?.[0] || 'Archivo cargado'
+        })
     }
 
-    // Optimizar resolución física de miniatura y logo en paralelo para que el PDF no pese de más
-    const [previewImgUrl, optimizedLogo] = await Promise.all([
-        rawPreviewImgUrl ? optimizePdfThumbnail(rawPreviewImgUrl, { maxWidth: 400, maxHeight: 400, quality: 0.75 }) : Promise.resolve(''),
-        Promise.resolve(XIGNUX_LOGO_LIGHT)
-    ])
+    // Optimizar resolución física de miniaturas de todos los archivos y logo en paralelo
+    const optimizedArtworkUrls = await batchOptimizePdfThumbnails(
+        rawArtworkFiles.map(f => f.url),
+        { maxWidth: 400, maxHeight: 400, quality: 0.75, timeoutMs: 8000 }
+    )
+    const optimizedLogo = XIGNUX_LOGO_LIGHT
+
+    const artworkItems = rawArtworkFiles.map((item, idx) => ({
+        url: optimizedArtworkUrls[idx] || item.url,
+        name: item.name
+    }))
+    const previewImgUrl = artworkItems[0]?.url || ''
+
 
     const getDpiQuality = (d: number) => {
         if (d <= 0) return { label: 'Sin datos', color: '#94a3b8' }
@@ -525,6 +543,22 @@ export async function generatePdfBudget(order: Order) {
                         </table>
                     </div>
 
+                    <!-- Multi-file artwork gallery if order has multiple pieces -->
+                    ${artworkItems.length > 1 ? `
+                    <div style="margin: 12px 0 16px 0; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; break-inside: avoid; page-break-inside: avoid;">
+                        <div class="tech-specs-title" style="margin-bottom: 8px;">🎨 Archivos Adjuntos a la Orden (${artworkItems.length} piezas)</div>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            ${artworkItems.map((item, idx) => `
+                                <div style="flex: 1 1 110px; max-width: 140px; padding: 6px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">
+                                    <img src="${item.url}" alt="${item.name}" style="max-width: 100%; max-height: 80px; object-fit: contain; border-radius: 4px; margin-bottom: 4px;" />
+                                    <div style="font-size: 9.5px; font-weight: 700; color: #1e2433; word-break: break-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.name}</div>
+                                    <div style="font-size: 8.5px; color: #64748b;">Pieza #${idx + 1}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- Technical Specifications -->
                     ${(hasMeta || order.bobinaAsignada || order.consumoEstimado) ? `
                     <div class="tech-specs">
@@ -614,6 +648,38 @@ export async function generatePdfBudget(order: Order) {
                     XignuX Servicios Gráficos e Impresión Digital Profesional · José V. Cardozo 912, Córdoba · Tel: 3517897667/3517717071 · Presupuesto sujeto a confirmación técnica de archivos.
                 </div>
             </div>
+
+            <script>
+                (function() {
+                    function waitForImagesAndPrint() {
+                        var images = Array.from(document.images);
+                        var promises = images.map(function(img) {
+                            if (img.complete && img.naturalWidth > 0) {
+                                return img.decode ? img.decode().catch(function() {}) : Promise.resolve();
+                            }
+                            return new Promise(function(resolve) {
+                                img.onload = function() {
+                                    if (img.decode) img.decode().catch(function() {}).then(resolve);
+                                    else resolve();
+                                };
+                                img.onerror = function() { resolve(); };
+                            });
+                        });
+                        var timeoutPromise = new Promise(function(resolve) { setTimeout(resolve, 3500); });
+                        Promise.race([Promise.all(promises), timeoutPromise]).then(function() {
+                            setTimeout(function() {
+                                window.print();
+                            }, 250);
+                        });
+                    }
+
+                    if (document.readyState === 'complete') {
+                        waitForImagesAndPrint();
+                    } else {
+                        window.addEventListener('load', waitForImagesAndPrint);
+                    }
+                })();
+            </script>
         </body>
         </html>
     `

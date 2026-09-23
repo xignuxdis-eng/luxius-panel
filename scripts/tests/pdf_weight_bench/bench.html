@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PDF weight bench</title>
+<script src="optimizer.js"></script>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+  html, body { margin: 0; padding: 0; background: #525659; color: #1e2433; font-size: 12px; }
+  .a4-page { width: 210mm; min-height: 297mm; padding: 16mm 18mm; margin: 0 auto 30px; background: #fff; box-shadow: 0 8px 25px rgba(0,0,0,.25); }
+  .items-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; }
+  .items-table th { background: #1e2433; color: #fff; padding: 8px 10px; font-size: 10.5px; }
+  .items-table td { padding: 9px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11.5px; }
+  .thumb-gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+  .thumb-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center; }
+  .thumb-card img { width: 100%; height: 90px; object-fit: contain; border-radius: 4px; }
+  .row-img { width: 38px; height: 38px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; }
+  @media print {
+    html, body { background: #fff !important; }
+    .a4-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; min-height: auto !important; }
+    .items-table tr, .thumb-card { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="a4-page">
+  <h2 id="title">bench</h2>
+  <table class="items-table">
+    <thead><tr><th>OT</th><th>Vista</th><th>Descripción</th><th>Importe</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="thumb-gallery" id="gallery"></div>
+  <pre id="log" style="font-size:9px;color:#64748b"></pre>
+</div>
+<script>
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('mode') || 'raw';        // raw | opt | svgpass
+  const n = parseInt(params.get('n') || '8', 10);   // filas
+  const srcs = ['big.jpg', 'big2.jpg'];
+  const log = [];
+  document.getElementById('title').textContent = `mode=${mode} n=${n}`;
+
+  const t0 = performance.now();
+  const imgs = [];
+  for (let i = 0; i < n; i++) {
+    const src = srcs[i % srcs.length];
+    let url = src;
+    if (mode === 'opt') url = await optimizePdfThumbnail(src, { maxWidth: 300, maxHeight: 300, quality: 0.72 });
+    if (mode === 'svgpass') {
+      // Simula un SVG que embebe el raster original (caso CorelDRAW/Illustrator export)
+      const b64 = await fetch(src).then(r => r.blob()).then(b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(b); }));
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="300"><image width="300" height="300" xlink:href="data:image/jpeg;base64,${b64}"/></svg>`;
+      url = 'data:image/svg+xml;base64,' + btoa(svg);
+      url = await optimizePdfThumbnail(url); // el optimizador lo deja pasar tal cual
+    }
+    imgs.push(url);
+    log.push(`${i}: ${src} -> ${url.startsWith('data:') ? url.slice(0, 22) + '… len=' + url.length : url}`);
+  }
+  log.push(`prep ms=${Math.round(performance.now() - t0)}`);
+
+  document.getElementById('rows').innerHTML = imgs.map((u, i) =>
+    `<tr><td>OT-${i}</td><td><img class="row-img" src="${u}"></td><td>Vinilo vehicular 1.50x1.82m</td><td>$ 185.900,00</td></tr>`).join('');
+  document.getElementById('gallery').innerHTML = imgs.map((u, i) =>
+    `<div class="thumb-card"><img src="${u}"><div>OT-${i}</div></div>`).join('');
+  document.getElementById('log').textContent = log.join('\n');
+
+  await Promise.all([...document.images].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+  document.title = 'READY';
+})();
+</script>
+</body>
+</html>

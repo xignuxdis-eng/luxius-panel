@@ -90,16 +90,27 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                            order.status === 'impreso' || order.status === 'post' ? 'Impreso' :
                            order.status === 'entregado' || order.status === 'finalizado' ? 'Entregado' : order.status
 
-        // Resolve thumbnail
+        // Resolve primary thumbnail for table row
         let thumbUrl = ''
         if (order.imgMetadata?.thumbnailUrl) {
             thumbUrl = resolveMediaUrl(order.imgMetadata.thumbnailUrl)
         } else if (order.archivos && order.archivos.length > 0) {
             const firstFile = order.archivos[0]
             const ext = firstFile.split('.').pop()?.toLowerCase() || ''
-            if (['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif'].includes(ext)) {
+            if (['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif', 'bmp', 'tiff', 'tif'].includes(ext)) {
                 thumbUrl = resolveMediaUrl(firstFile)
             }
+        }
+
+        // Collect all artwork files for the full visual gallery
+        const files: { url: string; fileName: string }[] = []
+        if (order.archivos && order.archivos.length > 0) {
+            order.archivos.forEach((f, fIdx) => {
+                const fOrig = order.archivosOriginales?.[fIdx] || f.split('/').pop() || `Pieza ${fIdx + 1}`
+                files.push({ url: resolveMediaUrl(f), fileName: fOrig })
+            })
+        } else if (thumbUrl) {
+            files.push({ url: thumbUrl, fileName: order.archivosOriginales?.[0] || 'Archivo cargado' })
         }
 
         return {
@@ -111,6 +122,7 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
             status: statusLabel,
             rawStatus: order.status,
             thumbUrl,
+            files,
             fileName: order.archivosOriginales?.[0] || '',
             total,
             sena,
@@ -118,19 +130,60 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
         }
     })
 
-    // Optimizar resolución física de todas las miniaturas. El logo ya es un SVG vectorial (~0.5KB)
-    const optimizedThumbnails = await batchOptimizePdfThumbnails(
-        mappedRows.map(r => r.thumbUrl),
-        { maxWidth: 300, maxHeight: 300, quality: 0.72 }
+    // Flatten all artwork pieces across all orders for the visual gallery
+    interface GalleryPiece {
+        ot: string;
+        desc: string;
+        url: string;
+        fileName: string;
+    }
+    const galleryPieces: GalleryPiece[] = []
+    mappedRows.forEach(row => {
+        if (row.files && row.files.length > 0) {
+            row.files.forEach(f => {
+                galleryPieces.push({
+                    ot: row.ot,
+                    desc: row.desc,
+                    url: f.url,
+                    fileName: f.fileName
+                })
+            })
+        } else if (row.thumbUrl) {
+            galleryPieces.push({
+                ot: row.ot,
+                desc: row.desc,
+                url: row.thumbUrl,
+                fileName: row.fileName || 'Archivo'
+            })
+        }
+    })
+
+    // Optimizar resolución física de todas las miniaturas en lote con timeout generoso y concurrencia controlada
+    const allUrlsToOptimize = [
+        ...mappedRows.map(r => r.thumbUrl),
+        ...galleryPieces.map(g => g.url)
+    ]
+    const optimizedUrls = await batchOptimizePdfThumbnails(
+        allUrlsToOptimize,
+        { maxWidth: 320, maxHeight: 320, quality: 0.72, timeoutMs: 8000 }
     )
     const optimizedLogo = XIGNUX_LOGO_LIGHT
 
-    // Reemplazar URLs pesadas con las miniaturas de bajo peso
+    // Reemplazar URLs en las filas de la tabla
     mappedRows.forEach((row, idx) => {
-        if (optimizedThumbnails[idx]) {
-            row.thumbUrl = optimizedThumbnails[idx]
+        if (optimizedUrls[idx]) {
+            row.thumbUrl = optimizedUrls[idx]
         }
     })
+
+    // Reemplazar URLs en las piezas de la galería
+    const galleryOffset = mappedRows.length
+    galleryPieces.forEach((piece, idx) => {
+        if (optimizedUrls[galleryOffset + idx]) {
+            piece.url = optimizedUrls[galleryOffset + idx]
+        }
+    })
+
 
     const htmlContent = `
         <!DOCTYPE html>
@@ -502,17 +555,18 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                     </div>
 
                     <!-- Visual Artwork Gallery Section -->
-                    ${mappedRows.some(r => r.thumbUrl) ? `
-                        <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
+                    ${galleryPieces.length > 0 ? `
+                        <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #e2e8f0; break-inside: avoid; page-break-inside: avoid;">
                             <div style="font-size: 11px; font-weight: 800; color: #1e2433; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;">
-                                🎨 Grilla Visual de Trabajos a Imprimir
+                                🎨 Grilla Visual de Trabajos y Archivos a Imprimir (${galleryPieces.length} piezas)
                             </div>
                             <div class="thumb-gallery">
-                                ${mappedRows.filter(r => r.thumbUrl).map(r => `
+                                ${galleryPieces.map(g => `
                                     <div class="thumb-card">
-                                        <img src="${r.thumbUrl}" alt="${r.ot}" />
-                                        <div style="font-size: 10.5px; font-weight: 700; color: #2563eb;">${r.ot}</div>
-                                        <div style="font-size: 9.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.desc}</div>
+                                        <img src="${g.url}" alt="${g.ot}" />
+                                        <div style="font-size: 10.5px; font-weight: 700; color: #2563eb;">${g.ot}</div>
+                                        <div style="font-size: 9.5px; font-weight: 600; color: #1e2433; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${g.fileName}">${g.fileName}</div>
+                                        <div style="font-size: 9px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${g.desc}</div>
                                     </div>
                                 `).join('')}
                             </div>
@@ -528,11 +582,35 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
             </div>
 
             <script>
-                window.onload = function() {
-                    setTimeout(function() {
-                        window.print();
-                    }, 600);
-                }
+                (function() {
+                    function waitForImagesAndPrint() {
+                        var images = Array.from(document.images);
+                        var promises = images.map(function(img) {
+                            if (img.complete && img.naturalWidth > 0) {
+                                return img.decode ? img.decode().catch(function() {}) : Promise.resolve();
+                            }
+                            return new Promise(function(resolve) {
+                                img.onload = function() {
+                                    if (img.decode) img.decode().catch(function() {}).then(resolve);
+                                    else resolve();
+                                };
+                                img.onerror = function() { resolve(); };
+                            });
+                        });
+                        var timeoutPromise = new Promise(function(resolve) { setTimeout(resolve, 3500); });
+                        Promise.race([Promise.all(promises), timeoutPromise]).then(function() {
+                            setTimeout(function() {
+                                window.print();
+                            }, 250);
+                        });
+                    }
+
+                    if (document.readyState === 'complete') {
+                        waitForImagesAndPrint();
+                    } else {
+                        window.addEventListener('load', waitForImagesAndPrint);
+                    }
+                })();
             </script>
         </body>
         </html>

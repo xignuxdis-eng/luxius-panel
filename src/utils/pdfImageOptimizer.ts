@@ -24,8 +24,8 @@ const PLACEHOLDER_SVG = 'data:image/svg+xml;base64,' + btoa(
 
 /**
  * Escala físicamente la resolución de una imagen y la comprime en JPEG ligero.
- * Usa fetch() -> Blob -> createImageBitmap para evitar problemas de CORS con <img>.
- * Si falla, devuelve un placeholder SVG liviano — NUNCA el archivo original pesado.
+ * Usa fetch() -> Blob -> createImageBitmap, con fallback a Image element off-screen.
+ * Si la optimización falla pero la URL es válida, retorna la URL directa para que el navegador la renderice.
  */
 export async function optimizePdfThumbnail(
     src: string | undefined | null,
@@ -33,20 +33,20 @@ export async function optimizePdfThumbnail(
 ): Promise<string> {
     if (!src || typeof src !== 'string') return '';
 
-    // Si ya es un SVG vectorial ligero, mantenerlo intacto
+    // Si ya es un SVG vectorial ligero o un icono data URL, mantenerlo intacto
     if (src.startsWith('data:image/svg+xml') || src.endsWith('.svg')) {
         return src;
     }
 
     const {
-        maxWidth = 300,
-        maxHeight = 300,
-        quality = 0.65,
-        timeoutMs = 4000
+        maxWidth = 320,
+        maxHeight = 320,
+        quality = 0.72,
+        timeoutMs = 8000
     } = options;
 
     try {
-        let blob: Blob;
+        let blob: Blob | null = null;
 
         if (src.startsWith('data:')) {
             // Data URL: convertir directamente a blob
@@ -58,64 +58,95 @@ export async function optimizePdfThumbnail(
             const timer = setTimeout(() => controller.abort(), timeoutMs);
             try {
                 const resp = await fetch(src, { signal: controller.signal });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                blob = await resp.blob();
+                if (resp.ok) {
+                    blob = await resp.blob();
+                }
+            } catch (fetchErr) {
+                // Fetch falló (puede ser CORS o red). Probaremos fallback vía new Image()
+                blob = null;
             } finally {
                 clearTimeout(timer);
             }
         }
 
-        // Si el blob es muy pequeño (< 2KB), probablemente es un error/placeholder
-        if (blob.size < 100) {
-            return PLACEHOLDER_SVG;
-        }
+        if (blob) {
+            // Si el blob es muy pequeño (< 100 bytes), probablemente es un error/placeholder
+            if (blob.size < 100) {
+                return PLACEHOLDER_SVG;
+            }
 
-        // Si el blob ya es pequeño (< 20KB) y no necesita redimensionar, usarlo directo
-        if (blob.size < 20000) {
-            return await blobToDataUrl(blob);
-        }
+            // Si el blob ya es pequeño (< 25KB) y no necesita redimensionar, usarlo directo
+            if (blob.size < 25000) {
+                return await blobToDataUrl(blob);
+            }
 
-        // createImageBitmap funciona sin CORS issues ya que operamos sobre el blob local
-        const bitmap = await createImageBitmap(blob);
-        let { width, height } = bitmap;
+            // createImageBitmap opera velozmente sobre el blob en memoria
+            const bitmap = await createImageBitmap(blob);
+            let { width, height } = bitmap;
 
-        // Calcular dimensiones proporcionales reducidas
-        if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = Math.max(1, Math.round(width * ratio));
-            height = Math.max(1, Math.round(height * ratio));
-        }
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.max(1, Math.round(width * ratio));
+                height = Math.max(1, Math.round(height * ratio));
+            }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
 
-        if (!ctx) {
+            if (ctx) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(bitmap, 0, 0, width, height);
+                bitmap.close();
+
+                const compressed = canvas.toDataURL('image/jpeg', quality);
+                if (compressed.length > 150000) {
+                    return canvas.toDataURL('image/jpeg', 0.5);
+                }
+                return compressed;
+            }
             bitmap.close();
-            return PLACEHOLDER_SVG;
         }
 
-        // Fondo blanco para preservar legibilidad en PNGs transparentes al pasar a JPEG
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(bitmap, 0, 0, width, height);
-        bitmap.close();
+        // Fallback: Si fetch falló o no pudo crear canvas desde blob, intentar cargar mediante HTMLImageElement
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Image element timeout')), Math.min(timeoutMs, 5000));
+            img.onload = () => { clearTimeout(timer); resolve(); };
+            img.onerror = () => { clearTimeout(timer); reject(new Error('Image element load error')); };
+            img.src = src;
+        });
 
-        // Comprimir a JPEG — genera ~8-20KB por miniatura
-        const compressed = canvas.toDataURL('image/jpeg', quality);
+        let { naturalWidth: width, naturalHeight: height } = img;
+        if (width > 0 && height > 0) {
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.max(1, Math.round(width * ratio));
+                height = Math.max(1, Math.round(height * ratio));
+            }
 
-        // Verificar que el resultado comprimido sea razonablemente pequeño (< 100KB)
-        // Si es más grande, recomprimir con calidad más baja
-        if (compressed.length > 130000) {
-            const recompressed = canvas.toDataURL('image/jpeg', 0.4);
-            return recompressed;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                return canvas.toDataURL('image/jpeg', quality);
+            }
         }
 
-        return compressed;
+        return src;
     } catch (err) {
-        console.warn('[PDF Image Optimizer] No se pudo procesar imagen, usando placeholder liviano:', err);
-        // NUNCA devolver src original — puede ser un archivo de 50MB
+        console.warn('[PDF Image Optimizer] No se pudo re-escalar imagen, usando src original o placeholder:', err);
+        // Si el src es una URL válida, devolverla para que el navegador intente renderizarla directamente
+        if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('blob:'))) {
+            return src;
+        }
         return PLACEHOLDER_SVG;
     }
 }
@@ -131,11 +162,26 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
- * Procesa en paralelo un conjunto de URLs de imágenes y devuelve sus versiones optimizadas en miniatura.
+ * Procesa un lote de URLs con control de concurrencia para no saturar las conexiones
+ * del navegador ni provocar timeouts en cascada.
  */
 export async function batchOptimizePdfThumbnails(
     sources: (string | undefined | null)[],
     options: OptimizeOptions = {}
 ): Promise<string[]> {
-    return Promise.all(sources.map(src => optimizePdfThumbnail(src, options)));
+    const concurrency = 4;
+    const results: string[] = new Array(sources.length);
+
+    for (let i = 0; i < sources.length; i += concurrency) {
+        const batch = sources.slice(i, i + concurrency);
+        const batchResults = await Promise.all(
+            batch.map(src => optimizePdfThumbnail(src, options))
+        );
+        for (let j = 0; j < batchResults.length; j++) {
+            results[i + j] = batchResults[j];
+        }
+    }
+
+    return results;
 }
+
