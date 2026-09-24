@@ -252,6 +252,11 @@ export function generatePresupuestoHTML(data: PresupuestoData): string {
                 <span>SALDO RESTANTE:</span>
                 <span>$${(data.total * 0.5).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
+            <div style="margin-top: 10px; padding: 8px 12px; background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 11px; color: #334155; line-height: 1.5;">
+                <strong>Datos para Transferencia:</strong><br>
+                CBU / Alias: <code style="background: #e2e8f0; padding: 1px 5px; border-radius: 3px;">a.flores.24</code><br>
+                Titular: Adrian Flores
+            </div>
         </div>
     </div>
 

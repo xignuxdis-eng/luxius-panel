@@ -622,8 +622,8 @@ export async function generatePdfBudget(order: Order) {
                                 </div>
                                 <div class="bank-box">
                                     <strong>Datos para Transferencia:</strong><br>
-                                    Alias: <code>XIGNUX.GRAFICA</code> · CBU: <code>0000003100010000000000</code><br>
-                                    Titular: XignuX Gráfica SRL · Banco Santander
+                                    CBU / Alias: <code>a.flores.24</code><br>
+                                    Titular: Adrian Flores
                                 </div>
                             `}
                         </div>

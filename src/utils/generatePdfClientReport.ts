@@ -532,7 +532,7 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                             <strong style="display: block; margin-bottom: 4px; font-size: 12px;">💡 Condición de Pago y Seña</strong>
                             Para confirmar órdenes en proceso de diseño o impresión, se sugiere abonar el <strong>50% en concepto de seña</strong>. Las órdenes en estado <em>Impreso</em> o <em>Entregado</em> corresponden a trabajos formalizados.
                             <div style="margin-top: 8px; font-size: 10.5px; color: #334155; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
-                                <strong>CBU / Alias:</strong> <code>XIGNUX.GRAFICA</code> · Santander SRL
+                                <strong>CBU / Alias:</strong> <code>a.flores.24</code> · Titular: Adrian Flores
                             </div>
                         </div>
 
