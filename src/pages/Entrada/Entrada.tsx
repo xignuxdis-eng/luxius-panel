@@ -122,6 +122,21 @@ export default function Entrada() {
     const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
 
     const calculateOrderPrice = (order: Order) => {
+        // 1. Precio manual (monto acordado personalizado) → máxima prioridad
+        const manualPrice = (order as any).precioUnitarioManual
+            ?? (order as any).precio_manual
+            ?? (order as any).precioManual;
+        if (manualPrice !== undefined && manualPrice !== null && Number(manualPrice) > 0) {
+            return Math.round(Number(manualPrice));
+        }
+
+        // 2. Total/subtotal ya persistido (incluye precio especial, servicios, demasías)
+        const storedTotal = Number(order.total || 0);
+        const storedSubtotal = Number(order.subtotal || 0);
+        if (storedTotal > 0) return Math.round(storedTotal);
+        if (storedSubtotal > 0) return Math.round(storedSubtotal);
+
+        // 3. Fallback: recalcular desde materiales (solo para órdenes sin total guardado)
         const matData = allMateriales.find(m => m.codigo === order.material);
         const w = round2(Number(order.ancho) || 0);
         const h = round2(Number(order.alto) || 0);
@@ -138,7 +153,6 @@ export default function Entrada() {
                 const cliente = allClientes.find(cl => cl.id === order.clientId);
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
 
-                // Collect ALL valid bobina+orientation combos
                 type Candidate = { bobina: number; ml: number; cost: number };
                 const candidates: Candidate[] = [];
 
@@ -156,12 +170,10 @@ export default function Entrada() {
                     }
                 }
 
-                // Minimize waste: smallest bobina first, then fewest ML
                 candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
 
                 if (candidates.length > 0) return candidates[0].cost;
 
-                // Fallback: widest bobina
                 if (availableWidths.length > 0) {
                     const widest = availableWidths[availableWidths.length - 1];
                     const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${widest.ancho}`] : null;
@@ -180,8 +192,7 @@ export default function Entrada() {
             }
         }
 
-        const price = order.subtotal || order.total || 0;
-        return price > 0 ? Math.round(price) : 0;
+        return 0;
     }
 
     const getConsumption = (order: Order) => {
