@@ -29,14 +29,17 @@ export default function ConciliationTable() {
 
     const fetchReconciliation = async () => {
         try {
-            const res = await fetch(`${API_URL}/analytics/reconciliation`);
+            const ctrl = new AbortController();
+            const id = setTimeout(() => ctrl.abort(), 6000);
+            const res = await fetch(`${API_URL}/analytics/reconciliation`, { signal: ctrl.signal, cache: 'no-store' });
+            clearTimeout(id);
             if (!res.ok) return;
             const result = await res.json();
             if (result && Array.isArray(result.reconciled)) {
                 setData(result.reconciled);
             }
         } catch (err) {
-            console.error('Error fetching reconciliation:', err);
+            console.warn('Notice fetching reconciliation:', err);
         } finally {
             setLoading(false);
         }
@@ -47,7 +50,7 @@ export default function ConciliationTable() {
     }, []);
 
     const getEfficiencyStatus = (ratio: number) => {
-        if (ratio === 0) return 'neutral';
+        if (!ratio || ratio === 0) return 'neutral';
         if (ratio >= 0.95 && ratio <= 1.15) return 'good';
         if (ratio < 0.95) return 'under';
         return 'waste';
@@ -79,21 +82,22 @@ export default function ConciliationTable() {
                     </thead>
                     <tbody>
                         {data.map((item) => {
-                            const m2Status = getEfficiencyStatus(item.efficiency.m2);
+                            const effM2 = Number(item.efficiency?.m2 ?? 0);
+                            const m2Status = getEfficiencyStatus(effM2);
                             return (
-                                <tr key={item.id} className={`status-${item.status}`}>
+                                <tr key={item.id} className={`status-${item.status || 'pending'}`}>
                                     <td className="col-id">#{item.id}</td>
                                     <td className="col-info">
-                                        <div className="client-name">{item.cliente}</div>
-                                        <div className="job-name">{item.trabajo}</div>
+                                        <div className="client-name">{item.cliente || 'Cliente'}</div>
+                                        <div className="job-name">{item.trabajo || 'Trabajo'}</div>
                                     </td>
-                                    <td>{item.teorico.m2.toFixed(2)} m²</td>
-                                    <td className="col-estimated">{item.consumoEstimado.toFixed(2)} m²</td>
+                                    <td>{(Number(item.teorico?.m2) || 0).toFixed(2)} m²</td>
+                                    <td className="col-estimated">{(Number(item.consumoEstimado) || 0).toFixed(2)} m²</td>
                                     <td className={`col-real ${m2Status}`}>
-                                        {item.status === 'consolidated' ? (
+                                        {item.status === 'consolidated' && item.real ? (
                                             <>
-                                                {item.real.m2.toFixed(2)} m²
-                                                <span className="badge">{item.real.logsCount} logs</span>
+                                                {(Number(item.real.m2) || 0).toFixed(2)} m²
+                                                <span className="badge">{item.real.logsCount || 0} logs</span>
                                             </>
                                         ) : (
                                             <span className="text-muted">Sin datos</span>
@@ -109,17 +113,17 @@ export default function ConciliationTable() {
                                         )}
                                     </td>
                                     <td>
-                                        {item.status === 'consolidated' ? (
+                                        {item.status === 'consolidated' && item.real ? (
                                             <div className="ink-info">
-                                                {item.real.totalInkMl.toFixed(1)} ml
-                                                <small className="ink-ratio">{item.efficiency.inkRatio.toFixed(5)} L/m²</small>
+                                                {(Number(item.real.totalInkMl) || 0).toFixed(1)} ml
+                                                <small className="ink-ratio">{(Number(item.efficiency?.inkRatio) || 0).toFixed(5)} L/m²</small>
                                             </div>
                                         ) : '—'}
                                     </td>
                                     <td>
                                         {item.status === 'consolidated' ? (
                                             <div className={`efficiency-indicator ${m2Status}`}>
-                                                {(item.efficiency.m2 * 100).toFixed(0)}%
+                                                {(effM2 * 100).toFixed(0)}%
                                             </div>
                                         ) : '—'}
                                     </td>
@@ -137,6 +141,13 @@ export default function ConciliationTable() {
                                 </tr>
                             );
                         })}
+                        {data.length === 0 && (
+                            <tr>
+                                <td colSpan={9} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                    No hay datos de conciliación registrados actualmente.
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

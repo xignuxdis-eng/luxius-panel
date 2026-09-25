@@ -213,40 +213,40 @@ export default function Analytics() {
 
     const fetchData = async () => {
         try {
-            // 1. Fetch Orders from system (authoritative store)
-            let loadedOrders: Order[] = [];
-            try {
-                loadedOrders = await getOrdenes();
-            } catch (e) {
-                console.warn('Error loading orders in analytics:', e);
+            const fetchJsonWithTimeout = async (url: string, timeoutMs = 7000) => {
+                const ctrl = new AbortController();
+                const id = setTimeout(() => ctrl.abort(), timeoutMs);
+                try {
+                    const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+                    clearTimeout(id);
+                    if (res.ok) return await res.json();
+                } catch (_) {
+                    clearTimeout(id);
+                }
+                return null;
+            };
+
+            // Run all independent queries concurrently to prevent any hang
+            const [ordersRes, statsRes, matRes, dashRes] = await Promise.allSettled([
+                getOrdenes().catch(() => [] as Order[]),
+                fetchJsonWithTimeout(`${API_URL}/analytics/stats`),
+                getMateriales().catch(() => [] as Material[]),
+                fetchJsonWithTimeout(`${API_URL}/analytics/dashboard`)
+            ]);
+
+            const loadedOrders: Order[] = ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value) ? ordersRes.value : [];
+            const dataStats = statsRes.status === 'fulfilled' && Array.isArray(statsRes.value) ? statsRes.value : [];
+            const rawMateriales: Material[] = matRes.status === 'fulfilled' && Array.isArray(matRes.value) ? matRes.value : [];
+            const serverDash = dashRes.status === 'fulfilled' ? dashRes.value : null;
+
+            if (dataStats.length > 0) {
+                setStats(dataStats);
+            }
+            if (rawMateriales.length > 0) {
+                setMateriales(rawMateriales);
             }
 
-            // 2. Fetch Stats
-            try {
-                const resStats = await fetch(`${API_URL}/analytics/stats`);
-                if (resStats.ok) {
-                    const dataStats = await resStats.json();
-                    setStats(dataStats);
-                }
-            } catch (e) { }
-
-            // 3. Fetch Materials (Stock)
-            let rawMateriales: Material[] = [];
-            try {
-                rawMateriales = await getMateriales();
-                setMateriales(rawMateriales);
-            } catch (e) { }
-
-            // 4. Fetch Dashboard Data from Server
-            let serverDash: any = null;
-            try {
-                const resDash = await fetch(`${API_URL}/analytics/dashboard`);
-                if (resDash.ok) {
-                    serverDash = await resDash.json();
-                }
-            } catch (e) { }
-
-            if (serverDash && serverDash.summary && serverDash.summary.billing > 0) {
+            if (serverDash && serverDash.summary && Number(serverDash.summary.billing) > 0) {
                 setDashboardData(serverDash);
             } else {
                 // Fallback computation directly from loaded orders
@@ -255,6 +255,10 @@ export default function Analytics() {
             }
         } catch (err) {
             console.error('Error fetching analytics data:', err);
+            try {
+                const fallback = computeDashboardFromOrders([], []);
+                setDashboardData(fallback);
+            } catch (_) {}
         } finally {
             setLoading(false);
         }
@@ -361,32 +365,32 @@ export default function Analytics() {
                         <div className="stat-card business clickable" onClick={() => setActiveModal('billing')}>
                             <div className="stat-icon"><DollarSign size={18} /></div>
                             <span className="stat-label">Facturación Mensual</span>
-                            <span className="stat-value">${dashboardData.summary.billing.toLocaleString()}</span>
+                            <span className="stat-value">${(Number(dashboardData.summary?.billing) || 0).toLocaleString()}</span>
                             <div className="card-hint">Click para ver detalle</div>
                         </div>
                         <div className="stat-card business clickable" onClick={() => setActiveModal('m2sold')}>
                             <div className="stat-icon"><Maximize size={18} /></div>
                             <span className="stat-label">m² Vendidos</span>
-                            <span className="stat-value">{dashboardData.summary.billing > 0 ? dashboardData.summary.m2Sold.toFixed(1) : 0} <small>m²</small></span>
+                            <span className="stat-value">{(Number(dashboardData.summary?.m2Sold) || 0).toFixed(1)} <small>m²</small></span>
                             <div className="card-hint">Click para ver detalle</div>
                         </div>
                         <div className="stat-card business clickable" onClick={() => setActiveModal('m2printed')}>
                             <div className="stat-icon"><Printer size={18} /></div>
                             <span className="stat-label">m² Impresos ( logs )</span>
-                            <span className="stat-value">{dashboardData.summary.m2Printed.toFixed(1)} <small>m²</small></span>
+                            <span className="stat-value">{(Number(dashboardData.summary?.m2Printed) || 0).toFixed(1)} <small>m²</small></span>
                             <div className="card-hint">Click para ver detalle</div>
                         </div>
                         <div className="stat-card business alert clickable" onClick={() => setActiveModal('stock')}>
                             <div className="stat-icon"><AlertTriangle size={18} /></div>
                             <span className="stat-label">Stock Warnings</span>
-                            <span className="stat-value">{dashboardData.summary.stockWarnings}</span>
+                            <span className="stat-value">{dashboardData.summary?.stockWarnings || 0}</span>
                             <div className="card-hint">Click para ver detalle</div>
                         </div>
                         <div className="stat-card business highlight clickable" onClick={() => setActiveModal('topclient')}>
                             <div className="stat-icon"><Users size={18} /></div>
                             <span className="stat-label">Top Cliente</span>
-                            <span className="stat-value fs-v-small">{dashboardData.summary.topClient.name}</span>
-                            <span className="stat-sub-value">${dashboardData.summary.topClient.value.toLocaleString()}</span>
+                            <span className="stat-value fs-v-small">{dashboardData.summary?.topClient?.name || 'Cliente General'}</span>
+                            <span className="stat-sub-value">${(Number(dashboardData.summary?.topClient?.value) || 0).toLocaleString()}</span>
                             <div className="card-hint">Click para ver detalle</div>
                         </div>
                     </div>
@@ -535,18 +539,24 @@ export default function Analytics() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {dashboardData.intelligence.profitability.map((c: any, idx: number) => (
-                                            <tr key={c.name}>
-                                                <td><span className="leakage-ot">{idx + 1}. {c.name}</span></td>
-                                                <td>${c.billing.toLocaleString()}</td>
-                                                <td><span className="profit-index">${c.index}</span></td>
-                                                <td>
-                                                    <div className={`efficiency-badge badge-${c.index > 5000 ? 'success' : (c.index > 3000 ? 'warning' : 'danger')}`}>
-                                                        {c.index > 5000 ? 'Premium' : (c.index > 3000 ? 'Standard' : 'Bajo Margen')}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {(dashboardData.intelligence?.profitability || []).map((c: any, idx: number) => {
+                                            const clientName = c.cliente || c.name || `Cliente ${idx + 1}`;
+                                            const billingVal = Number(c.facturacion ?? c.billing ?? 0);
+                                            const m2Val = Number(c.m2Real || c.m2Facturado || 1);
+                                            const indexVal = Number(c.index ?? (billingVal > 0 ? Math.round(billingVal / Math.max(1, m2Val)) : 3500));
+                                            return (
+                                                <tr key={clientName + idx}>
+                                                    <td><span className="leakage-ot">{idx + 1}. {clientName}</span></td>
+                                                    <td>${billingVal.toLocaleString()}</td>
+                                                    <td><span className="profit-index">${indexVal.toLocaleString()}</span></td>
+                                                    <td>
+                                                        <div className={`efficiency-badge badge-${indexVal > 5000 ? 'success' : (indexVal > 3000 ? 'warning' : 'danger')}`}>
+                                                            {indexVal > 5000 ? 'Premium' : (indexVal > 3000 ? 'Standard' : 'Bajo Margen')}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
