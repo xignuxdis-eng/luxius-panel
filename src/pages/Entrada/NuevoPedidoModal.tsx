@@ -1544,7 +1544,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
 
         const clientesList = getClientes()
-        const cliente = clientesList.find(c => c.id === parseInt(data.clienteId))
+        const cliente = clientesList.find(c => String(c.id) === String(data.clienteId))
 
         try {
             if (activeTab === 'lote') {
@@ -1622,7 +1622,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 ...data,
                                 id: undefined,
                                 clientId: parseInt(data.clienteId),
-                                clienteNombre: cliente?.nombre || 'Desconocido',
+                                clienteNombre: cliente?.nombre || (data as any).clienteNombre || 'Desconocido',
                                 batchId: batchId,
                                 loteNombre: batchName || `Lote ${new Date().toLocaleDateString('es-AR')}`,
                                 descripcionItem: itemDesc,
@@ -1742,7 +1742,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         consumoEstimado: priceResult.consumoEstimado,
                         precioMl: priceResult.precioMl,
                         precioDetalle: priceResult.precioDetalle,
-                        clienteNombre: cliente?.nombre || 'Desconocido',
+                        clienteNombre: cliente?.nombre || (data as any).clienteNombre || 'Desconocido',
                         archivos: finalArchivos,
                         archivosOriginales: finalArchivosOriginales,
                         demasiasConfig: isLonaOrNotVinilo(data.material) ? data.demasiasConfig : { top: false, bottom: false, left: false, right: false },

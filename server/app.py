@@ -543,16 +543,29 @@ def post_clientes():
     if not item:
         return jsonify({'error': 'Body required'}), 400
 
-    cliente = Cliente.query.filter_by(id=item.get('id')).first()
-    is_new = cliente is None
+    raw_id = item.get('id')
+    cliente = None
+    if raw_id is not None:
+        try:
+            cliente = Cliente.query.filter_by(id=int(raw_id)).first()
+        except (ValueError, TypeError):
+            cliente = None
 
-    if is_new and not item.get('id'):
+    if cliente is None:
         max_id = db.session.query(db.func.max(Cliente.id)).scalar() or 0
-        item['id'] = max_id + 1
-        cliente = Cliente(id=item['id'])
+        try:
+            c_id_num = int(raw_id) if raw_id is not None else None
+            if c_id_num and 0 < c_id_num < 100000 and not Cliente.query.filter_by(id=c_id_num).first():
+                assigned_id = c_id_num
+            else:
+                assigned_id = max_id + 1
+        except (ValueError, TypeError):
+            assigned_id = max_id + 1
+
+        cliente = Cliente(id=assigned_id)
+        db.session.add(cliente)
 
     _apply_cliente_fields(cliente, item)
-    db.session.add(cliente)
     db.session.commit()
     _ensure_client_user(cliente)
     return jsonify(cliente.to_dict())
@@ -925,7 +938,7 @@ def db_reset_balances():
 def _apply_cliente_fields(c: Cliente, data: dict):
     c.nombre            = data.get('nombre', c.nombre or data.get('persona', ''))
     c.empresa           = data.get('empresa', c.empresa or '')
-    c.persona           = data.get('persona', c.persona or '')
+    c.persona           = data.get('persona', c.persona or data.get('nombre', ''))
     c.relacion          = data.get('relacion', c.relacion or '')
     c.responsable       = data.get('responsable', c.responsable or '')
     c.direccion         = data.get('direccion', c.direccion or '')
@@ -938,8 +951,16 @@ def _apply_cliente_fields(c: Cliente, data: dict):
     c.balance           = data.get('balance', c.balance or 0.0)
     c.pago_cuenta       = data.get('pagoCuenta', c.pago_cuenta or 0.0)
     c.precios_especiales= data.get('preciosEspeciales', c.precios_especiales or {})
-    if data.get('extra'):
-        c.extra = {**(c.extra or {}), **data['extra']}
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    extra = dict(c.extra or {})
+    for k in ['cuit', 'telefono', 'condVenta', 'vip', 'fechaInicio']:
+        if k in data:
+            extra[k] = data[k]
+    if data.get('extra') and isinstance(data['extra'], dict):
+        extra.update(data['extra'])
+    c.extra = extra
+    flag_modified(c, 'extra')
     c.updated_at = datetime.now(timezone.utc)
 
 def _apply_maquina_fields(m: Maquina, data: dict):

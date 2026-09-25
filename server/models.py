@@ -47,15 +47,21 @@ class Cliente(db.Model):
     presupuestos = relationship('Presupuesto', back_populates='cliente')
 
     def to_dict(self):
+        extra = self.extra or {}
         return {
             'id': self.id, 'nombre': self.nombre, 'empresa': self.empresa,
-            'persona': self.persona, 'relacion': self.relacion,
+            'persona': self.persona or self.nombre, 'relacion': self.relacion,
             'responsable': self.responsable, 'direccion': self.direccion,
             'categoria': self.categoria, 'username': self.username,
             'email': self.email, 'habilitado': self.habilitado,
-            'saldo': self.saldo, 'deuda': self.deuda, 'balance': self.balance,
-            'pagoCuenta': self.pago_cuenta,
+            'saldo': self.saldo or 0.0, 'deuda': self.deuda or 0.0, 'balance': self.balance or 0.0,
+            'pagoCuenta': self.pago_cuenta or 0.0,
             'preciosEspeciales': self.precios_especiales or {},
+            'cuit': extra.get('cuit', ''),
+            'telefono': extra.get('telefono', ''),
+            'condVenta': extra.get('condVenta', 'EFECTIVO'),
+            'vip': extra.get('vip', False),
+            'fechaInicio': extra.get('fechaInicio', ''),
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
         }

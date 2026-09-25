@@ -67,8 +67,13 @@ export default function Entrada() {
     }, [viewTab, searchTerm, statusFilter, materialFilter, categoryFilter])
 
     const { user } = useAuthStore()
-    const allClientes = useState(() => getClientes())[0]
-    const allMateriales = useState(() => getMateriales())[0]
+    const [allClientes, setAllClientes] = useState<Cliente[]>(getClientes())
+    const [allMateriales, setAllMateriales] = useState<Material[]>(getMateriales())
+
+    useEffect(() => {
+        setAllClientes(getClientes())
+        setAllMateriales(getMateriales())
+    }, [orders])
 
     const filteredOrders = orders.filter(order => {
         const matchesSearch =
@@ -100,8 +105,8 @@ export default function Entrada() {
             );
 
             const orderClientId = order.clientId || (order as any).clienteId;
-            const matchesLinked = linkedClient && (orderClientId === linkedClient.id);
-            const matchesUser = orderClientId === user.id;
+            const matchesLinked = linkedClient && (String(orderClientId) === String(linkedClient.id));
+            const matchesUser = String(orderClientId) === String(user.id);
 
             if (!matchesLinked && !matchesUser) return false;
         }
@@ -150,7 +155,7 @@ export default function Entrada() {
                     .filter((b: any) => b.usefulWidth > 0)
                     .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
-                const cliente = allClientes.find(cl => cl.id === order.clientId);
+                const cliente = allClientes.find(cl => String(cl.id) === String(order.clientId));
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
 
                 type Candidate = { bobina: number; ml: number; cost: number };
@@ -184,7 +189,7 @@ export default function Entrada() {
             }
 
             if (matData.precioM2) {
-                const cliente = allClientes.find(cl => cl.id === order.clientId);
+                const cliente = allClientes.find(cl => String(cl.id) === String(order.clientId));
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
                 const priceToUse = specialPrice || matData.precioM2 || 0;
                 const m2 = round2(w * h * c);
@@ -1002,7 +1007,7 @@ export default function Entrada() {
                                                             className="btn-icon-action"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                const clientObj = allClientes.find(c => c.id === item.primaryOrder.clientId);
+                                                                const clientObj = allClientes.find(c => String(c.id) === String(item.primaryOrder.clientId));
                                                                 generatePdfClientReport(item.orders, {
                                                                     clienteNombre: item.primaryOrder.clienteNombre,
                                                                     clienteEmpresa: clientObj?.empresa,

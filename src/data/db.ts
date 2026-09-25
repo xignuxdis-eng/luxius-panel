@@ -677,6 +677,7 @@ export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {
 
     const existingIndex = sessionItems.findIndex(c => String(c.id) === String(cliente.id))
     let result: Cliente
+    const isExisting = Boolean(cliente.id && existingIndex !== -1);
 
     if (existingIndex !== -1) {
         sessionItems[existingIndex] = { ...sessionItems[existingIndex], ...cliente } as Cliente
@@ -706,12 +707,19 @@ export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {
     localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(sessionItems))
     
     try {
-        const method = cliente.id ? 'PUT' : 'POST';
-        const url = cliente.id ? `${API_URL}/clientes/${result.id}` : `${API_URL}/clientes`;
+        const method = isExisting ? 'PUT' : 'POST';
+        const url = isExisting ? `${API_URL}/clientes/${result.id}` : `${API_URL}/clientes`;
+        
+        // Si es un nuevo cliente, evitar enviar un ID aleatorio ficticio para que el backend asigne el secuencial
+        const payload: any = { ...result };
+        if (!isExisting) {
+            delete payload.id;
+        }
+
         const res = await fetchWithTimeout(url, {
             method,
             headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify(result)
+            body: JSON.stringify(payload)
         }, 10000);
         
         if (res.ok) {
@@ -724,6 +732,10 @@ export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {
                     currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverCliente };
                     localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(currentLocal));
                     result = currentLocal[localIdx];
+                } else {
+                    currentLocal.unshift(serverCliente);
+                    localStorage.setItem(SESSION_CLIENTES_KEY, JSON.stringify(currentLocal));
+                    result = serverCliente;
                 }
             } catch(e) { }
         } else {
