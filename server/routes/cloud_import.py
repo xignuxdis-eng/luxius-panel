@@ -30,6 +30,98 @@ def _extract_drive_id(url: str):
         
     return None
 
+@import_bp.route('/file', methods=['GET', 'OPTIONS'])
+def stream_cloud_file():
+    """Stream an individual Google Drive file on-demand with chunking to avoid memory spikes."""
+    if request.method == 'OPTIONS':
+        from flask import Response
+        res = Response()
+        res.headers['Access-Control-Allow-Origin'] = '*'
+        res.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        res.headers['Access-Control-Allow-Headers'] = '*'
+        return res
+
+    drive_id = request.args.get('id', '').strip()
+    file_name = request.args.get('name', 'archivo').strip()
+    
+    if not drive_id:
+        return jsonify({"error": "Falta el identificador del archivo"}), 400
+
+    safe_name = os.path.basename(file_name) or "archivo"
+
+    # Attempt 1: Direct stream from Google Drive uc export
+    try:
+        session = requests.Session()
+        direct_url = f"https://drive.google.com/uc?export=download&id={drive_id}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': '*/*'
+        }
+        r = session.get(direct_url, stream=True, headers=headers, timeout=35)
+        
+        # Check for virus warning confirm token
+        confirm_token = None
+        for k, v in r.cookies.items():
+            if k.startswith('download_warning'):
+                confirm_token = v
+                break
+        
+        if not confirm_token and 'text/html' in r.headers.get('Content-Type', ''):
+            m = re.search(r'confirm=([0-9A-Za-z_-]+)', r.text)
+            if m:
+                confirm_token = m.group(1)
+                
+        if confirm_token:
+            direct_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={drive_id}"
+            r = session.get(direct_url, stream=True, headers=headers, timeout=35)
+            
+        if r.status_code == 200 and 'text/html' not in r.headers.get('Content-Type', ''):
+            cd = r.headers.get('Content-Disposition', '')
+            if 'filename=' in cd:
+                extracted = cd.split('filename=')[-1].strip('"\'; ')
+                if extracted:
+                    safe_name = extracted
+            
+            content_type = r.headers.get('Content-Type', 'application/octet-stream')
+            content_length = r.headers.get('Content-Length')
+
+            def generate():
+                for chunk in r.iter_content(chunk_size=65536):
+                    if chunk:
+                        yield chunk
+
+            from flask import Response, stream_with_context
+            res = Response(stream_with_context(generate()), status=200, content_type=content_type)
+            res.headers['Content-Disposition'] = f'inline; filename="{urllib.parse.quote(safe_name)}"'
+            res.headers['Access-Control-Allow-Origin'] = '*'
+            res.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+            res.headers['Access-Control-Allow-Headers'] = '*'
+            if content_length:
+                res.headers['Content-Length'] = content_length
+            return res
+    except Exception as stream_err:
+        print(f"[CloudImport] Direct stream failed for {drive_id}, fallback to gdown: {stream_err}")
+
+    # Attempt 2: Fallback to gdown download
+    try:
+        from app import UPLOADS_DIR
+        temp_dir = os.path.join(UPLOADS_DIR, 'temp_cloud')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_target = os.path.join(temp_dir, f"gd_{drive_id}_{safe_name}")
+        if not os.path.exists(temp_target):
+            gdown.download(id=drive_id, output=temp_target, quiet=True)
+            
+        if os.path.exists(temp_target):
+            from flask import send_file
+            res = send_file(temp_target, as_attachment=False, download_name=safe_name)
+            res.headers['Access-Control-Allow-Origin'] = '*'
+            return res
+    except Exception as gd_err:
+        print(f"[CloudImport] gdown fallback error for {drive_id}: {gd_err}")
+
+    return jsonify({"error": "No se pudo descargar el archivo desde Google Drive."}), 500
+
+
 @import_bp.route('', methods=['POST'])
 @login_required
 def import_from_cloud():
@@ -49,114 +141,74 @@ def import_from_cloud():
         # Detect Google Drive
         if 'drive.google.com' in url or 'docs.google.com' in url:
             is_folder = '/folders/' in url
-            downloaded_paths = []
             
             if is_folder:
-                batch_dir = os.path.join(temp_dir, file_id)
-                os.makedirs(batch_dir, exist_ok=True)
-                downloaded_paths = gdown.download_folder(url=url, output=batch_dir, quiet=True)
-                if not downloaded_paths:
-                    return jsonify({"error": "No se pudo descargar la carpeta. Verifique que tenga permisos públicos de lectura ('Cualquiera con el enlace')."}), 403
+                # Fast folder discovery without synchronous mass-downloading (<1s)
+                try:
+                    folder_items = gdown.download_folder(url=url, skip_download=True, quiet=True)
+                except Exception as fd_err:
+                    print(f"[Drive Import] gdown folder discovery error: {fd_err}")
+                    folder_items = []
+                
+                if not folder_items:
+                    return jsonify({"error": "No se pudo leer la carpeta de Google Drive. Verifique que tenga permisos públicos de lectura ('Cualquier persona con el enlace')."}), 403
+                
+                processed_files = []
+                for item in folder_items:
+                    if getattr(item, 'id', None) is None:
+                        continue
+                        
+                    raw_filename = os.path.basename(getattr(item, 'path', ''))
+                    if not raw_filename or raw_filename.startswith('.') or raw_filename.lower() == 'desktop.ini':
+                        continue
+                    
+                    encoded_name = urllib.parse.quote(raw_filename)
+                    processed_files.append({
+                        "fileName": raw_filename,
+                        "originalName": raw_filename,
+                        "fileSize": 0,
+                        "tempUrl": f"/api/import-cloud/file?id={item.id}&name={encoded_name}",
+                        "driveId": item.id
+                    })
+                
+                if not processed_files:
+                    return jsonify({"error": "No se encontraron archivos válidos en la carpeta de Google Drive."}), 400
+                
+                return jsonify({
+                    "status": "success",
+                    "files": processed_files
+                }), 200
+                
             else:
+                # Single Google Drive file (<0.5s discovery)
                 drive_id = _extract_drive_id(url)
                 if not drive_id:
                     return jsonify({"error": "Enlace de Google Drive inválido. Copie el enlace completo que contenga /d/ID o id=ID."}), 400
                 
-                single_dir = os.path.join(temp_dir, file_id)
-                os.makedirs(single_dir, exist_ok=True)
-                output_target = single_dir + os.sep
-
-                # Download using drive id with gdown
+                safe_name = "archivo_drive"
+                file_size = 0
                 try:
-                    downloaded_file = gdown.download(id=drive_id, output=output_target, quiet=True)
-                except Exception as gd_err:
-                    print(f"[Drive Import] gdown id download notice: {gd_err}")
-                    downloaded_file = None
+                    session = requests.Session()
+                    r_head = session.get(f"https://drive.google.com/uc?export=download&id={drive_id}", stream=True, timeout=15)
+                    cd = r_head.headers.get('Content-Disposition', '')
+                    if 'filename=' in cd:
+                        safe_name = cd.split('filename=')[-1].strip('"\'; ')
+                    file_size = int(r_head.headers.get('Content-Length') or 0)
+                    r_head.close()
+                except Exception as e:
+                    print(f"[Drive Import] Single file metadata warning: {e}")
                 
-                # Fallback to direct uc?id= URL if needed
-                if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    try:
-                        download_url = f'https://drive.google.com/uc?id={drive_id}'
-                        downloaded_file = gdown.download(url=download_url, output=output_target, quiet=True)
-                    except Exception as gd_err2:
-                        print(f"[Drive Import] gdown url download notice: {gd_err2}")
-                        downloaded_file = None
-
-                
-                # Fallback to direct requests stream if needed
-                if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    try:
-                        session = requests.Session()
-                        direct_url = f"https://drive.google.com/uc?export=download&id={drive_id}"
-                        r = session.get(direct_url, stream=True, timeout=25)
-                        confirm_token = None
-                        for k, v in r.cookies.items():
-                            if k.startswith('download_warning'):
-                                confirm_token = v
-                        if confirm_token:
-                            direct_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={drive_id}"
-                            r = session.get(direct_url, stream=True, timeout=25)
-                        
-                        if r.status_code == 200 and 'text/html' not in r.headers.get('Content-Type', ''):
-                            out_name = "archivo_drive"
-                            cd = r.headers.get('content-disposition', '')
-                            if 'filename=' in cd:
-                                out_name = cd.split('filename=')[-1].strip('"\'; ')
-                            out_p = os.path.join(single_dir, out_name)
-                            with open(out_p, 'wb') as f:
-                                for chunk in r.iter_content(chunk_size=32768):
-                                    if chunk:
-                                        f.write(chunk)
-                            if os.path.exists(out_p) and os.path.getsize(out_p) > 0:
-                                downloaded_file = out_p
-                    except Exception as req_e:
-                        print(f"[Drive Import] requests stream fallback error: {req_e}")
-
-                # If downloaded_file is still not found, check if anything was written to single_dir
-                if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    files_in_dir = [os.path.join(single_dir, f) for f in os.listdir(single_dir) if os.path.isfile(os.path.join(single_dir, f))]
-                    if files_in_dir:
-                        downloaded_file = files_in_dir[0]
-
-                if not downloaded_file or not os.path.exists(str(downloaded_file)):
-                    return jsonify({"error": "No se pudo descargar desde Google Drive. Asegúrese de que el archivo esté configurado como 'Cualquier persona con el enlace puede ver'."}), 403
-                
-                downloaded_paths = [str(downloaded_file)]
-                
-            processed_files = []
-            
-            for path in downloaded_paths:
-                if not os.path.isfile(path):
-                    continue
-                original_filename = os.path.basename(path)
-                # If gdown created temporary download name, keep a clean filename
-                if original_filename.startswith(f"{file_id}_download"):
-                    original_filename = "archivo_drive"
-                
-                _, ext = os.path.splitext(original_filename)
-                if not ext:
-                    ext = ".pdf"  # Fallback standard extension
-                    
-                unique_filename = f"cloud_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}{ext}"
-                final_path = os.path.join(UPLOADS_DIR, unique_filename)
-                
-                os.replace(path, final_path)
-                file_size = os.path.getsize(final_path)
-                
-                processed_files.append({
-                    "fileName": unique_filename,
-                    "originalName": original_filename if original_filename != "archivo_drive" else f"archivo_drive{ext}",
-                    "fileSize": file_size,
-                    "tempUrl": f"/uploads/{unique_filename}"
-                })
-                
-            if not processed_files:
-                return jsonify({"error": "No se encontraron archivos válidos en la descarga de Google Drive."}), 400
-                
-            return jsonify({
-                "status": "success",
-                "files": processed_files
-            }), 200
+                encoded_name = urllib.parse.quote(safe_name)
+                return jsonify({
+                    "status": "success",
+                    "files": [{
+                        "fileName": safe_name,
+                        "originalName": safe_name,
+                        "fileSize": file_size,
+                        "tempUrl": f"/api/import-cloud/file?id={drive_id}&name={encoded_name}",
+                        "driveId": drive_id
+                    }]
+                }), 200
             
         elif 'we.tl' in url or 'wetransfer.com' in url:
             import zipfile

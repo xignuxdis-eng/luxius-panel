@@ -1067,7 +1067,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         cloudAbortControllerRef.current = abortController;
         const abortTimeout = setTimeout(() => {
             abortController.abort();
-        }, 90000);
+        }, 600000); // 10 minutos para soportar lotes grandes de archivos
 
         const isWeTransfer = cloudUrl.includes('we.tl') || cloudUrl.includes('wetransfer.com');
         setCloudImportStatus(isWeTransfer ? 'Conectando con WeTransfer...' : 'Conectando con Google Drive...');
@@ -1153,7 +1153,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     for (let i = 0; i < data.files.length; i++) {
                         if (abortController.signal.aborted) break;
                         const fileInfo = data.files[i];
-                        setCloudImportStatus(`Descargando archivo (${i + 1}/${data.files.length})...`);
+                        setCloudImportStatus(`Descargando (${i + 1}/${data.files.length}): ${fileInfo.originalName}...`);
                         try {
                             const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
                             const blobRes = await fetchWithTimeout(fileUrl, 90000);
