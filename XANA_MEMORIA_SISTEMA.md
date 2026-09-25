@@ -153,6 +153,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Importación de carpetas pesadas de Google Drive fallaba o parecía colgada por timeout** | El backend intentaba descargar sincrónicamente todos los archivos (ej. 140MB) en una sola llamada HTTP antes de responder, excediendo el límite de 90s/100s de frontend y Render. | Se desacopló la importación: descubrimiento instantáneo de metadatos en <1s con `skip_download=True`, endpoint de streaming bajo demanda (`/api/import-cloud/file`), y descarga progresiva en el cliente con feedback visual archivo por archivo. | `server/routes/cloud_import.py`<br>`luXius-Backend/routes/cloud_import.py`<br>`src/pages/Entrada/NuevoPedidoModal.tsx` |
 | **Sección de analíticas quedaba colgada / pantalla congelada** | 1) `Uncaught TypeError: Cannot read properties of undefined (reading 'toLocaleString')` en tabla de rentabilidad por incompatibilidad de llaves (`c.billing` vs `c.facturacion`). 2) Múltiples peticiones HTTP en cascada sin timeout que bloqueaban la carga si el backend local no respondía. | Se protegieron todas las propiedades con fallback (`cliente`/`name`, `facturacion`/`billing`), se paralelizaron las peticiones con `Promise.allSettled` y timeouts de 7s en `Analytics.tsx`, y se blindó `ConciliationTable.tsx` contra campos nulos y timeouts de 6s. | `src/pages/Analytics/Analytics.tsx`<br>`src/pages/Analytics/ConciliationTable.tsx` |
 | **Clientes recién creados desaparecían de Administración y no figuraban en el detalle de órdenes** | 1) `post_clientes()` en backend tenía condición fallida `if is_new and not item.get('id'):` que dejaba `cliente=None` cuando el frontend mandaba un ID temporal, disparando error 500 al guardar en BD y borrando el cliente local al ejecutar `refreshCollection`. 2) Backend no serializaba campos extendidos (`cuit`, `telefono`, `condVenta`, `vip`, `fechaInicio`). 3) `allClientes` en `Entrada.tsx` estaba congelado en un `useState(...)[0]` estático y comparaciones de ID sensibles a tipo. | Se corrigió `post_clientes()` y `_apply_cliente_fields()` en backend para instanciar siempre clientes nuevos con ID secuencial y persistir `cuit`, `telefono`, etc. en `extra`, se actualizó `Cliente.to_dict()` para devolverlos, se limpió el payload POST en `saveCliente` (`src/data/db.ts`), y se reactivó `allClientes` y comparaciones seguras por `String(id)` en `Entrada.tsx` y `NuevoPedidoModal.tsx`. | `luXius-Backend/app.py`<br>`luXius-Backend/models.py`<br>`luXius-Backend/server/app.py`<br>`server/app.py`<br>`server/models.py`<br>`src/data/db.ts`<br>`src/pages/Entrada/Entrada.tsx`<br>`src/pages/Entrada/NuevoPedidoModal.tsx` |
+| **Crash en Render: `ModuleNotFoundError: No module named 'psycopg'`** | 1) SQLAlchemy 2.0 intentaba resolver la URL PostgreSQL cargando el dialecto nuevo `psycopg` (v3) que no estaba en `requirements.txt`. 2) Render estaba vinculado a la rama `master` de `luXius-Backend` en GitHub, la cual estaba desfasada por un mes respecto a `main` (`dad678a` vs `9387226`), impidiendo que Render desplegara las correcciones. | Se forzó el dialecto `postgresql+psycopg2://` en `config.py`, se instaló `psycopg[binary]>=3.1`, `psycopg-binary>=3.1` y `psycopg2-binary>=2.9` en `requirements.txt`, y se sincronizaron ambas ramas en GitHub (`git push origin main:master`), logrando el arranque exitoso de Gunicorn con `HTTP 200 OK` en producción. | `luXius-Backend/config.py`<br>`luXius-Backend/requirements.txt`<br>`server/config.py`<br>`server/requirements.txt` |
 
 
 ---
@@ -161,29 +162,32 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:
 
-1. **Dependencias**:
+1. **Estado Actual de Producción (Septiembre 2026)**:
+   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` están en el commit `6cce8e0`.
+   - **Frontend Web**: Publicado y funcional en `https://xignuxdis-eng.github.io/luxius-panel/` (rama `gh-pages` actualizada).
+   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada.
+   - **Remotos**: Si GitLab presenta lentitud o cuelgues por credenciales, omitir GitLab y operar directamente sobre GitHub (`origin`).
+2. **Dependencias**:
    ```bash
    npm install
    ```
-2. **Levantar Entorno de Desarrollo**:
+3. **Levantar Entorno de Desarrollo**:
    ```bash
    npm run dev
    ```
-3. **Verificar Compilación TypeScript**:
+4. **Verificar Compilación TypeScript**:
    ```bash
    npm run build
    ```
-4. **Desplegar Cambios**:
-   - `git add -A && git commit -m "..." && git push origin master` (publica en GitHub y GitLab a la vez)
-   - `npm run build; .\scripts\deploy_gh_pages.ps1` -> actualiza `gh-pages`
-   - Copiar `dist/` a `D:\XignuX\luxius-panel\dist\` (si es la PC del taller).
-5. **Contexto Adicional**:
+5. **Desplegar Cambios**:
+   - `git add -A && git commit -m "..." && git push origin master` (publica en GitHub).
+   - `npm run build; .\scripts\deploy_gh_pages.ps1` -> actualiza la versión pública en `gh-pages`.
+   - Copiar `dist/` a `D:\XignuX\luxius-panel\dist\` (si es la PC del taller con Nginx local).
+6. **Contexto Adicional**:
    - Para entender el agente Xana: revisar `.agents/rules/xana_agent.md` y `.agents/AGENTS.md`.
    - Para el Roadmap del Artista y Xpress Viewer: revisar `docs/roadmaps/ROADMAP_ARTISTA_XPRESS_VIEWER.md`.
    - Para la app móvil: revisar `docs/xana/XANA_MEMORIA_APP_MOVIL.md`.
    - Para la arquitectura general de infraestructura: revisar `ESPECIFICACION_TECNICA_ECOSISTEMA_LUXIUS.md`.
-   - Para el estado del plan de mejoras: sección 8 de este documento (es la **única lista de tareas vigente**; actualizarla en cada commit relevante).
-6. **Al hacer `git pull` en una máquina que ya tenía el repo antes de la Fase 1** (22/09/2026): git eliminará del disco `server/uploads/`, `server/luxius.db`, `dist/` y `backup-luxius-*/` porque dejaron de estar versionados. Hacer copia previa si esa máquina tiene datos locales en esas rutas (la PC del taller, por ejemplo).
 
 ---
 
@@ -191,33 +195,26 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
 
-### Fase 1: Higiene del repositorio (22/09/2026)
+### Fase 1: Higiene del repositorio y Sincronización de Base de Datos (22-25/09/2026)
 - [x] Cerrar trabajo pendiente del logo SVG liviano en `generatePdfBudget.ts` y `generatePdfClientReport.ts`.
 - [x] Ampliar `.gitignore` (backups, `*.db`, `server/uploads/`, multimedia, PDFs de prueba, `build_log.txt`).
-- [x] Script `scripts/fase1_limpieza.ps1` (untrack de artefactos, reorganización, doble remoto, commit y push).
-- [x] Ejecutado `.\scripts\fase1_limpieza.ps1` el 22/09/2026: commit `8c41d2c` (2516 archivos, -800k líneas) publicado en GitHub y GitLab con el mismo SHA. `origin` tiene 2 push-URLs.
-- [x] Publicar `dist/` a `gh-pages` con `scripts/deploy_gh_pages.ps1` (reemplaza a `git subtree split`, que ya no aplica porque `dist/` no se versiona en `master`).
+- [x] Script `scripts/fase1_limpieza.ps1` (untrack de artefactos, reorganización, commit y push).
+- [x] Publicar `dist/` a `gh-pages` con `scripts/deploy_gh_pages.ps1`.
+- [x] **Bugfix Crítico Clientes y Sincronización BD**: Corregido `post_clientes()` y `_apply_cliente_fields()` en backend para crear e hidratar clientes en BD sin depender de IDs temporales.
+- [x] **Serialización Completa de Clientes**: Almacenamiento en `extra` y serialización en `Cliente.to_dict()` de `cuit`, `telefono`, `condVenta`, `vip`, `fechaInicio`.
+- [x] **Revisión Reactiva Frontend**: Reactividad de `allClientes` y búsquedas seguras por `String(id)` en `Entrada.tsx`, `NuevoPedidoModal.tsx` y `db.ts`.
+- [x] **Estabilidad de Render**: Soporte dual de drivers `psycopg2` y `psycopg` (v3) en `requirements.txt` y dialecto explícito en `config.py`; sincronizadas ramas `main` y `master` en `luXius-Backend`.
 
-### Fase 2: Seguridad (prioridad alta)
-- [ ] Sacar contraseñas hardcodeadas del seed `_seed_default_users()` en `server/app.py`; leerlas de variables de entorno (`SEED_*_PASSWORD`) o generarlas aleatorias y loguearlas una vez.
-- [ ] Rotar en Neon las contraseñas de `sistema`, `adrian`, `admin`, `impresion`, `diseño`, `vendedor` (están expuestas en el historial Git).
-- [ ] Confirmar que `JWT_SECRET_KEY` en Render no es el valor por defecto de `config.py`.
-- [ ] Rate limiter: pasar de `memory://` a Redis (Render Key Value) para que persista entre reinicios y workers.
-- [ ] Correr `gitleaks` sobre el historial y purgar secretos si aparecen (`git filter-repo`).
-
-### Fase 3: Deuda técnica del backend
-- [ ] Decidir el destino de `server/index.js` (Express legacy, 1237 líneas) e `install_service.js`: extraer `logParser.js` a un servicio propio si las impresoras lo usan, o eliminarlos.
-- [ ] Reemplazar `db.create_all()` por migraciones con Flask-Migrate/Alembic.
-- [ ] Partir `server/app.py` (>1000 líneas) en blueprints: `routes/clientes.py`, `routes/maquinas.py`, `routes/usuarios.py`, `routes/tarifas.py`, `routes/analytics.py`.
-- [ ] Unificar `luXius-Backend` y `server/` (submódulo Git o repo único) para eliminar la copia manual de `run_project.bat`.
-
-### Fase 4: Calidad y CI/CD
-- [ ] `vitest` para `src/utils/pricingCalculator.ts` (asignación de bobina por menor desperdicio, precios especiales por cliente).
-- [ ] `pytest` para `routes/orders.py` y `sync_routes.py`.
-- [ ] `.gitlab-ci.yml` con etapas `lint`, `test`, `build` y despliegue automático a `gh-pages`; habilitar SAST y Secret Detection.
-- [ ] Migrar `scripts/tests/*.cjs` a tests reales o eliminarlos.
-
-### Fase 5: Producto (ver `ESPECIFICACION_TECNICA_ECOSISTEMA_LUXIUS.md`)
-- [ ] Módulo 1: Smart Order de Xana (`/api/xana/smart-order`) end-to-end con tarjeta interactiva.
-- [ ] Módulo 2: Bóveda Drive con cron nocturno y `drive_folder_id` en `presupuestos`.
-- [ ] Módulo 3: Daemon Hot Folder RIP con `POST /api/orders/{id}/rip-status`.
+### Lo que sigue inmediatamente (Siguientes Pasos de Trabajo):
+- [ ] **Validación en Vivo de Clientes en UI**: Probar la creación de un nuevo cliente desde Administración (`ClientesView`) y verificar que persista en el detalle de las órdenes tras F5 sin parpadeos.
+- [ ] **Fase 2 - Seguridad (prioridad alta)**:
+  - [ ] Sacar contraseñas hardcodeadas del seed `_seed_default_users()` en `server/app.py`; leerlas de variables de entorno (`SEED_*_PASSWORD`).
+  - [ ] Rotar en Neon las contraseñas de usuarios por defecto expuestas en el historial Git.
+  - [ ] Confirmar que `JWT_SECRET_KEY` en Render sea único y seguro.
+  - [ ] Migrar Rate Limiter de `memory://` a Redis para persistencia entre workers.
+- [ ] **Fase 3 - Deuda Técnica Backend**:
+  - [ ] Partir `server/app.py` y `luXius-Backend/app.py` en Blueprints (`routes/clientes.py`, `routes/maquinas.py`, etc.).
+  - [ ] Unificar la duplicación entre la carpeta `server/` y el repo `luXius-Backend`.
+- [ ] **Fase 5 - Módulos de Producto**:
+  - [ ] Módulo 1: Smart Order de Xana (`/api/xana/smart-order`) con tarjeta interactiva.
+  - [ ] Módulo 2: Bóveda Drive con sincronización nocturna de órdenes y remitos.
