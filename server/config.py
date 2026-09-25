@@ -4,9 +4,12 @@ import sys
 class Config:
     _raw_db_url = os.environ.get('DATABASE_URL', '')
 
-    # Render/Neon usan postgres:// pero SQLAlchemy 2.x necesita postgresql://
-    if _raw_db_url and _raw_db_url.startswith('postgres://'):
-        _raw_db_url = _raw_db_url.replace('postgres://', 'postgresql://', 1)
+    # Render/Neon usan postgres:// o postgresql:// sin driver; forzar psycopg2 para compatibilidad total
+    if _raw_db_url:
+        if _raw_db_url.startswith('postgres://'):
+            _raw_db_url = _raw_db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+        elif _raw_db_url.startswith('postgresql://'):
+            _raw_db_url = _raw_db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
 
     # Default a SQLite si no hay DATABASE_URL configurada
     _db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'luxius.db')
