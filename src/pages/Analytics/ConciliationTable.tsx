@@ -1,79 +1,45 @@
-import { useState, useEffect } from 'react';
-import { CheckCircle, Clock } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { CheckCircle, Clock, Upload } from 'lucide-react';
 import { API_URL, getOrdenes } from '@data/db';
 import type { Order } from '@/types';
+import { parseRolandVersaWorksLog } from '@/utils/ripLogParser';
+import { getRipLogs, saveRipLogs, reconcileRipLogs, type ReconciledItem } from '@/utils/ripLogReconcile';
 import './ConciliationTable.css';
-
-interface ReconciledItem {
-    id: number;
-    cliente: string;
-    trabajo: string;
-    material: string;
-    teorico: { m2: number };
-    real: {
-        m2: number;
-        totalInkMl: number;
-        logsCount: number;
-    };
-    efficiency: {
-        m2: number;
-        inkRatio: number;
-    };
-    consumoEstimado: number;
-    stockWarning: boolean;
-    status: 'consolidated' | 'pending';
-}
-
-function buildReconciliationFromOrders(orders: Order[]): ReconciledItem[] {
-    const printedStatuses = ['impreso', 'post', 'completo', 'entregado', 'finalizado'];
-    const ML_PER_M2_PER_CHANNEL = 4;
-    return orders
-        .map((o) => {
-            const w = Number(o.ancho) || 0;
-            const h = Number(o.alto) || 0;
-            const c = Number(o.copias) || 1;
-            const m2 = Math.round(w * h * c * 1000) / 1000;
-            if (m2 <= 0) return null;
-            const isPrinted = printedStatuses.includes(o.status);
-            const totalInkMl = Math.round(m2 * ML_PER_M2_PER_CHANNEL * 4 * 10) / 10;
-            return {
-                id: Number(o.id) || 0,
-                cliente: o.clienteNombre || 'Cliente',
-                trabajo: o.ot || `OT-${o.id}`,
-                material: o.material || 'Vinilo',
-                teorico: { m2 },
-                real: isPrinted ? { m2, totalInkMl, logsCount: 1 } : { m2: 0, totalInkMl: 0, logsCount: 0 },
-                efficiency: isPrinted
-                    ? { m2: 1, inkRatio: Math.round((totalInkMl / 1000 / m2) * 100000) / 100000 }
-                    : { m2: 0, inkRatio: 0 },
-                consumoEstimado: m2,
-                stockWarning: false,
-                status: (isPrinted ? 'consolidated' : 'pending') as 'consolidated' | 'pending'
-            };
-        })
-        .filter(Boolean) as ReconciledItem[];
-}
 
 export default function ConciliationTable() {
     const [data, setData] = useState<ReconciledItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [importing, setImporting] = useState(false);
+    const [logSummary, setLogSummary] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const fetchReconciliation = async () => {
         try {
-            const ctrl = new AbortController();
-            const id = setTimeout(() => ctrl.abort(), 6000);
-            const res = await fetch(`${API_URL}/analytics/reconciliation`, { signal: ctrl.signal, cache: 'no-store' });
-            clearTimeout(id);
-            if (!res.ok) return;
-            const result = await res.json();
-            if (result && Array.isArray(result.reconciled) && result.reconciled.length > 0) {
-                setData(result.reconciled);
-            } else {
-                const orders = await getOrdenes().catch(() => [] as Order[]);
-                setData(buildReconciliationFromOrders(orders));
+            const orders = await getOrdenes().catch(() => [] as Order[]);
+            const logs = getRipLogs();
+
+            if (logs.length > 0) {
+                setData(reconcileRipLogs(orders, logs));
+                return;
             }
+
+            try {
+                const ctrl = new AbortController();
+                const id = setTimeout(() => ctrl.abort(), 6000);
+                const res = await fetch(`${API_URL}/analytics/reconciliation`, { signal: ctrl.signal, cache: 'no-store' });
+                clearTimeout(id);
+                if (res.ok) {
+                    const result = await res.json();
+                    if (result && Array.isArray(result.reconciled) && result.reconciled.length > 0) {
+                        setData(result.reconciled);
+                        return;
+                    }
+                }
+            } catch (_) {}
+
+            setData(reconcileRipLogs(orders, []));
         } catch (err) {
-            console.warn('Notice fetching reconciliation:', err);
+            console.warn('Error fetching reconciliation:', err);
         } finally {
             setLoading(false);
         }
@@ -82,6 +48,28 @@ export default function ConciliationTable() {
     useEffect(() => {
         fetchReconciliation();
     }, []);
+
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+            const text = await file.text();
+            const logs = parseRolandVersaWorksLog(text);
+            saveRipLogs(logs);
+            const orders = await getOrdenes().catch(() => [] as Order[]);
+            const items = reconcileRipLogs(orders, logs);
+            setData(items);
+            const matched = items.filter(i => i.matched).length;
+            setLogSummary(`${logs.length} trabajos importados · ${matched} matcheados con órdenes`);
+        } catch (err) {
+            console.error('Error importing RIP log:', err);
+            setLogSummary('Error al importar el log. Verificá que sea un archivo de Roland VersaWorks.');
+        } finally {
+            setImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const getEfficiencyStatus = (ratio: number) => {
         if (!ratio || ratio === 0) return 'neutral';
@@ -94,10 +82,49 @@ export default function ConciliationTable() {
 
     return (
         <div className="conciliation-container">
-            <div className="section-header">
-                <h2>Cruce de Órdenes vs. RIP</h2>
-                <p>Análisis de rentabilidad real basado en logs de producción.</p>
+            <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                <div>
+                    <h2>Cruce de Órdenes vs. RIP</h2>
+                    <p>Análisis de rentabilidad real basado en logs de producción.</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".log,.xml,.txt,.csv"
+                        onChange={handleImport}
+                        style={{ display: 'none' }}
+                    />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={importing}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(37,99,235,0.5)',
+                            background: '#2563eb',
+                            color: '#fff',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            opacity: importing ? 0.6 : 1
+                        }}
+                        title="Importar log de impresora (Roland VersaWorks .log/.xml)"
+                    >
+                        <Upload size={15} />
+                        {importing ? 'Importando...' : 'Importar Log RIP'}
+                    </button>
+                </div>
             </div>
+
+            {logSummary && (
+                <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.35)', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                    {logSummary}
+                </div>
+            )}
 
             <div className="table-wrapper">
                 <table className="conciliation-table">
