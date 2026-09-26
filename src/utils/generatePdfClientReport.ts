@@ -1,5 +1,5 @@
 import type { Order } from '@/types'
-import { XIGNUX_LOGO_LIGHT } from './logoBase64Light'
+import { XIGNUX_LOGO_LIGHT, XIGNUX_LOGO_BASE64 } from './logoBase64Light'
 import { resolveMediaUrl } from '@/data/db'
 import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
 

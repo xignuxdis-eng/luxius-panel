@@ -1,7 +1,7 @@
 import type { Order } from '@/types'
 import { XIGNUX_LOGO_LIGHT } from './logoBase64Light'
 import { resolveMediaUrl } from '@/data/db'
-import { optimizePdfThumbnail } from './pdfImageOptimizer'
+import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
 
 export async function generatePdfBudget(order: Order) {
     const printWindow = window.open('', '_blank')
