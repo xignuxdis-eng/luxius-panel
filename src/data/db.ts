@@ -931,6 +931,8 @@ export function saveMaterial(material: Partial<Material>): Material {
         })
     }
 
+    try { window.dispatchEvent(new CustomEvent('luxius-materials-updated')) } catch (e) { }
+
     return result
 }
 
@@ -944,6 +946,7 @@ export function deleteMaterial(id: number) {
         } catch (e) { }
     }
     syncDelete('materiales', id);
+    try { window.dispatchEvent(new CustomEvent('luxius-materials-updated')) } catch (e) { }
 }
 
 export function getMaterialById(id: number): Material | undefined {

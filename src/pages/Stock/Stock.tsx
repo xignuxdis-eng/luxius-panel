@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import Header from '@components/layout/Header'
-import { getMateriales, saveMaterial, refreshCollection } from '@data/db'
-import type { Material } from '@/types'
+import { getMateriales, saveMaterial, refreshCollection, getOrdenes } from '@data/db'
+import type { Material, Order } from '@/types'
 import Button from '@components/ui/Button'
 import StockNewsFeed from '@components/StockNewsFeed'
-import { RefreshCw } from 'lucide-react'
+import NuevoMaterialModal from '@pages/ABM/NuevoMaterialModal'
+import { syncMaterialVariations } from '@/utils/materialAudit'
+import { RefreshCw, PlusCircle, ShieldCheck } from 'lucide-react'
 import './Stock.css'
 
 export default function Stock() {
@@ -15,11 +17,26 @@ export default function Stock() {
     const [adjustmentAmount, setAdjustmentAmount] = useState<string>('') // string to handle empty/decimals better
     const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract' | 'set'>('add')
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [isNewMaterialOpen, setIsNewMaterialOpen] = useState(false)
+    const [auditSummary, setAuditSummary] = useState<string | null>(null)
 
     useEffect(() => {
         loadStock()
         // Sync with live server in background
         refreshCollection('materiales').then(() => loadStock())
+    }, [])
+
+    useEffect(() => {
+        const onMaterialsUpdate = () => loadStock()
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'luxius_session_materiales') loadStock()
+        }
+        window.addEventListener('luxius-materials-updated', onMaterialsUpdate)
+        window.addEventListener('storage', onStorage)
+        return () => {
+            window.removeEventListener('luxius-materials-updated', onMaterialsUpdate)
+            window.removeEventListener('storage', onStorage)
+        }
     }, [])
 
     const loadStock = () => {
@@ -36,6 +53,21 @@ export default function Stock() {
             loadStock()
         } finally {
             setIsRefreshing(false)
+        }
+    }
+
+    const handleAudit = async () => {
+        const orders = await getOrdenes().catch(() => [] as Order[])
+        const mats = getMateriales()
+        const { added, audit } = syncMaterialVariations(orders, mats)
+        loadStock()
+        const unresolved = audit.missingVariations.length - added
+        if (added > 0) {
+            setAuditSummary(`✅ Auditoría: ${audit.totalMaterials} materiales revisados · se agregaron ${added} variación(es) de ancho faltantes${unresolved > 0 ? ` · ${unresolved} sin resolver` : ''}.`)
+        } else if (audit.missingVariations.length === 0) {
+            setAuditSummary(`✅ Auditoría: ${audit.totalMaterials} materiales revisados · sin variaciones faltantes.`)
+        } else {
+            setAuditSummary(`⚠️ Auditoría: ${audit.missingVariations.length} variación(es) detectadas pero sin resolver (material no mL o no encontrado).`)
         }
     }
 
@@ -281,25 +313,31 @@ export default function Stock() {
                                     </div>
                                 ) : (
                                     <div className={group.isSubstrate ? "substrate-gallery" : "variants-list"}>
-                                        {group.variants.map((v: Material) => {
-                                            const current = v.stockActual || 0
-                                            const min = v.stockMinimo || 10
-                                            const vStatus = getStockStatus(current, min)
-                                            const standardRoll = 50
-                                            const fillPercent = Math.min(Math.round((current / standardRoll) * 100), 100)
+                                        {group.isSubstrate
+                                            ? group.variants.flatMap((v: Material) => {
+                                                const isMl = v.tipoCobro === 'ml' && !!v.bobinas && v.bobinas.length > 0
+                                                if (isMl) {
+                                                    return v.bobinas!.map((b, bi) => ({ key: `${v.id}-b${bi}`, v, width: b.ancho }))
+                                                }
+                                                return [{ key: String(v.id), v, width: v.ancho }]
+                                            }).map(({ key, v, width }: { key: string; v: Material; width: number }) => {
+                                                const current = v.stockActual || 0
+                                                const min = v.stockMinimo || 10
+                                                const vStatus = getStockStatus(current, min)
+                                                const standardRoll = 50
+                                                const fillPercent = Math.min(Math.round((current / standardRoll) * 100), 100)
 
-                                            if (group.isSubstrate) {
                                                 return (
-                                                    <div 
-                                                        key={v.id} 
-                                                        className={`roll-visual-wrapper status-${vStatus.level}`} 
+                                                    <div
+                                                        key={key}
+                                                        className={`roll-visual-wrapper status-${vStatus.level}`}
                                                         onClick={() => handleOpenAdjustment(v)}
                                                         style={{
                                                             borderColor: vStatus.borderColor,
                                                             background: vStatus.bgColor
                                                         }}
                                                     >
-                                                        <div 
+                                                        <div
                                                             className="roll-progress-bar"
                                                             style={{
                                                                 width: `${fillPercent}%`,
@@ -309,7 +347,7 @@ export default function Stock() {
                                                         />
 
                                                         <div className="roll-info">
-                                                            <span className="roll-width">{v.ancho ? `${v.ancho}m` : v.codigo}</span>
+                                                            <span className="roll-width">{width ? `${width}m` : v.codigo}</span>
                                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                                                 <span className="roll-stock" style={{ color: vStatus.color }}>
                                                                     {current % 1 === 0 ? current : current.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
@@ -322,35 +360,42 @@ export default function Stock() {
                                                         </div>
                                                     </div>
                                                 )
-                                            }
+                                            })
+                                            : group.variants.map((v: Material) => {
+                                                const current = v.stockActual || 0
+                                                const min = v.stockMinimo || 10
+                                                const vStatus = getStockStatus(current, min)
+                                                const standardRoll = 50
+                                                const fillPercent = Math.min(Math.round((current / standardRoll) * 100), 100)
 
-                                            return (
-                                                <div 
-                                                    key={v.id} 
-                                                    className="variant-row" 
-                                                    onClick={() => handleOpenAdjustment(v)}
-                                                    style={{ borderColor: vStatus.borderColor }}
-                                                >
-                                                    <div className="variant-info">
-                                                        <span className="variant-width">
-                                                            {v.codigo}
-                                                        </span>
-                                                        <div className="variant-meter">
-                                                            <div className="variant-progress" style={{ width: `${fillPercent}%`, backgroundColor: vStatus.color }} />
+                                                return (
+                                                    <div
+                                                        key={v.id}
+                                                        className="variant-row"
+                                                        onClick={() => handleOpenAdjustment(v)}
+                                                        style={{ borderColor: vStatus.borderColor }}
+                                                    >
+                                                        <div className="variant-info">
+                                                            <span className="variant-width">
+                                                                {v.codigo}
+                                                            </span>
+                                                            <div className="variant-meter">
+                                                                <div className="variant-progress" style={{ width: `${fillPercent}%`, backgroundColor: vStatus.color }} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="variant-values">
+                                                            <span className="variant-number" style={{ color: vStatus.color }}>
+                                                                {current % 1 === 0 ? current : current.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                                                                <span className="variant-unit"> {v.unidad}</span>
+                                                            </span>
+                                                            <Button size="xs" variant="ghost" className="mini-adjust">
+                                                                ⚡
+                                                            </Button>
                                                         </div>
                                                     </div>
-                                                    <div className="variant-values">
-                                                        <span className="variant-number" style={{ color: vStatus.color }}>
-                                                            {current % 1 === 0 ? current : current.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
-                                                            <span className="variant-unit"> {v.unidad}</span>
-                                                        </span>
-                                                        <Button size="xs" variant="ghost" className="mini-adjust">
-                                                            ⚡
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
+                                                )
+                                            })
+                                        }
                                     </div>
                                 )}
                             </div>
@@ -390,6 +435,24 @@ export default function Stock() {
                     >
                         <RefreshCw size={14} className={isRefreshing ? 'spinning' : ''} />
                         <span className="label">{isRefreshing ? 'Sincronizando...' : 'Sincronizar'}</span>
+                    </button>
+                    <button
+                        className="stat-pill"
+                        style={{ cursor: 'pointer', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', display: 'flex', alignItems: 'center', gap: '6px', color: '#34d399' }}
+                        onClick={() => setIsNewMaterialOpen(true)}
+                        title="Agregar nuevo material directamente"
+                    >
+                        <PlusCircle size={14} />
+                        <span className="label">Nuevo Material</span>
+                    </button>
+                    <button
+                        className="stat-pill"
+                        style={{ cursor: 'pointer', background: 'rgba(37,99,235,0.12)', border: '1px solid rgba(37,99,235,0.4)', display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa' }}
+                        onClick={handleAudit}
+                        title="Auditar y sincronizar variaciones con las Órdenes de Trabajo"
+                    >
+                        <ShieldCheck size={14} />
+                        <span className="label">Auditar</span>
                     </button>
                     <div className="stat-pill">
                         <span className="label">Total:</span>
@@ -444,6 +507,13 @@ export default function Stock() {
 
             <StockNewsFeed />
 
+            {auditSummary && (
+                <div className="audit-summary-banner" style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '10px', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.35)', color: 'var(--text-primary)', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <span>{auditSummary}</span>
+                    <button onClick={() => setAuditSummary(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+                </div>
+            )}
+
             {/* Adjustment Modal */}
             {isAdjustmentModalOpen && selectedMaterial && (
                 <div className="modal-overlay">
@@ -497,6 +567,15 @@ export default function Stock() {
                     </div>
                 </div>
             )}
+
+            <NuevoMaterialModal
+                isOpen={isNewMaterialOpen}
+                onClose={() => setIsNewMaterialOpen(false)}
+                onSave={() => {
+                    setIsNewMaterialOpen(false)
+                    loadStock()
+                }}
+            />
         </div>
     )
 }
