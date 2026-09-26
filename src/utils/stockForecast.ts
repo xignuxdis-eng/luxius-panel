@@ -35,11 +35,17 @@ export interface StockForecast {
     groupsAtRisk: GroupForecast[]
 }
 
-const ACTIVE_STATUSES = new Set([
-    'relevamiento', 'diseno', 'preorden', 'orden', 'impreso', 'post', 'completo', 'standby'
-])
+const ACTIVE_STATUSES = new Set(['orden'])
 
 const SEVERITY_RANK: Record<ForecastSeverity, number> = { ok: 1, low: 2, critical: 3 }
+
+export const STOCK_ALERT_ROLES = ['administrador', 'principal', 'impresion']
+
+export function canViewStockAlerts(role?: string): boolean {
+    if (!role) return false
+    const r = role.toLowerCase().trim()
+    return STOCK_ALERT_ROLES.includes(r)
+}
 
 function toNum(v: unknown): number {
     const n = Number(v)

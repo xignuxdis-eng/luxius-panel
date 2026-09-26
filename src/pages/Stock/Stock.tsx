@@ -6,7 +6,8 @@ import Button from '@components/ui/Button'
 import StockNewsFeed from '@components/StockNewsFeed'
 import NuevoMaterialModal from '@pages/ABM/NuevoMaterialModal'
 import { syncMaterialVariations } from '@/utils/materialAudit'
-import { computeStockForecast, type ForecastItem } from '@/utils/stockForecast'
+import { computeStockForecast, canViewStockAlerts, type ForecastItem } from '@/utils/stockForecast'
+import { useAuthStore } from '@store/authStore'
 import { RefreshCw, PlusCircle, ShieldCheck } from 'lucide-react'
 import './Stock.css'
 
@@ -132,6 +133,9 @@ export default function Stock() {
         setSelectedBobinaAncho(null)
         loadStock()
     }
+
+    const { user } = useAuthStore()
+    const canViewAlerts = canViewStockAlerts(user?.role)
 
     const forecast = useMemo(() => computeStockForecast(orders, materiales), [orders, materiales])
 
@@ -401,7 +405,7 @@ export default function Stock() {
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        {forecastItem && forecastItem.severity !== 'ok' && (
+                                                        {canViewAlerts && forecastItem && forecastItem.severity !== 'ok' && (
                                                             <div
                                                                 style={{
                                                                     fontSize: '0.6rem',
@@ -540,7 +544,7 @@ export default function Stock() {
                 </div>
             </div>
 
-            {(forecast.criticalCount > 0 || forecast.lowCount > 0) && (
+            {canViewAlerts && (forecast.criticalCount > 0 || forecast.lowCount > 0) && (
                 <div className="forecast-panel" style={{ marginBottom: '18px', padding: '14px 16px', borderRadius: '10px', background: forecast.criticalCount > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${forecast.criticalCount > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>📊 Proyección de faltantes</strong>
