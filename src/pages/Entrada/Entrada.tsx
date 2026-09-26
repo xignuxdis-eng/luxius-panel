@@ -9,8 +9,9 @@ import StatusChangeModal from './StatusChangeModal'
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
 import OrderChatModal from '@components/shared/OrderChatModal'
 import type { Order } from '@/types'
-import { generatePdfBudget } from '@/utils/generatePdfBudget'
+import { generatePdfBudget, generatePdfBatch, type BudgetPdfMode } from '@/utils/generatePdfBudget'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
+import PdfModeModal from '@components/PdfModeModal'
 import './Entrada.css'
 
 export default function Entrada() {
@@ -35,6 +36,9 @@ export default function Entrada() {
     // BATCH SELECTION STATE & ACCORDION EXPANSION STATE
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
+
+    // PDF mode selector target (single order or batch)
+    const [pdfModeTarget, setPdfModeTarget] = useState<{ orders: Order[]; label: string } | null>(null)
 
     // VIEW TAB: 'active' (current OTs), 'history' (completed), or 'trash' (soft-deleted)
     const [viewTab, setViewTab] = useState<'active' | 'history' | 'trash'>('active')
@@ -566,6 +570,30 @@ export default function Entrada() {
         });
     }
 
+    const openPdfModeModal = (orders: Order[], label: string) => {
+        setPdfModeTarget({ orders, label })
+    }
+
+    const handlePdfModeSelect = (mode: BudgetPdfMode) => {
+        if (!pdfModeTarget) return
+        const target = pdfModeTarget
+        setPdfModeTarget(null)
+        if (target.orders.length === 1) {
+            generatePdfBudget(target.orders[0], { mode })
+        } else {
+            generatePdfBatch(target.orders, { mode })
+        }
+    }
+
+    const handleBatchPdf = () => {
+        const selectedList = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)))
+        if (selectedList.length === 0) {
+            alert('Seleccioná al menos una orden para generar el PDF masivo.')
+            return
+        }
+        openPdfModeModal(selectedList, `Consolidado de ${selectedList.length} órdenes`)
+    }
+
     const handleBatchDelete = async () => {
         const isTrash = viewTab === 'trash';
         const count = selectedIds.size;
@@ -730,6 +758,14 @@ export default function Entrada() {
                             style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none' }}
                         >
                             📄 Exportar PDF Cliente
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleBatchPdf}
+                            style={{ backgroundColor: '#059669', color: '#fff', border: 'none' }}
+                        >
+                            📚 PDF Masivo
                         </Button>
                         {viewTab !== 'trash' ? (
                             <>
@@ -1218,7 +1254,7 @@ export default function Entrada() {
                                                                 </button>
                                                                 <button
                                                                     className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); generatePdfBudget(order); }}
+                                                                    onClick={(e) => { e.stopPropagation(); openPdfModeModal([order], `Presupuesto ${order.ot || order.id}`); }}
                                                                     title="Presupuesto PDF"
                                                                 >
                                                                     <span style={{ pointerEvents: 'none' }}>📄</span>
@@ -1488,7 +1524,7 @@ export default function Entrada() {
                                                             className="btn-icon-action"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                generatePdfBudget(order);
+                                                                openPdfModeModal([order], `Presupuesto ${order.ot || order.id}`);
                                                             }}
                                                             title="Imprimir / Ver Presupuesto PDF"
                                                             style={{ background: 'rgba(249, 115, 22, 0.25)', border: '1px solid rgba(249, 115, 22, 0.6)' }}
@@ -1597,6 +1633,13 @@ export default function Entrada() {
                     />
                 )
             }
+            <PdfModeModal
+                isOpen={!!pdfModeTarget}
+                title="Generar PDF"
+                subtitle={pdfModeTarget?.label}
+                onClose={() => setPdfModeTarget(null)}
+                onSelect={handlePdfModeSelect}
+            />
         </div>
     )
 }
