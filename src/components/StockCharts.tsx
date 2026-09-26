@@ -199,7 +199,7 @@ export default function StockCharts() {
            <div className="p-6 border-b border-gray-200">
              <div className="flex items-center justify-between">
                <h3 className="text-lg font-semibold text-gray-800">🎨 Materiales Líquidos</h3>
-               <span className="text-xs text-gray-500">Rango: 0 - 5000 ml</span>
+               <span className="text-xs text-gray-500">Rango: 0 - 2000 ml</span>
              </div>
            </div>
            <div className="p-6">
@@ -233,8 +233,8 @@ export default function StockCharts() {
                      dotColor = 'bg-gray-400';
                    }
                    
-                                       // Calcular porcentaje basado en rango fijo de 0-5000 ml
-                    const maxRange = 5000; // ml
+                                        // Calcular porcentaje basado en rango fijo de 0-2000 ml
+                     const maxRange = 2000; // ml
                     const stockPercentage = (material.stock / maxRange) * 100;
                     
                     return (

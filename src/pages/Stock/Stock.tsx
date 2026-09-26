@@ -230,6 +230,58 @@ export default function Stock() {
         }
     }
 
+    const LIQUID_FULL_ML = 500
+    const LIQUID_ALERT_ML = 250
+
+    const getLiquidStatus = (currentMl: number) => {
+        if (currentMl <= 0) {
+            return {
+                level: 'out',
+                color: '#ef4444',
+                bgColor: 'rgba(239, 68, 68, 0.10)',
+                borderColor: 'rgba(239, 68, 68, 0.40)',
+                label: 'Sin Stock',
+                icon: '🔴',
+                percent: 0,
+                desc: 'Agotado'
+            }
+        }
+        if (currentMl < LIQUID_ALERT_ML) {
+            return {
+                level: 'low',
+                color: '#f97316',
+                bgColor: 'rgba(249, 115, 22, 0.10)',
+                borderColor: 'rgba(249, 115, 22, 0.40)',
+                label: 'Reponer',
+                icon: '🟠',
+                percent: Math.min(Math.round((currentMl / LIQUID_ALERT_ML) * 100), 100),
+                desc: 'Bajo'
+            }
+        }
+        if (currentMl < LIQUID_FULL_ML) {
+            return {
+                level: 'medium',
+                color: '#eab308',
+                bgColor: 'rgba(234, 179, 8, 0.08)',
+                borderColor: 'rgba(234, 179, 8, 0.35)',
+                label: 'Medio',
+                icon: '🟡',
+                percent: Math.min(Math.round((currentMl / LIQUID_FULL_ML) * 100), 100),
+                desc: 'Medio'
+            }
+        }
+        return {
+            level: 'optimal',
+            color: '#10b981',
+            bgColor: 'rgba(16, 185, 129, 0.08)',
+            borderColor: 'rgba(16, 185, 129, 0.35)',
+            label: 'Disponible',
+            icon: '🟢',
+            percent: 100,
+            desc: 'Completo'
+        }
+    }
+
     const renderGrid = (items: Material[], title: string) => {
         const grouped = items.reduce((acc: any[], m) => {
             const lowTipo = m.tipo?.toLowerCase();
@@ -302,7 +354,8 @@ export default function Stock() {
 
                         // Calculate overall group health
                         const groupMaxStock = Math.max(...group.variants.map((v: Material) => v.stockActual || 0), 0)
-                        const groupStatus = getStockStatus(groupMaxStock)
+                        const groupMinStock = Math.min(...group.variants.map((v: Material) => v.stockActual || 0), 0)
+                        const groupStatus = isLiquid ? getLiquidStatus(groupMinStock) : getStockStatus(groupMaxStock)
 
                         return (
                             <div
@@ -329,7 +382,8 @@ export default function Stock() {
                                     <div className="liquid-tank-container">
                                         {group.variants.map((v: Material) => {
                                             const current = v.stockActual || 0
-                                            const fillPercent = Math.min((current / 5) * 100, 100)
+                                            const fillPercent = Math.min((current / LIQUID_FULL_ML) * 100, 100)
+                                            const isLow = current < LIQUID_ALERT_ML
 
                                             return (
                                                 <div key={v.id} className="tank-3d-wrapper" onClick={() => handleOpenAdjustment(v)}>
@@ -346,8 +400,11 @@ export default function Stock() {
                                                         </div>
                                                     </div>
                                                     <div className="tank-info">
-                                                        <span className="tank-liters">{current.toFixed(current % 1 === 0 ? 0 : 2)} L</span>
+                                                        <span className="tank-liters">{current % 1 === 0 ? current : current.toFixed(1)} ml</span>
                                                         <span className="tank-unit-label">Stock Actual</span>
+                                                        {isLow && (
+                                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f87171', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '1px 6px' }}>⚠ Reponer</span>
+                                                        )}
                                                     </div>
                                                     <Button size="xs" variant="secondary" className="adjust-btn-overlay">
                                                         ⚡ Ajustar
