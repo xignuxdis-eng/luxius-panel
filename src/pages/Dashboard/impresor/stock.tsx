@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   PackageSearch, 
   AlertTriangle, 
   CheckCircle, 
   Clock,
-  TrendingUp,
   AlertCircle,
   X,
   Bell,
   BarChart3,
   RefreshCw
 } from 'lucide-react';
-import { getMateriales, refreshCollection, saveMaterial } from '@/data/db';
+import { getMateriales, refreshCollection } from '@/data/db';
 import type { Material } from '@/types';
 
 export default function StockImpresor() {

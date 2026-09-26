@@ -1,4 +1,4 @@
-import { Package, Plus, AlertTriangle } from "lucide-react";
+import { Package } from "lucide-react";
 
 export default function CargarStock() {
   return (

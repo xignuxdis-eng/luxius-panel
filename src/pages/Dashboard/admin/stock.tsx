@@ -2,8 +2,8 @@ import StockManager from "../../../components/StockManager";
 import PrinterMetricsReader from "../../../components/PrinterMetricsReader";
 
 export default function StockManagementPage() {
-    const handleStockUpdate = (material: string, type: string, newStock: number) => {
-        console.log(`Updated stock for ${material} (${type}): ${newStock}`);
+    const handleStockUpdate = (materialId: number, newStock: number) => {
+        console.log(`Updated stock for material ${materialId}: ${newStock}`);
     };
 
     return (
