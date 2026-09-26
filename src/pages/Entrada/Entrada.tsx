@@ -10,6 +10,7 @@ import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
 import OrderChatModal from '@components/shared/OrderChatModal'
 import type { Order } from '@/types'
 import { generatePdfBudget, generatePdfBatch, type BudgetPdfMode } from '@/utils/generatePdfBudget'
+import { computeStockForecast } from '@/utils/stockForecast'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
 import './Entrada.css'
@@ -126,6 +127,13 @@ export default function Entrada() {
         : viewTab === 'history'
             ? filteredOrders.filter(o => ['impreso', 'entregado', 'finalizado', 'completo'].includes(o.status))
             : filteredOrders.filter(o => !['entregado', 'finalizado', 'eliminado'].includes(o.status));
+
+    const forecast = useMemo(() => computeStockForecast(orders, allMateriales), [orders, allMateriales])
+    const forecastGroupByKey = useMemo(() => {
+        const map = new Map<string, string>()
+        forecast.groups.forEach(g => map.set(g.key, g.riskLevel))
+        return map
+    }, [forecast])
 
 
     const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
@@ -809,6 +817,15 @@ export default function Entrada() {
             )}
 
             {/* TABLE */}
+            {forecast.groupsAtRisk.length > 0 && (
+                <div className="forecast-banner" style={{ marginBottom: '12px', padding: '12px 16px', borderRadius: '10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                    <strong>⚠ {forecast.groupsAtRisk.length} grupo(s) en riesgo de entrega integral por faltante de stock</strong>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                        {forecast.groupsAtRisk.slice(0, 3).map(g => `${g.label} (${g.shortfallCodigos.join(', ')})`).join(' · ')}
+                        {forecast.groupsAtRisk.length > 3 ? ' …' : ''}
+                    </span>
+                </div>
+            )}
             <div className="orders-table-container glass-panel animate-fade-in" style={{ animationDelay: '0.1s' }}>
                 {loading ? (
                     <div className="loading-state">
@@ -880,6 +897,12 @@ export default function Entrada() {
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                                             <span className="batch-badge-pill">🏷️ {item.batchName}</span>
                                                             <span className="batch-count-pill">📦 {item.orders.length} OTs</span>
+                                                            {forecastGroupByKey.get(`batch:${item.batchId}`) === 'critical' && (
+                                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.4)' }}>⚠ Faltante stock</span>
+                                                            )}
+                                                            {forecastGroupByKey.get(`batch:${item.batchId}`) === 'low' && (
+                                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.4)' }}>◐ Stock bajo</span>
+                                                            )}
                                                         </div>
                                                         <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                                                             {isExpanded ? '▼ Clic para contraer' : '▶ Clic para ver los archivos'}

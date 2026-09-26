@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Header from '@components/layout/Header'
 import { getMateriales, saveMaterial, refreshCollection, getOrdenes, saveMovimientoStock } from '@data/db'
 import type { Material, Order } from '@/types'
@@ -6,6 +6,7 @@ import Button from '@components/ui/Button'
 import StockNewsFeed from '@components/StockNewsFeed'
 import NuevoMaterialModal from '@pages/ABM/NuevoMaterialModal'
 import { syncMaterialVariations } from '@/utils/materialAudit'
+import { computeStockForecast, type ForecastItem } from '@/utils/stockForecast'
 import { RefreshCw, PlusCircle, ShieldCheck } from 'lucide-react'
 import './Stock.css'
 
@@ -20,11 +21,13 @@ export default function Stock() {
     const [isNewMaterialOpen, setIsNewMaterialOpen] = useState(false)
     const [auditSummary, setAuditSummary] = useState<string | null>(null)
     const [selectedBobinaAncho, setSelectedBobinaAncho] = useState<number | null>(null)
+    const [orders, setOrders] = useState<Order[]>([])
 
     useEffect(() => {
         loadStock()
         // Sync with live server in background
         refreshCollection('materiales').then(() => loadStock())
+        getOrdenes().then(setOrders).catch(() => setOrders([]))
     }, [])
 
     useEffect(() => {
@@ -130,7 +133,13 @@ export default function Stock() {
         loadStock()
     }
 
+    const forecast = useMemo(() => computeStockForecast(orders, materiales), [orders, materiales])
 
+    const forecastByKey = useMemo(() => {
+        const map = new Map<string, ForecastItem>()
+        forecast.items.forEach(i => map.set(i.key, i))
+        return map
+    }, [forecast])
 
     const filteredMaterials = materiales.filter(m =>
         m.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -358,6 +367,8 @@ export default function Stock() {
                                                 const vStatus = getStockStatus(current, min)
                                                 const standardRoll = 50
                                                 const fillPercent = Math.min(Math.round((current / standardRoll) * 100), 100)
+                                                const fKey = bobina ? `mat:${v.id}:${bobina.ancho}` : `mat:${v.id}`
+                                                const forecastItem = forecastByKey.get(fKey)
 
                                                 return (
                                                     <div
@@ -390,6 +401,26 @@ export default function Stock() {
                                                                 </span>
                                                             </div>
                                                         </div>
+                                                        {forecastItem && forecastItem.severity !== 'ok' && (
+                                                            <div
+                                                                style={{
+                                                                    fontSize: '0.6rem',
+                                                                    fontWeight: 700,
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '4px',
+                                                                    background: forecastItem.severity === 'critical' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)',
+                                                                    color: forecastItem.severity === 'critical' ? '#f87171' : '#fbbf24',
+                                                                    border: `1px solid ${forecastItem.severity === 'critical' ? 'rgba(239,68,68,0.5)' : 'rgba(245,158,11,0.5)'}`,
+                                                                    marginTop: '6px',
+                                                                    textAlign: 'center'
+                                                                }}
+                                                                title={`Demanda proyectada: ${forecastItem.demanda.toLocaleString('es-AR', { maximumFractionDigits: 2 })} · Disponible: ${forecastItem.disponible.toLocaleString('es-AR', { maximumFractionDigits: 2 })}`}
+                                                            >
+                                                                {forecastItem.severity === 'critical'
+                                                                    ? `⚠ Faltante ${Math.abs(forecastItem.restante).toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${forecastItem.unidad}`
+                                                                    : `◐ Bajo ${forecastItem.restante.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ${forecastItem.unidad}`}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )
                                             })
@@ -508,6 +539,27 @@ export default function Stock() {
                     </div>
                 </div>
             </div>
+
+            {(forecast.criticalCount > 0 || forecast.lowCount > 0) && (
+                <div className="forecast-panel" style={{ marginBottom: '18px', padding: '14px 16px', borderRadius: '10px', background: forecast.criticalCount > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${forecast.criticalCount > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>📊 Proyección de faltantes</strong>
+                        {forecast.criticalCount > 0 && <span className="stat-pill" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>🔴 {forecast.criticalCount} críticos</span>}
+                        {forecast.lowCount > 0 && <span className="stat-pill" style={{ background: 'rgba(245,158,11,0.15)', color: '#fbbf24' }}>🟠 {forecast.lowCount} bajos</span>}
+                        {forecast.groupsAtRisk.length > 0 && <span className="stat-pill" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>⚠ {forecast.groupsAtRisk.length} grupos en riesgo</span>}
+                    </div>
+                    {forecast.groupsAtRisk.length > 0 && (
+                        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {forecast.groupsAtRisk.slice(0, 5).map(g => (
+                                <div key={g.key} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                    <strong>{g.label}</strong> · {g.orderCount} OT · faltante: {g.shortfallCodigos.join(', ')}
+                                </div>
+                            ))}
+                            {forecast.groupsAtRisk.length > 5 && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>+ {forecast.groupsAtRisk.length - 5} más</div>}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {renderGrid(groupedMaterials.produccion, '📜 Producción / Sustratos')}
 

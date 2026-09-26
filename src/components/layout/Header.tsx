@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
-import { getUsuarios, initializeData } from '@data/db'
+import { getUsuarios, initializeData, getMateriales, getOrdenes } from '@data/db'
+import { computeStockForecast } from '@/utils/stockForecast'
 import PerfilModal from '../../pages/Sistema/PerfilModal'
 import { ArcadeModal } from '@components/arcade/ArcadeModal'
 import './Header.css'
@@ -12,9 +14,21 @@ interface HeaderProps {
 
 export default function Header({ title, subtitle }: HeaderProps) {
     const user = useAuthStore((state) => state.user)
+    const navigate = useNavigate()
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isArcadeOpen, setIsArcadeOpen] = useState(false)
     const [isSyncing, setIsSyncing] = useState(false)
+    const [stockAlertCount, setStockAlertCount] = useState(0)
+
+    useEffect(() => {
+        let active = true
+        getOrdenes().then(orders => {
+            if (!active) return
+            const forecast = computeStockForecast(orders, getMateriales())
+            setStockAlertCount(forecast.groupsAtRisk.length)
+        }).catch(() => {})
+        return () => { active = false }
+    }, [])
 
     const handleQuickSync = async () => {
         setIsSyncing(true)
@@ -48,6 +62,20 @@ export default function Header({ title, subtitle }: HeaderProps) {
             </div>
 
             <div className="header-right">
+                <button
+                    className="pixel-btn pixel-btn-warning"
+                    onClick={() => navigate('/stock')}
+                    title={`${stockAlertCount} grupo(s) en riesgo de faltante de stock`}
+                    style={{ fontSize: '11px', padding: '4px 10px', position: 'relative' }}
+                >
+                    🔔 STOCK
+                    {stockAlertCount > 0 && (
+                        <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ef4444', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {stockAlertCount}
+                        </span>
+                    )}
+                </button>
+
                 <button
                     className="pixel-btn pixel-btn-info"
                     onClick={handleQuickSync}
