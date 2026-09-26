@@ -34,6 +34,7 @@ export interface Material {
     stockActual?: number // Meterage or units
     stockMinimo?: number // Alert threshold
     botellasCerradas?: number // Sealed/unopened bottles (for inks/liquids, stock outside machine)
+    botellasMl?: number // Total ml of sealed bottles (outside machine)
 }
 
 

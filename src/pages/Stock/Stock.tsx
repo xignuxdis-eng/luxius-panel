@@ -141,6 +141,12 @@ export default function Stock() {
         loadStock()
     }
 
+    const handleSetBottlesMl = (material: Material, ml: number) => {
+        const value = Math.max(0, ml)
+        saveMaterial({ ...material, botellasMl: value })
+        loadStock()
+    }
+
     const { user } = useAuthStore()
     const canViewAlerts = canViewStockAlerts(user?.role)
 
@@ -414,12 +420,26 @@ export default function Stock() {
                                                             <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f87171', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '1px 6px' }}>⚠ Reponer</span>
                                                         )}
                                                     </div>
-                                                    <div className="bottle-indicator" onClick={(e) => e.stopPropagation()} title="Botellas cerradas (stock fuera de máquina)" style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center', marginTop: '4px' }}>
+                                                    <div className="bottle-indicator" onClick={(e) => e.stopPropagation()} title="Botellas cerradas (stock fuera de máquina)" style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
                                                         <span style={{ fontSize: '0.75rem' }}>🍾</span>
                                                         <button onClick={(e) => { e.stopPropagation(); handleAdjustBottles(v, -1) }} style={{ width: '18px', height: '18px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                                                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: '16px', textAlign: 'center' }}>{v.botellasCerradas || 0}</span>
                                                         <button onClick={(e) => { e.stopPropagation(); handleAdjustBottles(v, 1) }} style={{ width: '18px', height: '18px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                                         <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>cerradas</span>
+                                                        <span style={{ color: 'var(--border)', margin: '0 2px' }}>|</span>
+                                                        <input
+                                                            key={`botellasMl-${v.id}-${v.botellasMl ?? 0}`}
+                                                            type="number"
+                                                            min={0}
+                                                            step="any"
+                                                            defaultValue={v.botellasMl ?? 0}
+                                                            onBlur={(e) => handleSetBottlesMl(v, Number(e.target.value) || 0)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            style={{ width: '52px', padding: '2px 4px', fontSize: '0.72rem', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-hover)', color: 'var(--text-primary)', textAlign: 'center' }}
+                                                            title="Mililitros sellados fuera de máquina"
+                                                        />
+                                                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>ml</span>
                                                     </div>
                                                     <Button size="xs" variant="secondary" className="adjust-btn-overlay">
                                                         ⚡ Ajustar
