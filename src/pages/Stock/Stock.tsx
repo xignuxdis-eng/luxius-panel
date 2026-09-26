@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import Header from '@components/layout/Header'
-import { getMateriales, saveMaterial, refreshCollection, getOrdenes } from '@data/db'
+import { getMateriales, saveMaterial, refreshCollection, getOrdenes, saveMovimientoStock } from '@data/db'
 import type { Material, Order } from '@/types'
 import Button from '@components/ui/Button'
 import StockNewsFeed from '@components/StockNewsFeed'
@@ -19,6 +19,7 @@ export default function Stock() {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [isNewMaterialOpen, setIsNewMaterialOpen] = useState(false)
     const [auditSummary, setAuditSummary] = useState<string | null>(null)
+    const [selectedBobinaAncho, setSelectedBobinaAncho] = useState<number | null>(null)
 
     useEffect(() => {
         loadStock()
@@ -72,8 +73,9 @@ export default function Stock() {
     }
 
 
-    const handleOpenAdjustment = (material: Material) => {
+    const handleOpenAdjustment = (material: Material, bobinaAncho?: number) => {
         setSelectedMaterial(material)
+        setSelectedBobinaAncho(bobinaAncho ?? null)
         setAdjustmentAmount('')
         setAdjustmentType('add')
         setAdjustmentModalOpen(true)
@@ -83,18 +85,48 @@ export default function Stock() {
         e.preventDefault()
         if (!selectedMaterial) return
 
-        const current = selectedMaterial.stockActual || 0
         const amount = parseFloat(adjustmentAmount) || 0
-        let newStock = current
+        let updated: Material
 
-        if (adjustmentType === 'add') newStock += amount
-        if (adjustmentType === 'subtract') newStock -= amount
-        if (adjustmentType === 'set') newStock = amount
+        if (selectedBobinaAncho !== null && selectedMaterial.bobinas && selectedMaterial.bobinas.length > 0) {
+            // Ajuste independiente de una bobina/ancho específico (no comparte estado con las demás)
+            const target = selectedMaterial.bobinas.find(b => Math.abs(Number(b.ancho) - selectedBobinaAncho) < 0.001)
+            const current = target?.stockActual ?? selectedMaterial.stockActual ?? 0
+            let newStock = current
+            if (adjustmentType === 'add') newStock += amount
+            if (adjustmentType === 'subtract') newStock -= amount
+            if (adjustmentType === 'set') newStock = amount
+            if (newStock < 0) newStock = 0
 
-        if (newStock < 0) newStock = 0
+            updated = {
+                ...selectedMaterial,
+                bobinas: selectedMaterial.bobinas.map(b =>
+                    Math.abs(Number(b.ancho) - selectedBobinaAncho) < 0.001 ? { ...b, stockActual: newStock } : b
+                )
+            }
 
-        saveMaterial({ ...selectedMaterial, stockActual: newStock })
+            saveMovimientoStock({
+                materialId: selectedMaterial.id,
+                materialCodigo: selectedMaterial.codigo,
+                materialDescripcion: `${selectedMaterial.descripcion} (${selectedBobinaAncho}m)`,
+                tipo: adjustmentType === 'subtract' ? 'egreso' : adjustmentType === 'set' ? 'ajuste' : 'ingreso',
+                cantidad: Math.abs(newStock - current),
+                stockAnterior: current,
+                stockNuevo: newStock
+            })
+        } else {
+            const current = selectedMaterial.stockActual || 0
+            let newStock = current
+            if (adjustmentType === 'add') newStock += amount
+            if (adjustmentType === 'subtract') newStock -= amount
+            if (adjustmentType === 'set') newStock = amount
+            if (newStock < 0) newStock = 0
+            updated = { ...selectedMaterial, stockActual: newStock }
+        }
+
+        saveMaterial(updated)
         setAdjustmentModalOpen(false)
+        setSelectedBobinaAncho(null)
         loadStock()
     }
 
@@ -317,11 +349,11 @@ export default function Stock() {
                                             ? group.variants.flatMap((v: Material) => {
                                                 const isMl = v.tipoCobro === 'ml' && !!v.bobinas && v.bobinas.length > 0
                                                 if (isMl) {
-                                                    return v.bobinas!.map((b, bi) => ({ key: `${v.id}-b${bi}`, v, width: b.ancho }))
+                                                    return v.bobinas!.map((b, bi) => ({ key: `${v.id}-b${bi}`, v, width: b.ancho, bobina: b }))
                                                 }
-                                                return [{ key: String(v.id), v, width: v.ancho }]
-                                            }).map(({ key, v, width }: { key: string; v: Material; width: number }) => {
-                                                const current = v.stockActual || 0
+                                                return [{ key: String(v.id), v, width: v.ancho, bobina: null }]
+                                            }).map(({ key, v, width, bobina }: { key: string; v: Material; width: number; bobina: { ancho: number; precioML: number; stockActual?: number } | null }) => {
+                                                const current = bobina ? (bobina.stockActual ?? v.stockActual ?? 0) : (v.stockActual || 0)
                                                 const min = v.stockMinimo || 10
                                                 const vStatus = getStockStatus(current, min)
                                                 const standardRoll = 50
@@ -331,7 +363,7 @@ export default function Stock() {
                                                     <div
                                                         key={key}
                                                         className={`roll-visual-wrapper status-${vStatus.level}`}
-                                                        onClick={() => handleOpenAdjustment(v)}
+                                                        onClick={() => handleOpenAdjustment(v, bobina ? bobina.ancho : undefined)}
                                                         style={{
                                                             borderColor: vStatus.borderColor,
                                                             background: vStatus.bgColor
@@ -518,7 +550,7 @@ export default function Stock() {
             {isAdjustmentModalOpen && selectedMaterial && (
                 <div className="modal-overlay">
                     <div className="modal-content stock-modal">
-                        <h3>Ajustar Stock: {selectedMaterial.codigo}</h3>
+                        <h3>Ajustar Stock: {selectedMaterial.codigo}{selectedBobinaAncho !== null ? ` (${selectedBobinaAncho}m)` : ''}</h3>
                         <p>{selectedMaterial.descripcion}</p>
 
                         <form onSubmit={handleSaveAdjustment}>

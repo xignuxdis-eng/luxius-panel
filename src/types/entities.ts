@@ -26,7 +26,7 @@ export interface Material {
     color?: string
     tipoCobro?: 'm2' | 'ml'
     preciosPorAncho?: { maxAncho: number, precio: number }[] // Deprecated for ml, keep for legacy m2 tiered pricing
-    bobinas?: { ancho: number, precioML: number }[] // New: Specific coils for ml pricing
+    bobinas?: { ancho: number, precioML: number, stockActual?: number }[] // New: Specific coils for ml pricing (with optional per-coil stock)
     precioM2: number // Base price for m2 or fallback
 
     ancho: number // Default/Max width
