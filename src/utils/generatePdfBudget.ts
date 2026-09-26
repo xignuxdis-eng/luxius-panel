@@ -2,6 +2,7 @@ import type { Order } from '@/types'
 import { XIGNUX_LOGO_LIGHT } from './logoBase64Light'
 import { resolveMediaUrl } from '@/data/db'
 import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
+import { generatePdfClientReport } from './generatePdfClientReport'
 
 export type BudgetPdfMode = 'detallado' | 'simplificado'
 
@@ -733,7 +734,9 @@ export async function generatePdfBudget(order: Order, options: BudgetPdfOptions 
 
 export async function generatePdfBatch(orders: Order[], options: BudgetPdfOptions = {}) {
     const mode = options.mode || 'detallado'
-    const windowTitle = `CONSOLIDADO DE ÓRDENES (${orders.length})`
-    const pdfFilename = `Consolidado_Ordenes_XignuX_${new Date().toISOString().split('T')[0]}.pdf`
-    await openBudgetPdf(orders, mode, windowTitle, pdfFilename)
+    await generatePdfClientReport(orders, {
+        clienteNombre: `Consolidado de ${orders.length} Órdenes`,
+        tituloReporte: 'CONSOLIDADO DE ÓRDENES DE TRABAJO',
+        mode
+    })
 }

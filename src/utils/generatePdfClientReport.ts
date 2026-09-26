@@ -14,6 +14,7 @@ export interface ClientReportOptions {
     categoriaFiltro?: string;
     materialFiltro?: string;
     tituloReporte?: string;
+    mode?: 'detallado' | 'simplificado';
 }
 
 export async function generatePdfClientReport(orders: Order[], options: ClientReportOptions) {
@@ -52,6 +53,7 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
 
     const clienteNombre = options.clienteNombre || 'Todos los Clientes'
     const tituloReporte = options.tituloReporte || 'ESTADO DE CUENTA Y REPORTES DE TRABAJOS'
+    const isSimplified = options.mode === 'simplificado'
     const pdfFilename = `Reporte_Cliente_${clienteNombre.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
 
     const formatCurrency = (val: number) => {
@@ -489,13 +491,15 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                     <table class="items-table">
                         <thead>
                             <tr>
-                                <th style="width: 8%;">N° OT</th>
-                                <th style="width: 10%;">Vista Previa</th>
-                                <th style="width: 10%;">Fecha</th>
-                                <th style="width: 32%;">Descripción del Trabajo</th>
-                                <th style="width: 12%;">Estado</th>
+                                <th style="width: 10%;">N° OT</th>
+                                <th style="width: 12%;">Vista Previa</th>
+                                <th style="width: 12%;">Fecha</th>
+                                <th style="width: ${isSimplified ? '48%' : '36%'};">Descripción del Trabajo</th>
+                                <th style="width: 14%;">Estado</th>
+                                ${!isSimplified ? `
                                 <th class="text-right" style="width: 14%;">Importe</th>
                                 <th class="text-right" style="width: 14%;">Saldo</th>
+                                ` : ''}
                             </tr>
                         </thead>
                         <tbody>
@@ -517,15 +521,18 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                                         ${row.fileName ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">${row.fileName}</div>` : ''}
                                     </td>
                                     <td><span class="badge-status">${row.status}</span></td>
+                                    ${!isSimplified ? `
                                     <td class="text-right" style="font-weight: 600;">${formatCurrency(row.total)}</td>
                                     <td class="text-right" style="font-weight: 700; color: ${row.saldo > 0 ? '#dc2626' : '#166534'};">
                                         ${formatCurrency(row.saldo)}
                                     </td>
+                                    ` : ''}
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
 
+                    ${!isSimplified ? `
                     <!-- Summary & Commercial Notes -->
                     <div class="summary-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 20px;">
                         <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; font-size: 11.5px; color: #1e40af; line-height: 1.45;">
@@ -553,6 +560,7 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                             </table>
                         </div>
                     </div>
+                    ` : ''}
 
                     <!-- Visual Artwork Gallery Section -->
                     ${galleryPieces.length > 0 ? `
