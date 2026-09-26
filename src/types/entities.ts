@@ -148,6 +148,20 @@ export interface MovimientoCaja {
     usuario: string
 }
 
+export interface MovimientoStock {
+    id: number
+    materialId: number
+    materialCodigo: string
+    materialDescripcion: string
+    tipo: 'ingreso' | 'egreso' | 'ajuste' | 'inicial'
+    cantidad: number
+    stockAnterior: number
+    stockNuevo: number
+    fecha: string
+    usuario: string
+    observacion?: string
+}
+
 export interface Banco {
     id: number
     nombre: string

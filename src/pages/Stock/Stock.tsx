@@ -3,6 +3,7 @@ import Header from '@components/layout/Header'
 import { getMateriales, saveMaterial, refreshCollection } from '@data/db'
 import type { Material } from '@/types'
 import Button from '@components/ui/Button'
+import StockNewsFeed from '@components/StockNewsFeed'
 import { RefreshCw } from 'lucide-react'
 import './Stock.css'
 
@@ -440,6 +441,8 @@ export default function Stock() {
                 })
                 return renderGrid(sortedLiquids, '💧 Insumos Líquidos')
             })()}
+
+            <StockNewsFeed />
 
             {/* Adjustment Modal */}
             {isAdjustmentModalOpen && selectedMaterial && (

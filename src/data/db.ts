@@ -8,7 +8,7 @@
 // import configData from './db/config.json' // Kept for config defaults if needed, but others should be server-only
 
 // Types
-import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica, MonedaConfig, Caja, MovimientoCaja, Banco } from '@/types'
+import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica, MonedaConfig, Caja, MovimientoCaja, MovimientoStock, Banco } from '@/types'
 
 // API Configuration: dynamic between local server and Render cloud
 export const API_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -93,6 +93,7 @@ export const HIDDEN_ROLES_KEY = 'luxius_deleted_roles'
 
 export const SESSION_CALENDAR_EVENTS_KEY = 'luxius_session_calendar_events'
 export const SESSION_LOGS_KEY = 'luxius_session_logs'
+export const SESSION_MOV_STOCK_KEY = 'luxius_movimientos_stock'
 
 
 /// --- SYNC HELPERS ---
@@ -868,6 +869,7 @@ export function saveMaterial(material: Partial<Material>): Material {
     }
 
     const existingIndex = sessionItems.findIndex(m => String(m.id) === String(material.id))
+    const prevStock = existingIndex !== -1 ? (sessionItems[existingIndex].stockActual || 0) : undefined
     let result: Material
 
     if (existingIndex !== -1) {
@@ -900,6 +902,35 @@ export function saveMaterial(material: Partial<Material>): Material {
 
     localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(sessionItems))
     syncSave('materiales', result);
+
+    // Registrar movimiento de stock si cambió la cantidad
+    const newStock = result.stockActual || 0
+    if (existingIndex === -1) {
+        if (newStock > 0) {
+            saveMovimientoStock({
+                materialId: result.id,
+                materialCodigo: result.codigo,
+                materialDescripcion: result.descripcion,
+                tipo: 'inicial',
+                cantidad: newStock,
+                stockAnterior: 0,
+                stockNuevo: newStock,
+                usuario: getCurrentUserName()
+            })
+        }
+    } else if (prevStock !== undefined && newStock !== prevStock) {
+        saveMovimientoStock({
+            materialId: result.id,
+            materialCodigo: result.codigo,
+            materialDescripcion: result.descripcion,
+            tipo: newStock > prevStock ? 'ingreso' : 'egreso',
+            cantidad: Math.abs(newStock - prevStock),
+            stockAnterior: prevStock,
+            stockNuevo: newStock,
+            usuario: getCurrentUserName()
+        })
+    }
+
     return result
 }
 
@@ -927,6 +958,51 @@ export function getMaterialesByCalidad(calidadId: number): Material[] {
     const calidad = getCalidadById(calidadId);
     if (!calidad) return [];
     return getMateriales().filter(m => m.calidad === calidad.nombre)
+}
+
+// ============================================================
+// Movimientos de Stock (Historial de Entradas / Ajustes)
+// ============================================================
+
+function getCurrentUserName(): string {
+    try {
+        const raw = localStorage.getItem('luxius-auth-v6')
+        if (raw) {
+            const parsed = JSON.parse(raw)
+            const name = parsed?.state?.user?.name || parsed?.state?.user?.username
+            if (name) return name
+        }
+    } catch (e) { }
+    return 'Sistema'
+}
+
+export function getMovimientosStock(): MovimientoStock[] {
+    const raw = localStorage.getItem(SESSION_MOV_STOCK_KEY)
+    if (raw) {
+        try { return JSON.parse(raw) as MovimientoStock[] } catch (e) { }
+    }
+    return []
+}
+
+export function saveMovimientoStock(mov: Partial<MovimientoStock>): MovimientoStock {
+    const movs = getMovimientosStock()
+    const newMov: MovimientoStock = {
+        id: mov.id || Math.floor(Math.random() * 900000) + 1000,
+        materialId: mov.materialId || 0,
+        materialCodigo: mov.materialCodigo || '',
+        materialDescripcion: mov.materialDescripcion || '',
+        tipo: mov.tipo || 'ajuste',
+        cantidad: Math.abs(mov.cantidad || 0),
+        stockAnterior: mov.stockAnterior ?? 0,
+        stockNuevo: mov.stockNuevo ?? 0,
+        fecha: mov.fecha || new Date().toISOString(),
+        usuario: mov.usuario || 'Sistema',
+        observacion: mov.observacion
+    }
+    movs.unshift(newMov)
+    localStorage.setItem(SESSION_MOV_STOCK_KEY, JSON.stringify(movs))
+    try { window.dispatchEvent(new CustomEvent('luxius-stock-updated')) } catch (e) { }
+    return newMov
 }
 
 // ============================================================
