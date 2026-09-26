@@ -194,6 +194,31 @@ function computeDashboardFromOrders(orders: Order[], rawMateriales: Material[] =
     };
 }
 
+function buildStatsFromOrders(orders: Order[]): PrinterStat[] {
+    const printedStatuses = ['impreso', 'post', 'completo', 'entregado', 'finalizado'];
+    const ML_PER_M2_PER_CHANNEL = 4;
+    return orders
+        .filter(o => printedStatuses.includes(o.status))
+        .map((o) => {
+            const w = Number(o.ancho) || 0;
+            const h = Number(o.alto) || 0;
+            const c = Number(o.copias) || 1;
+            const m2 = Math.round(w * h * c * 1000) / 1000;
+            const inkPerChannel = Math.round(m2 * ML_PER_M2_PER_CHANNEL * 100) / 100;
+            const ts = o.createdAt || new Date().toISOString();
+            return {
+                jobName: o.ot || `OT-${o.id}`,
+                machine: 'Roland TrueVIS VG-640',
+                material: o.material || 'Vinilo',
+                sizeM2: m2,
+                ink: { c: inkPerChannel, m: inkPerChannel, y: inkPerChannel, k: inkPerChannel },
+                startTime: ts,
+                endTime: ts,
+                durationMinutes: Math.max(5, Math.round(m2 * 8)),
+            };
+        });
+}
+
 export default function Analytics() {
     const [stats, setStats] = useState<PrinterStat[]>([]);
     const [_materiales, setMateriales] = useState<Material[]>([]);
@@ -230,7 +255,7 @@ export default function Analytics() {
             const [ordersRes, statsRes, matRes, dashRes] = await Promise.allSettled([
                 getOrdenes().catch(() => [] as Order[]),
                 fetchJsonWithTimeout(`${API_URL}/analytics/stats`),
-                getMateriales().catch(() => [] as Material[]),
+                Promise.resolve(getMateriales()),
                 fetchJsonWithTimeout(`${API_URL}/analytics/dashboard`)
             ]);
 
@@ -241,6 +266,8 @@ export default function Analytics() {
 
             if (dataStats.length > 0) {
                 setStats(dataStats);
+            } else {
+                setStats(buildStatsFromOrders(loadedOrders));
             }
             if (rawMateriales.length > 0) {
                 setMateriales(rawMateriales);
