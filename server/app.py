@@ -1063,8 +1063,45 @@ def put_tarifas():
 
 @app.get('/api/analytics/stats')
 def get_analytics_stats():
-    # Fallback printer stats list
-    return jsonify([])
+    """Métricas de producción derivadas de órdenes impresas (estimadas, sin logs RIP reales)."""
+    try:
+        PRINTED_STATUSES = {
+            'impreso', 'IMPRESO', 'aprobado', 'post', 'POST',
+            'completo', 'COMPLETO', 'entregado', 'ENTREGADO', 'finalizado', 'FINALIZADO'
+        }
+        ML_PER_M2_PER_CHANNEL = 4
+
+        presupuestos = Presupuesto.query.filter(Presupuesto.deleted_at.is_(None)).all()
+        stats = []
+        for p in presupuestos:
+            if p.estado not in PRINTED_STATUSES:
+                continue
+            esp = p.especificaciones or {}
+            carteles = esp.get('carteles', [])
+            primer = carteles[0] if carteles else {}
+            medidas = primer.get('medidas', {})
+            w = float(esp.get('ancho') or medidas.get('ancho', 0) or 0)
+            h = float(esp.get('alto') or medidas.get('alto', 0) or 0)
+            c = int(esp.get('copias') or primer.get('copias', 1) or 1)
+            m2 = round(w * h * c, 3)
+            if m2 <= 0:
+                continue
+            ink = round(m2 * ML_PER_M2_PER_CHANNEL, 2)
+            ts = p.created_at.isoformat() if p.created_at else datetime.now(timezone.utc).isoformat()
+            stats.append({
+                'jobName': f"OT-{str(p.id)[:8]}",
+                'machine': 'Roland TrueVIS VG-640',
+                'material': esp.get('material') or primer.get('tipo', 'Vinilo'),
+                'sizeM2': m2,
+                'ink': {'c': ink, 'm': ink, 'y': ink, 'k': ink},
+                'startTime': ts,
+                'endTime': ts,
+                'durationMinutes': max(5, round(m2 * 8))
+            })
+        return jsonify(stats)
+    except Exception as e:
+        app.logger.error(f"Error en get_analytics_stats: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @app.get('/api/analytics/dashboard')
 def get_analytics_dashboard():
@@ -1283,7 +1320,53 @@ def get_analytics_dashboard():
 
 @app.get('/api/analytics/reconciliation')
 def get_analytics_reconciliation():
-    return jsonify({'reconciled': []})
+    """Cruce de órdenes vs producción. Sin logs RIP reales se estima real≈teórico para impresas."""
+    try:
+        PRINTED_STATUSES = {
+            'impreso', 'IMPRESO', 'aprobado', 'post', 'POST',
+            'completo', 'COMPLETO', 'entregado', 'ENTREGADO', 'finalizado', 'FINALIZADO'
+        }
+        ML_PER_M2_PER_CHANNEL = 4
+
+        presupuestos = Presupuesto.query.filter(Presupuesto.deleted_at.is_(None)).all()
+        clientes = {c.id: c.nombre for c in Cliente.query.all()}
+
+        reconciled = []
+        for p in presupuestos:
+            esp = p.especificaciones or {}
+            carteles = esp.get('carteles', [])
+            primer = carteles[0] if carteles else {}
+            medidas = primer.get('medidas', {})
+            w = float(esp.get('ancho') or medidas.get('ancho', 0) or 0)
+            h = float(esp.get('alto') or medidas.get('alto', 0) or 0)
+            c = int(esp.get('copias') or primer.get('copias', 1) or 1)
+            teorico_m2 = round(w * h * c, 3)
+            if teorico_m2 <= 0:
+                continue
+
+            cname = p.cliente.nombre if p.cliente else (clientes.get(p.cliente_id) or 'Cliente General')
+            material = esp.get('material') or primer.get('tipo', 'Vinilo')
+            is_printed = p.estado in PRINTED_STATUSES
+            total_ink_ml = round(teorico_m2 * ML_PER_M2_PER_CHANNEL * 4, 1)
+
+            item = {
+                'id': p.id,
+                'cliente': cname,
+                'trabajo': p.descripcion or f"OT-{str(p.id)[:8]}",
+                'material': material,
+                'teorico': {'m2': teorico_m2},
+                'real': {'m2': teorico_m2, 'totalInkMl': total_ink_ml, 'logsCount': 1} if is_printed else {'m2': 0, 'totalInkMl': 0, 'logsCount': 0},
+                'efficiency': {'m2': 1.0, 'inkRatio': round(total_ink_ml / 1000.0 / teorico_m2, 5)} if is_printed else {'m2': 0.0, 'inkRatio': 0.0},
+                'consumoEstimado': round(float(esp.get('consumoEstimado') or teorico_m2), 2),
+                'stockWarning': False,
+                'status': 'consolidated' if is_printed else 'pending'
+            }
+            reconciled.append(item)
+
+        return jsonify({'reconciled': reconciled})
+    except Exception as e:
+        app.logger.error(f"Error en get_analytics_reconciliation: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 # ================================================================

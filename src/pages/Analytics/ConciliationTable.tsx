@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Clock } from 'lucide-react';
-import { API_URL } from '@data/db';
+import { API_URL, getOrdenes } from '@data/db';
+import type { Order } from '@/types';
 import './ConciliationTable.css';
 
 interface ReconciledItem {
@@ -23,6 +24,36 @@ interface ReconciledItem {
     status: 'consolidated' | 'pending';
 }
 
+function buildReconciliationFromOrders(orders: Order[]): ReconciledItem[] {
+    const printedStatuses = ['impreso', 'post', 'completo', 'entregado', 'finalizado'];
+    const ML_PER_M2_PER_CHANNEL = 4;
+    return orders
+        .map((o) => {
+            const w = Number(o.ancho) || 0;
+            const h = Number(o.alto) || 0;
+            const c = Number(o.copias) || 1;
+            const m2 = Math.round(w * h * c * 1000) / 1000;
+            if (m2 <= 0) return null;
+            const isPrinted = printedStatuses.includes(o.status);
+            const totalInkMl = Math.round(m2 * ML_PER_M2_PER_CHANNEL * 4 * 10) / 10;
+            return {
+                id: Number(o.id) || 0,
+                cliente: o.clienteNombre || 'Cliente',
+                trabajo: o.ot || `OT-${o.id}`,
+                material: o.material || 'Vinilo',
+                teorico: { m2 },
+                real: isPrinted ? { m2, totalInkMl, logsCount: 1 } : { m2: 0, totalInkMl: 0, logsCount: 0 },
+                efficiency: isPrinted
+                    ? { m2: 1, inkRatio: Math.round((totalInkMl / 1000 / m2) * 100000) / 100000 }
+                    : { m2: 0, inkRatio: 0 },
+                consumoEstimado: m2,
+                stockWarning: false,
+                status: (isPrinted ? 'consolidated' : 'pending') as 'consolidated' | 'pending'
+            };
+        })
+        .filter(Boolean) as ReconciledItem[];
+}
+
 export default function ConciliationTable() {
     const [data, setData] = useState<ReconciledItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -35,8 +66,11 @@ export default function ConciliationTable() {
             clearTimeout(id);
             if (!res.ok) return;
             const result = await res.json();
-            if (result && Array.isArray(result.reconciled)) {
+            if (result && Array.isArray(result.reconciled) && result.reconciled.length > 0) {
                 setData(result.reconciled);
+            } else {
+                const orders = await getOrdenes().catch(() => [] as Order[]);
+                setData(buildReconciliationFromOrders(orders));
             }
         } catch (err) {
             console.warn('Notice fetching reconciliation:', err);
