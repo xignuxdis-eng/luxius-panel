@@ -134,6 +134,13 @@ export default function Stock() {
         loadStock()
     }
 
+    const handleAdjustBottles = (material: Material, delta: number) => {
+        const current = material.botellasCerradas || 0
+        const newCount = Math.max(0, current + delta)
+        saveMaterial({ ...material, botellasCerradas: newCount })
+        loadStock()
+    }
+
     const { user } = useAuthStore()
     const canViewAlerts = canViewStockAlerts(user?.role)
 
@@ -230,7 +237,8 @@ export default function Stock() {
         }
     }
 
-    const LIQUID_FULL_ML = 500
+    const LIQUID_CAPACITY_ML = 2000
+    const LIQUID_REASONABLE_ML = 500
     const LIQUID_ALERT_ML = 250
 
     const getLiquidStatus = (currentMl: number) => {
@@ -258,7 +266,7 @@ export default function Stock() {
                 desc: 'Bajo'
             }
         }
-        if (currentMl < LIQUID_FULL_ML) {
+        if (currentMl < LIQUID_REASONABLE_ML) {
             return {
                 level: 'medium',
                 color: '#eab308',
@@ -266,7 +274,7 @@ export default function Stock() {
                 borderColor: 'rgba(234, 179, 8, 0.35)',
                 label: 'Medio',
                 icon: '🟡',
-                percent: Math.min(Math.round((currentMl / LIQUID_FULL_ML) * 100), 100),
+                percent: Math.min(Math.round((currentMl / LIQUID_REASONABLE_ML) * 100), 100),
                 desc: 'Medio'
             }
         }
@@ -354,7 +362,7 @@ export default function Stock() {
 
                         // Calculate overall group health
                         const groupMaxStock = Math.max(...group.variants.map((v: Material) => v.stockActual || 0), 0)
-                        const groupMinStock = Math.min(...group.variants.map((v: Material) => v.stockActual || 0), 0)
+                        const groupMinStock = Math.min(...group.variants.map((v: Material) => v.stockActual || 0))
                         const groupStatus = isLiquid ? getLiquidStatus(groupMinStock) : getStockStatus(groupMaxStock)
 
                         return (
@@ -382,7 +390,7 @@ export default function Stock() {
                                     <div className="liquid-tank-container">
                                         {group.variants.map((v: Material) => {
                                             const current = v.stockActual || 0
-                                            const fillPercent = Math.min((current / LIQUID_FULL_ML) * 100, 100)
+                                            const fillPercent = Math.min((current / LIQUID_CAPACITY_ML) * 100, 100)
                                             const isLow = current < LIQUID_ALERT_ML
 
                                             return (
@@ -405,6 +413,13 @@ export default function Stock() {
                                                         {isLow && (
                                                             <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f87171', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '1px 6px' }}>⚠ Reponer</span>
                                                         )}
+                                                    </div>
+                                                    <div className="bottle-indicator" onClick={(e) => e.stopPropagation()} title="Botellas cerradas (stock fuera de máquina)" style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center', marginTop: '4px' }}>
+                                                        <span style={{ fontSize: '0.75rem' }}>🍾</span>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleAdjustBottles(v, -1) }} style={{ width: '18px', height: '18px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: '16px', textAlign: 'center' }}>{v.botellasCerradas || 0}</span>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleAdjustBottles(v, 1) }} style={{ width: '18px', height: '18px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>cerradas</span>
                                                     </div>
                                                     <Button size="xs" variant="secondary" className="adjust-btn-overlay">
                                                         ⚡ Ajustar

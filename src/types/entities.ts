@@ -33,6 +33,7 @@ export interface Material {
     habilitado: boolean
     stockActual?: number // Meterage or units
     stockMinimo?: number // Alert threshold
+    botellasCerradas?: number // Sealed/unopened bottles (for inks/liquids, stock outside machine)
 }
 
 
