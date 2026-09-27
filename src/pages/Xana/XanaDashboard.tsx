@@ -11,7 +11,7 @@ import {
     XanaCommit,
     XanaPromptContext
 } from '@/data/db';
-import { Copy, Check, GitCommit, Brain, Terminal, RefreshCw, Layers } from 'lucide-react';
+import { Copy, Check, GitCommit, Brain, Terminal, RefreshCw } from 'lucide-react';
 import './XanaDashboard.css';
 
 const XanaDashboard: React.FC = () => {
@@ -246,7 +246,7 @@ const XanaDashboard: React.FC = () => {
                             {commits.map(commit => (
                                 <div key={commit.id} className="xana-card commit-card">
                                     <div className="xana-card-header">
-                                        <span className="xana-commit-hash">`{commit.commit_hash.slice(0, 7)}`</span>
+                                        <span className="xana-commit-hash">`{(commit.commit_hash || '—').slice(0, 7)}`</span>
                                         <span className="xana-branch-badge">{commit.branch}</span>
                                     </div>
                                     <div className="xana-card-body">

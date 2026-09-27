@@ -234,6 +234,17 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] Fix de Analíticas: `TypeError getMateriales().catch()`, métricas de producción desde órdenes, conciliación autosuficiente desde `getOrdenes()`.
 - [x] Importación de logs RIP de Roland VersaWorks (`ripLogParser.ts` + `ripLogReconcile.ts` + botón "Importar Log RIP").
 
+### Sesión 27/09/2026: Estrategia de Evolución de Xana y Fase 0 (en curso)
+- [x] Documento de consenso `MD consensos/Xana_Estrategia_Consenso_Final_v2.md` (arquitectura híbrida, 5 fases, gates A1-A6, ítems ⚠️ resueltos: roles y umbral anti-OOM).
+- [x] **Fase 0** — Fix de roles: `XanaAssistant.tsx` lee `luxius-auth-v6` y mapea roles reales (`administrador`/`principal`→admin, `impresion`→impresor, `cliente`/`vendedor`/`artista`); fallback sin sesión → `cliente` (mínimo privilegio).
+- [x] **Fase 0** — Token JWT en `/xana/chat` (`XanaAssistant.tsx` envía `Authorization: Bearer`).
+- [x] **Fase 0** — Fallback de commits: `xana.py` ya no devuelve `tasks`; `XanaDashboard.tsx` defensivo con `commit_hash || '—'`.
+- [x] **Fase 0** — Guard anti-OOM: `dimension_analyzer.py` usa `MAX_IMAGE_PIXELS = 500MP` (env `XANA_MAX_IMAGE_PIXELS`).
+- [x] **Fase 0** — Regex de escala: `detect_scale_in_text` ya no matchea "110" como 1:10 (requiere `:` o `/` para números sin prefijo).
+- [x] Memoria de Xana: `TASK-015` y `DEC-013` agregadas a `DEFAULT_XANA_DATA` en `xana.py`.
+- [ ] **Fase 0** restante: redactar suite A4 (20-30 casos), limpieza legacy no bloqueante (`XanaAIChat.tsx`, `xanaKnowledgeBase.ts`, `xanaFaqHandler.ts`), y desplegar/validar `luXius-Backend` en Render.
+- [ ] **Fase 1**: Function Calling + Shadow Mode + adaptador DeepSeek (gates A1/A2/A4/A6).
+
 ### Lo que sigue inmediatamente (Siguientes Pasos de Trabajo):
 - [~] **Analíticas sin datos** (resuelto en frontend + copia local `server/`):
   - [x] Implementar endpoints `/api/analytics/stats` y `/api/analytics/reconciliation` (en `server/app.py`).

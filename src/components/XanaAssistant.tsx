@@ -18,6 +18,19 @@ interface Message {
     time?: string;
 }
 
+const NORMALIZED_ROLES: Record<string, string> = {
+    administrador: 'admin',
+    principal: 'admin',
+    impresion: 'impresor',
+    cliente: 'cliente',
+    vendedor: 'vendedor',
+    artista: 'artista'
+};
+
+function normalizeRole(raw: string): string {
+    return NORMALIZED_ROLES[raw.toLowerCase()] || 'cliente';
+}
+
 export default function XanaAssistant() {
     const [isOpen, setIsOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -36,19 +49,20 @@ export default function XanaAssistant() {
 
     const getUserInfo = () => {
         try {
-            const authRaw = localStorage.getItem('luxius_auth');
+            const authRaw = localStorage.getItem('luxius-auth-v6');
             if (authRaw) {
                 const parsed = JSON.parse(authRaw);
-                if (parsed?.state?.user) {
+                const user = parsed?.state?.user;
+                if (user) {
                     return {
-                        role: (parsed.state.user.rol || parsed.state.user.role || 'cliente').toLowerCase(),
-                        username: parsed.state.user.nombre || parsed.state.user.username || 'Usuario',
-                        id: parsed.state.user.id || 0
+                        role: normalizeRole(String(user.rol || user.role || 'cliente')),
+                        username: user.nombre || user.username || user.name || 'Usuario',
+                        id: user.id || 0
                     };
                 }
             }
         } catch (_) {}
-        return { role: 'admin', username: 'Administrador', id: 1 };
+        return { role: 'cliente', username: 'Usuario', id: 0 };
     };
 
     const userInfo = getUserInfo();
@@ -244,7 +258,10 @@ export default function XanaAssistant() {
 
             const response = await fetch(`${API_URL}/xana/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(localStorage.getItem('luxius_auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('luxius_auth_token')}` } : {})
+                },
                 body: JSON.stringify(payload)
             });
 

@@ -18,6 +18,7 @@ import subprocess
 import sys
 import os
 import json
+import copy
 
 # Asegurar importación de services y models
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -160,6 +161,15 @@ DEFAULT_XANA_DATA = {
             "status": "completed",
             "created_at": "2026-09-18T21:30:00-03:00",
             "updated_at": "2026-09-19T11:35:00-03:00"
+        },
+        {
+            "id": 15,
+            "task_id": "TASK-015",
+            "project": "Xana AI — Fase 0 Estabilización",
+            "objective": "Corrección de bugs críticos del asistente Xana: detección de roles vía luxius-auth-v6 con mapeo de valores reales (administrador/principal→admin, impresion→impresor, cliente/vendedor/artista), token JWT en /xana/chat, fallback de commits sin devolver tareas, guard anti-OOM en análisis de imágenes y regex de escala sin falsos positivos (110x200 ya no se lee como 1:10).",
+            "status": "in_progress",
+            "created_at": "2026-09-27T00:35:00-03:00",
+            "updated_at": "2026-09-27T00:35:00-03:00"
         }
     ],
     "decisions": [
@@ -282,6 +292,16 @@ DEFAULT_XANA_DATA = {
             "alternatives_rejected": ["Módulo aislado sin conexión con órdenes", "Re-subida manual obligatoria en el visor"],
             "reason": "Permite al Artista inspeccionar DPI, medir demasías y vectorizar logos en un clic sin interrumpir el flujo de control de producción.",
             "created_at": "2026-09-18T21:40:00-03:00"
+        },
+        {
+            "id": 13,
+            "decision_id": "DEC-013",
+            "task_id": "TASK-015",
+            "topic": "Estrategia de evolución de Xana (Function Calling + RAG + análisis seguro)",
+            "choice": "Arquitectura híbrida en monolito Flask con ejecución asíncrona (job_id + polling), single-model-first (DeepSeek-V3/Gemini Flash configurable), capa estructurada anti-alucinación para precios/tolerancias (tools tipadas) y RAG solo para manuales, con vistas de solo lectura tipadas (no SQL libre). Roadmap en 5 fases con gates empíricos A1-A6.",
+            "alternatives_rejected": ["Fine-tuning desde cero", "Microservicio separado (FastAPI/Ray)", "Text-to-SQL libre", "Vector DB pesada (Qdrant/ChromaDB/LlamaIndex) en esta etapa"],
+            "reason": "Evoluciona el motor LangGraph existente sin reescritura, mantiene controlada la latencia del chat y evita alucinaciones en cotizaciones al consultar precios deterministas.",
+            "created_at": "2026-09-27T00:35:00-03:00"
         }
     ],
     "sessions": [
@@ -320,7 +340,7 @@ def _get_xana_store():
             return stored
     except Exception as e:
         print(f"[Xana Store] DB fetch error, using defaults: {e}")
-    return DEFAULT_XANA_DATA
+    return copy.deepcopy(DEFAULT_XANA_DATA)
 
 def _save_xana_store(data):
     try:
@@ -447,7 +467,7 @@ def get_xana_commits():
             seen.add(h)
             combined.append(c)
             
-    return jsonify(combined if combined else DEFAULT_XANA_DATA["tasks"])
+    return jsonify(combined)
 
 @xana_bp.post('/commits')
 @login_required

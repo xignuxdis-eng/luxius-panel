@@ -18,8 +18,8 @@ except ImportError:
     pdfium = None
 
 
-# Allow massive image files without DecompressionBombError for wide format printing
-Image.MAX_IMAGE_PIXELS = None
+# Allow large wide-format images without DecompressionBombError, but cap to prevent OOM
+Image.MAX_IMAGE_PIXELS = int(os.environ.get('XANA_MAX_IMAGE_PIXELS', '500000000'))
 
 LARGE_FORMAT_KEYWORDS = {
     'lona', 'front', 'back', 'vehicular', 'vv', 'cartel', 'gigantografia',
@@ -48,11 +48,11 @@ def detect_scale_in_text(text: str) -> int:
         return 1
     t = text.lower()
     
-    if re.search(r'\b(escala\s*1[.:/]?10|esc\s*1[.:/]?10|1[.:/]?10|10%|al\s*10%)\b', t):
+    if re.search(r'\b(escala\s*1[.:/]?10|esc\s*1[.:/]?10|1[:/]10|10%|al\s*10%)\b', t):
         return 10
-    if re.search(r'\b(escala\s*1[.:/]?20|esc\s*1[.:/]?20|1[.:/]?20|20%|al\s*20%)\b', t):
+    if re.search(r'\b(escala\s*1[.:/]?20|esc\s*1[.:/]?20|1[:/]20|20%|al\s*20%)\b', t):
         return 20
-    if re.search(r'\b(escala\s*1[.:/]?5|esc\s*1[.:/]?5|1[.:/]?5|5%)\b', t):
+    if re.search(r'\b(escala\s*1[.:/]?5|esc\s*1[.:/]?5|1[:/]5|5%)\b', t):
         return 5
         
     return 1
