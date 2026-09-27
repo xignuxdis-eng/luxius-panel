@@ -249,8 +249,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - [x] Deploy del backend vivo: fixes de Fase 0 pusheados a `luXius-Backend` (commit `e76ceb3`), ramas `main`+`master` → Render redeploy.
   - [x] **Paso 1** — Tool layer determinista: `services/xana_tools.py` con las 4 tools (`obtener_estado_ot`, `consultar_stock_materiales`, `obtener_metricas_ventas_cliente`, `crear_orden_trabajo`) + esquemas `XANA_TOOLS` + `execute_xana_tool`. Los materiales se leen de `collection_materiales` (ConfigGlobal), no hace falta tabla nueva.
   - [x] **Paso 2** — Function calling en `xana_graph.py`: nodo `function_calling` con Gemini `bind_tools`, fallback al router regex (shadow mode listo).
-  - [ ] **Paso 3** — Adaptador DeepSeek (para gate A1).
-  - [ ] **Gates** — A1 (cross-model ≥90%), A2 (shadow 7 días con línea base), A4 (suite trampa), A6 (latencia ≤3s).
+  - [x] **Paso 3** — Adaptador de proveedor LLM: `_build_llm()` en `xana_graph.py` soporta `XANA_LLM_PROVIDER` (`gemini` default | `deepseek` vía `langchain_openai.ChatOpenAI`), con `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL`. Documentado en `.env.example`. Ambos nodos (function calling y chat general) usan el proveedor configurable.
+  - [ ] **Gates** — A1 (cross-model ≥90%), A2 (shadow 7 días con línea base), A4 (suite trampa), A6 (latencia ≤3s). Requieren configurar las API keys en Render (`GEMINI_API_KEY` y/o `DEEPSEEK_API_KEY`).
 
 ### Lo que sigue inmediatamente (Siguientes Pasos de Trabajo):
 - [~] **Analíticas sin datos** (resuelto en frontend + copia local `server/`):
