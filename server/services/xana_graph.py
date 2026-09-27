@@ -15,10 +15,32 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from models import db, Presupuesto, Cliente, Vendedor, Maquina, SyncLog, ConfigGlobal
 from services.xana_tools import XANA_TOOLS, execute_xana_tool
 
+
+def _build_llm(temperature: float = 0.3):
+    """Construye el LLM según el proveedor configurado (XANA_LLM_PROVIDER: 'gemini' o 'deepseek')."""
+    provider = (os.environ.get('XANA_LLM_PROVIDER') or 'gemini').lower()
+
+    if provider == 'deepseek':
+        api_key = os.environ.get('DEEPSEEK_API_KEY')
+        if not api_key:
+            raise ValueError("DEEPSEEK_API_KEY no configurada")
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat'),
+            api_key=api_key,
+            base_url='https://api.deepseek.com',
+            temperature=temperature
+        )
+
+    api_key = os.environ.get('GEMINI_API_KEY')
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY no configurada")
+    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=temperature)
+
+
 # ================================================================
 # ESTADO COMPARTIDO (LangGraph State)
 # ================================================================
-
 class XanaState(TypedDict):
     message: str
     user_role: str
@@ -270,22 +292,14 @@ def orders_node(state: XanaState) -> XanaState:
 
 
 def general_chat_node(state: XanaState) -> XanaState:
-    """Nodo conversacional inteligente usando Google Gemini."""
+    """Nodo conversacional inteligente (proveedor configurable: Gemini o DeepSeek)."""
     msg = state.get('message', '')
     username = state.get('username', 'Usuario')
     role = state.get('user_role', 'cliente')
-    
-    gemini_key = os.environ.get('GEMINI_API_KEY')
-    
-    if gemini_key:
-        try:
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=gemini_key,
-                temperature=0.3
-            )
-            
-            system_prompt = f"""Eres Xana AI, la asistente inteligente e ingeniera de operaciones exclusiva de LuXius, el sistema de gestión de la imprenta gráfica argentina 'XignuX Gráfica'.
+
+    try:
+        llm = _build_llm(temperature=0.3)
+        system_prompt = f"""Eres Xana AI, la asistente inteligente e ingeniera de operaciones exclusiva de LuXius, el sistema de gestión de la imprenta gráfica argentina 'XignuX Gráfica'.
 Estás hablando con '{username}', que tiene el rol de '{role}'. 
 Actúa con profesionalismo, sé amable, ejecutiva y concisa.
 
@@ -300,19 +314,16 @@ REGLA ESTRICTA: Tu propósito es asistir en tareas relacionadas a LuXius, XignuX
 Si el usuario te hace preguntas no relacionadas, indícale amablemente tu función en la imprenta.
 No te presentes diciendo 'Hola, soy Xana' en cada mensaje; ve directo al grano."""
 
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=msg)
+        ]
 
-            messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=msg)
-            ]
-            
-            response = llm.invoke(messages)
-            state['reply'] = response.content
-            return state
-        except Exception as e:
-            print(f"[Xana LangGraph] Gemini error: {e}", file=sys.stderr)
-            # Si falla Gemini, caemos a la lógica local inteligente
-            pass
+        response = llm.invoke(messages)
+        state['reply'] = response.content
+        return state
+    except Exception as e:
+        print(f"[Xana LangGraph] LLM error: {e}", file=sys.stderr)
 
     # Respuesta local inteligente contextual (Fallback)
     msg_lower = msg.lower()
@@ -385,13 +396,12 @@ def function_calling_node(state: XanaState) -> XanaState:
     """Intenta resolver con function calling; si no hay tool, cae al router regex (shadow mode)."""
     state['tool_called'] = False
     msg = state.get('message', '')
-    gemini_key = os.environ.get('GEMINI_API_KEY')
 
-    if not gemini_key or not msg.strip():
+    if not msg.strip():
         return state
 
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=gemini_key, temperature=0)
+        llm = _build_llm(temperature=0)
         llm_with_tools = llm.bind_tools(XANA_TOOLS)
         response = llm_with_tools.invoke([HumanMessage(content=msg)])
 
