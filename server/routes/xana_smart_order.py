@@ -11,6 +11,7 @@ import zipfile
 import shutil
 import socket
 import urllib.parse
+import re
 from urllib.parse import urlparse
 import requests
 import gdown
@@ -91,11 +92,64 @@ def _execute_smart_order_process(url, cliente_input, material_code, calidad_code
 
             # A. GOOGLE DRIVE
             if 'drive.google.com' in url or 'docs.google.com' in url:
-                if '/folders/' in url:
+                # Limpiar parámetros de tracking que rompen gdown
+                clean_url = url.split('?')[0]
+                
+                if '/folders/' in clean_url:
+                    # Usar discovery + descarga individual (patrón robusto de cloud_import.py)
                     try:
-                        gdown.download_folder(url=url, output=temp_dir, quiet=True)
+                        import gdown
+                        # 1. Discovery rápido sin descargar
+                        folder_items = gdown.download_folder(url=clean_url, skip_download=True, quiet=True)
+                        if folder_items:
+                            for item in folder_items:
+                                if isinstance(item, dict) and item.get('id'):
+                                    file_id = item['id']
+                                    file_name = item.get('name', f'file_{file_id}')
+                                    # Descargar cada archivo con lógica robusta (confirm token, etc.)
+                                    try:
+                                        dl_file = gdown.download(id=file_id, output=temp_dir + os.sep, quiet=True)
+                                        if dl_file and os.path.exists(str(dl_file)):
+                                            continue
+                                    except Exception:
+                                        pass
+                                    # Fallback requests con confirm token
+                                    try:
+                                        s = requests.Session()
+                                        durl = f"https://drive.google.com/uc?export=download&id={file_id}"
+                                        r = s.get(durl, stream=True, timeout=45)
+                                        # Manejar confirm token (virus warning)
+                                        confirm_token = None
+                                        for k, v in r.cookies.items():
+                                            if k.startswith('download_warning'):
+                                                confirm_token = v
+                                                break
+                                        if not confirm_token and 'text/html' in r.headers.get('Content-Type', ''):
+                                            m = re.search(r'confirm=([0-9A-Za-z_-]+)', r.text)
+                                            if m:
+                                                confirm_token = m.group(1)
+                                        if confirm_token:
+                                            durl = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={file_id}"
+                                            r = s.get(durl, stream=True, timeout=45)
+                                        
+                                        if r.status_code == 200 and 'text/html' not in r.headers.get('Content-Type', ''):
+                                            cd = r.headers.get('content-disposition', '')
+                                            out_name = file_name
+                                            if 'filename=' in cd:
+                                                out_name = cd.split('filename=')[-1].strip('"\'; ')
+                                            out_p = os.path.join(temp_dir, out_name)
+                                            with open(out_p, 'wb') as f:
+                                                for chunk in r.iter_content(chunk_size=65536):
+                                                    if chunk: f.write(chunk)
+                                    except Exception as req_e:
+                                        print(f"[Drive Folder Item Error] {file_id}: {req_e}")
                     except Exception as gd_f_err:
                         print(f"[Drive Folder Import] gdown folder error: {gd_f_err}")
+                        # Fallback legacy: intentar descarga completa (para carpetas pequeñas)
+                        try:
+                            gdown.download_folder(url=clean_url, output=temp_dir, quiet=True)
+                        except Exception as legacy_err:
+                            print(f"[Drive Folder Legacy] Failed: {legacy_err}")
                 else:
                     drive_id = _extract_drive_id(url)
                     if not drive_id:

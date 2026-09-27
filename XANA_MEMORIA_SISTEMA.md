@@ -253,7 +253,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - [x] **Shadow Mode logging (A2)** — `_classify_regex_intent()` + `_log_shadow_decision()` registran cada decisión en `collection_xana_shadow` (máx 500): `message`, `regex_intent`, `final_intent`, `tool_name`. Recolectando línea base.
   - [x] **Verificación en producción (27/09)** — Function calling funciona end-to-end con Gemini (tool `consultar_stock_materiales` seleccionada y ejecutada correctamente). Probes A4 anti-alucinación **todos pasaron** (material/cliente/orden inexistente y precio no se inventan). Latencia A6: function calling ~2.9s, chat general ~3.2s.
   - [ ] **Gates pendientes**:
-    - **A1 (cross-model ≥90%)** — ⏳ bloqueado: falta `DEEPSEEK_API_KEY` en Render (el usuario debe crearla en platform.deepseek.com y cargarla).
+    - **A1 (cross-model ≥90%)** — ⏸️ **diferido**: `DEEPSEEK_API_KEY` configurada en Render pero sin créditos en la cuenta. Operando solo con Gemini (Function Calling verificado en prod). Se reactivará al recargar tokens en DeepSeek.
     - **A2 (shadow 7 días)** — ⏳ recolectando; comparar LLM vs regex al cumplir la ventana.
     - **A4 (suite trampa)** — ✅ probes manuales pasados; falta ejecutar la suite completa de 23 casos.
     - **A6 (latencia)** — ~3s medido; fijar el valor definitivo del presupuesto (≤3s vs aceptar ~3.2s en chat general).
