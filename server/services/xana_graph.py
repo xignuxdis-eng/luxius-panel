@@ -13,6 +13,7 @@ from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from models import db, Presupuesto, Cliente, Vendedor, Maquina, SyncLog, ConfigGlobal
+from services.xana_tools import XANA_TOOLS, execute_xana_tool
 
 # ================================================================
 # ESTADO COMPARTIDO (LangGraph State)
@@ -28,6 +29,7 @@ class XanaState(TypedDict):
     intent: str
     diagnostics_data: Dict[str, Any]
     reply: str
+    tool_called: bool
 
 
 # ================================================================
@@ -329,6 +331,88 @@ No te presentes diciendo 'Hola, soy Xana' en cada mensaje; ve directo al grano."
 
 
 # ================================================================
+# FUNCTION CALLING (FASE 1) — Tools tipadas con fallback al router regex
+# ================================================================
+
+def _format_tool_result(name: str, result: Dict[str, Any]) -> str:
+    """Formatea el resultado de una tool en un mensaje legible para el usuario."""
+    if not result.get('ok'):
+        return f"⚠️ {result.get('error', 'La herramienta no pudo completar la operación.')}"
+
+    if name == 'obtener_estado_ot':
+        return (
+            f"📦 **{result['ot']}** — Estado: *{result['estado']}*\n"
+            f"• Cliente: {result['cliente']}\n"
+            f"• Descripción: {result.get('descripcion') or '—'}\n"
+            f"• Total: ${result.get('total', 0):,.2f}\n"
+            f"• Saldo pendiente: ${result.get('saldo_pendiente', 0):,.2f}"
+        )
+
+    if name == 'consultar_stock_materiales':
+        mats = result.get('materiales', [])
+        if not mats:
+            return f"📦 {result.get('nota', 'Sin resultados.')}"
+        lines = [f"📦 **Stock de materiales** ({len(mats)} resultado(s)):"]
+        for m in mats[:8]:
+            unidad = m.get('unidad') or '—'
+            bobinas = m.get('bobinas') or []
+            extra = ''
+            if bobinas:
+                extra = ' · Bobinas: ' + ', '.join(
+                    f"{b.get('ancho')}m ({b.get('stockActual', 0)})"
+                    for b in bobinas if b.get('stockActual')
+                )
+            bot = ''
+            if m.get('botellasCerradas') or m.get('botellasMl'):
+                bot = f" · 🍾 {m.get('botellasCerradas', 0)} botellas ({m.get('botellasMl', 0)} ml)"
+            lines.append(f"• **{m.get('codigo')}** — {m.get('descripcion')}: {m.get('stockActual', 0)} {unidad}{extra}{bot}")
+        return '\n'.join(lines)
+
+    if name == 'obtener_metricas_ventas_cliente':
+        return (
+            f"📊 **Métricas de ventas** — {result.get('cliente') or 'Cliente'} ({result.get('periodo')})\n"
+            f"• Órdenes: {result.get('cantidad_ordenes', 0)}\n"
+            f"• Facturado: ${result.get('total_facturado', 0):,.2f}"
+        )
+
+    if name == 'crear_orden_trabajo':
+        return f"✅ {result.get('mensaje', 'Orden creada.')}\n• N° {result.get('ot')} — Estado: {result.get('estado')}"
+
+    return "✅ Operación completada."
+
+
+def function_calling_node(state: XanaState) -> XanaState:
+    """Intenta resolver con function calling; si no hay tool, cae al router regex (shadow mode)."""
+    state['tool_called'] = False
+    msg = state.get('message', '')
+    gemini_key = os.environ.get('GEMINI_API_KEY')
+
+    if not gemini_key or not msg.strip():
+        return state
+
+    try:
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=gemini_key, temperature=0)
+        llm_with_tools = llm.bind_tools(XANA_TOOLS)
+        response = llm_with_tools.invoke([HumanMessage(content=msg)])
+
+        tool_calls = getattr(response, 'tool_calls', None) or []
+        if tool_calls:
+            tc = tool_calls[0]
+            name = tc.get('name', '')
+            args = tc.get('args', {}) or {}
+            result = execute_xana_tool(name, args)
+            state['reply'] = _format_tool_result(name, result)
+            state['intent'] = 'tool_executed'
+            state['tool_called'] = True
+            return state
+    except Exception as e:
+        print(f"[Xana Function Calling] {e}", file=sys.stderr)
+
+    state['intent'] = ''
+    return state
+
+
+# ================================================================
 # CONSTRUCCIÓN DEL GRAFO LANGGRAPH
 # ================================================================
 
@@ -336,6 +420,7 @@ def create_xana_workflow():
     workflow = StateGraph(XanaState)
 
     # Añadir Nodos
+    workflow.add_node("function_calling", function_calling_node)
     workflow.add_node("router", router_node)
     workflow.add_node("diagnostics", diagnostics_node)
     workflow.add_node("db_health", db_health_node)
@@ -343,7 +428,19 @@ def create_xana_workflow():
     workflow.add_node("general_chat", general_chat_node)
 
     # Punto de Entrada
-    workflow.set_entry_point("router")
+    workflow.set_entry_point("function_calling")
+
+    # Si se ejecutó una tool -> END; si no -> router regex
+    def route_after_tool(state: XanaState) -> str:
+        if state.get('tool_called'):
+            return 'end'
+        return 'router'
+
+    workflow.add_conditional_edges(
+        "function_calling",
+        route_after_tool,
+        {"end": END, "router": "router"}
+    )
 
     # Aristas Condicionales basadas en la intención
     def route_decision(state: XanaState) -> str:
@@ -398,7 +495,8 @@ def run_xana_chat(
         'current_url': current_url,
         'intent': '',
         'diagnostics_data': {},
-        'reply': ''
+        'reply': '',
+        'tool_called': False
     }
 
     result = xana_app.invoke(initial_state)
