@@ -245,7 +245,12 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Fase 0** — Suite A4 redactada en `docs/xana/SUITE_A4_ANTIALUCINACION.md` (20-30 casos manuales + 5 trampa + matriz A1 de selección de tools).
 - [x] **Fase 0** — Limpieza del cluster legacy del chat: eliminados `XanaAIChat.tsx`, `xanaKnowledgeBase.ts`, `xanaFaqHandler.ts`, `intentClassifier.ts`, `contextResponses.ts`, `openaiService.ts` y `xanaConfig.ts` (todos sin consumidores vivos; el chat activo es `XanaAssistant` → `/api/xana/chat`).
 - [ ] **Fase 0** — Bloqueante: desplegar/validar `luXius-Backend` en Render (los fixes de backend están en la copia local `server/`).
-- [ ] **Fase 1** — Prerrequisitos detectados: (a) el backend **no tiene modelo `Material`** (el stock vive en frontend/localStorage), por lo que `consultar_stock_materiales` requiere definir su fuente de datos; (b) se necesita un LLM con function calling y clave de proveedor (DeepSeek/Gemini). Resto: Function Calling + Shadow Mode + adaptador DeepSeek (gates A1/A2/A4/A6).
+- [~] **Fase 1** — En curso:
+  - [x] Deploy del backend vivo: fixes de Fase 0 pusheados a `luXius-Backend` (commit `e76ceb3`), ramas `main`+`master` → Render redeploy.
+  - [x] **Paso 1** — Tool layer determinista: `services/xana_tools.py` con las 4 tools (`obtener_estado_ot`, `consultar_stock_materiales`, `obtener_metricas_ventas_cliente`, `crear_orden_trabajo`) + esquemas `XANA_TOOLS` + `execute_xana_tool`. Los materiales se leen de `collection_materiales` (ConfigGlobal), no hace falta tabla nueva.
+  - [x] **Paso 2** — Function calling en `xana_graph.py`: nodo `function_calling` con Gemini `bind_tools`, fallback al router regex (shadow mode listo).
+  - [ ] **Paso 3** — Adaptador DeepSeek (para gate A1).
+  - [ ] **Gates** — A1 (cross-model ≥90%), A2 (shadow 7 días con línea base), A4 (suite trampa), A6 (latencia ≤3s).
 
 ### Lo que sigue inmediatamente (Siguientes Pasos de Trabajo):
 - [~] **Analíticas sin datos** (resuelto en frontend + copia local `server/`):
