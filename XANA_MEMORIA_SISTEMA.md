@@ -242,8 +242,10 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Fase 0** — Guard anti-OOM: `dimension_analyzer.py` usa `MAX_IMAGE_PIXELS = 500MP` (env `XANA_MAX_IMAGE_PIXELS`).
 - [x] **Fase 0** — Regex de escala: `detect_scale_in_text` ya no matchea "110" como 1:10 (requiere `:` o `/` para números sin prefijo).
 - [x] Memoria de Xana: `TASK-015` y `DEC-013` agregadas a `DEFAULT_XANA_DATA` en `xana.py`.
-- [ ] **Fase 0** restante: redactar suite A4 (20-30 casos), limpieza legacy no bloqueante (`XanaAIChat.tsx`, `xanaKnowledgeBase.ts`, `xanaFaqHandler.ts`), y desplegar/validar `luXius-Backend` en Render.
-- [ ] **Fase 1**: Function Calling + Shadow Mode + adaptador DeepSeek (gates A1/A2/A4/A6).
+- [x] **Fase 0** — Suite A4 redactada en `docs/xana/SUITE_A4_ANTIALUCINACION.md` (20-30 casos manuales + 5 trampa + matriz A1 de selección de tools).
+- [x] **Fase 0** — Limpieza del cluster legacy del chat: eliminados `XanaAIChat.tsx`, `xanaKnowledgeBase.ts`, `xanaFaqHandler.ts`, `intentClassifier.ts`, `contextResponses.ts`, `openaiService.ts` y `xanaConfig.ts` (todos sin consumidores vivos; el chat activo es `XanaAssistant` → `/api/xana/chat`).
+- [ ] **Fase 0** — Bloqueante: desplegar/validar `luXius-Backend` en Render (los fixes de backend están en la copia local `server/`).
+- [ ] **Fase 1** — Prerrequisitos detectados: (a) el backend **no tiene modelo `Material`** (el stock vive en frontend/localStorage), por lo que `consultar_stock_materiales` requiere definir su fuente de datos; (b) se necesita un LLM con function calling y clave de proveedor (DeepSeek/Gemini). Resto: Function Calling + Shadow Mode + adaptador DeepSeek (gates A1/A2/A4/A6).
 
 ### Lo que sigue inmediatamente (Siguientes Pasos de Trabajo):
 - [~] **Analíticas sin datos** (resuelto en frontend + copia local `server/`):
