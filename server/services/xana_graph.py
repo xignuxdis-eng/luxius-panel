@@ -52,6 +52,7 @@ class XanaState(TypedDict):
     diagnostics_data: Dict[str, Any]
     reply: str
     tool_called: bool
+    tool_name: str
 
 
 # ================================================================
@@ -194,22 +195,23 @@ def tool_get_orders_for_user(user_role: str, user_id: int) -> List[Dict[str, Any
 # NODOS DEL GRAFO (LangGraph Nodes)
 # ================================================================
 
-def router_node(state: XanaState) -> XanaState:
-    """Clasifica la intención del usuario y los datos adjuntos."""
-    msg = state.get('message', '').lower()
-    logs = state.get('client_logs', [])
-
+def _classify_regex_intent(message: str, logs: List[Dict[str, Any]]) -> str:
+    """Clasificación determinista por regex (router legacy) — fallback y shadow mode (A2)."""
+    msg = (message or '').lower()
     if logs or 'error' in msg or 'consola' in msg or 'falló' in msg or 'diagnost' in msg or 'bug' in msg:
-        state['intent'] = 'diagnostics'
-    elif 'salud' in msg or 'base de datos' in msg or 'db' in msg or 'neon' in msg or 'tabla' in msg:
-        state['intent'] = 'db_health'
-    elif 'orden' in msg or 'pedido' in msg or 'presupuesto' in msg or 'ot' in msg:
-        state['intent'] = 'orders'
-    elif 'precio' in msg or 'cotiz' in msg or 'lona' in msg or 'vinilo' in msg or 'cuanto cuesta' in msg:
-        state['intent'] = 'pricing'
-    else:
-        state['intent'] = 'general_chat'
+        return 'diagnostics'
+    if 'salud' in msg or 'base de datos' in msg or 'db' in msg or 'neon' in msg or 'tabla' in msg:
+        return 'db_health'
+    if 'orden' in msg or 'pedido' in msg or 'presupuesto' in msg or 'ot' in msg:
+        return 'orders'
+    if 'precio' in msg or 'cotiz' in msg or 'lona' in msg or 'vinilo' in msg or 'cuanto cuesta' in msg:
+        return 'pricing'
+    return 'general_chat'
 
+
+def router_node(state: XanaState) -> XanaState:
+    """Clasifica la intención del usuario y los datos adjuntos (regex)."""
+    state['intent'] = _classify_regex_intent(state.get('message', ''), state.get('client_logs', []))
     return state
 
 
@@ -395,6 +397,7 @@ def _format_tool_result(name: str, result: Dict[str, Any]) -> str:
 def function_calling_node(state: XanaState) -> XanaState:
     """Intenta resolver con function calling; si no hay tool, cae al router regex (shadow mode)."""
     state['tool_called'] = False
+    state['tool_name'] = ''
     msg = state.get('message', '')
 
     if not msg.strip():
@@ -414,6 +417,7 @@ def function_calling_node(state: XanaState) -> XanaState:
             state['reply'] = _format_tool_result(name, result)
             state['intent'] = 'tool_executed'
             state['tool_called'] = True
+            state['tool_name'] = name
             return state
     except Exception as e:
         print(f"[Xana Function Calling] {e}", file=sys.stderr)
@@ -487,6 +491,32 @@ def create_xana_workflow():
 xana_app = create_xana_workflow()
 
 
+def _log_shadow_decision(message: str, user_role: str, regex_intent: str, final_intent: str, tool_name: str) -> None:
+    """Registra la decisión para el Shadow Mode (A2): compara router LLM vs router regex."""
+    try:
+        clave = 'collection_xana_shadow'
+        row = ConfigGlobal.query.filter_by(clave=clave).first()
+        logs = (row.valor if row and isinstance(row.valor, list) else [])
+        logs.append({
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'message': (message or '')[:200],
+            'user_role': user_role,
+            'regex_intent': regex_intent,
+            'final_intent': final_intent,
+            'tool_name': tool_name
+        })
+        if len(logs) > 500:
+            logs = logs[-500:]
+        if row:
+            row.valor = logs
+        else:
+            db.session.add(ConfigGlobal(clave=clave, valor=logs))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Xana Shadow] {e}", file=sys.stderr)
+
+
 def run_xana_chat(
     message: str,
     user_role: str = 'cliente',
@@ -506,10 +536,21 @@ def run_xana_chat(
         'intent': '',
         'diagnostics_data': {},
         'reply': '',
-        'tool_called': False
+        'tool_called': False,
+        'tool_name': ''
     }
 
     result = xana_app.invoke(initial_state)
+
+    # Shadow mode logging (A2): comparar LLM vs regex
+    _log_shadow_decision(
+        message=message,
+        user_role=user_role,
+        regex_intent=_classify_regex_intent(message, client_logs or []),
+        final_intent=result.get('intent', ''),
+        tool_name=result.get('tool_name', '')
+    )
+
     return {
         'reply': result.get('reply', ''),
         'intent': result.get('intent', ''),
