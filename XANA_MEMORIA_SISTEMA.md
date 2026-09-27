@@ -250,25 +250,71 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - [x] **Paso 1** — Tool layer determinista: `services/xana_tools.py` con las 4 tools (`obtener_estado_ot`, `consultar_stock_materiales`, `obtener_metricas_ventas_cliente`, `crear_orden_trabajo`) + esquemas `XANA_TOOLS` + `execute_xana_tool`. Los materiales se leen de `collection_materiales` (ConfigGlobal), no hace falta tabla nueva.
   - [x] **Paso 2** — Function calling en `xana_graph.py`: nodo `function_calling` con Gemini `bind_tools`, fallback al router regex (shadow mode listo).
   - [x] **Paso 3** — Adaptador de proveedor LLM: `_build_llm()` en `xana_graph.py` soporta `XANA_LLM_PROVIDER` (`gemini` default | `deepseek` vía `langchain_openai.ChatOpenAI`), con `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL`. Documentado en `.env.example`. Ambos nodos (function calling y chat general) usan el proveedor configurable.
-  - [ ] **Gates** — A1 (cross-model ≥90%), A2 (shadow 7 días con línea base), A4 (suite trampa), A6 (latencia ≤3s). Requieren configurar las API keys en Render (`GEMINI_API_KEY` y/o `DEEPSEEK_API_KEY`).
+  - [x] **Shadow Mode logging (A2)** — `_classify_regex_intent()` + `_log_shadow_decision()` registran cada decisión en `collection_xana_shadow` (máx 500): `message`, `regex_intent`, `final_intent`, `tool_name`. Recolectando línea base.
+  - [x] **Verificación en producción (27/09)** — Function calling funciona end-to-end con Gemini (tool `consultar_stock_materiales` seleccionada y ejecutada correctamente). Probes A4 anti-alucinación **todos pasaron** (material/cliente/orden inexistente y precio no se inventan). Latencia A6: function calling ~2.9s, chat general ~3.2s.
+  - [ ] **Gates pendientes**:
+    - **A1 (cross-model ≥90%)** — ⏳ bloqueado: falta `DEEPSEEK_API_KEY` en Render (el usuario debe crearla en platform.deepseek.com y cargarla).
+    - **A2 (shadow 7 días)** — ⏳ recolectando; comparar LLM vs regex al cumplir la ventana.
+    - **A4 (suite trampa)** — ✅ probes manuales pasados; falta ejecutar la suite completa de 23 casos.
+    - **A6 (latencia)** — ~3s medido; fijar el valor definitivo del presupuesto (≤3s vs aceptar ~3.2s en chat general).
 
-### Lo que sigue inmediatamente (Siguientes Pasos de Trabajo):
-- [~] **Analíticas sin datos** (resuelto en frontend + copia local `server/`):
-  - [x] Implementar endpoints `/api/analytics/stats` y `/api/analytics/reconciliation` (en `server/app.py`).
-  - [x] Métricas de producción y conciliación derivadas desde las órdenes (`buildStatsFromOrders`, `ConciliationTable` autosuficiente).
-  - [x] Corregir `TypeError` de `getMateriales().catch()` que rompía `fetchData`.
-  - [ ] Sincronizar `server/` con `luXius-Backend` (Render): el backend desplegado aún sirve los stubs viejos hasta que se publique esta implementación.
-  - [ ] Persistencia multi-equipo de logs RIP en backend (hoy se guardan en `localStorage` del navegador); requiere endpoint `POST /api/analytics/import-logs` + modelo `PrintLog`.
-- [ ] **Reconfigurar doble remoto**: `origin` hoy tiene solo GitHub; agregar push-URL de GitLab (Sección 2, regla 3) o documentar operación solo-GitHub.
-- [ ] **Validación en Vivo de Clientes en UI**: Probar la creación de un nuevo cliente desde Administración (`ClientesView`) y verificar que persista en el detalle de las órdenes tras F5 sin parpadeos.
-- [ ] **Fase 2 - Seguridad (prioridad alta)**:
-  - [ ] Sacar contraseñas hardcodeadas del seed `_seed_default_users()` en `server/app.py`; leerlas de variables de entorno (`SEED_*_PASSWORD`).
-  - [ ] Rotar en Neon las contraseñas de usuarios por defecto expuestas en el historial Git.
-  - [ ] Confirmar que `JWT_SECRET_KEY` en Render sea único y seguro.
-  - [ ] Migrar Rate Limiter de `memory://` a Redis para persistencia entre workers.
-- [ ] **Fase 3 - Deuda Técnica Backend**:
-  - [ ] Partir `server/app.py` y `luXius-Backend/app.py` en Blueprints (`routes/clientes.py`, `routes/maquinas.py`, etc.).
-  - [ ] Unificar la duplicación entre la carpeta `server/` y el repo `luXius-Backend`.
-- [ ] **Fase 5 - Módulos de Producto**:
-  - [ ] Módulo 1: Smart Order de Xana (`/api/xana/smart-order`) con tarjeta interactiva.
-  - [ ] Módulo 2: Bóveda Drive con sincronización nocturna de órdenes y remitos.
+### ⏭️ PRÓXIMO PASO (si me quedo sin tokens): Fase 2 — Base de Conocimiento Estructurada + RAG Pragmático
+- Fichas técnicas/anchos/precios estructurados (Capa Estructurada) **reutilizando `pricingCalculator.ts` y precios existentes**.
+- Índice RAG plano persistente **solo** para manuales y guías (sin Qdrant/ChromaDB/LlamaIndex), con citas obligatorias.
+- Instrumentar latencia de búsqueda (gate A3: ≤300ms, corpus ≤500 docs/5MB).
+- Ver detalle completo en `MD consensos/Xana_Estrategia_Consenso_Final_v2.md` (Fase 2) y suite en `docs/xana/SUITE_A4_ANTIALUCINACION.md`.
+
+### ✅ Fase 2 — Base de Conocimiento Estructurada + RAG Pragmático (COMPLETADA 27/09/2026)
+- [x] **Servicio `xana_knowledge.py`**: Capa Estructurada (materiales, bobinas, precios, tolerancias, procedimientos) + Capa RAG (índice plano con sentence-transformers all-MiniLM-L6-v2).
+- [x] **Tools de conocimiento** (6 nuevas): `consultar_ficha_tecnica`, `consultar_bobinas_disponibles`, `consultar_precio_material`, `buscar_en_manuales`, `consultar_procedimiento`, `consultar_tolerancias`.
+- [x] **Integración en LangGraph**: Nodo `knowledge_node` con fallback regex + function calling vía tools tipadas.
+- [x] **Citas obligatorias**: Todas las respuestas incluyen fuente (`KB:materiales:VV`, `RAG:guia_calibracion_tintas.md:chunk0`).
+- [x] **Telemetría Gate A3**: Latencia de búsqueda loggeada en `collection_xana_rag_telemetry` (p95, avg, corpus size).
+- [x] **Corpus RAG inicial**: 3 guías (calibración tintas, cambio bobina, preparación archivos) en `server/rag_corpus/`.
+- [x] **Endpoints de gestión KB**: `/kb/sync`, `/kb/rag/ingest`, `/kb/rag/search`, `/kb/rag/stats`, `/kb/stats`.
+- [x] **Límites Gate A3**: Corpus ≤500 docs / ≤5MB, similitud threshold 0.35, top-k 4.
+
+### ✅ Fase 3 — Métricas y Análisis de Tendencias Seguro (COMPLETADA 27/09/2026)
+- [x] **Servicio `xana_analytics.py`**: Vistas SQL parametrizadas de solo lectura (`v_ventas_cliente`, `v_consumo_material`, `v_rendimiento_maquina`, `v_resumen_financiero`) compatibles SQLite + PostgreSQL.
+- [x] **Tools analíticas** (5 nuevas): `obtener_ventas_cliente`, `obtener_consumo_materiales`, `obtener_rendimiento_maquinas`, `obtener_resumen_financiero`, `obtener_top_clientes`.
+- [x] **Seguridad**: Sin Text-to-SQL libre, timeouts configurables (3s default), límite 100 filas, busy_timeout SQLite 5s.
+- [x] **Control de acceso**: Restringido a roles `admin`, `principal`, `impresion`.
+- [x] **Telemetría Gate A4**: Latencia loggeada en `xana_analytics_telemetry` (p95, avg, success rate).
+- [x] **Integración en LangGraph**: Nodo `analytics_node` con routing por intención `analytics`.
+- [x] **Endpoints de gestión**: `/analytics/telemetry`, `/analytics/query`.
+- [x] **Límites Gate A4**: timeout ≤3s, max_rows ≤100, vistas parametrizadas únicamente.
+
+### ✅ Fase 4 — Voz e Integración Móvil (COMPLETADA 27/09/2026)
+- [x] **Frontend Web (XanaAssistant.tsx)**: Web Speech API integrada — botón voz (Mic/MicOff), `recognition.lang='es-AR'`, continuo + resultados intermedios, input poblado con transcript, animación CSS pulse "listening".
+- [x] **Backend `xana_voice.py`**: Pipeline asíncrono idéntico a Smart Order (ThreadPoolExecutor + job_id + polling 202 Accepted).
+  - Endpoints: `POST /api/xana/voice/transcribe` (202 + job_id), `GET /api/xana/voice/transcribe/status/<job_id>`, `POST /api/xana/voice/transcribe-and-order` (flujo completo Voz → Transcripción → Smart Order Draft).
+  - Proveedores STT configurables por `XANA_STT_PROVIDER`: `mock` (dev), `google` (Cloud Speech-to-Text), `whisper` (openai-whisper local CPU).
+  - Límite 25MB, formatos webm/ogg/mp3/wav/m4a, lang default `es-AR`.
+- [x] **Patrón móvil documentado**: `docs/xana/XANA_MEMORIA_APP_MOVIL.md` actualizado con Fase E (Voz a OT) — flujo end-to-end MediaRecorder → transcribe polling → smart-order draft → confirmación usuario → OT real.
+- [x] **Integración Capacitor**: Permiso `RECORD_AUDIO` en AndroidManifest, SecureStorage para JWT, HTTPS enforced.
+
+### ✅ Fase 5 — Módulos Avanzados (COMPLETADA 27/09/2026)
+- [x] **Smart Order interactivo**: `XanaSmartOrderCard.tsx` — Tarjeta interactiva completa con:
+  - Selector de material en vivo con recálculo de precios vía `pricingCalculator.ts` (motor oficial)
+  - Selector de escala human-in-the-loop (1:1 / 1:10 ⭐ / 1:20) con recálculo inmediato de consumo, bobina, precio
+  - Desglose de consumo por bobina (chips visuales)
+  - Precio total editable antes de confirmar
+  - Alertas de escala heurística 3D (1:10 detectado)
+  - SHA-256 anchor visible por archivo (integridad)
+  - Botón "Abrir en Modal" para edición completa en `NuevoPedidoModal`
+  - Confirmación crea OT real en PostgreSQL vía `/api/xana/smart-order/confirm`
+- [x] **Backend `xana_smart_order.py`**: Pipeline asíncrono (ThreadPoolExecutor + job_id + 202 polling)
+  - Ingesta WeTransfer / Google Drive / archivos locales con anti-SSRF
+  - Análisis dimensional + heurística 3D de escalas + checksum SHA-256
+  - Subida no bloqueante a Cloudflare R2
+  - Resolución inteligente de cliente + tarifas por material
+  - Endpoints: `POST /api/xana/smart-order` (202), `GET /api/xana/smart-order/status/<job_id>`, `POST /api/xana/smart-order/confirm`
+- [x] **Drive Vault nocturno**: `xana_vault.py` — Sincronización programada a Google Drive
+  - Estructura: `/XignuX Vault/{AÑO}/{MES}/{TIPO}/{CLIENTE}/`
+  - Sube PDF (modo simplificado) + metadata JSON por orden/remito
+  - Proveedor Service Account (configurable por `GOOGLE_SERVICE_ACCOUNT_JSON`)
+  - Endpoints: `POST /api/xana/vault/sync` (202 + job_id), `GET /api/xana/vault/sync/status/<job_id>`, `GET /api/xana/vault/structure`, `GET /api/xana/vault/config`
+  - Límite 500 archivos por corrida, dry-run mode, cancelación
+  - Permisos públicos auto-asignados en Drive para acceso directo
+
+---

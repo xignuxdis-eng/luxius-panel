@@ -69,6 +69,8 @@ except Exception:
     limiter = DummyLimiter()
 
 from routes.xana_smart_order import smart_order_bp
+from routes.xana_voice import voice_bp
+from routes.xana_vault import vault_bp
 
 # Make limiter available to blueprints
 app.limiter = limiter
@@ -82,6 +84,8 @@ app.register_blueprint(stats_bp)
 app.register_blueprint(import_bp)
 app.register_blueprint(google_drive_bp)
 app.register_blueprint(smart_order_bp)
+app.register_blueprint(voice_bp)
+app.register_blueprint(vault_bp)
 
 
 # Rate limits are configured directly on routes or via limiter default limits

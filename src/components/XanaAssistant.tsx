@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
     X, Send, Bot, Sparkles, AlertTriangle, Database, 
-    Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle
+    Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle, Mic, MicOff
 } from 'lucide-react';
 import { getRecentLogs, clearLogs, RecordedError } from '../utils/errorRecorder';
 import { API_URL } from '../data/db';
@@ -41,11 +41,15 @@ export default function XanaAssistant() {
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
     ]);
-    const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
+const [input, setInput] = useState('');
+const [isLoading, setIsLoading] = useState(false);
+// Voice recognition state
+const [isListening, setIsListening] = useState(false);
+const [voiceSupported, setVoiceSupported] = useState(false);
+const recognitionRef = useRef<SpeechRecognition | null>(null);
+const scrollRef = useRef<HTMLDivElement>(null);
+const inputRef = useRef<HTMLInputElement>(null);
+const menuRef = useRef<HTMLDivElement>(null);
 
     const getUserInfo = () => {
         try {
@@ -88,6 +92,81 @@ export default function XanaAssistant() {
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMenuOpen]);
+
+    // ===== VOICE RECOGNITION (Web Speech API) =====
+    useEffect(() => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            setVoiceSupported(true);
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'es-AR';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event: any) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                // Update input with interim + final transcript
+                setInput(prev => {
+                    // Replace the last interim portion if exists
+                    const base = prev.replace(/\[voz:.*?\]$/, '').trim();
+                    const combined = base + (finalTranscript || interimTranscript);
+                    return combined + (interimTranscript && !finalTranscript ? ' [voz...]' : '');
+                });
+            };
+
+            recognition.onerror = (event: any) => {
+                console.warn('[Xana Voice] Speech recognition error:', event.error);
+                if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    setIsListening(false);
+                }
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    // Auto-restart if still listening
+                    try { recognition.start(); } catch {}
+                }
+            };
+
+            recognitionRef.current = recognition;
+        }
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+                recognitionRef.current = null;
+            }
+        };
+    }, [isListening]);
+
+    const toggleVoice = () => {
+        if (!voiceSupported || !recognitionRef.current) return;
+        
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        } else {
+            try {
+                // Clear input when starting fresh voice input
+                setInput('');
+                recognitionRef.current.start();
+                setIsListening(true);
+            } catch (e) {
+                console.warn('[Xana Voice] Start error:', e);
+            }
+        }
+    };
 
     const sendMessage = async (customText?: string, sendLogs: boolean = false) => {
         const textToSend = customText || input.trim();
@@ -561,6 +640,17 @@ export default function XanaAssistant() {
                             placeholder="Escribe tu consulta o pide un cálculo..."
                             className="xana-input"
                         />
+                        {voiceSupported && (
+                            <button
+                                onClick={toggleVoice}
+                                disabled={isLoading}
+                                className={`xana-voice-btn ${isListening ? 'listening' : ''}`}
+                                title={isListening ? 'Detener dictado (Esc para cancelar)' : 'Iniciar dictado por voz'}
+                                aria-label={isListening ? 'Detener reconocimiento de voz' : 'Iniciar reconocimiento de voz'}
+                            >
+                                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                            </button>
+                        )}
                         <button
                             onClick={() => sendMessage()}
                             disabled={isLoading || !input.trim()}

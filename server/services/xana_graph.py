@@ -14,6 +14,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from models import db, Presupuesto, Cliente, Vendedor, Maquina, SyncLog, ConfigGlobal
 from services.xana_tools import XANA_TOOLS, execute_xana_tool
+from services.xana_knowledge import format_knowledge_tool_result, sync_materials_to_kb
+from services.xana_analytics import format_analytics_tool_result
 
 
 def _build_llm(temperature: float = 0.3):
@@ -192,8 +194,116 @@ def tool_get_orders_for_user(user_role: str, user_id: int) -> List[Dict[str, Any
 
 
 # ================================================================
-# NODOS DEL GRAFO (LangGraph Nodes)
+# NODO DE CONOCIMIENTO (FASE 2) — KB Estructurada + RAG
 # ================================================================
+
+def knowledge_node(state: XanaState) -> XanaState:
+    """Nodo para consultas de conocimiento técnico (fichas, bobinas, precios, manuales, procedimientos, tolerancias)."""
+    msg = state.get('message', '')
+    username = state.get('username', 'Usuario')
+    role = state.get('user_role', 'cliente')
+    user_id = state.get('user_id', 0)
+    
+    # Sincronizar materiales a KB si es primera vez o datos desactualizados
+    try:
+        sync_materials_to_kb()
+    except Exception:
+        pass
+    
+    # Intentar function calling primero (ya se hizo en function_calling_node)
+    # Si llegamos aquí es porque no hubo tool_called, usar fallback regex-based
+    
+    # Usar consulta difusa sobre KB estructurada
+    from services.xana_knowledge import query_structured_kb, rag_index, RAG_TOP_K
+    
+    results = query_structured_kb(msg, top_k=3)
+    
+    # Si no hay resultados estructurados, intentar RAG
+    rag_results = []
+    if not results:
+        rag_results = rag_index.search(msg, top_k=RAG_TOP_K)
+    
+    if not results and not rag_results:
+        state['reply'] = (
+            f"No encontré información técnica específica para tu consulta. "
+            f"Podés preguntarme sobre:\n"
+            f"• Fichas técnicas de materiales (ej: 'ficha VV', 'especificaciones vinilo vehicular')\n"
+            f"• Bobinas disponibles (ej: 'bobinas 1.37', 'anchos disponibles')\n"
+            f"• Precios por m² (ej: 'precio lona frontlight', 'cuanto cuesta microperforado')\n"
+            f"• Manuales y guías (ej: 'cómo calibrar tinta', 'procedimiento cambio bobina')\n"
+            f"• Tolerancias del sistema (ej: 'margen seguridad', 'DPI mínimo')"
+        )
+        return state
+    
+    lines = [f"🔍 **Consulta de Conocimiento Técnico**"]
+    
+    if results:
+        lines.append(f"\n📋 **Base de Conocimiento Estructurada ({len(results)} resultado(s)):**")
+        for r in results:
+            if r['tipo'] == 'material':
+                ficha = r['data']
+                lines.append(f"• **{ficha['codigo']}** — {ficha['descripcion']} ({ficha['tipo']})")
+                if ficha.get('anchos_disponibles'):
+                    lines.append(f"  Anchos: {', '.join(f'{a}m' for a in ficha['anchos_disponibles'])}")
+                if ficha.get('precio_m2'):
+                    lines.append(f"  Precio: ${ficha['precio_m2']:,.2f}/m²")
+                lines.append(f"  📎 `{r['citacion']}`")
+            elif r['tipo'] == 'bobina':
+                info = r['data']
+                mats = ', '.join(info.get('materiales_compatibles', [])[:3])
+                lines.append(f"• Bobina **{r['ancho']}m** — Compatibles: {mats}")
+                lines.append(f"  📎 `{r['citacion']}`")
+            elif r['tipo'] == 'procedimiento':
+                lines.append(f"• Procedimiento: **{r['nombre']}**")
+                lines.append(f"  📎 `{r['citacion']}`")
+    
+    if rag_results:
+        lines.append(f"\n📚 **Manuales y Guías (RAG) ({len(rag_results)} pasaje(s)):**")
+        for i, r in enumerate(rag_results, 1):
+            snippet = r['content'][:180].replace('\n', ' ') + ('...' if len(r['content']) > 180 else '')
+            lines.append(f"{i}. **{r['source_name']}** (score: {r['score']:.2f})")
+            lines.append(f"   {snippet}")
+            lines.append(f"   📎 `{r['citacion']}`")
+    
+    state['reply'] = '\n'.join(lines)
+    state['intent'] = 'knowledge'
+    return state
+
+
+# ================================================================
+# NODO ANALÍTICO (FASE 3) — Métricas y Análisis Seguro
+# ================================================================
+
+def analytics_node(state: XanaState) -> XanaState:
+    """Nodo para consultas analíticas (ventas, consumo, rendimiento, financiero)."""
+    msg = state.get('message', '')
+    username = state.get('username', 'Usuario')
+    role = state.get('user_role', 'cliente')
+    user_id = state.get('user_id', 0)
+    
+    # Solo admins/principales/impresores pueden ver analíticas
+    if role not in ('admin', 'principal', 'impresion'):
+        state['reply'] = "🔒 Las consultas analíticas están restringidas a roles Administrador, Principal e Impresión."
+        return state
+    
+    # Intentar function calling primero (ya se hizo en function_calling_node)
+    # Si llegamos aquí es porque no hubo tool_called, usar fallback regex-based
+    # Para analytics, el function calling es obligatorio por seguridad (vistas parametrizadas)
+    # Si no se invocó tool, guiamos al usuario
+    
+    state['reply'] = (
+        f"📊 **Consultas Analíticas Disponibles** (requieren permisos de {role}):\n\n"
+        f"• **Ventas por cliente**: \"ventas cliente 123 mes\", \"facturación cliente X trimestre\"\n"
+        f"• **Consumo materiales**: \"consumo materiales mes\", \"m2 vinilo vehicular trimestre\"\n"
+        f"• **Rendimiento máquinas**: \"rendimiento máquinas mes\", \"horas impresora semana\"\n"
+        f"• **Resumen financiero**: \"resumen financiero mes\", \"facturación total anio\"\n"
+        f"• **Top clientes**: \"top 10 clientes mes\", \"mejores clientes trimestre\"\n\n"
+        f"💡 Usa lenguaje natural y Xana invocará las tools analíticas seguras (vistas parametrizadas, "
+        f"timeout {3}s, máx 100 filas)."
+    )
+    state['intent'] = 'analytics'
+    return state
+
 
 def _classify_regex_intent(message: str, logs: List[Dict[str, Any]]) -> str:
     """Clasificación determinista por regex (router legacy) — fallback y shadow mode (A2)."""
@@ -206,6 +316,10 @@ def _classify_regex_intent(message: str, logs: List[Dict[str, Any]]) -> str:
         return 'orders'
     if 'precio' in msg or 'cotiz' in msg or 'lona' in msg or 'vinilo' in msg or 'cuanto cuesta' in msg:
         return 'pricing'
+    if 'ficha' in msg or 'técnica' in msg or 'especificac' in msg or 'bobina' in msg or 'ancho' in msg or 'manual' in msg or 'guía' in msg or 'procedimiento' in msg or 'tolerancia' in msg:
+        return 'knowledge'
+    if 'venta' in msg or 'factur' in msg or 'consumo' in msg or 'material' in msg or 'máquina' in msg or 'maquina' in msg or 'rendimiento' in msg or 'financiero' in msg or 'resumen' in msg or 'top client' in msg or 'métrica' in msg or 'metrica' in msg:
+        return 'analytics'
     return 'general_chat'
 
 
@@ -344,13 +458,23 @@ No te presentes diciendo 'Hola, soy Xana' en cada mensaje; ve directo al grano."
 
 
 # ================================================================
-# FUNCTION CALLING (FASE 1) — Tools tipadas con fallback al router regex
+# FUNCTION CALLING (FASE 1 + 2) — Tools tipadas con fallback al router regex
 # ================================================================
 
 def _format_tool_result(name: str, result: Dict[str, Any]) -> str:
     """Formatea el resultado de una tool en un mensaje legible para el usuario."""
     if not result.get('ok'):
         return f"⚠️ {result.get('error', 'La herramienta no pudo completar la operación.')}"
+
+    # Knowledge tools (Fase 2)
+    if name in ('consultar_ficha_tecnica', 'consultar_bobinas_disponibles', 'consultar_precio_material',
+                'buscar_en_manuales', 'consultar_procedimiento', 'consultar_tolerancias'):
+        return format_knowledge_tool_result(name, result)
+
+    # Analytics tools (Fase 3)
+    if name in ('obtener_ventas_cliente', 'obtener_consumo_materiales', 'obtener_rendimiento_maquinas',
+                'obtener_resumen_financiero', 'obtener_top_clientes'):
+        return format_analytics_tool_result(name, result)
 
     if name == 'obtener_estado_ot':
         return (
@@ -440,6 +564,8 @@ def create_xana_workflow():
     workflow.add_node("db_health", db_health_node)
     workflow.add_node("orders", orders_node)
     workflow.add_node("general_chat", general_chat_node)
+    workflow.add_node("knowledge", knowledge_node)
+    workflow.add_node("analytics", analytics_node)
 
     # Punto de Entrada
     workflow.set_entry_point("function_calling")
@@ -465,6 +591,10 @@ def create_xana_workflow():
             return 'db_health'
         elif intent == 'orders':
             return 'orders'
+        elif intent == 'knowledge':
+            return 'knowledge'
+        elif intent == 'analytics':
+            return 'analytics'
         else:
             return 'general_chat'
 
@@ -475,6 +605,8 @@ def create_xana_workflow():
             "diagnostics": "diagnostics",
             "db_health": "db_health",
             "orders": "orders",
+            "knowledge": "knowledge",
+            "analytics": "analytics",
             "general_chat": "general_chat"
         }
     )
@@ -482,6 +614,8 @@ def create_xana_workflow():
     workflow.add_edge("diagnostics", END)
     workflow.add_edge("db_health", END)
     workflow.add_edge("orders", END)
+    workflow.add_edge("knowledge", END)
+    workflow.add_edge("analytics", END)
     workflow.add_edge("general_chat", END)
 
     return workflow.compile()

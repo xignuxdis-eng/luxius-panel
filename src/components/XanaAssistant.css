@@ -415,3 +415,47 @@
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Voice Button */
+.xana-voice-btn {
+    background: linear-gradient(135deg, #9333ea, #3b82f6);
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(147, 51, 234, 0.3);
+}
+
+.xana-voice-btn:hover:not(:disabled):not(.listening) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4);
+}
+
+.xana-voice-btn.listening {
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    animation: pulse-red 1.5s infinite;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.4);
+}
+
+.xana-voice-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+@keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.2); }
+}
+
+/* Voice indicator in input placeholder when listening */
+.xana-input-area:has(.xana-voice-btn.listening) .xana-input::placeholder {
+    color: #ef4444;
+    opacity: 0.8;
+}

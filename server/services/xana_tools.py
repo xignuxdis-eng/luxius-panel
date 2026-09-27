@@ -1,10 +1,22 @@
 """
-Herramientas deterministas de Xana (Function Calling) — Fase 1
+Herramientas deterministas de Xana (Function Calling) — Fase 1 + Fase 2 + Fase 3
 Capa de tools tipadas sobre datos reales del backend (Presupuesto, Cliente, Vendedor, collection_materiales).
+Incluye Knowledge Tools para KB estructurada y RAG, y Analytics Tools para métricas seguras.
 """
 
 from datetime import datetime, timezone, timedelta
 from models import db, Presupuesto, Cliente, Vendedor, ConfigGlobal
+from services.xana_knowledge import (
+    KNOWLEDGE_TOOLS,
+    KNOWLEDGE_TOOL_EXECUTORS,
+    format_knowledge_tool_result,
+    sync_materials_to_kb
+)
+from services.xana_analytics import (
+    ANALYTICS_TOOLS,
+    ANALYTICS_TOOL_EXECUTORS,
+    format_analytics_tool_result
+)
 
 
 # ================================================================
@@ -74,7 +86,7 @@ XANA_TOOLS = [
             }
         }
     }
-]
+] + KNOWLEDGE_TOOLS + ANALYTICS_TOOLS
 
 PERIODO_DIAS = {
     'semana': 7,
@@ -247,7 +259,7 @@ TOOL_EXECUTORS = {
     "consultar_stock_materiales": tool_consultar_stock_materiales,
     "obtener_metricas_ventas_cliente": tool_obtener_metricas_ventas_cliente,
     "crear_orden_trabajo": tool_crear_orden_trabajo
-}
+} | KNOWLEDGE_TOOL_EXECUTORS | ANALYTICS_TOOL_EXECUTORS
 
 
 def execute_xana_tool(name, args):
@@ -264,5 +276,7 @@ def execute_xana_tool(name, args):
             return fn(args.get('cliente_id'), args.get('periodo'))
         if name == 'crear_orden_trabajo':
             return fn(args)
+        # Knowledge y Analytics tools usan **args directamente
+        return fn(**args)
     except Exception as e:
         return {"ok": False, "error": str(e)}

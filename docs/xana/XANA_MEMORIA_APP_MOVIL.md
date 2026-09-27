@@ -49,7 +49,38 @@ Para que la app móvil deje de ser un prototipo "mock" y se convierta en una pie
 1. **Xana en el bolsillo:** Consumir `/api/xana/chat` desde un nuevo botón flotante en la app para que los operarios le pregunten dudas de manuales.
 2. **Firmas y Remitos Remotos:** Extraer el "Canvas de firma digital" que tiene la app y enviarlo al backend para que éste arme el PDF final centralizado, en lugar de generarlo localmente en el celular.
 
-### Fase E: Release Final
+### Fase E: Integración Voz a OT (Fase 4 - NUEVO) ⭐
+Patrón asíncrono idéntico a `/api/xana/smart-order` (ThreadPoolExecutor + job_id + polling).
+
+**Endpoints disponibles en backend:**
+- `POST /api/xana/voice/transcribe` — Inicia transcripción asíncrona (202 + job_id)
+- `GET /api/xana/voice/transcribe/status/<job_id>` — Polling estado
+- `POST /api/xana/voice/transcribe-and-order` — Flujo completo Voz → Transcripción → Smart Order Draft (síncrono, para móvil)
+
+**Flujo móvil recomendado (end-to-end):**
+```
+1. Usuario pulsa botón micrófono en app → graba audio (MediaRecorder, webm/opus)
+2. POST /api/xana/voice/transcribe con FormData { audio: blob, language: "es-AR" }
+3. Recibe 202 + job_id → Poll GET /api/xana/voice/transcribe/status/<job_id> cada 500ms
+4. Cuando status="success": muestra transcript en UI, permite editar/confirmar
+5. OPCIÓN A: Usuario confirma → POST /api/xana/smart-order con transcript en observaciones
+   OPCIÓN B: Flujo directo → POST /api/xana/voice/transcribe-and-order con audio + params
+6. Backend devuelve draft_order (interactive card) → App muestra para confirmación final
+7. Usuario aprueba → Crea OT real en sistema
+```
+
+**Configuración STT (servidor, vía env `XANA_STT_PROVIDER`):**
+- `mock` — Desarrollo/testing sin proveedor externo (actual por defecto)
+- `google` — Google Cloud Speech-to-Text (requiere `GOOGLE_APPLICATION_CREDENTIALS`)
+- `whisper` — openai-whisper local CPU (modelo base ~145MB, primer carga ~3s)
+
+**Notas de implementación móvil:**
+- Usar `MediaRecorder` con `mimeType: 'audio/webm;codecs=opus'` (compatible con backend)
+- Max 25MB, 60s recomendado por frase
+- Manejar permisos micrófono en `AndroidManifest.xml`: `RECORD_AUDIO`
+- Para offline: grabar local, subir cuando hay conectividad (patrón Fase C)
+
+### Fase F: Release Final
 1. Generar la *Keystore* criptográfica de Android para la empresa XignuX.
 2. Compilar el `app-release.aab`.
 3. Distribuir a los técnicos.
