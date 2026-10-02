@@ -1,0 +1,27 @@
+{
+    "name": "Luxius - Gestión de Impresión",
+    "short_name": "Luxius",
+    "description": "Sistema de Gestión de Impresión Premium — Núcleo operativo de XignuX",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "any",
+    "theme_color": "#1a1b1e",
+    "background_color": "#1a1b1e",
+    "categories": ["business", "productivity"],
+    "lang": "es",
+    "icons": [
+        {
+            "src": "./xignux_logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "./xignux_logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}
