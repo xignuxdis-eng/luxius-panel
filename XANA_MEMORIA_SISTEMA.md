@@ -301,8 +301,12 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
     - `ABM.css` (+126 líneas): Tabs con `scroll-snap-type: x mandatory` + scrollbar oculta, `.abm-list-view` overflow-x, `.op-btn-sm` touch-safe 44px, `.bobina-row` wrap→column en mobile, header actions stacking, tabla compacta.
   - [x] **Batch 2 COMPLETADO** (02/10/2026 17:23, commit `bffb096`):
     - `Dashboard.css` (+82 líneas): Stats grid `minmax(min(100%, 180px))`, `.stat-value` → `var(--fs-2xl)`, system-status-compact wrap, alerts stack vertical en mobile, botones touch-safe, hover transform deshabilitado en mobile.
-  - **Desplegado**: GitHub Pages (`gh-pages` → `b724fa2`) + Nginx local sincronizado.
-  - [ ] **Pendiente Fase 2**: modales bottom-sheet, FAB unificado, dashboard tabs swipeable.
+  - **Desplegado Batch 1+2**: GitHub Pages (`gh-pages` → `b724fa2`) + Nginx local sincronizado.
+  - [x] **Batch 3 COMPLETADO** (02/10/2026 17:34, commit `d50b254`):
+    - `Modal.css` (+88 líneas): Bottom-sheet pattern centralizado para 21 modales. En ≤768px: `align-items: flex-end`, `slideUp` animation cubic-bezier iOS-style, esquinas redondeadas superiores, drag handle indicator, 85vh max. En ≤480px: 92vh near full-screen. Close button touch-safe 44px en todos los viewports.
+    - `NuevoPedidoModal.css` (+133 líneas): `.compact-grid` 4col→2col (tablet)→1col (mobile), tabs scroll-snap, inputs `min-height: 44px`, form actions column stack, uploads y promos escalados.
+  - **Desplegado Batch 3**: GitHub Pages (`gh-pages` → `920226b`) + Nginx local sincronizado.
+  - [ ] **Pendiente Fase 2**: FAB unificado, dashboard tabs swipeable.
 - [ ] **Fase 3 (Performance)** — Pendiente: React.lazy() en rutas, fuentes condicionales (pixel fonts solo si theme=pixel), logo WebP, code splitting de XanaAssistant (32KB monolítico).
 - [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
 - **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
