@@ -6,6 +6,7 @@ import FloatingCalculator from '@components/ui/FloatingCalculator'
 import FloatingAlarm from '@components/ui/FloatingAlarm'
 import FloatingWhatsApp from '@components/ui/FloatingWhatsApp'
 import XanaAssistant from '@components/XanaAssistant'
+import FABMenu from '@components/ui/FABMenu'
 import './MainLayout.css'
 
 interface MainLayoutProps {
@@ -20,6 +21,48 @@ export default function MainLayout({ children }: MainLayoutProps) {
     useEffect(() => {
         setIsSidebarOpen(false)
     }, [location.pathname])
+
+    // FAB actions for mobile — dispatch custom events to toggle widgets
+    const fabActions = [
+        {
+            id: 'xana',
+            icon: '🤖',
+            label: 'Xana IA',
+            color: '#9333ea',
+            onClick: () => {
+                // Toggle Xana assistant by simulating click on its button
+                const xanaBtn = document.querySelector('.xana-button') as HTMLButtonElement
+                if (xanaBtn) xanaBtn.click()
+            },
+        },
+        {
+            id: 'whatsapp',
+            icon: '💬',
+            label: 'WhatsApp',
+            color: '#25d366',
+            onClick: () => window.open('https://wa.me/5493518192655', '_blank'),
+        },
+        {
+            id: 'calculator',
+            icon: '🧮',
+            label: 'Calculadora',
+            color: '#3b82f6',
+            onClick: () => {
+                const calcBtn = document.querySelector('.calc-toggle-btn') as HTMLButtonElement
+                if (calcBtn) calcBtn.click()
+            },
+        },
+        {
+            id: 'media',
+            icon: '🎵',
+            label: 'Reproductor',
+            color: '#f59e0b',
+            onClick: () => {
+                const mediaBtn = document.querySelector('.media-player-toggle') as HTMLButtonElement
+                if (mediaBtn) mediaBtn.click()
+            },
+        },
+    ]
 
     return (
         <div className="main-layout">
@@ -64,9 +107,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <FloatingAlarm />
             <FloatingCalculator />
             <MediaPlayer />
+
+            {/* FAB unificado — visible solo en mobile (≤768px via CSS) */}
+            <FABMenu actions={fabActions} />
         </div>
     )
 }
-
-
-
