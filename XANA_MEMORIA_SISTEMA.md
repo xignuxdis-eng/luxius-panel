@@ -314,7 +314,14 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
     - `MainLayout.tsx` integra `<FABMenu>` con actions que simulan click en widgets originales.
   - **Desplegado Batch 4**: GitHub Pages (`gh-pages` → `2ed3642`) + Nginx local sincronizado.
   - [ ] **Pendiente Fase 2 (menor)**: dashboard tabs swipeable (nice-to-have, bajo impacto).
-- [ ] **Fase 3 (Performance)** — Pendiente: React.lazy() en rutas, fuentes condicionales (pixel fonts solo si theme=pixel), logo WebP, code splitting de XanaAssistant (32KB monolítico).
+- [x] **Fase 3 (Performance)** — COMPLETADA 02/10/2026, commit `8877297`:
+  - **React.lazy() code-splitting**: 14 páginas → 52 chunks separados.
+    - Bundle JS principal: 2480KB → **327KB** (**-87%**).
+    - CSS principal: 166KB → **49KB** (**-70%**).
+    - Cada página se carga on-demand al navegar, con `<Suspense fallback={<RouteFallback />}>`.
+  - **Fuentes pixel condicionales**: `index.html` reemplazó `<link>` estático por script condicional que solo carga ~150KB de Google Fonts si `localStorage.theme === 'pixel'`. `ThemeToggle.tsx` carga dinámicamente las fuentes al cambiar a pixel theme en runtime.
+  - **Logo WebP**: descartado (logo es text-based `✦ LuXius`, el PNG de `/public/` no está en path crítico).
+  - **Desplegado**: GitHub Pages (`gh-pages` → `efde55c`) + Nginx local sincronizado.
 - [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
 - **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
 - **Archivos nuevos creados Fase 2**: `src/components/ui/FABMenu.tsx`, `src/components/ui/FABMenu.css`.
