@@ -327,3 +327,13 @@
     background: rgba(239, 68, 68, 0.2);
     border-color: #ef4444;
 }
+
+@media (max-width: 480px) {
+    .floating-calculator {
+        width: calc(100vw - 32px);
+        right: 16px;
+        left: 16px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+}

@@ -29,12 +29,18 @@ const navItems: NavItem[] = [
     { label: 'Xana Memoria', path: '/xana', icon: '🧠' },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+    isOpen?: boolean
+    onClose?: () => void
+}
+
+export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     const navigate = useNavigate()
     const { user, logout } = useAuthStore()
     const [isArcadeOpen, setIsArcadeOpen] = useState(false)
 
     const handleLogout = () => {
+        onClose?.()
         logout()
         navigate('/login')
     }
@@ -46,13 +52,26 @@ export default function Sidebar() {
     });
 
     return (
-        <aside className="sidebar">
-            <div className="sidebar-logo">
-                <div className="logo-brand">
-                    <span className="logo-icon">✦</span>
-                    <span className="logo-text">LuXius</span>
+        <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+            <div className="sidebar-header">
+                <div className="sidebar-logo">
+                    <div className="logo-brand">
+                        <span className="logo-icon">✦</span>
+                        <span className="logo-text">LuXius</span>
+                    </div>
+                    <span className="logo-subtitle">...núcleo operativo de XignuX</span>
                 </div>
-                <span className="logo-subtitle">...núcleo operativo de XignuX</span>
+                {onClose && (
+                    <button
+                        type="button"
+                        className="sidebar-close-btn"
+                        onClick={onClose}
+                        aria-label="Cerrar navegación"
+                        title="Cerrar menú"
+                    >
+                        ✕
+                    </button>
+                )}
             </div>
 
             <nav className="sidebar-nav">
@@ -65,6 +84,7 @@ export default function Sidebar() {
                                     `nav-item ${isActive ? 'active' : ''}`
                                 }
                                 end={item.path === '/'}
+                                onClick={() => onClose?.()}
                             >
                                 <span className="nav-icon">{item.icon}</span>
                                 <span className="nav-label">{item.label}</span>

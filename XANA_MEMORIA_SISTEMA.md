@@ -281,7 +281,12 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - H7: Font sizes en px/rem fijos sin clamp().
   - H8: Padding excesivo (32px 40px) en main-content.
   - H9: Viewport meta correcto (sin bloqueo de zoom ✅).
-- [ ] **Fase 1 (Fundación)** — Pendiente: breakpoints centralizados, sidebar colapsable + hamburguesa, bottom nav bar, touch targets 44px, padding adaptativo.
+- [x] **Fase 1 (Fundación Mobile-First)** — COMPLETADA 02/10/2026:
+  - Tokens y breakpoints centralizados en `src/styles/index.css` (`--bp-mobile`, `--space-page`, fluid `--fs-*` con clamp, `--touch-target-min: 44px`).
+  - `MainLayout`: Barra superior móvil (`mobile-topbar`) con hamburguesa accesible, marca compacta, backdrop overlay (`sidebar-overlay`), auto-cierre al cambiar de ruta y padding adaptativo (`var(--space-page)`).
+  - `Sidebar`: Modo drawer off-canvas (`position: fixed`, `transform: translateX(-100%)` a `translateX(0)` cuando `.open`), botón de cierre táctil (`✕`), auto-cierre al seleccionar cualquier opción, touch targets WCAG ≥44px.
+  - `Header`: Título fluido con `clamp()`, envoltorio de botones responsivo (`flex-wrap`), ocultamiento de fecha larga en viewport estrecho.
+  - Floating Widgets (`FloatingCalculator`, `MediaPlayer`): Dimensiones adaptativas (`max-width: calc(100vw - 32px)`) para evitar clipping en pantallas móviles.
 - [ ] **Fase 2 (Componentes)** — Pendiente: stock grid mobile-first, tablas responsivas (ABM/Usuarios), modales bottom-sheet, FAB unificado, dashboard tabs.
 - [ ] **Fase 3 (Performance)** — Pendiente: React.lazy() en rutas, fuentes condicionales (pixel fonts solo si theme=pixel), logo WebP, code splitting de XanaAssistant (32KB monolítico).
 - [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
