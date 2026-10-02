@@ -9,6 +9,9 @@ build/
 .env.local
 .env.*.local
 *.env
+token.json
+client_secret*.json
+*.bak
 
 # Python
 .venv/

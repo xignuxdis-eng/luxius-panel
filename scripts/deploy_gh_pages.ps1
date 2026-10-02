@@ -5,7 +5,7 @@
 .DESCRIPTION
     Crea un commit huerfano con el arbol de dist/ usando git plumbing (sin tocar el working tree
     ni el indice principal) y lo fuerza a la rama gh-pages en todos los push-URLs de origin
-    (GitHub y GitLab). Reemplaza al antiguo `git subtree split --prefix dist master`.
+    (GitHub). Reemplaza al antiguo `git subtree split --prefix dist master`.
 
 .NOTES
     Ejecutar desde la raiz del proyecto despues de `npm run build`:

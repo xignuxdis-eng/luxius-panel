@@ -2,18 +2,17 @@
 .SYNOPSIS
     FASE 1 - Higiene del repositorio luxius-panel.
     Ejecucion unica, sin confirmaciones. Deja el repo limpio y sincronizado
-    en GitHub (origin) y GitLab (gitlab) a la vez.
+    en GitHub (origin).
 
 .DESCRIPTION
-    1. Configura 'origin' con doble push-url (GitHub + GitLab): a partir de aqui
-       un unico `git push origin master` publica en ambos remotos.
+    1. Configura 'origin' apuntando solo a GitHub.
     2. Saca del control de versiones (sin borrar del disco) los artefactos que
        nunca debieron subirse: .venv, __pycache__, dist, zip, BD SQLite, uploads,
        backups, multimedia pesada y archivos de prueba binarios.
     3. Reorganiza la raiz: scripts de test -> scripts/tests/, documentacion y
        roadmaps -> docs/, y elimina archivos vacios o duplicados.
     4. Commitea todo (incluyendo el trabajo pendiente de logo liviano en PDFs)
-       y hace push a master en GitHub y GitLab.
+       y hace push a master en GitHub.
 
 .NOTES
     Ejecutar desde la raiz del proyecto:  .\scripts\fase1_limpieza.ps1
@@ -35,17 +34,13 @@ Get-Process git, git-credential-manager, git-remote-https -ErrorAction SilentlyC
 if (Test-Path .git\index.lock) { Remove-Item .git\index.lock -Force; Warn "index.lock eliminado" }
 
 # ---------------------------------------------------------------------------
-Step "1. Configurando doble remoto de push (GitHub + GitLab)"
+Step "1. Configurando remoto origin (GitHub)"
 $github = 'https://github.com/xignuxdis-eng/luxius-panel.git'
-$gitlab = 'https://gitlab.com/luxius-group/luxius-panel.git'
 
-if (-not (git remote | Select-String -Quiet '^gitlab$')) { git remote add gitlab $gitlab }
+# Eliminar remoto gitlab si existe (desvinculado 02/10/2026)
+if (git remote | Select-String -Quiet '^gitlab$') { git remote remove gitlab; Ok "remoto 'gitlab' eliminado" }
 git remote set-url origin $github
-git remote set-url --delete --push origin $gitlab 2>$null
-git remote set-url --delete --push origin $github 2>$null
-git remote set-url --add --push origin $github
-git remote set-url --add --push origin $gitlab
-Ok "origin -> push a GitHub y GitLab en un solo comando"
+Ok "origin -> push solo a GitHub"
 git remote -v
 
 # ---------------------------------------------------------------------------
@@ -133,7 +128,7 @@ foreach ($f in $ArchivosBasura) {
 }
 
 # ---------------------------------------------------------------------------
-Step "4. Commit y push simultaneo (GitHub + GitLab)"
+Step "4. Commit y push a GitHub"
 git add -A
 git status --short | Select-Object -First 40
 $msg = @"
@@ -144,14 +139,14 @@ chore(repo): fase 1 higiene - untrack artefactos, reorganizar raiz, logo SVG en 
 - Mover scripts de test a scripts/tests/, roadmaps y docs Xana a docs/, legacy a docs/legacy
 - Eliminar orders.json y audit.json vacios y env.example duplicado
 - Terminar trabajo pendiente: logo SVG liviano (logoBase64Light.ts) en generatePdfBudget y generatePdfClientReport
-- Doble push-url en origin: un solo push publica en GitHub y GitLab
+- Remoto unico: origin push solo a GitHub (GitLab desvinculado)
 - Actualizar XANA_MEMORIA_SISTEMA.md con estado, roadmap de mejoras y flujo multi-remoto
 "@
 git commit -m $msg
 if ($LASTEXITCODE -ne 0) { Warn "Nada para commitear o commit fallido" }
 
 git push origin master
-if ($LASTEXITCODE -eq 0) { Ok "master publicado en GitHub y GitLab" } else { Warn "Push fallo en al menos un remoto. Revisar credenciales (git credential-manager)." }
+if ($LASTEXITCODE -eq 0) { Ok "master publicado en GitHub" } else { Warn "Push fallo. Revisar credenciales (git credential-manager)." }
 
 # ---------------------------------------------------------------------------
 Step "5. Build de verificacion"

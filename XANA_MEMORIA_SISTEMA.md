@@ -10,7 +10,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 | Componente | Repositorio GitHub | Entorno / Hosting | URL de Producción |
 | :--- | :--- | :--- | :--- |
-| **Frontend Panel** | `xignuxdis-eng/luxius-panel`<br>**Espejo GitLab:** `luxius-group/luxius-panel` (project id `86780561`) | GitHub Pages + Servidor Local Nginx | Web: `https://xignuxdis-eng.github.io/luxius-panel/`<br>Local: `http://localhost/` (`D:\XignuX\luxius-panel\dist`) |
+| **Frontend Panel** | `xignuxdis-eng/luxius-panel` | GitHub Pages + Servidor Local Nginx | Web: `https://xignuxdis-eng.github.io/luxius-panel/`<br>Local: `http://localhost/` (`D:\XignuX\luxius-panel\dist`) |
 | **Backend API** | `luXius-Backend` | Render (Python Web Service) | `https://luxius-backend.onrender.com` |
 | **Landing Web** | `xignux-landing` | GitHub Pages / Hosting Web | Dominio oficial XignuX |
 | **App Móvil** | `XignuX Workfield Manager` | Capacitor + Vanilla JS (Híbrida Android) | APK / AAB para técnicos de campo y colocadores |
@@ -21,21 +21,16 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 1. **Autonomía y Auto-Aprobación**: Ejecutar directamente todas las tareas, comandos de terminal, compilaciones y despliegues sin detenerse a solicitar confirmaciones al usuario.
 2. **Compilación y Build Frontend**: Cada cambio en el frontend (`f:\Sitio XignuX`) debe compilarse con `npm run build`.
-3. **Sincronización Inmediata a GitHub y GitLab (doble remoto)**:
+3. **Sincronización Inmediata a GitHub**:
    - `git add -A && git commit -m "..." && git push origin master`
-   - `origin` tiene **dos push-URLs** (GitHub y GitLab), configuradas por `scripts/fase1_limpieza.ps1`. Un solo `git push origin master` publica en ambos. Verificar con `git remote -v` (deben aparecer 2 líneas `push`). Si falta, reconfigurar:
-     ```powershell
-     git remote set-url --add --push origin https://github.com/xignuxdis-eng/luxius-panel.git
-     git remote set-url --add --push origin https://gitlab.com/luxius-group/luxius-panel.git
-     ```
-   - Ambos remotos deben tener **el mismo SHA en `master`**. Fuente de verdad: el commit más reciente; nunca hacer force-push sobre uno solo.
+   - `origin` apunta exclusivamente a GitHub (`github.com/xignuxdis-eng/luxius-panel`). GitLab fue desvinculado el 02/10/2026.
    - Definir `$env:GIT_TERMINAL_PROMPT = '0'` antes de operaciones remotas en agentes/IDEs: evita que `git fetch/push` quede colgado esperando credenciales en una terminal no interactiva (incidente registrado en la bitácora, sección 6).
 4. **Despliegue a GitHub Pages**:
    - Para que los cambios impacten en la versión web pública (`https://xignuxdis-eng.github.io/luxius-panel/`), la rama `gh-pages` debe actualizarse con el contenido de `dist/`. Desde la Fase 1 (22/09/2026) `dist/` **ya no se versiona en `master`**, por lo que `git subtree split` dejó de funcionar. Usar:
      ```powershell
      npm run build; .\scripts\deploy_gh_pages.ps1
      ```
-     El script crea un commit huérfano con el contenido de `dist/` y lo fuerza a `gh-pages` en GitHub y GitLab.
+     El script crea un commit huérfano con el contenido de `dist/` y lo fuerza a `gh-pages` en GitHub.
 5. **Sincronización Local (Nginx)**:
    - Copiar el contenido de `dist/` al servidor Nginx local de producción:
      ```powershell
@@ -147,7 +142,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Artista no tenía acceso a Xpress Viewer ni herramientas de inspección rápida** | `/xpress-viewer` no estaba en `rolePermissions.artista` ni había enlaces contextuales desde las órdenes. | Se activó la ruta para Artista, soporte de `searchParams` en `XpressViewer.tsx` y botones `👁️ Xpress Studio` en `Diseno.tsx` y modales. | `src/types/auth.ts`<br>`src/pages/XpressViewer/XpressViewer.tsx`<br>`src/pages/Diseno/Diseno.tsx` |
 | **Logo PNG de 967 KB seguía incrustándose en reportes de cliente** | `generatePdfClientReport.ts` importaba `XIGNUX_LOGO_BASE64` y lo recomprimía en canvas en cada PDF. | Se reemplazó por `XIGNUX_LOGO_LIGHT` (SVG ~0.5 KB) y se eliminó la recompresión del logo. Trabajo iniciado el 19/09 y cerrado el 22/09/2026. | `src/utils/generatePdfClientReport.ts`<br>`src/utils/logoBase64Light.ts`<br>`scripts/compressLogo.mjs` |
 | **Repo con 300+ MB de basura versionada** | `.venv`, `__pycache__`, `dist/`, `luxius-panel.zip`, `server/luxius.db`, `server/uploads/`, backups y `.mp4/.mp3` fueron agregados antes de las reglas de `.gitignore`, por lo que seguían trackeados. | `scripts/fase1_limpieza.ps1`: `git rm --cached` de todo lo anterior (se conserva en disco), `.gitignore` ampliado, raíz reorganizada en `scripts/tests/`, `docs/roadmaps/`, `docs/xana/`, `docs/legacy/`. | `.gitignore`<br>`scripts/fase1_limpieza.ps1` |
-| **Terminal del agente IA quedó colgada de forma permanente** | Un `git fetch gitlab` en shell no interactivo se quedó esperando usuario/contraseña por stdin; todos los comandos posteriores expiraron. | Regla: exportar `GIT_TERMINAL_PROMPT=0` antes de cualquier `fetch/push` desde agentes. El script de Fase 1 lo hace y además mata procesos `git` huérfanos y borra `index.lock`. Si ocurre, reiniciar la terminal del IDE. | `scripts/fase1_limpieza.ps1`<br>Sección 2, regla 3 |
+| **Terminal del agente IA quedó colgada de forma permanente** | Un `git fetch` en shell no interactivo se quedó esperando usuario/contraseña por stdin; todos los comandos posteriores expiraron. | Regla: exportar `GIT_TERMINAL_PROMPT=0` antes de cualquier `fetch/push` desde agentes. El script de Fase 1 lo hace y además mata procesos `git` huérfanos y borra `index.lock`. Si ocurre, reiniciar la terminal del IDE. | `scripts/fase1_limpieza.ps1`<br>Sección 2, regla 3 |
 | **Logo oficial no aparecía en PDFs y miniaturas quedaban vacías por impresión prematura** | El logo había sido sustituido por un placeholder SVG genérico. Además, `window.print()` se ejecutaba con un `setTimeout` fijo de 500-600ms antes de que las imágenes se decodificaran en el DOM, y órdenes con múltiples archivos solo mostraban el primero. | Se procesó el logo oficial XignuX (PNG 32-bit optimizado a 92KB), se implementó detector de imágenes listas (`img.decode()`) antes de abrir el diálogo de impresión, soporte multi-archivo en presupuestos y reportes, y concurrencia controlada en `pdfImageOptimizer.ts`. | `src/utils/logoBase64.ts`<br>`src/utils/logoBase64Light.ts`<br>`src/utils/pdfImageOptimizer.ts`<br>`src/utils/generatePdfBudget.ts`<br>`src/utils/generatePdfClientReport.ts`<br>`src/utils/presupuestoPdf.ts` |
 | **Listado de órdenes mostraba precios de lista en lugar de precio especial o manual** | `calculateOrderPrice()` en `Entrada.tsx` recalculaba desde cero con la fórmula estándar de materiales ignorando `order.total`, `order.subtotal` y `order.precioUnitarioManual` guardados. | Se ajustó `calculateOrderPrice()` para priorizar `precioUnitarioManual`, luego `order.total` y `order.subtotal` persistidos, manteniendo el cálculo de materiales solo como fallback si no hay total guardado. | `src/pages/Entrada/Entrada.tsx` |
 | **Importación de carpetas pesadas de Google Drive fallaba o parecía colgada por timeout** | El backend intentaba descargar sincrónicamente todos los archivos (ej. 140MB) en una sola llamada HTTP antes de responder, excediendo el límite de 90s/100s de frontend y Render. | Se desacopló la importación: descubrimiento instantáneo de metadatos en <1s con `skip_download=True`, endpoint de streaming bajo demanda (`/api/import-cloud/file`), y descarga progresiva en el cliente con feedback visual archivo por archivo. | `server/routes/cloud_import.py`<br>`luXius-Backend/routes/cloud_import.py`<br>`src/pages/Entrada/NuevoPedidoModal.tsx` |
@@ -180,7 +175,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
    - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` están en el commit `6cce8e0`.
    - **Frontend Web**: Publicado y funcional en `https://xignuxdis-eng.github.io/luxius-panel/` (rama `gh-pages` actualizada).
    - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Últimos commits de esta sesión (más reciente → más antiguo): `d62f544` (import logs RIP Roland), `b5e8e54` (conciliación+stats backend), `5b854d8` (fix analíticas), `699f708` (layout tinta), `7ac5544` (ml botellas), `b82e4d9` (tinta 2L + botellas), `26c0a97` (calibración tinta), `d91fb35` (filtro alertas + roles), `b70f97a` (fix types), `804bd33` (proyección faltantes), `32f7ac2` (memoria), `f597485` (stock por bobina), `480365f` (autorización commit automático), `1f094de` (stock CRUD/audit), `3e9d76e` (selector PDF + masivo), `d2ab9c0` (fix imports PDF), `d3471a5` (feed stock + export PDF).
-   - **Remotos**: ⚠️ `origin` actualmente tiene **una sola URL de push (GitHub)**; GitLab está configurado como remoto separado (`gitlab`). No se está cumpliendo el "doble remoto en `origin`" descrito en la Sección 2 regla 3 (pendiente reconfigurar si se requiere espejo GitLab). Los deploys actuales publican solo en GitHub.
+   - **Remotos**: `origin` apunta exclusivamente a GitHub. GitLab fue desvinculado el 02/10/2026.
 2. **Dependencias**:
    ```bash
    npm install
