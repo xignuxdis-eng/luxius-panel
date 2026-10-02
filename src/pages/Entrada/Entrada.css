@@ -384,4 +384,154 @@
     font-size: 13px;
     margin-right: 4px;
     user-select: none;
+}
+
+/* ================================================================
+   MOBILE-FIRST RESPONSIVE — Fase 2 (02/10/2026)
+   ================================================================ */
+
+/* — Base fluid overrides — */
+.btn-icon-action {
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+}
+
+.batch-expand-btn {
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    width: auto;
+    height: auto;
+}
+
+/* Scroll shadow indicator on table container */
+.orders-table-container {
+    position: relative;
+}
+
+.orders-table-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.15), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.orders-table-container.has-scroll::after {
+    opacity: 1;
+}
+
+/* — Tablet (≤768px) — */
+@media (max-width: 768px) {
+    .filters-bar {
+        flex-wrap: wrap;
+        gap: var(--space-gap);
+        padding: var(--space-card);
+    }
+
+    .filter-group {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .filter-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .action-bar {
+        flex-wrap: wrap;
+        gap: var(--space-gap);
+    }
+
+    .orders-table th,
+    .orders-table td {
+        padding: 8px 8px;
+    }
+
+    .client-cell {
+        max-width: 110px;
+    }
+
+    .batch-badge-pill {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+    }
+
+    .batch-count-pill {
+        font-size: 0.65rem;
+    }
+}
+
+/* — Mobile (≤480px) — */
+@media (max-width: 480px) {
+    .filters-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .filter-actions {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .results-count {
+        width: 100%;
+        text-align: center;
+        margin: 0;
+    }
+
+    .action-bar {
+        flex-direction: column;
+    }
+
+    /* Table minimum readability */
+    .orders-table th,
+    .orders-table td {
+        padding: 6px 6px;
+        font-size: 11px;
+    }
+
+    .orders-table th {
+        font-size: 9px;
+    }
+
+    .ot-text {
+        font-size: 11px;
+    }
+
+    .status-badge {
+        font-size: 8px;
+        padding: 2px 6px;
+    }
+
+    .client-cell {
+        max-width: 90px;
+        font-size: 11px;
+    }
+
+    .order-actions-row {
+        gap: 2px;
+    }
+
+    .batch-child-indent {
+        padding-left: 8px;
+    }
+
+    .demasia-indicator-group {
+        padding: 2px 4px;
+    }
+
+    .demasia-arrows {
+        font-size: 1rem;
+    }
 }

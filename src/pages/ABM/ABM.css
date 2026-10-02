@@ -240,3 +240,137 @@
     letter-spacing: 0.05em;
     box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
 }
+
+/* ================================================================
+   MOBILE-FIRST RESPONSIVE — Fase 2 (02/10/2026)
+   ================================================================ */
+
+/* — Base fluid overrides — */
+.op-btn-sm {
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+}
+
+/* Tabs scroll-snap with fade edges */
+.abm-tabs {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    position: relative;
+}
+
+.abm-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.abm-tabs .tab-link {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+}
+
+/* Table scroll wrapper */
+.abm-list-view {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+}
+
+/* — Tablet (≤768px) — */
+@media (max-width: 768px) {
+    .abm-page {
+        gap: 16px;
+    }
+
+    .tab-link {
+        padding: 10px 14px;
+        font-size: var(--fs-xs);
+        min-height: var(--touch-target-min);
+        display: flex;
+        align-items: center;
+    }
+
+    .abm-actions-header {
+        flex-wrap: wrap;
+        gap: var(--space-gap);
+        padding: var(--space-card);
+    }
+
+    .input-field.sm {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .abm-table th,
+    .abm-table td {
+        padding: 8px 10px;
+    }
+
+    .bobina-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .bobina-row > div {
+        min-width: 120px;
+    }
+
+    .table-ops {
+        gap: 4px;
+    }
+}
+
+/* — Mobile (≤480px) — */
+@media (max-width: 480px) {
+    .abm-tabs {
+        padding: 2px;
+        gap: 2px;
+    }
+
+    .tab-link {
+        padding: 8px 10px;
+        font-size: var(--fs-xs);
+    }
+
+    .abm-actions-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .abm-table th {
+        font-size: 9px;
+        padding: 6px 8px;
+    }
+
+    .abm-table td {
+        font-size: 12px;
+        padding: 6px 8px;
+    }
+
+    .name-cell .name {
+        font-size: var(--fs-sm);
+    }
+
+    .name-cell .sub,
+    .contact-cell .sub {
+        font-size: 10px;
+    }
+
+    .code-badge {
+        font-size: var(--fs-xs);
+        padding: 3px 6px;
+    }
+
+    .bobina-row {
+        flex-direction: column;
+    }
+
+    .bobina-row > div {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .bobinas-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}

@@ -688,4 +688,172 @@
 .stat-pill.pill-out {
     border-color: rgba(239, 68, 68, 0.3);
     color: #f87171;
+}
+
+/* ================================================================
+   MOBILE-FIRST RESPONSIVE — Fase 2 (02/10/2026)
+   Tokens: --space-page, --space-card, --space-gap, --touch-target-min,
+           --fs-*, --bp-tablet (768px), --bp-mobile (480px)
+   ================================================================ */
+
+/* — Base fluid overrides — */
+.stock-page {
+    padding: var(--space-page);
+}
+
+.stock-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+
+.stock-modal {
+    max-width: min(400px, calc(100vw - 32px));
+}
+
+/* Touch-safe interactive elements */
+.mini-adjust {
+    min-height: var(--touch-target-min) !important;
+    min-width: var(--touch-target-min) !important;
+    padding: 6px 12px !important;
+}
+
+.type-btn {
+    min-height: var(--touch-target-min);
+    padding: 10px;
+}
+
+.adjust-btn-overlay {
+    min-height: var(--touch-target-min) !important;
+    padding: 6px 14px !important;
+}
+
+/* — Tablet (≤768px) — */
+@media (max-width: 768px) {
+    .stock-controls {
+        flex-wrap: wrap;
+        gap: var(--space-gap);
+        padding: var(--space-card);
+    }
+
+    .stock-stats {
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .stock-section {
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-size: var(--fs-base);
+    }
+
+    .stock-grid {
+        gap: var(--space-gap);
+    }
+
+    .stock-card {
+        min-height: 170px;
+    }
+
+    .stock-card.type-tinta,
+    .stock-card.type-solvente {
+        min-height: 280px;
+    }
+
+    /* Tanks scale down */
+    .tank-3d-wrapper {
+        width: 78px;
+    }
+
+    .tank-3d {
+        width: 42px;
+        height: 100px;
+    }
+
+    .liquid-tank-container {
+        gap: 10px;
+    }
+
+    /* Grouped variants */
+    .variant-row {
+        padding: 10px 12px;
+        min-height: var(--touch-target-min);
+    }
+
+    .roll-visual-wrapper {
+        padding: 10px 14px;
+        min-height: var(--touch-target-min);
+    }
+}
+
+/* — Mobile (≤480px) — */
+@media (max-width: 480px) {
+    .stock-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .stock-stats {
+        justify-content: flex-start;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+    }
+
+    .stock-stats::-webkit-scrollbar {
+        display: none;
+    }
+
+    .stat-pill {
+        flex-shrink: 0;
+        font-size: var(--fs-xs);
+    }
+
+    .stock-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .stock-card {
+        min-height: 160px;
+    }
+
+    .current-value .number {
+        font-size: 1.3rem;
+    }
+
+    .stock-name-header {
+        font-size: var(--fs-sm);
+    }
+
+    /* Tanks compact mode */
+    .tank-3d-wrapper {
+        width: 65px;
+    }
+
+    .tank-3d {
+        width: 36px;
+        height: 85px;
+    }
+
+    .tank-liters {
+        font-size: var(--fs-sm);
+    }
+
+    .tank-cap.bottom {
+        font-size: 0.6rem;
+        height: 20px;
+    }
+
+    /* Big input in modal */
+    .big-input {
+        font-size: 1.2rem;
+        padding: 10px;
+    }
+
+    .adjustment-type-selector {
+        gap: 4px;
+    }
 }
