@@ -13,6 +13,13 @@ export default function ThemeToggle() {
         } else if (theme === 'pixel') {
             document.body.classList.add('pixel-theme')
             document.body.classList.remove('light-theme')
+            // Dynamically load pixel fonts if not already loaded (Fase 3 Performance)
+            if (!document.querySelector('link[href*="Press+Start+2P"]')) {
+                const link = document.createElement('link')
+                link.rel = 'stylesheet'
+                link.href = 'https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap'
+                document.head.appendChild(link)
+            }
         } else {
             document.body.classList.remove('light-theme', 'pixel-theme')
         }

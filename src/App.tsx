@@ -1,23 +1,47 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { hasRolePermission } from '@/types/auth'
+import { initializeData } from '@/data/db'
 
-// Layouts
+// Layouts (static — always needed)
 import MainLayout from '@components/layout/MainLayout'
 import XanaAssistant from '@components/XanaAssistant'
 
-// Pages
-import Login from '@pages/Login/Login'
-import Dashboard from '@pages/Dashboard/Dashboard'
-import Entrada from '@pages/Entrada/Entrada'
-import Diseno from '@pages/Diseno/Diseno'
-import Impresion from '@pages/Impresion/Impresion'
-import ABM from '@pages/ABM/ABM'
-import Reportes from '@pages/Reportes/Reportes'
-import Sistema from '@pages/Sistema/Sistema'
-import Analytics from '@pages/Analytics/Analytics'
+// Pages (lazy-loaded — code splitting per route)
+const Login = lazy(() => import('@pages/Login/Login'))
+const Dashboard = lazy(() => import('@pages/Dashboard/Dashboard'))
+const Entrada = lazy(() => import('@pages/Entrada/Entrada'))
+const Diseno = lazy(() => import('@pages/Diseno/Diseno'))
+const Impresion = lazy(() => import('@pages/Impresion/Impresion'))
+const ABM = lazy(() => import('@pages/ABM/ABM'))
+const Reportes = lazy(() => import('@pages/Reportes/Reportes'))
+const Sistema = lazy(() => import('@pages/Sistema/Sistema'))
+const Analytics = lazy(() => import('@pages/Analytics/Analytics'))
+const Utilidades = lazy(() => import('@pages/Utilidades/Utilidades'))
+const Stock = lazy(() => import('@pages/Stock/Stock'))
+const Presupuestador = lazy(() => import('@/pages/Presupuestador/Presupuestador'))
+const XpressViewer = lazy(() => import('@/pages/XpressViewer/XpressViewer'))
+const XanaDashboard = lazy(() => import('@/pages/Xana/XanaDashboard'))
 
-import { useLocation } from 'react-router-dom'
-import { hasRolePermission } from '@/types/auth'
+// Route loading fallback
+function RouteFallback() {
+    return (
+        <div style={{
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            height: '60vh', color: 'var(--text-muted)'
+        }}>
+            <div className="loader" style={{
+                width: '32px', height: '32px',
+                border: '3px solid rgba(255,255,255,0.1)',
+                borderTopColor: 'var(--accent)',
+                borderRadius: '50%',
+                animation: 'rotation 0.8s linear infinite',
+            }} />
+        </div>
+    )
+}
 
 // Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -39,14 +63,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <>{children}</>
 }
 
-import Utilidades from '@pages/Utilidades/Utilidades'
-import Stock from '@pages/Stock/Stock'
-import Presupuestador from '@/pages/Presupuestador/Presupuestador'
-import XpressViewer from '@/pages/XpressViewer/XpressViewer'
-import XanaDashboard from '@/pages/Xana/XanaDashboard'
-
-import { useEffect, useState } from 'react'
-import { initializeData } from '@/data/db'
 
 function App() {
     const [isInitializing, setIsInitializing] = useState(true)
@@ -104,7 +120,7 @@ function App() {
     }
 
     return (
-        <>
+        <Suspense fallback={<RouteFallback />}>
             <Routes>
                 <Route path="/login" element={<Login />} />
 
@@ -113,29 +129,31 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <MainLayout>
-                                <Routes>
-                                    <Route path="/" element={<Dashboard />} />
-                                    <Route path="/entrada" element={<Entrada />} />
-                                    <Route path="/presupuestador" element={<Presupuestador />} />
-                                    <Route path="/xpress-viewer" element={<XpressViewer />} />
-                                    <Route path="/diseno" element={<Diseno />} />
-                                    <Route path="/impresion" element={<Impresion />} />
-                                    <Route path="/stock" element={<Stock />} />
-                                    <Route path="/analiticas" element={<Analytics />} />
-                                    <Route path="/utilidades" element={<Utilidades />} />
-                                    <Route path="/xana" element={<ProtectedRoute><XanaDashboard /></ProtectedRoute>} />
-                                    <Route path="/abm/*" element={<ABM />} />
-                                    <Route path="/reportes" element={<Reportes />} />
-                                    <Route path="/sistema/*" element={<Sistema />} />
-                                    <Route path="*" element={<Navigate to="/" replace />} />
-                                </Routes>
+                                <Suspense fallback={<RouteFallback />}>
+                                    <Routes>
+                                        <Route path="/" element={<Dashboard />} />
+                                        <Route path="/entrada" element={<Entrada />} />
+                                        <Route path="/presupuestador" element={<Presupuestador />} />
+                                        <Route path="/xpress-viewer" element={<XpressViewer />} />
+                                        <Route path="/diseno" element={<Diseno />} />
+                                        <Route path="/impresion" element={<Impresion />} />
+                                        <Route path="/stock" element={<Stock />} />
+                                        <Route path="/analiticas" element={<Analytics />} />
+                                        <Route path="/utilidades" element={<Utilidades />} />
+                                        <Route path="/xana" element={<ProtectedRoute><XanaDashboard /></ProtectedRoute>} />
+                                        <Route path="/abm/*" element={<ABM />} />
+                                        <Route path="/reportes" element={<Reportes />} />
+                                        <Route path="/sistema/*" element={<Sistema />} />
+                                        <Route path="*" element={<Navigate to="/" replace />} />
+                                    </Routes>
+                                </Suspense>
                             </MainLayout>
                         </ProtectedRoute>
                     }
                 />
             </Routes>
             <XanaAssistant />
-        </>
+        </Suspense>
     )
 }
 

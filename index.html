@@ -11,7 +11,17 @@
     <meta name="description" content="Luxius - Sistema de Gestión de Impresión Premium" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+    <script>
+        // Conditional pixel font loading — Fase 3 Performance (02/10/2026)
+        // Only load ~150KB of pixel fonts if theme is actually 'pixel'
+        if (localStorage.getItem('theme') === 'pixel') {
+            var l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = 'https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap';
+            document.head.appendChild(l);
+        }
+        // When theme changes to pixel at runtime, ThemeToggle.tsx will load fonts dynamically
+    </script>
     <title>Luxius | Gestión de Impresión</title>
 </head>
 
