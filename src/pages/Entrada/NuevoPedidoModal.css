@@ -994,3 +994,136 @@
     background: var(--accent);
     color: white;
 }
+
+/* ================================================================
+   MOBILE-FIRST RESPONSIVE — Fase 2 (02/10/2026)
+   NuevoPedidoModal — el modal más complejo del sistema.
+   ================================================================ */
+
+/* — Tablet (≤768px) — */
+@media (max-width: 768px) {
+    .nuevo-pedido-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-snap-type: x mandatory;
+        gap: 4px;
+    }
+
+    .nuevo-pedido-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tab-btn {
+        flex-shrink: 0;
+        scroll-snap-align: start;
+        min-height: var(--touch-target-min);
+        padding: 8px 14px;
+    }
+
+    .compact-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+    }
+
+    .form-section {
+        padding: 6px;
+    }
+
+    .form-actions {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .form-actions button {
+        min-height: var(--touch-target-min);
+    }
+
+    .checkbox-row {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .upload-controls {
+        flex-wrap: wrap;
+    }
+
+    .upload-preview-thumb {
+        width: 60px;
+        height: 60px;
+        min-width: 60px;
+        min-height: 60px;
+    }
+
+    .pdf-explode-suggestion {
+        flex-wrap: wrap;
+        font-size: var(--fs-xs);
+    }
+}
+
+/* — Mobile (≤480px) — */
+@media (max-width: 480px) {
+    .compact-grid {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .pedido-form {
+        gap: 4px;
+    }
+
+    .form-section {
+        padding: 4px;
+        gap: 4px;
+    }
+
+    .form-group label {
+        font-size: 9px;
+    }
+
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+        padding: 6px 8px;
+        font-size: 13px;
+        min-height: var(--touch-target-min);
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+
+    .tab-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .compact-upload {
+        padding: 8px;
+    }
+
+    .upload-text {
+        font-size: 10px;
+    }
+
+    .batch-upload-text span {
+        font-size: 12px;
+    }
+
+    .promo-card {
+        padding: 8px;
+    }
+
+    .promo-price-tag {
+        font-size: 14px;
+    }
+
+    .promo-btn-select {
+        min-height: var(--touch-target-min);
+        padding: 8px 12px;
+    }
+}

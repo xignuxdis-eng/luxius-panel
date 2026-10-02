@@ -111,3 +111,100 @@
 [data-theme='pixel'] .modal-close:hover {
     background: #ff0044;
 }
+
+/* ================================================================
+   BOTTOM-SHEET MOBILE PATTERN — Fase 2 (02/10/2026)
+   All 21 modals inherit this behavior automatically.
+   ================================================================ */
+
+/* Touch-safe close button (all viewports) */
+.modal-close {
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+}
+
+/* — Tablet (≤768px): Bottom-sheet conversion — */
+@media (max-width: 768px) {
+    .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        max-height: 85vh;
+        animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .modal-content.size-sm,
+    .modal-content.size-md,
+    .modal-content.size-lg,
+    .modal-content.size-xl {
+        max-width: 100% !important;
+    }
+
+    /* Drag handle indicator */
+    .modal-header::before {
+        content: '';
+        display: block;
+        width: 36px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .modal-header {
+        position: relative;
+        padding: 20px 16px 12px;
+    }
+
+    .modal-title {
+        font-size: var(--fs-base);
+    }
+
+    .modal-body {
+        padding: var(--space-card);
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* — Mobile (≤480px): Near full-screen — */
+@media (max-width: 480px) {
+    .modal-content {
+        max-height: 92vh;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .modal-header {
+        padding: 22px 14px 10px;
+    }
+
+    .modal-title {
+        font-size: var(--fs-sm);
+    }
+
+    .modal-body {
+        padding: 12px;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0.5;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
