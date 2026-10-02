@@ -306,11 +306,18 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
     - `Modal.css` (+88 líneas): Bottom-sheet pattern centralizado para 21 modales. En ≤768px: `align-items: flex-end`, `slideUp` animation cubic-bezier iOS-style, esquinas redondeadas superiores, drag handle indicator, 85vh max. En ≤480px: 92vh near full-screen. Close button touch-safe 44px en todos los viewports.
     - `NuevoPedidoModal.css` (+133 líneas): `.compact-grid` 4col→2col (tablet)→1col (mobile), tabs scroll-snap, inputs `min-height: 44px`, form actions column stack, uploads y promos escalados.
   - **Desplegado Batch 3**: GitHub Pages (`gh-pages` → `920226b`) + Nginx local sincronizado.
-  - [ ] **Pendiente Fase 2**: FAB unificado, dashboard tabs swipeable.
+  - [x] **Batch 4 COMPLETADO** (02/10/2026 18:19, commit `d81596c`):
+    - Nuevo `FABMenu.tsx` + `FABMenu.css`: Botón flotante unificado ⚡ visible solo en ≤768px.
+    - 4 acciones: Xana IA (🤖), WhatsApp (💬), Calculadora (🧮), Reproductor (🎵).
+    - Oculta 5 widgets individuales en mobile vía CSS (`!important` en `.xana-button`, `.floating-whatsapp`, `.calc-toggle-btn`, `.media-player-toggle`, `.minimized-alarm`).
+    - Staggered animations (40ms delay), backdrop overlay, cierre por click outside.
+    - `MainLayout.tsx` integra `<FABMenu>` con actions que simulan click en widgets originales.
+  - **Desplegado Batch 4**: GitHub Pages (`gh-pages` → `2ed3642`) + Nginx local sincronizado.
+  - [ ] **Pendiente Fase 2 (menor)**: dashboard tabs swipeable (nice-to-have, bajo impacto).
 - [ ] **Fase 3 (Performance)** — Pendiente: React.lazy() en rutas, fuentes condicionales (pixel fonts solo si theme=pixel), logo WebP, code splitting de XanaAssistant (32KB monolítico).
 - [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
 - **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
-- **Archivos nuevos planificados**: `src/styles/breakpoints.css`, `src/styles/mobile.css`, `src/components/layout/BottomNav.tsx`, `src/components/ui/FABMenu.tsx`, `src/hooks/useMediaQuery.ts`, `src/hooks/useSwipeGesture.ts`, `public/manifest.json`.
+- **Archivos nuevos creados Fase 2**: `src/components/ui/FABMenu.tsx`, `src/components/ui/FABMenu.css`.
 
 ### ✅ Fase 2 — Base de Conocimiento Estructurada + RAG Pragmático (COMPLETADA 27/09/2026)
 - [x] **Servicio `xana_knowledge.py`**: Capa Estructurada (materiales, bobinas, precios, tolerancias, procedimientos) + Capa RAG (índice plano con sentence-transformers all-MiniLM-L6-v2).
