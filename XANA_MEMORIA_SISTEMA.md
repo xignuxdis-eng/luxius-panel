@@ -1,5 +1,5 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 26/09/2026 (En sincronía con Producción)  
+> **Última Actualización:** 02/10/2026 (En sincronía con Producción)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -165,6 +165,9 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Niveles de tinta mostraban alerta de "sin stock" con 500 ml y el tanque se llenaba al 100%** | 1) `groupMinStock` usaba `Math.min(...valores, 0)` forzando el mínimo a 0 siempre. 2) La escala del tanque era 5 L (o 500 ml) en vez de la capacidad real de 2 L. | Se corrigió `groupMinStock` (sin el `, 0`); se definieron `LIQUID_CAPACITY_ML=2000`, `LIQUID_REASONABLE_ML=500`, `LIQUID_ALERT_ML=250`; el tanque escala a 2 L (500 ml = 25%); alerta "Reponer" < 250 ml; el estado del grupo usa el color más crítico (mínimo). | `src/pages/Stock/Stock.tsx`<br>`src/components/StockCharts.tsx` |
 | **No se registraba el stock de tinta fuera de máquina (botellas cerradas)** | No existía el concepto de botellas selladas en el modelo. | Se agregó `Material.botellasCerradas` (cantidad) y `Material.botellasMl` (ml); indicador "🍾 − N + cerradas \| [ml]" editable en cada tinta. | `src/types/entities.ts`<br>`src/pages/Stock/Stock.tsx` |
 | **La conciliación Órdenes vs RIP no usaba datos reales** | Los logs de la impresora (Roland VersaWorks) no se ingerían; `/api/analytics/reconciliation` era un stub. | Se creó `ripLogParser.ts` (parsea el XML EventLog de Roland, eventos 24/25 con tinta nl→ml y tamaño mm→m²) y `ripLogReconcile.ts` (matchea por nombre de archivo y calcula m² real, tinta real y eficiencia). Botón "Importar Log RIP" en `ConciliationTable` que guarda los logs en `localStorage`. | `src/utils/ripLogParser.ts`<br>`src/utils/ripLogReconcile.ts`<br>`src/pages/Analytics/ConciliationTable.tsx` |
+| **R2→Drive podía borrar de R2 archivos de órdenes que todavía no se habían impreso** | `test_single_file.py` pedía la confirmación (`input()`) ANTES de buscar el presupuesto y evaluar `presupuesto.estado`, así que la protección 🔒 quedaba después del prompt y nunca surtía efecto. Además `buscar_presupuesto_por_archivo()` no traía `estado` ni `deleted_at` en el SELECT, y el script autenticaba contra Drive y ejecutaba `CREATE TABLE` antes de preguntar nada. | Se agregó `requiere_proteccion_por_no_impreso()` con `ESTADOS_IMPRESOS`, se amplió el SELECT con `p.estado, p.deleted_at`, y se reordenó `main()` para que la búsqueda de solo lectura y el chequeo 🔒 ocurran antes del `input()`. `get_drive_service()` y el DDL quedaron después del prompt; ambos `input()` asumen `n` ante `EOFError`. Verificado: `1790309456184_avelino_atrasyzocalo1_135x267cm.jpg` frena con `🔒 PROTEGIDO` sin preguntar. | `scripts/sync_r2_to_drive.py`<br>`scripts/test_single_file.py` |
+| **Scripts con emoji crasheaban al correrlos en consola Windows** | `cmd.exe`/`powershell.exe` usan cp1252 y los `print()` con `✔`, `🔒`, `⚠️` lanzaban `UnicodeEncodeError`. | Se corre con `$env:PYTHONIOENCODING="utf-8"`. El log a archivo nunca se vio afectado porque `logging.FileHandler` ya usa `encoding='utf-8'`. | `scripts/*.py` |
+| **Panel web inutilizable en dispositivos móviles** | 1) `MainLayout.css` fuerza `grid-template-columns: 260px 1fr` sin colapso de sidebar. 2) Solo 9 media queries en 68+ archivos CSS; `Stock.css` (691 líneas) tiene 0 breakpoints. 3) Cuatro widgets flotantes (`XanaAssistant`, `FloatingWhatsApp`, `FloatingAlarm`, `FloatingCalculator`) se superponen en viewport <768px. 4) Touch targets bajo mínimo WCAG 44×44px en `.nav-item`, `.mini-adjust`, `.type-btn`. 5) `padding: 32px 40px` en `.main-content` desperdicia ~80px en móvil. | **Decisión arquitectónica: NO crear versión separada para móvil** — se adopta estrategia de Responsive Progresivo (Mobile-First Enhancement) sobre el codebase existente. Plan de 4 fases documentado en `plan_mobile_first_ux_ui.md` (auditoría Antigravity 02/10/2026). Implementación pendiente en Fases 1-4 del roadmap. | `src/components/layout/MainLayout.css`<br>`src/components/layout/Sidebar.css`<br>`src/styles/index.css`<br>`src/pages/Stock/Stock.css`<br>`src/components/XanaAssistant.css` |
 
 
 ---
@@ -264,6 +267,27 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - Instrumentar latencia de búsqueda (gate A3: ≤300ms, corpus ≤500 docs/5MB).
 - Ver detalle completo en `MD consensos/Xana_Estrategia_Consenso_Final_v2.md` (Fase 2) y suite en `docs/xana/SUITE_A4_ANTIALUCINACION.md`.
 
+### Sesión 02/10/2026: Auditoría Mobile-First UX/UI y Plan Estratégico
+- [x] **Auditoría completa del codebase para adaptabilidad móvil**: Se auditaron 68+ archivos CSS, layouts, componentes y patrones responsive.
+- [x] **Decisión arquitectónica: NO crear versión separada para móvil**. Razones: doble codebase insostenible, panel de gestión (no B2C), React SPA ya soporta responsive nativo, time-to-market 3-6 semanas vs 2-4 meses.
+- [x] **Plan estratégico documentado** en `plan_mobile_first_ux_ui.md` (Antigravity artifact) con 4 fases priorizadas por impacto/esfuerzo.
+- [x] **9 hallazgos identificados** (5 críticos, 4 moderados):
+  - H1: Layout `260px 1fr` sin colapso real de sidebar.
+  - H2: No existe botón hamburguesa ni mecanismo toggle.
+  - H3: 9 media queries totales en 68+ archivos (Stock.css: 0).
+  - H4: 4 floating widgets superpuestos en viewport móvil.
+  - H5: Tablas de datos sin scroll horizontal ni card-view.
+  - H6: Touch targets <44px en nav-items, mini-adjust, type-btn.
+  - H7: Font sizes en px/rem fijos sin clamp().
+  - H8: Padding excesivo (32px 40px) en main-content.
+  - H9: Viewport meta correcto (sin bloqueo de zoom ✅).
+- [ ] **Fase 1 (Fundación)** — Pendiente: breakpoints centralizados, sidebar colapsable + hamburguesa, bottom nav bar, touch targets 44px, padding adaptativo.
+- [ ] **Fase 2 (Componentes)** — Pendiente: stock grid mobile-first, tablas responsivas (ABM/Usuarios), modales bottom-sheet, FAB unificado, dashboard tabs.
+- [ ] **Fase 3 (Performance)** — Pendiente: React.lazy() en rutas, fuentes condicionales (pixel fonts solo si theme=pixel), logo WebP, code splitting de XanaAssistant (32KB monolítico).
+- [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
+- **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
+- **Archivos nuevos planificados**: `src/styles/breakpoints.css`, `src/styles/mobile.css`, `src/components/layout/BottomNav.tsx`, `src/components/ui/FABMenu.tsx`, `src/hooks/useMediaQuery.ts`, `src/hooks/useSwipeGesture.ts`, `public/manifest.json`.
+
 ### ✅ Fase 2 — Base de Conocimiento Estructurada + RAG Pragmático (COMPLETADA 27/09/2026)
 - [x] **Servicio `xana_knowledge.py`**: Capa Estructurada (materiales, bobinas, precios, tolerancias, procedimientos) + Capa RAG (índice plano con sentence-transformers all-MiniLM-L6-v2).
 - [x] **Tools de conocimiento** (6 nuevas): `consultar_ficha_tecnica`, `consultar_bobinas_disponibles`, `consultar_precio_material`, `buscar_en_manuales`, `consultar_procedimiento`, `consultar_tolerancias`.
@@ -316,5 +340,117 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Endpoints: `POST /api/xana/vault/sync` (202 + job_id), `GET /api/xana/vault/sync/status/<job_id>`, `GET /api/xana/vault/structure`, `GET /api/xana/vault/config`
   - Límite 500 archivos por corrida, dry-run mode, cancelación
   - Permisos públicos auto-asignados en Drive para acceso directo
+
+---
+
+## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
+
+Migración de respaldo: baja objetos de Cloudflare R2 con antigüedad mayor a
+`DIAS_ANTIGUEDAD` (default 5 días), los sube a Google Drive, registra la
+referencia en PostgreSQL y **solo entonces** borra el original de R2.
+
+### Archivos del sistema (NO tocar salvo pedido explícito)
+- `scripts/sync_r2_to_drive.py` — pipeline principal (cron)
+- `scripts/test_single_file.py` — prueba controlada de un archivo puntual
+- `scripts/resolve_orphans.py` — revisión interactiva de huérfanos
+- `scripts/generate_drive_token.py` — genera OAuth de usuario de Drive
+- `.github/workflows/r2-to-drive.yml` — cron `0 6 */3 * *`
+
+### Configuración (.env)
+`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`,
+`GOOGLE_DRIVE_FOLDER_ID` (carpeta raíz), `GOOGLE_OAUTH_TOKEN_JSON` o
+`GOOGLE_OAUTH_TOKEN_FILE`, `DATABASE_URL`, `DIAS_ANTIGUEDAD`,
+`EXCLUIR_PREFIJOS` (default `thumbnails/`), `CARPETA_HUERFANOS`,
+`DRY_RUN`, `MAX_REINTENTOS_DRIVE`, `BACKOFF_BASE_SEGUNDOS`, `SMTP_*`.
+
+### Estructura de carpetas en Drive
+```
+{AÑO}/{MM}/{DD}/{CLIENTE}/{OT-XXXXXXXX}/{archivo.ext}
+```
+- Año/Mes/Día salen de `presupuestos.created_at` (**no** del `LastModified` de R2).
+- `OT-XXXXXXXX` = `"OT-" + UPPER(SUBSTRING(presupuestos.id, 1, 8))`. Ver sección 9.1.
+- Cliente = `clientes.nombre` (LEFT JOIN), o `Sin-Cliente`.
+- Sin match → una sola carpeta `_Huerfanos_SinClasificar`.
+
+### 9.1. El número de OT NO es un campo en la base
+Diagnosticado el 30/09/2026. No existe columna `ot`/`numero_ot` en ninguna
+tabla ni clave equivalente dentro de `especificaciones`. Se **calcula al vuelo**
+desde el UUID:
+```python
+ot = f"OT-{str(p.id)[:8].upper()}"    # server/routes/orders.py:234
+```
+Aparece idéntico en `orders.py:234,295-299`, `app.py:1200`, `stats.py:397,500`,
+`services/xana_tools.py:140,251`, `services/xana_graph.py:187`. El frontend
+cae a `OT-${order.id}` si `order.ot` viene vacío.
+
+**No usar `descripcion ILIKE 'Proyecto OT-%'`**: 102 de 181 presupuestos la
+tienen, con colisiones masivas (OT-8 aparece 8 veces), todas creadas en dos
+días de agosto 2026, y solo 18 tienen archivos. Es residuo de datos de prueba.
+El propio código la descarta como basura en `Entrada.tsx:1330`,
+`Reportes.tsx:461` y `generatePdfClientReport.ts:83`.
+
+**La nomenclatura de producción NO está aplicada a los archivos de R2.** La
+fórmula `OT-[N°]_x[Copias]_[Mat]_[Serv]_[Medidas]` existe en
+`SharedFileViewerModal.tsx:18-83` (activa) y `server/index.js:63-146` (legacy,
+usa el UUID completo), pero `archivos[]` tiene **0 elementos** con prefijo
+`OT-` en toda la tabla. Los nombres reales son `{timestamp_ms}_{original}`.
+
+### 9.2. Protección "no imprimir archivos de órdenes no impresas"
+`requiere_proteccion_por_no_impreso(estado, deleted_at)` en `sync_r2_to_drive.py`.
+Devuelve `True` (no se toca nada) salvo que:
+- `deleted_at IS NOT NULL` (papelera) → `False`
+- `estado = 'cancelado'` → `False`
+- `estado IN ESTADOS_IMPRESOS = {'impreso','post','completo','entregado','finalizado'}` → `False`
+
+En `test_single_file.py` el chequeo corre **antes** del `input()`
+"¿Continuar?" (línea ~80), así que un archivo protegido frena sin preguntar.
+`get_drive_service()` y `ensure_orphan_queue_table()` quedaron después del
+prompt para que abortar no cueste nada. Ambos `input()` tienen `except EOFError`
+que asumen `n` por seguridad (comportamiento correcto en CI/cron).
+
+### 9.3. Estados de `presupuestos.estado` (diagnosticado 30/09/2026)
+Solo **4 valores** existen en la tabla:
+| estado | total | vivos (`deleted_at IS NULL`) | con archivos |
+|---|---|---|---|
+| `ORDEN_DE_TRABAJO` | 92 | 14 | 32 |
+| `impreso` | 62 | 61 | 61 |
+| `cancelado` | 26 | 0 | 0 |
+| `borrador` | 1 | 0 | 0 |
+
+Filtro recomendado: `estado = 'impreso'` = ya impreso; `estado =
+'ORDEN_DE_TRABAJO'` = listo para imprimir, todavía no. Sumar siempre
+`deleted_at IS NULL` (154 de 181 están en papelera).
+
+`estado` es `String(20)` libre, sin CHECK ni enum. El mapa canónico BD↔frontend
+está en `server/routes/orders.py:19-73` y el tipo en `src/types/orden.ts:2-15`.
+Fuente de verdad para "pasó impresión": el set de `server/app.py:1072`
+(`PRINTED_STATUSES`). **No usar el SQL de `services/xana_analytics.py`** —
+cuenta `aprobado`/`en_taller`/`entregado`/`facturado` y devuelve todo en cero.
+Lo mismo `server/routes/stats.py:52`.
+
+**No existe** ninguna columna ni clave JSON con `impres`/`print`/`produccion`
+en el schema. No hay tabla de órdenes, impresiones ni cola de impresión.
+`sync_log` existe como tabla de auditoría pero tiene 0 filas.
+
+### 9.4. Sistema `drive_reconciliation.py` — ELIMINADO (30/09/2026)
+Bóveda histórica con Shared Drive + tabla `drive_vault_audits`, nunca
+operativa. Se borraron el service, los endpoints `/google-drive/vault/*`, los
+imports en `routes/google_drive.py`, el modelo `DriveVaultAudit` y la tabla
+`drive_vault_audits` (DROP confirmado, 0 filas). **El sistema vivo es el
+pipeline de la sección 9.** Queda una referencia de texto en
+`server/routes/xana.py:142` (objective histórico) y la pantalla
+`src/pages/Sistema/GoogleDriveView.tsx` conserva llamadas a los endpoints
+eliminados (devuelve 404 hasta que se adapte o se retire).
+
+### 9.5. Notas operativas
+- En `cmd.exe`/`powershell.exe` de Windows, los prints con emoji/✔/🔒 lanzan
+  `UnicodeEncodeError` (cp1252). Usar `$env:PYTHONIOENCODING="utf-8"`.
+  El log a archivo nunca se ve afectado (usa `encoding='utf-8'` explícito).
+- Los objetos R2 no traen metadata del nombre original (`Metadata: {}`,
+  `ContentDisposition: None`). Hay dos patrones de key:
+  `uploads/{timestamp}_{nombre_original}` y `uploads/YYYYMMDD/{hash}.{ext}`.
+  Los legacy con hash no se pueden matchear por nombre contra `archivos[]`.
+- `orphan_review_queue` se conserva; los huérfanos se respaldan en Drive pero
+  **nunca** se borran de R2.
 
 ---
