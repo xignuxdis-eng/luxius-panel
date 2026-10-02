@@ -1,5 +1,5 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 02/10/2026 17:20 (En sincronía con Producción)  
+> **Última Actualización:** 02/10/2026 19:11 (En sincronía con Producción — Plan Mobile-First 4 fases COMPLETADO)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -43,6 +43,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 ## 3. 🏗️ Arquitectura Técnica del Frontend (`luxius-panel`)
 
 - **Tecnologías**: React 18, TypeScript, Vite, Vanilla CSS con temas Dark Mode / Cyberpunk industrial enriquecidos.
+- **Optimización (Fase 3, 02/10/2026)**: 14 páginas lazy-loaded con `React.lazy()` + `Suspense` → 52 chunks separados (JS principal: 2480→327KB, **-87%**; CSS: 166→49KB, **-70%**).
+- **PWA (Fase 4, 02/10/2026)**: Installable via `manifest.json`, service worker `sw.js` (cache-first statics, network-first API, offline SPA shell), iOS safe-area `env()`, `@media (display-mode: standalone)`.
 - **Rutas y Vistas Principales**:
   - `src/pages/Entrada/`: Ingestión de pedidos, modal de nuevo pedido (`NuevoPedidoModal.tsx`), estados de OT.
   - `src/pages/Diseno/`: Aprobación técnica, previsualizaciones vectoriales y bitmaps.
@@ -162,7 +164,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **La conciliación Órdenes vs RIP no usaba datos reales** | Los logs de la impresora (Roland VersaWorks) no se ingerían; `/api/analytics/reconciliation` era un stub. | Se creó `ripLogParser.ts` (parsea el XML EventLog de Roland, eventos 24/25 con tinta nl→ml y tamaño mm→m²) y `ripLogReconcile.ts` (matchea por nombre de archivo y calcula m² real, tinta real y eficiencia). Botón "Importar Log RIP" en `ConciliationTable` que guarda los logs en `localStorage`. | `src/utils/ripLogParser.ts`<br>`src/utils/ripLogReconcile.ts`<br>`src/pages/Analytics/ConciliationTable.tsx` |
 | **R2→Drive podía borrar de R2 archivos de órdenes que todavía no se habían impreso** | `test_single_file.py` pedía la confirmación (`input()`) ANTES de buscar el presupuesto y evaluar `presupuesto.estado`, así que la protección 🔒 quedaba después del prompt y nunca surtía efecto. Además `buscar_presupuesto_por_archivo()` no traía `estado` ni `deleted_at` en el SELECT, y el script autenticaba contra Drive y ejecutaba `CREATE TABLE` antes de preguntar nada. | Se agregó `requiere_proteccion_por_no_impreso()` con `ESTADOS_IMPRESOS`, se amplió el SELECT con `p.estado, p.deleted_at`, y se reordenó `main()` para que la búsqueda de solo lectura y el chequeo 🔒 ocurran antes del `input()`. `get_drive_service()` y el DDL quedaron después del prompt; ambos `input()` asumen `n` ante `EOFError`. Verificado: `1790309456184_avelino_atrasyzocalo1_135x267cm.jpg` frena con `🔒 PROTEGIDO` sin preguntar. | `scripts/sync_r2_to_drive.py`<br>`scripts/test_single_file.py` |
 | **Scripts con emoji crasheaban al correrlos en consola Windows** | `cmd.exe`/`powershell.exe` usan cp1252 y los `print()` con `✔`, `🔒`, `⚠️` lanzaban `UnicodeEncodeError`. | Se corre con `$env:PYTHONIOENCODING="utf-8"`. El log a archivo nunca se vio afectado porque `logging.FileHandler` ya usa `encoding='utf-8'`. | `scripts/*.py` |
-| **Panel web inutilizable en dispositivos móviles** | 1) `MainLayout.css` fuerza `grid-template-columns: 260px 1fr` sin colapso de sidebar. 2) Solo 9 media queries en 68+ archivos CSS; `Stock.css` (691 líneas) tiene 0 breakpoints. 3) Cuatro widgets flotantes (`XanaAssistant`, `FloatingWhatsApp`, `FloatingAlarm`, `FloatingCalculator`) se superponen en viewport <768px. 4) Touch targets bajo mínimo WCAG 44×44px en `.nav-item`, `.mini-adjust`, `.type-btn`. 5) `padding: 32px 40px` en `.main-content` desperdicia ~80px en móvil. | **Decisión arquitectónica: NO crear versión separada para móvil** — se adopta estrategia de Responsive Progresivo (Mobile-First Enhancement) sobre el codebase existente. Plan de 4 fases documentado en `plan_mobile_first_ux_ui.md` (auditoría Antigravity 02/10/2026). Implementación pendiente en Fases 1-4 del roadmap. | `src/components/layout/MainLayout.css`<br>`src/components/layout/Sidebar.css`<br>`src/styles/index.css`<br>`src/pages/Stock/Stock.css`<br>`src/components/XanaAssistant.css` |
+| **Panel web inutilizable en dispositivos móviles** (**RESUELTO 02/10/2026**) | 1) `MainLayout.css` fuerza `grid-template-columns: 260px 1fr` sin colapso de sidebar. 2) Solo 9 media queries en 68+ archivos CSS; `Stock.css` (691 líneas) tiene 0 breakpoints. 3) Cinco widgets flotantes se superponen en viewport <768px. 4) Touch targets bajo mínimo WCAG 44×44px. 5) `padding: 32px 40px` en `.main-content` desperdicia ~80px en móvil. | **Plan Mobile-First 4 fases COMPLETADO** (02/10/2026, commits `fa43e79`→`e529912`): Fase 1 (fundación tokens/sidebar/topbar), Fase 2 (9 CSS responsive + bottom-sheet 21 modales + FAB unificado), Fase 3 (React.lazy -87% JS + fonts condicionales), Fase 4 (PWA manifest + service worker + iOS safe-area). Bundle de 2.5MB→327KB. App instalable y usable en mobile. | `src/components/layout/MainLayout.*`<br>`src/styles/index.css`<br>`src/pages/*/Stock.css,Entrada.css,ABM.css,Dashboard.css`<br>`src/components/ui/Modal.css,FABMenu.*`<br>`src/App.tsx,index.html,public/manifest.json,public/sw.js` |
 
 
 ---
@@ -283,7 +285,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - `Sidebar`: Modo drawer off-canvas (`position: fixed`, `transform: translateX(-100%)` a `translateX(0)` cuando `.open`), botón de cierre táctil (`✕`), auto-cierre al seleccionar cualquier opción, touch targets WCAG ≥44px.
   - `Header`: Título fluido con `clamp()`, envoltorio de botones responsivo (`flex-wrap`), ocultamiento de fecha larga en viewport estrecho.
   - Floating Widgets (`FloatingCalculator`, `MediaPlayer`): Dimensiones adaptativas (`max-width: calc(100vw - 32px)`) para evitar clipping en pantallas móviles.
-- [ ] **Fase 2 (Componentes Mobile-First)** — EN CURSO desde 02/10/2026:
+- [x] **Fase 2 (Componentes Mobile-First)** — COMPLETADA 02/10/2026 (commits `bffb096`→`d81596c`):
   - **Punto de retorno**: Tag `pre-fase2-mobile` en commit `fa43e79` (local + GitHub). Revertir: `git reset --hard pre-fase2-mobile`.
   - **Auditoría pre-intervención Fase 2** (13 archivos CSS escaneados por `@media`):
     | Archivo | Media Queries | Problemas |
@@ -329,7 +331,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - **CSS polish**: `overscroll-behavior: none`, `env(safe-area-inset-*)` para iPhone notch/Dynamic Island, `-webkit-tap-highlight-color: transparent`, `@media (display-mode: standalone)`.
   - **Desplegado**: GitHub Pages (`gh-pages` → `45a96a5`) + Nginx local sincronizado.
 - **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
-- **Archivos nuevos creados Fase 2**: `src/components/ui/FABMenu.tsx`, `src/components/ui/FABMenu.css`.
+- **Archivos nuevos creados (Fase 2-4)**: `src/components/ui/FABMenu.tsx`, `src/components/ui/FABMenu.css`, `public/manifest.json`, `public/sw.js`.
+- **Archivos modificados (Fase 2-4)**: `Stock.css`, `Entrada.css`, `ABM.css`, `Dashboard.css`, `Modal.css`, `NuevoPedidoModal.css`, `index.css`, `MainLayout.tsx`, `App.tsx`, `ThemeToggle.tsx`, `index.html` (total: +1200 líneas de CSS/TSX).
 
 ### ✅ Fase 2 — Base de Conocimiento Estructurada + RAG Pragmático (COMPLETADA 27/09/2026)
 - [x] **Servicio `xana_knowledge.py`**: Capa Estructurada (materiales, bobinas, precios, tolerancias, procedimientos) + Capa RAG (índice plano con sentence-transformers all-MiniLM-L6-v2).
