@@ -1,5 +1,5 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 02/10/2026 (En sincronía con Producción)  
+> **Última Actualización:** 02/10/2026 17:20 (En sincronía con Producción)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -276,13 +276,33 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - H7: Font sizes en px/rem fijos sin clamp().
   - H8: Padding excesivo (32px 40px) en main-content.
   - H9: Viewport meta correcto (sin bloqueo de zoom ✅).
+- [x] **Desvinculación GitLab verificada** (02/10/2026 17:12): `origin` apunta exclusivamente a GitHub en ambos repos (`luxius-panel` y `luXius-Backend`). No quedan remotos, push-URLs, ni configuraciones globales/locales referenciando GitLab. `git push --dry-run` OK en ambos.
 - [x] **Fase 1 (Fundación Mobile-First)** — COMPLETADA 02/10/2026:
   - Tokens y breakpoints centralizados en `src/styles/index.css` (`--bp-mobile`, `--space-page`, fluid `--fs-*` con clamp, `--touch-target-min: 44px`).
   - `MainLayout`: Barra superior móvil (`mobile-topbar`) con hamburguesa accesible, marca compacta, backdrop overlay (`sidebar-overlay`), auto-cierre al cambiar de ruta y padding adaptativo (`var(--space-page)`).
   - `Sidebar`: Modo drawer off-canvas (`position: fixed`, `transform: translateX(-100%)` a `translateX(0)` cuando `.open`), botón de cierre táctil (`✕`), auto-cierre al seleccionar cualquier opción, touch targets WCAG ≥44px.
   - `Header`: Título fluido con `clamp()`, envoltorio de botones responsivo (`flex-wrap`), ocultamiento de fecha larga en viewport estrecho.
   - Floating Widgets (`FloatingCalculator`, `MediaPlayer`): Dimensiones adaptativas (`max-width: calc(100vw - 32px)`) para evitar clipping en pantallas móviles.
-- [ ] **Fase 2 (Componentes)** — Pendiente: stock grid mobile-first, tablas responsivas (ABM/Usuarios), modales bottom-sheet, FAB unificado, dashboard tabs.
+- [ ] **Fase 2 (Componentes Mobile-First)** — EN CURSO desde 02/10/2026:
+  - **Punto de retorno**: Tag `pre-fase2-mobile` en commit `fa43e79` (local + GitHub). Revertir: `git reset --hard pre-fase2-mobile`.
+  - **Auditoría pre-intervención Fase 2** (13 archivos CSS escaneados por `@media`):
+    | Archivo | Media Queries | Problemas |
+    |---|---|---|
+    | `Stock.css` (691 lín) | 0 ❌ | Grid desborda <320px, padding fijo 24px, tanques 3D no escalan, touch targets `.mini-adjust` 4px |
+    | `ABM.css` (242 lín) | 0 ❌ | `.abm-table` sin overflow wrapper, `.op-btn-sm` 32px (<44 WCAG), `.bobina-row` sin wrap |
+    | `Entrada.css` (387 lín) | 0 ❌ | Filtros sin wrap, `.btn-icon-action` 28px, `.batch-expand-btn` 24px |
+    | `Dashboard.css` (328 lín) | 1 ✅ | Stats grid desborda <360px, `.stat-value` 28px fijo, status bar sin wrap |
+    | `NuevoClienteModal.css` | 1 ✅ | Ya colapsa grid a 1col en <640px. OK. |
+  - **Orden de ejecución**: Batch 1 (Stock → Entrada → ABM) + Batch 2 (Dashboard refinamiento).
+  - **Tokens Fase 1 reutilizados**: `--space-page`, `--space-card`, `--space-gap`, `--fs-*`, `--touch-target-min`, `--bp-mobile`, `--bp-tablet`.
+  - [x] **Batch 1 COMPLETADO** (02/10/2026 17:23, commit `bffb096`):
+    - `Stock.css` (+168 líneas): Grid `minmax(min(100%, 220px))`, padding `var(--space-page)`, `.mini-adjust`/`.type-btn`/`.adjust-btn-overlay` con `min-height: var(--touch-target-min)`, tanques 3D escalables (50→42→36px), modal `min(400px, calc(100vw-32px))`, stat-pills scroll horizontal en mobile, grid 1col en ≤480px.
+    - `Entrada.css` (+150 líneas): `.btn-icon-action`/`.batch-expand-btn` touch-safe 44px, scroll shadow indicator (pseudo-element `::after`), filtros `flex-wrap` en tablet y `flex-direction: column` en mobile, tabla con padding compacto y font escalado, batch badges reducidos.
+    - `ABM.css` (+126 líneas): Tabs con `scroll-snap-type: x mandatory` + scrollbar oculta, `.abm-list-view` overflow-x, `.op-btn-sm` touch-safe 44px, `.bobina-row` wrap→column en mobile, header actions stacking, tabla compacta.
+  - [x] **Batch 2 COMPLETADO** (02/10/2026 17:23, commit `bffb096`):
+    - `Dashboard.css` (+82 líneas): Stats grid `minmax(min(100%, 180px))`, `.stat-value` → `var(--fs-2xl)`, system-status-compact wrap, alerts stack vertical en mobile, botones touch-safe, hover transform deshabilitado en mobile.
+  - **Desplegado**: GitHub Pages (`gh-pages` → `b724fa2`) + Nginx local sincronizado.
+  - [ ] **Pendiente Fase 2**: modales bottom-sheet, FAB unificado, dashboard tabs swipeable.
 - [ ] **Fase 3 (Performance)** — Pendiente: React.lazy() en rutas, fuentes condicionales (pixel fonts solo si theme=pixel), logo WebP, code splitting de XanaAssistant (32KB monolítico).
 - [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
 - **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
