@@ -322,7 +322,12 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - **Fuentes pixel condicionales**: `index.html` reemplazó `<link>` estático por script condicional que solo carga ~150KB de Google Fonts si `localStorage.theme === 'pixel'`. `ThemeToggle.tsx` carga dinámicamente las fuentes al cambiar a pixel theme en runtime.
   - **Logo WebP**: descartado (logo es text-based `✦ LuXius`, el PNG de `/public/` no está en path crítico).
   - **Desplegado**: GitHub Pages (`gh-pages` → `efde55c`) + Nginx local sincronizado.
-- [ ] **Fase 4 (QA + Polish)** — Pendiente: testing BrowserStack, Lighthouse ≥85 mobile, PWA manifest + service worker, gestos nativos (swipe sidebar).
+- [x] **Fase 4 (QA + Polish)** — COMPLETADA 02/10/2026, commit `82fcb8a`:
+  - **PWA manifest** (`public/manifest.json`): `standalone` display, dark theme `#1a1b1e`, `xignux_logo.png` como icon 192x192/512x512, categorías business/productivity.
+  - **Service Worker** (`public/sw.js`): cache-first para statics (JS/CSS/fonts/images), network-first para API, offline SPA shell (fallback a `index.html` en navigation requests).
+  - **index.html PWA tags**: `<link rel="manifest">`, `theme-color`, `apple-touch-icon`, `apple-mobile-web-app-capable`, `viewport-fit=cover`, SW registration.
+  - **CSS polish**: `overscroll-behavior: none`, `env(safe-area-inset-*)` para iPhone notch/Dynamic Island, `-webkit-tap-highlight-color: transparent`, `@media (display-mode: standalone)`.
+  - **Desplegado**: GitHub Pages (`gh-pages` → `45a96a5`) + Nginx local sincronizado.
 - **KPIs definidos**: Lighthouse Performance ≥85, LCP ≤2.5s, FID ≤100ms, CLS ≤0.1, touch target compliance 100%.
 - **Archivos nuevos creados Fase 2**: `src/components/ui/FABMenu.tsx`, `src/components/ui/FABMenu.css`.
 
