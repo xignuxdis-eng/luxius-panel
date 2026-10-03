@@ -187,10 +187,10 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:
 
-1. **Estado Actual de Producción (Septiembre 2026)**:
+1. **Estado Actual de Producción (02/10/2026)**:
    - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` están en el commit `6cce8e0`.
    - **Frontend Web**: Publicado y funcional en `https://xignuxdis-eng.github.io/luxius-panel/` (rama `gh-pages` actualizada).
-   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Últimos commits de esta sesión (más reciente → más antiguo): `d62f544` (import logs RIP Roland), `b5e8e54` (conciliación+stats backend), `5b854d8` (fix analíticas), `699f708` (layout tinta), `7ac5544` (ml botellas), `b82e4d9` (tinta 2L + botellas), `26c0a97` (calibración tinta), `d91fb35` (filtro alertas + roles), `b70f97a` (fix types), `804bd33` (proyección faltantes), `32f7ac2` (memoria), `f597485` (stock por bobina), `480365f` (autorización commit automático), `1f094de` (stock CRUD/audit), `3e9d76e` (selector PDF + masivo), `d2ab9c0` (fix imports PDF), `d3471a5` (feed stock + export PDF).
+   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Últimos commits de esta sesión (más reciente → más antiguo): `7697184` (alerta laminado especial >2.93m lila/morado), `77fd17c` (estilizar botones cabecera Stock/Sync/Arcade), `74fb912` (centrar destinatario en etiquetas rollo), `db647ff` (fijar ancho 105mm/210mm en PDFs sin estiramiento), `54df833` (Artegra Sans en LuXius branding), `44f60bc` (unicode-range demo fix), `8972ab1` (Artegra Sans global + tag pre-artegra-global), `28e5e42` (fix nombre proyecto etiquetas), `c7b9bc2` (limpieza loader etiquetas), `409b46d` (Artegra Sans en etiquetas), `30f38d5` (carga instantánea y miniaturas etiquetas), `1cfd3f8` (generador etiquetas rollo), `8a51b20`/`e529912` (Fase 4 Mobile First PWA).
    - **Remotos**: `origin` apunta exclusivamente a GitHub. GitLab fue desvinculado el 02/10/2026.
 2. **Dependencias**:
    ```bash
@@ -409,6 +409,22 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] Teléfono WhatsApp configurable (3517897667) y pie de marca oficial XignuX.
 - [x] Integración en `Entrada.tsx` (botón masivo en barra de selección "🏷️ Etiqueta Rollo", botón individual en tabla y botón en tarjetas mobile).
 - [x] Integración en `SharedFileViewerModal.tsx` ("🏷️ Imprimir Etiqueta").
+
+### Sesión 02/10/2026: Tipografía Corporativa Oficial y Ajustes PDF (completado)
+- [x] **Punto de Restauración Tag Git**: Creado y pusheado el tag `pre-artegra-global` (commit `28e5e42`).
+- [x] **Tipografía Oficial Artegra Sans en todo el sistema**: Fuentes corporativas `ArtegraSans-Bold.otf` y `ArtegraSans-SemiBold.otf` integradas globalmente en `src/styles/index.css` (Headings Bold, UI/Forms SemiBold) con fallback a Outfit.
+- [x] **Fix de marca de agua Fontspring DEMO**: Configuración de `unicode-range` (`U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A`) para que caracteres alterados como paréntesis `()`, `4` y signos caigan limpia y automáticamente en Outfit.
+- [x] **Tipografía corporativa en branding `✦ LuXius`**: Actualizados estilos en `Sidebar.css` y `Login.css` eliminando hardcoding de Segoe UI.
+- [x] **Fijación de ancho físico en documentos PDF**: `@page { size: 105mm 297mm; margin: 0; }` y `max-width: 105mm !important` en `generateLabelPdf.ts`, y `@page { size: 210mm 297mm; }` y `.a4-page { max-width: 210mm !important; }` en `generatePdfBudget.ts` y `generatePdfClientReport.ts`, evitando estiramiento horizontal al abrir o guardar el documento.
+- [x] **Centrado estético de destinatario y dirección** en `generateLabelPdf.ts`.
+- [x] **Restauración y contraste de botones de cabecera**: Clases unificadas `.header-action-btn`, `.header-stock-btn` (ámbar), `.header-sync-btn` (azul) y `.header-arcade-btn` (violeta neón) con soporte para tema oscuro, claro y pixel.
+
+### Sesión 02/10/2026: Ayuda Visual para Producción — Laminado Especial (> 2.93 ml) (completado)
+- [x] **Alerta visual lila/morado en consumo**: Detección automática en órdenes o paños donde metros lineales o dimensión > 2.93m (`consumption.unit === 'ml' && consumption.value > 2.93` o `maxDim > 2.93`).
+- [x] **Diseño de alta visibilidad**: Celda de consumo destacada con estilo morado neón (`.special-lamination-box`), resplandor `0 0 12px rgba(168, 85, 247, 0.35)`, valor en blanco lila `⚡ X.XX ml`, rollo violeta armónico y badge `LAMINADO ESP.`.
+- [x] **Resalte en columna Medidas**: En piezas mayores a 2.93m, la cota específica se resalta en morado negrita (`#c084fc`) con ícono `⚡`.
+- [x] **Indicador en Lotes de Producción (Acordeón)**: Fila principal de lote muestra la píldora `⚡ Paños > 2.93m (Laminado Esp.)` aun con el lote contraído. En cada fila hija desplegada se muestra el badge lila y un borde lateral morado (`.is-special-lamination`).
+- [x] **Integración en Reportes**: Módulo de Reportes adaptado con el mismo indicador visual para trazabilidad integral.
 
 ---
 
