@@ -377,6 +377,7 @@ const LABEL_CSS = `
     /* Secciones (Destinatario, Dirección) */
     .label-section {
         margin: 12px 0;
+        text-align: center;
     }
     .label-section-header {
         font-family: 'Artegra Sans', sans-serif;
@@ -386,6 +387,7 @@ const LABEL_CSS = `
         letter-spacing: 2px;
         color: #64748b;
         margin: 0 0 4px 0;
+        text-align: center;
     }
     .label-section-value {
         font-family: 'Artegra Sans', sans-serif;
@@ -397,6 +399,7 @@ const LABEL_CSS = `
         letter-spacing: 0.5px;
         word-break: break-word;
         text-transform: uppercase;
+        text-align: center;
     }
     .label-section-address {
         font-family: 'Artegra Sans', sans-serif;
@@ -406,6 +409,7 @@ const LABEL_CSS = `
         margin: 0;
         line-height: 1.35;
         word-break: break-word;
+        text-align: center;
     }
 
     /* Detalle de Archivos */
