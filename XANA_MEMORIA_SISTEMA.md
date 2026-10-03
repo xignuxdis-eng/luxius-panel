@@ -1,5 +1,5 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 02/10/2026 19:11 (En sincronía con Producción — Plan Mobile-First 4 fases COMPLETADO)  
+> **Última Actualización:** 03/10/2026 13:30 (En sincronía con Producción — Bot Telegram en Vivo + Depuración Métricas de Taller + Escalador IA)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -184,6 +184,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Bot de Telegram para Monitoreo y Taller (Fase 1)** (**03/10/2026**) | El taller y administración carecían de un canal ágil y remoto para consultar en tiempo real el estado de la cola de impresión, metros lineales pendientes, alertas de stock crítico y tareas del sistema sin abrir la web o estando fuera de horario. | Se desarrolló el servicio nativo de bot de Telegram: 1) `services/telegram_service.py` con cliente HTTP directo (sin dependencias externas pesadas) y validación de seguridad por `TELEGRAM_ADMIN_CHAT_ID`. 2) Comandos `/start`, `/status` (salud y latencia PostgreSQL), `/taller` (órdenes vivas, metros lineales, urgencias), `/alertas` (stock bajo mínimo), `/tareas` (tareas activas Xana) y `/sesiones` (commits recientes e historial de agentes). 3) Rutas webhook y configuración en `routes/telegram.py` registradas en `app.py`. 4) Hoja de ruta documentada en `docs/roadmaps/Xana_Telegram_Roadmap.md`. | `server/services/telegram_service.py`<br>`server/routes/telegram.py`<br>`luXius-Backend/services/telegram_service.py`<br>`luXius-Backend/routes/telegram.py`<br>`docs/roadmaps/Xana_Telegram_Roadmap.md` |
 | **Certificación Gate A4 Suite Anti-Alucinación (Xana IA)** (**03/10/2026**) | Existía riesgo de alucinaciones en cotizaciones matemáticas, tolerancias técnicas de taller (ancho de plotter, demasía, consumo tinta) y consultas sobre clientes o pedidos inexistentes que podían degradar la confiabilidad del asistente. | Se blindó la capa determinista y se certificó formalmente la Suite A4: 1) Nuevas herramientas `cotizar_trabajo` (matemática exacta con optimización de bobina y recargos) y `consultar_especificacion_tecnica` (tolerancias reales verificadas de taller) en `services/xana_tools.py`. 2) Validación estricta en `tool_obtener_metricas_ventas_cliente` y `tool_obtener_estado_ot` retornando error estructurado ante entidades inexistentes sin inventar números. 3) Creación y ejecución de `scripts/test_suite_a4.py` evaluando las 23 pruebas de `SUITE_A4_ANTIALUCINACION.md`. Resultado: **23/23 casos aprobados (100.0%)** y 0 fallas en casos trampa. Reporte oficial generado en `docs/xana/REPORTE_GATE_A4_EJECUTADO.md`. | `server/services/xana_tools.py`<br>`luXius-Backend/services/xana_tools.py`<br>`luXius-Backend/services/xana_graph.py`<br>`server/scripts/test_suite_a4.py`<br>`luXius-Backend/scripts/test_suite_a4.py`<br>`docs/xana/SUITE_A4_ANTIALUCINACION.md`<br>`docs/xana/REPORTE_GATE_A4_EJECUTADO.md` |
 | **Calibración Gates A2 & A6 de Xana IA, Postergación Taller y Escalador Inteligente** (**03/10/2026**) | Se requería auditar el Shadow Mode (Gate A2) y el budget de latencia síncrona (Gate A6) de Xana IA, posponer la etapa física del taller hasta operar frente al RIP, y trazar la arquitectura para solucionar el pixelado en gigantografía cuando los clientes envían fotos de baja calidad. | 1) Se ejecutó la suite de calibración (`scripts/test_xana_calibration.py`) con 20 prompts representativos: **Gate A2 aprobado con 100.0% de acuerdo** entre router determinista y LLM; **Gate A6 aprobado con p95 de 2,726 ms (≤ 3,000 ms budget)** y promedio de 2,068 ms. 2) Se blindó `_build_llm()` con `max_retries=0` y `timeout=10.0` para fail-fast automático ante 429 de APIs externas. 3) Se agregaron endpoints `/api/xana/shadow/stats` y `/api/xana/calibration/report`. 4) La fase de Taller Físico (Daemon Hot Folder) se declaró formalmente **pausada por tiempo indeterminado** hasta estar in situ frente a la máquina. 5) Se redactó el roadmap arquitectónico del **Escalador Inteligente de Imágenes (AI Super-Resolution)** en `docs/roadmaps/ROADMAP_ESCALADOR_INTELIGENTE_IMAGENES.md` (arquitectura híbrida de 3 niveles: cliente WebGL/Lanczos-3 rápido para previews < 2s, worker asíncrono backend con Real-ESRGAN/GFPGAN para 4x/8x y restauración de rostros, integración directa en `XpressViewer.tsx` con split slider y guardado de versión HD en la OT). | `docs/xana/REPORTE_CALIBRACION_XANA_GATES_A2_A6.md`<br>`docs/roadmaps/ROADMAP_ESCALADOR_INTELIGENTE_IMAGENES.md`<br>`server/routes/xana.py`<br>`luXius-Backend/routes/xana.py`<br>`server/services/xana_graph.py`<br>`luXius-Backend/services/xana_graph.py` |
+| **Escalador Inteligente de Imágenes con Aceleración GPU Vulkan (Real-ESRGAN)** (**03/10/2026**) | Al ampliar artes de baja resolución de clientes para cartelería o gigantografías, la pérdida de definición y pixelado degradaban la calidad de impresión. | Se integró el motor neuronal local `realesrgan-ncnn-vulkan.exe` con aceleración directa por hardware en GPU AMD Radeon RX 5700 XT (modelos `x4plus` y `x4plus-anime`), con tiempos de inferencia récord de 906 ms a 2.3 s y fallback por CPU en PIL Lanczos. En el backend se creó `services/upscaler_service.py` y rutas `/api/upscaler/*`, y en el frontend se implementó el modal `UpscalerModal` en `XpressViewer.tsx` con split slider interactivo before/after (0-100%), cotas DPI en tiempo real y guardado/reemplazo directo en la OT. | `services/upscaler_service.py`<br>`routes/upscaler.py`<br>`src/pages/XpressViewer/XpressViewer.tsx`<br>`src/pages/XpressViewer/XpressViewer.css`<br>`docs/roadmaps/ROADMAP_ESCALADOR_INTELIGENTE_IMAGENES.md` |
 
 ---
 
@@ -191,11 +192,12 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:
 
-1. **Estado Actual de Producción (02/10/2026)**:
-   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` sincronizadas en GitHub con endpoints de auditoría y huérfanos.
+1. **Estado Actual de Producción (03/10/2026)**:
+   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` sincronizadas en GitHub con webhook de Telegram (`/api/telegram/webhook`), configuración persistente in-situ (`/api/telegram/config`), servicio de briefing matutino (`/api/production/briefing`), escalador IA (`/api/upscaler/*`) y calibración de gates Xana A2, A4 y A6 certificadas.
+   - **Telegram Bot Activo**: Bot oficial `@LuXius_Taller_Bot` (ID `8862580603`) con webhook verificado en Render y chat admin `1499600102`. Comandos `/status`, `/taller`, `/briefing`, `/alertas`, `/tareas`, `/addtask`, `/done`, `/clear` y notas de voz multimodales vía Gemini activas.
    - **Frontend Web**: Publicado y funcional en `https://xignuxdis-eng.github.io/luxius-panel/` (rama `gh-pages` actualizada).
-   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Últimos commits de esta sesión (más reciente → más antiguo): `feat(drive-pipeline)` (pipeline R2→Drive, resolución 680 huérfanos, UI almacenamiento dual), `7697184` (alerta laminado especial >2.93m lila/morado), `77fd17c` (estilizar botones cabecera Stock/Sync/Arcade), `74fb912` (centrar destinatario en etiquetas rollo), `db647ff` (fijar ancho 105mm/210mm en PDFs sin estiramiento), `54df833` (Artegra Sans en LuXius branding), `44f60bc` (unicode-range demo fix), `8972ab1` (Artegra Sans global + tag pre-artegra-global), `28e5e42` (fix nombre proyecto etiquetas), `c7b9bc2` (limpieza loader etiquetas), `409b46d` (Artegra Sans en etiquetas), `30f38d5` (carga instantánea y miniaturas etiquetas), `1cfd3f8` (generador etiquetas rollo), `8a51b20`/`e529912` (Fase 4 Mobile First PWA).
-   - **Remotos**: `origin` apunta exclusivamente a GitHub. GitLab fue desvinculado el 02/10/2026.
+   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Incluye panel de gestión de Telegram (`/sistema/telegram`), filtro estricto de órdenes pendientes vs impresas en taller, selector de etiquetas operativas en carga y lote, y suite de preimpresión/escalador IA en Xpress Studio.
+   - **Remotos**: `origin` apunta exclusivamente a GitHub (`xignuxdis-eng`). GitLab fue desvinculado el 02/10/2026.
 2. **Dependencias**:
    ```bash
    npm install
@@ -562,6 +564,27 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Verificación y Compilación**:
   - `npm run build` ejecutado en 7.36s sin errores.
   - Backend daemon en puerto 5000 activo con PostgreSQL conectado y rutas `/api/production/briefing` y `/api/telegram/*` probadas y operativas.
+
+### Sesión 03/10/2026 (4ª parte): Despliegue en Vivo de Telegram Bot, Configuración In-Situ y Depuración de Métricas de Taller (completado)
+- [x] **Conexión Exitosa del Bot en Producción**:
+  - Bot oficial `@LuXius_Taller_Bot` (ID `8862580603`) vinculado exitosamente al backend en Render (`https://luxius-backend.onrender.com/api/telegram/webhook`).
+  - Chat ID del administrador registrado: `1499600102`. Webhook oficial confirmado por Telegram API (`{"description": "Webhook was set", "ok": true}`).
+- [x] **Panel de Configuración In-Situ (`TelegramView.tsx`)**:
+  - Nueva vista de administración en `/sistema/telegram` (`src/pages/Sistema/TelegramView.tsx` y `TelegramView.css`).
+  - Tarjeta de credenciales directa: permite ingresar y modificar el Bot Token y Chat ID sin necesidad de ingresar a la consola de Render.
+  - Endpoint `POST /api/telegram/config` con validación en vivo contra `getMe` de Telegram y persistencia en `ConfigGlobal` de PostgreSQL (Neon).
+  - Botones de acción directa: `🔗 Configurar Webhook en Telegram`, `📤 Probar Mensaje` y `☀️ Despachar Briefing`.
+  - Guía visual interactiva de 3 pasos con enlaces directos a `@BotFather` y `@userinfobot`.
+- [x] **Depuración de Métricas de Producción (Filtro Estricto de Pendientes vs Impresas)**:
+  - **Diagnóstico**: La base de datos contiene 85 órdenes vivas: 61 ya terminadas (`impreso`) y 24 pendientes de impresión (`orden` / `ORDEN_DE_TRABAJO`). El briefing y `/taller` incluían erróneamente las órdenes ya impresas, inflando el metraje de 54.8 ml a 173 ml y mostrando trabajos antiguos ya finalizados.
+  - **Resolución**: Filtro estricto en `services/briefing_service.py` y `cmd_taller` (`Presupuesto.estado.in_(['orden', 'ORDEN_DE_TRABAJO'])`). Las 61 órdenes terminadas se reportan como métrica informativa separada (`✅ Ya Impresas: 61 OTs`).
+  - **Normalización de Bobinas y Materiales**: Eliminado el fallback ambiguo `"Estándar"`. Funciones `resolve_material_name()` (normaliza `VV` → `Vinilo Vehicular`, `FL` → `Lona Frontlight`, `VBB` → `Vinilo Base Blanca`, `BL` → `Lona Backlight`) y `resolve_bobina_ancho()` (resuelve con exactitud a `1.37m` o `1.52m` según dimensiones de la pieza).
+  - **Secuencia Óptima de Xana Verificada**:
+    1. Tanda 1 en bobina `Vinilo Vehicular (1.37m)` para 16 OTs (35.2 ml continuos).
+    2. Tanda 2 en bobina `Vinilo Vehicular (1.52m)` para 8 OTs (19.7 ml continuos).
+    Total exacto en cola: **24 OTs / 54.83 metros lineales**.
+- [x] **Etiquetas Operativas en Carga de Pedido**:
+  - Selector visual interactivo de `PRESET_ORDER_TAGS` (`🚨 URGENTE`, `⭐ VIP`, `🔄 REIMPRESIÓN`, `🧪 MUESTRA`, `⏳ ESPERA PAGO`, `📦 STOCK`) integrado en `NuevoPedidoModal.tsx` tanto para carga unitaria como por lotes.
 
 ---
 
