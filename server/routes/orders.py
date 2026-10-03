@@ -459,6 +459,42 @@ def get_order(order_id):
     return jsonify({'error': 'Orden no encontrada'}), 404
 
 
+def _check_and_notify_order_priority(p, previous_tags=None):
+    """Dispara notificación push a Telegram cuando una orden es asignada como urgente o VIP."""
+    try:
+        esp = p.especificaciones or {}
+        raw_tags = esp.get('tags') or []
+        tags_lower = [str(t).lower() for t in raw_tags]
+        is_urgent = any('urgente' in t or 'vip' in t for t in tags_lower)
+
+        if previous_tags:
+            prev_lower = [str(t).lower() for t in previous_tags]
+            was_urgent = any('urgente' in t or 'vip' in t for t in prev_lower)
+            if was_urgent:
+                return
+
+        if is_urgent:
+            import threading
+            from services.telegram_service import notify_urgent_order
+            ot_code = f"OT-{str(p.id)[:8].upper()}"
+            cname = p.cliente.nombre if p.cliente else 'Cliente'
+            mat = esp.get('material') or 'Sustrato'
+            ml = float(esp.get('consumoEstimado') or 0.0)
+            if ml <= 0:
+                alto = float(esp.get('alto') or 0.0)
+                copias = int(esp.get('copias') or 1)
+                ml = alto * copias
+
+            p_status = p.estado or 'orden'
+            threading.Thread(
+                target=notify_urgent_order,
+                args=(ot_code, cname, mat, ml, "Prioridad asignada en sistema", p_status),
+                daemon=True
+            ).start()
+    except Exception as e:
+        print(f"[Telegram Notify Order] Error disparando notificación: {e}")
+
+
 # ================================================================
 # POST /api/orders — Crear una nueva orden
 # ================================================================
@@ -475,8 +511,10 @@ def create_order():
     p = _find_presupuesto(order_id) or _find_presupuesto(ot_val)
 
     if p:
+        prev_tags = list((p.especificaciones or {}).get('tags') or [])
         _apply_order_to_presupuesto(p, data)
         db.session.commit()
+        _check_and_notify_order_priority(p, previous_tags=prev_tags)
         return jsonify(_presupuesto_to_order(p)), 200
 
     # Validar vendedor_id
@@ -561,6 +599,7 @@ def create_order():
 
     db.session.add(p)
     db.session.commit()
+    _check_and_notify_order_priority(p)
 
     return jsonify(_presupuesto_to_order(p)), 201
 
@@ -578,8 +617,10 @@ def update_order(order_id):
     if not target:
         return jsonify({'error': 'Orden no encontrada'}), 404
 
+    prev_tags = list((target.especificaciones or {}).get('tags') or [])
     _apply_order_to_presupuesto(target, data)
     db.session.commit()
+    _check_and_notify_order_priority(target, previous_tags=prev_tags)
 
     return jsonify(_presupuesto_to_order(target))
 

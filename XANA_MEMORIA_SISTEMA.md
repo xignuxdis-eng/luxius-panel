@@ -540,6 +540,27 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Verificación y Compilación Exitosa**:
   - `npm run build` ejecutado en 6.80s sin errores de TypeScript ni empaquetado.
 
+### Sesión 03/10/2026 (3ª parte): Bot de Telegram Fases 2 & 3, Resumen Matutino (Briefing) y Voice-to-Task Multimodal (completado)
+- [x] **Telegram Bot — Fase 2: Modo Gestor & Memoria de Xana**:
+  - Comando `/addtask [texto]`: registro automático de tareas con ID `TASK-XXX`, timestamp ART y persistencia en `ConfigGlobal` de Neon PostgreSQL.
+  - Comando `/completar [ID]` o `/done`: cierre de tareas de la memoria.
+  - Comando `/clear`: depuración del historial manteniendo tareas en progreso y el backlog limpio.
+  - Notificaciones push activas inmediatas (`notify_urgent_order`, `notify_stock_alert`, `notify_xana_decision`) disparadas en segundo plano cuando una OT se marca como `🚨 URGENTE` o `⭐ VIP`, o ante insumos bajo mínimo.
+  - Endpoint `POST /api/telegram/notify` para alertas directas.
+- [x] **Resumen Matutino de Producción (Briefing Diario Automatizado)**:
+  - Servicio central `services/briefing_service.py` y endpoint `GET /api/production/briefing`.
+  - Agrupamiento inteligente por bobina para tandas continuas de taller (ej. 85.3 ml en VV 1.37), compromisos de entrega para el día, detección de urgencias y recomendación táctica de Xana.
+  - Comando `/briefing` en Telegram para consulta remota en cualquier momento.
+  - Integración en frontend: botón `☀️ Briefing del Día` en el Header del Dashboard, modal interactivo `MorningBriefingModal.tsx` con métricas, barras de demanda de bobina y botón `📲 Enviar Reporte a Telegram` (`POST /api/telegram/briefing/trigger`).
+- [x] **Telegram Bot — Fase 3: Modo Comandante con Audio de Voz Multimodal**:
+  - Webhook receptor de notas de voz (`voice` / `audio`) con descarga binaria mediante Telegram API.
+  - Inferencia y transcripción multimodal con Gemini en cascada (`gemini-3.5-flash` → `gemini-flash-latest` → `gemini-2.5-pro`) con paso de audio inline base64.
+  - Voice-to-Task agéntico: extracción de la intención y creación automática de tareas en la memoria de Xana sin intervención manual ante audios que indiquen anotar o recordar trabajos.
+  - Comando `/execute [directiva]` para resolución agéntica directa vía LangGraph.
+- [x] **Verificación y Compilación**:
+  - `npm run build` ejecutado en 7.36s sin errores.
+  - Backend daemon en puerto 5000 activo con PostgreSQL conectado y rutas `/api/production/briefing` y `/api/telegram/*` probadas y operativas.
+
 ---
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)

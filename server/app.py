@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv()
 
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, send_file
@@ -73,6 +75,7 @@ from routes.xana_voice import voice_bp
 from routes.xana_vault import vault_bp
 from routes.telegram import telegram_bp
 from routes.upscaler import upscaler_bp
+from routes.briefing import briefing_bp
 
 # Make limiter available to blueprints
 app.limiter = limiter
@@ -90,6 +93,7 @@ app.register_blueprint(voice_bp)
 app.register_blueprint(vault_bp)
 app.register_blueprint(telegram_bp)
 app.register_blueprint(upscaler_bp)
+app.register_blueprint(briefing_bp)
 
 
 # Rate limits are configured directly on routes or via limiter default limits

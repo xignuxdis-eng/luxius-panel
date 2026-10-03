@@ -10,11 +10,13 @@ import { Order } from '@/types'
 import './Dashboard.css'
 
 import WorkshopDashboard from '@components/workshop/WorkshopDashboard'
+import MorningBriefingModal from '@components/workshop/MorningBriefingModal'
 
 export default function Dashboard() {
     const navigate = useNavigate()
     const user = useAuthStore((state) => state.user)
     const [viewMode, setViewMode] = useState<'workshop' | 'standard'>('workshop')
+    const [showBriefing, setShowBriefing] = useState(false)
 
     // States for async data
     const [dbStats, setDbStats] = useState<any>({
@@ -154,7 +156,27 @@ export default function Dashboard() {
                     title="Panel de Control Luxius"
                     subtitle={`Bienvenido de nuevo, ${user?.name?.split(' ')[0] || 'Usuario'}.`}
                 />
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                        onClick={() => setShowBriefing(true)}
+                        style={{
+                            backgroundColor: '#059669',
+                            color: '#ffffff',
+                            border: '1px solid #10b981',
+                            padding: '8px 14px',
+                            borderRadius: '6px',
+                            fontWeight: 'bold',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                        }}
+                        title="Ver resumen matutino de taller y secuencia recomendada"
+                    >
+                        ☀️ Briefing del Día
+                    </button>
                     <button
                         onClick={() => setViewMode('workshop')}
                         style={{
@@ -259,6 +281,9 @@ export default function Dashboard() {
                     </div>
                 </aside>
             </div>
+
+            {/* Morning Briefing Modal */}
+            <MorningBriefingModal isOpen={showBriefing} onClose={() => setShowBriefing(false)} />
         </div>
     )
 }

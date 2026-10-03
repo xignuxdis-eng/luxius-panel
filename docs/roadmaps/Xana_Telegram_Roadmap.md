@@ -1,11 +1,11 @@
 # Roadmap: Integración de Xana y Telegram Bot 🤖📱
 
-Este documento establece el plan de acción para conectar el sistema de memoria "Xana" y los agentes de IA (Antigravity) con un bot de Telegram, permitiendo control, monitoreo y ejecución remota desde cualquier dispositivo móvil.
+Este documento establece el plan de acción para conectar el sistema de memoria "Xana" y los agentes de IA con un bot de Telegram, permitiendo control, monitoreo, briefing matutino y ejecución remota desde cualquier dispositivo móvil.
 
 ---
 
 ## Fase 1: Fundaciones y Monitoreo (Modo Observador) ✅ COMPLETADA (03/10/2026)
-**Objetivo:** Conectar el bot de Telegram al backend de LuXius para poder visualizar el estado de la IA a distancia.
+**Objetivo:** Conectar el bot de Telegram al backend de LuXius para poder visualizar el estado de la infraestructura a distancia.
 
 1. **Creación del Bot (BotFather):** 
    - Token de acceso configurable vía variable de entorno `TELEGRAM_BOT_TOKEN`.
@@ -15,7 +15,7 @@ Este documento establece el plan de acción para conectar el sistema de memoria 
    - Rutas Blueprint `/api/telegram/webhook`, `/api/telegram/status` y `/api/telegram/setup-webhook`.
    - Seguridad estricta por `TELEGRAM_ADMIN_CHAT_ID` (soporta múltiples IDs separados por coma). Respuestas denegadas automáticas a usuarios no autorizados.
 3. **Comandos de Lectura Implementados:**
-   - `/start` o `/ayuda`: Menú interactivo de comandos disponibles.
+   - `/start` o `/ayuda`: Menú interactivo de comandos disponibles clasificados.
    - `/status`: Estado en tiempo real del backend, latencia de base de datos Neon PostgreSQL y conteo de órdenes/máquinas.
    - `/taller`: Cola de impresión activa, conteo de OTs en taller, estimación de metros lineales pendientes y lista de órdenes urgentes (`🚨 URGENTE`).
    - `/alertas`: Detección en vivo de materiales con stock crítico o bajo el mínimo.
@@ -24,31 +24,40 @@ Este documento establece el plan de acción para conectar el sistema de memoria 
 
 ---
 
-## Fase 2: Control Unidireccional y Notificaciones (Modo Gestor)
-**Objetivo:** Poder dictar trabajo a la memoria de Xana desde el teléfono y recibir avisos cuando el sistema haga algo importante.
+## Fase 2: Control Gestor, Briefing Matutino y Notificaciones Push ✅ COMPLETADA (03/10/2026)
+**Objetivo:** Dictar trabajo a la memoria de Xana desde el teléfono, generar el briefing matutino de taller y recibir notificaciones push en tiempo real ante eventos prioritarios.
 
-1. **Gestión de Tareas:**
-   - Implementar `/addtask [texto]`: Permite escribir una idea o bug desde el celular y que se guarde automáticamente en la base de datos de Xana (para que la IA lo atienda luego).
-   - Implementar `/clear`: Limpiar tareas completadas del historial.
-2. **Notificaciones Push Activas:**
-   - Modificar los endpoints de `xana.py` para que, cada vez que una sesión de la IA se cierre con estado `completed` o `failed`, el servidor te envíe un mensaje a Telegram automáticamente: *"✅ Tarea completada: Arreglar bug de descarga"* o *"❌ Fallo en intento: Compilación vite caída"*.
-   - Notificación instantánea cuando la IA toma una **Decisión Arquitectónica** importante.
-
----
-
-## Fase 3: Ejecución Agéntica Total (Modo Comandante)
-**Objetivo:** Despertar y ordenar la ejecución de código a la IA directamente desde Telegram utilizando el SDK de Antigravity.
-
-1. **Integración SDK:**
-   - Instalar el `antigravity-sdk-python` en el servidor local.
-   - Darle permisos al backend para instanciar sub-agentes en tu repositorio de forma headless (sin interfaz visual).
-2. **Comando de Ejecución:**
-   - Implementar `/execute [instrucción]`. Esto no solo guardará la tarea en la memoria, sino que despertará a un agente de Antigravity en segundo plano, le dará la instrucción, y te mantendrá al tanto del progreso del código por Telegram.
-3. **Soporte Multimedia (Opcional pero brutal):**
-   - **Notas de voz:** Si envías un audio de voz por Telegram ("Oye, entra al CSS y cambia el dashboard a color azul"), el bot usará un modelo de voz a texto (Gemini/Whisper), lo convertirá en una tarea de Xana, y ejecutará el agente.
-   - **Imágenes:** Si envías un screenshot de un bug en la UI por Telegram, el agente lo recibe como contexto para ir a solucionarlo en el código.
+1. **Gestión Remota de Memoria de Xana:**
+   - `/addtask [texto]`: Permite ingresar ideas, órdenes o requerimientos desde el celular. Se le asigna automáticamente un identificador secuencial `TASK-XXX`, timestamp ART (UTC-3), prioridad heurística y persistencia en `ConfigGlobal` de Neon PostgreSQL.
+   - `/completar [ID]` o `/done [ID]`: Marca la tarea indicada como `completed` en la memoria del sistema.
+   - `/clear`: Depura y archiva tareas completadas antiguas manteniendo visible el backlog limpio y ordenado.
+2. **☀️ Briefing Matutino de Producción (`/briefing`):**
+   - Servicio central `services/briefing_service.py` y endpoint `GET /api/production/briefing`.
+   - Analiza en caliente metros lineales totales, bobinas más exigidas para consolidar tandas continuas de impresión, compromisos de entrega para hoy, urgencias y alertas de insumos.
+   - Incluye recomendación operativa táctica de Xana para el taller.
+   - Integrado en el panel web (`src/pages/Dashboard/Dashboard.tsx`) con botón `☀️ Briefing del Día`, modal Glassmorphism y botón de despacho inmediato a Telegram (`POST /api/telegram/briefing/trigger`).
+3. **Notificaciones Push Activas a Telegram:**
+   - `notify_urgent_order()`: Disparo automático e inmediato en segundo plano cuando un vendedor o diseñador crea o actualiza una OT con etiqueta `🚨 URGENTE` o `⭐ VIP`.
+   - `notify_stock_alert()`: Disparo de alerta push cuando un insumo cae bajo el stock mínimo.
+   - `notify_xana_decision()`: Aviso instantáneo cuando se asienta una nueva decisión arquitectónica (`DEC-XXX`) en el sistema.
+   - Endpoint `POST /api/telegram/notify` disponible para envíos directos autorizados.
 
 ---
 
-> NOTA
-> **Estado Actual:** Fase 1 COMPLETADA y verificada. La infraestructura del bot está desplegada y lista para operar vía Webhook en `/api/telegram/webhook`.
+## Fase 3: Modo Comandante con Audio de Voz Multimodal ✅ COMPLETADA (03/10/2026)
+**Objetivo:** Permitir el control y la interacción por voz en tiempo real con Xana desde Telegram utilizando modelos multimodales avanzados.
+
+1. **Procesamiento de Notas de Voz (`voice` / `audio`):**
+   - Detección reactiva en el webhook `/api/telegram/webhook`.
+   - Descarga en memoria binaria del audio `.oga` / `.ogg` mediante Telegram Bot API.
+   - Inferencia con Gemini Multimodal en cascada elástica (`gemini-3.5-flash` → `gemini-flash-latest` → `gemini-2.5-pro`) pasando los bytes inline base64.
+2. **Voice-to-Task Agéntico:**
+   - La IA transcribe fielmente el mensaje y extrae la intención:
+     - Si es un pedido de tarea (ej: *"anotame revisar las cuchillas del plotter Roland"*), extrae la directiva `ACCION: CREAR_TAREA: ...` y la crea de forma totalmente desatendida en la base de datos de Xana.
+     - Si es una consulta de taller, responde ejecutivamente en el mismo mensaje.
+3. **Comando de Ejecución Agéntica:**
+   - `/execute [instrucción]` o envío de texto libre: Invoca el motor LangGraph de Xana para resolver dudas de stock, metraje o tolerancias técnicas al instante.
+
+---
+
+> **Estado Actual:** Fases 1, 2 y 3 COMPLETADAS, verificadas en vivo contra Neon PostgreSQL y compiladas en el frontend de producción.

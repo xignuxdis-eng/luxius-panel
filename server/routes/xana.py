@@ -495,6 +495,13 @@ def add_xana_decision():
     decisions.insert(0, decision)
     store['decisions'] = decisions
     _save_xana_store(store)
+
+    try:
+        from services.telegram_service import notify_xana_decision
+        notify_xana_decision(decision['decision_id'], decision['topic'], decision['choice'])
+    except Exception:
+        pass
+
     return jsonify(decision), 201
 
 @xana_bp.get('/sessions')
