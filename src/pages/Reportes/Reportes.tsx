@@ -551,28 +551,67 @@ export default function Reportes() {
 
                                             <td>
                                                 <div>{Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m ({order.copias} cop)</div>
-                                                {(order.bobinaAsignada || order.consumoEstimado) && (
-                                                    <div style={{ marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                        {order.consumoEstimado && (
-                                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#00daf3' }}>
-                                                                {order.consumoEstimado.toFixed(2)} ml
-                                                            </span>
-                                                        )}
-                                                        {order.bobinaAsignada && (
-                                                            <span style={{
-                                                                fontSize: '0.68rem',
-                                                                fontWeight: 700,
-                                                                padding: '1px 4px',
-                                                                borderRadius: '4px',
-                                                                background: 'rgba(59, 130, 246, 0.18)',
-                                                                color: '#93c5fd',
-                                                                border: '1px solid rgba(59, 130, 246, 0.35)'
-                                                            }}>
-                                                                Rollo {order.bobinaAsignada}m
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                {(order.bobinaAsignada || order.consumoEstimado) && (() => {
+                                                    const isSpecial = (order.consumoEstimado && order.consumoEstimado > 2.93) || Math.max(Number(order.ancho) || 0, Number(order.alto) || 0) > 2.93;
+                                                    if (isSpecial) {
+                                                        return (
+                                                            <div style={{ marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }} title="⚠️ Paño > 2.93m: Requiere laminado especial">
+                                                                {order.consumoEstimado && (
+                                                                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f5d0fe' }}>
+                                                                        ⚡ {order.consumoEstimado.toFixed(2)} <small style={{ color: '#c084fc' }}>ml</small>
+                                                                    </span>
+                                                                )}
+                                                                {order.bobinaAsignada && (
+                                                                    <span style={{
+                                                                        fontSize: '0.66rem',
+                                                                        fontWeight: 700,
+                                                                        padding: '1px 5px',
+                                                                        borderRadius: '4px',
+                                                                        background: 'rgba(147, 51, 234, 0.35)',
+                                                                        color: '#e9d5ff',
+                                                                        border: '1px solid rgba(216, 180, 254, 0.5)'
+                                                                    }}>
+                                                                        Rollo {order.bobinaAsignada}m
+                                                                    </span>
+                                                                )}
+                                                                <span style={{
+                                                                    fontSize: '0.60rem',
+                                                                    fontWeight: 800,
+                                                                    padding: '1px 4px',
+                                                                    borderRadius: '4px',
+                                                                    background: 'linear-gradient(135deg, #9333ea 0%, #7e22ce 100%)',
+                                                                    color: '#fff',
+                                                                    border: '1px solid #c084fc',
+                                                                    letterSpacing: '0.3px'
+                                                                }}>
+                                                                    LAMINADO ESP.
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <div style={{ marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                            {order.consumoEstimado && (
+                                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#00daf3' }}>
+                                                                    {order.consumoEstimado.toFixed(2)} ml
+                                                                </span>
+                                                            )}
+                                                            {order.bobinaAsignada && (
+                                                                <span style={{
+                                                                    fontSize: '0.68rem',
+                                                                    fontWeight: 700,
+                                                                    padding: '1px 4px',
+                                                                    borderRadius: '4px',
+                                                                    background: 'rgba(59, 130, 246, 0.18)',
+                                                                    color: '#93c5fd',
+                                                                    border: '1px solid rgba(59, 130, 246, 0.35)'
+                                                                }}>
+                                                                    Rollo {order.bobinaAsignada}m
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>

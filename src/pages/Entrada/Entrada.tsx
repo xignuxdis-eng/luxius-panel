@@ -288,6 +288,90 @@ export default function Entrada() {
         };
     }
 
+    const isSpecialLaminationOrder = (order: Order, cons?: { value: number; unit: string; bobina: string | null }) => {
+        const c = cons || getConsumption(order);
+        const w = Number(order.ancho) || 0;
+        const h = Number(order.alto) || 0;
+        return (c.unit === 'ml' && c.value > 2.93) || Math.max(w, h) > 2.93;
+    };
+
+    const renderConsumptionBadge = (order: Order, cons: { value: number; unit: string; bobina: string | null }) => {
+        const isSpecial = isSpecialLaminationOrder(order, cons);
+
+        if (cons.unit === 'ml') {
+            if (isSpecial) {
+                return (
+                    <div
+                        className="special-lamination-box"
+                        title="⚠️ Paño mayor a 2.93m: Requiere proceso de laminado especial en producción"
+                    >
+                        <div className="special-lamination-val font-mono">
+                            <span style={{ fontSize: '0.8rem' }}>⚡</span>
+                            <span>{cons.value.toFixed(2)}</span>
+                            <small style={{ color: '#c084fc', fontWeight: 800 }}>ml</small>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            {cons.bobina && (
+                                <span className="special-lamination-bobina">
+                                    Rollo {cons.bobina}m
+                                </span>
+                            )}
+                            <span className="special-lamination-pill">
+                                LAMINADO ESP.
+                            </span>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: '#00daf3', fontSize: '0.85rem' }}>
+                        {cons.value.toFixed(2)} <small>ml</small>
+                    </span>
+                    {cons.bobina && (
+                        <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            background: 'rgba(59, 130, 246, 0.18)',
+                            color: '#93c5fd',
+                            border: '1px solid rgba(59, 130, 246, 0.35)',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            Rollo {cons.bobina}m
+                        </span>
+                    )}
+                </div>
+            );
+        }
+
+        if (isSpecial) {
+            return (
+                <div
+                    className="special-lamination-box"
+                    title="⚠️ Paño mayor a 2.93m: Requiere proceso de laminado especial en producción"
+                >
+                    <div className="special-lamination-val font-mono">
+                        <span style={{ fontSize: '0.8rem' }}>⚡</span>
+                        <span>{cons.value.toFixed(2)}</span>
+                        <small style={{ color: '#c084fc', fontWeight: 800 }}>{cons.unit}</small>
+                    </div>
+                    <span className="special-lamination-pill">
+                        LAMINADO ESP.
+                    </span>
+                </div>
+            );
+        }
+
+        return (
+            <span className="m2-text font-mono text-muted">
+                {cons.value.toFixed(2)} <small>{cons.unit}</small>
+            </span>
+        );
+    };
+
     // ACCORDION / BATCH GROUPING TYPES & COMPUTATION
     interface GroupedBatch {
         isBatch: true;
@@ -1025,11 +1109,23 @@ export default function Entrada() {
                                                                     ))}
                                                                 </div>
                                                             )}
+                                                            {item.orders.some(o => isSpecialLaminationOrder(o)) && (
+                                                                <span className="batch-special-lamination-pill" title="Este lote incluye paños > 2.93m con laminado especial">
+                                                                    <span>⚡</span> Paños {'>'} 2.93m (Laminado Esp.)
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     ) : (
-                                                        <span className="m2-text font-mono text-muted" style={{ fontWeight: 700, color: '#e2e8f0' }}>
-                                                            {item.totalConsumption.m2.toFixed(2)} <small>m²</small>
-                                                        </span>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                            <span className="m2-text font-mono text-muted" style={{ fontWeight: 700, color: '#e2e8f0' }}>
+                                                                {item.totalConsumption.m2.toFixed(2)} <small>m²</small>
+                                                            </span>
+                                                            {item.orders.some(o => isSpecialLaminationOrder(o)) && (
+                                                                <span className="batch-special-lamination-pill" title="Este lote incluye paños > 2.93m con laminado especial">
+                                                                    <span>⚡</span> Paños {'>'} 2.93m (Laminado Esp.)
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </td>
                                                 {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
@@ -1144,7 +1240,7 @@ export default function Entrada() {
 
 
                                                 return (
-                                                    <tr key={order.id || order.ot} className={`batch-child-row fade-in ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''}`}>
+                                                    <tr key={order.id || order.ot} className={`batch-child-row fade-in ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''} ${isSpecialLaminationOrder(order, consumption) ? 'is-special-lamination' : ''}`}>
                                                         <td style={{ verticalAlign: 'middle' }}>
                                                             <div className="batch-child-indent">
                                                                 <span className="batch-child-connector">↳</span>
@@ -1190,7 +1286,7 @@ export default function Entrada() {
                                                                 fontSize: '0.72rem',
                                                                 padding: '2px 6px',
                                                                 cursor: 'pointer'
-                                                            }}>
+                                                             }}>
                                                                 {statusLabels[order.status]}
                                                             </span>
                                                         </td>
@@ -1201,7 +1297,20 @@ export default function Entrada() {
                                                             <span className="material-tag-sm">{order.material}</span>
                                                         </td>
                                                         <td style={{ textAlign: 'center' }}>
-                                                            <span className="dims-text">{Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m</span>
+                                                            {(() => {
+                                                                const w = Number(order.ancho) || 0;
+                                                                const h = Number(order.alto) || 0;
+                                                                const isSpecial = isSpecialLaminationOrder(order, consumption);
+                                                                return (
+                                                                    <span className="dims-text">
+                                                                        <span style={w > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{w.toFixed(2)}</span>
+                                                                        {' x '}
+                                                                        <span style={h > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{h.toFixed(2)}</span>
+                                                                        {' m'}
+                                                                        {isSpecial && <span style={{ marginLeft: '3px', fontSize: '0.72rem', color: '#c084fc' }} title="Paño > 2.93m: Requiere laminado especial">⚡</span>}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td style={{ textAlign: 'center' }}>
                                                             <span className="copies-badge">{order.copias}</span>
@@ -1222,31 +1331,7 @@ export default function Entrada() {
                                                             )}
                                                         </td>
                                                         <td style={{ textAlign: 'center' }}>
-                                                            {consumption.unit === 'ml' ? (
-                                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: '#00daf3', fontSize: '0.85rem' }}>
-                                                                        {consumption.value.toFixed(2)} <small>ml</small>
-                                                                    </span>
-                                                                    {consumption.bobina && (
-                                                                        <span style={{
-                                                                            fontSize: '0.68rem',
-                                                                            fontWeight: 700,
-                                                                            padding: '1px 5px',
-                                                                            borderRadius: '4px',
-                                                                            background: 'rgba(59, 130, 246, 0.18)',
-                                                                            color: '#93c5fd',
-                                                                            border: '1px solid rgba(59, 130, 246, 0.35)',
-                                                                            whiteSpace: 'nowrap'
-                                                                        }}>
-                                                                            Rollo {consumption.bobina}m
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="m2-text font-mono text-muted">
-                                                                    {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
-                                                                </span>
-                                                            )}
+                                                            {renderConsumptionBadge(order, consumption)}
                                                         </td>
                                                         {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
                                                             <td>
@@ -1357,7 +1442,7 @@ export default function Entrada() {
                                 }
 
                                 return (
-                                    <tr key={order.id || order.ot} className={`fade-in hover-row ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''}`} style={selectedIds.has(String(order.id || order.ot)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
+                                    <tr key={order.id || order.ot} className={`fade-in hover-row ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''} ${isSpecialLaminationOrder(order, consumption) ? 'is-special-lamination' : ''}`} style={selectedIds.has(String(order.id || order.ot)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
                                         <td>
                                             <input
                                                 type="checkbox"
@@ -1450,7 +1535,20 @@ export default function Entrada() {
                                             </div>
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
-                                            <span className="dims-text">{Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m</span>
+                                            {(() => {
+                                                const w = Number(order.ancho) || 0;
+                                                const h = Number(order.alto) || 0;
+                                                const isSpecial = isSpecialLaminationOrder(order, consumption);
+                                                return (
+                                                    <span className="dims-text">
+                                                        <span style={w > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{w.toFixed(2)}</span>
+                                                        {' x '}
+                                                        <span style={h > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{h.toFixed(2)}</span>
+                                                        {' m'}
+                                                        {isSpecial && <span style={{ marginLeft: '3px', fontSize: '0.72rem', color: '#c084fc' }} title="Paño > 2.93m: Requiere laminado especial">⚡</span>}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
                                             <span className="copies-badge">{order.copias}</span>
@@ -1471,31 +1569,7 @@ export default function Entrada() {
                                             )}
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
-                                            {consumption.unit === 'ml' ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: '#00daf3', fontSize: '0.85rem' }}>
-                                                        {consumption.value.toFixed(2)} <small>ml</small>
-                                                    </span>
-                                                    {consumption.bobina && (
-                                                        <span style={{
-                                                            fontSize: '0.68rem',
-                                                            fontWeight: 700,
-                                                            padding: '1px 5px',
-                                                            borderRadius: '4px',
-                                                            background: 'rgba(59, 130, 246, 0.18)',
-                                                            color: '#93c5fd',
-                                                            border: '1px solid rgba(59, 130, 246, 0.35)',
-                                                            whiteSpace: 'nowrap'
-                                                        }}>
-                                                            Rollo {consumption.bobina}m
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="m2-text font-mono text-muted">
-                                                    {consumption.value.toFixed(2)} <small>{consumption.unit}</small>
-                                                </span>
-                                            )}
+                                            {renderConsumptionBadge(order, consumption)}
                                         </td>
                                         {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
                                             <td>
