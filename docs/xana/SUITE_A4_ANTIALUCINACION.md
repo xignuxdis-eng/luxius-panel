@@ -1,8 +1,8 @@
 # 🧪 Suite de Evaluación de Xana AI — A4 (Anti-Alucinación) y A1 (Selección de Tools)
 
-**Versión:** Fase 0 — redacción inicial
-**Fecha:** 27/09/2026
-**Estado:** Preparada (no ejecutable aún; se ejecuta por primera vez en Fase 1, cuando exista al menos una tool/LLM respondiendo)
+**Versión:** Fase 1 — Ejecutada y Aprobada
+**Fecha:** 03/10/2026
+**Estado:** ✅ APROBADA (23/23 casos aprobados, 0 alucinaciones, 100% en casos trampa). Ver `REPORTE_GATE_A4_EJECUTADO.md`.
 
 ---
 

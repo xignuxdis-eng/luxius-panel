@@ -124,6 +124,9 @@ export interface Order {
         tipoCobro?: 'ml' | 'm2';
         consumoML?: number;
     };
+
+    // Operational Tags
+    tags?: string[];
 }
 
 
@@ -137,6 +140,29 @@ export interface OrderFilters {
     ancho?: number
     accesorios?: string
     emergencia?: boolean
+    tag?: string
+}
+
+export interface OrderTagDef {
+    id: string;
+    label: string;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    icon: string;
+}
+
+export const PRESET_ORDER_TAGS: OrderTagDef[] = [
+    { id: 'urgente', label: 'URGENTE', color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', icon: '🚨' },
+    { id: 'reimpresion', label: 'REIMPRESIÓN', color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.4)', icon: '🔄' },
+    { id: 'muestra', label: 'MUESTRA', color: '#a855f7', bgColor: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.4)', icon: '🧪' },
+    { id: 'vip', label: 'VIP', color: '#ec4899', bgColor: 'rgba(236, 72, 153, 0.15)', borderColor: 'rgba(236, 72, 153, 0.4)', icon: '⭐' },
+    { id: 'espera_pago', label: 'ESPERA PAGO', color: '#eab308', bgColor: 'rgba(234, 179, 8, 0.15)', borderColor: 'rgba(234, 179, 8, 0.4)', icon: '⏳' },
+    { id: 'stock', label: 'STOCK', color: '#06b6d4', bgColor: 'rgba(6, 182, 212, 0.15)', borderColor: 'rgba(6, 182, 212, 0.4)', icon: '📦' },
+];
+
+export function getOrderTag(tagId: string): OrderTagDef | undefined {
+    return PRESET_ORDER_TAGS.find(t => t.id === tagId || t.label.toLowerCase() === tagId.toLowerCase());
 }
 
 // Status labels for UI

@@ -314,6 +314,9 @@ def _presupuesto_to_order(p):
         'origen': p.origen or 'web',
         'vendedorNombre': p.vendedor.nombre if p.vendedor else (esp.get('operarioNombre') or esp.get('vendedorNombre') or ''),
         'operarioNombre': p.vendedor.nombre if p.vendedor else (esp.get('operarioNombre') or esp.get('vendedorNombre') or ''),
+
+        # Operational tags
+        'tags': esp.get('tags') or [],
     }
 
 
@@ -412,7 +415,7 @@ def _apply_order_to_presupuesto(p, data):
 
     from sqlalchemy.orm.attributes import flag_modified
     current_especs = dict(p.especificaciones or {})
-    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente', 'precioUnitarioManual'):
+    for k in ('carteles', 'archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente', 'precioUnitarioManual', 'tags'):
         if k in data:
             current_especs[k] = data[k]
 
@@ -550,7 +553,7 @@ def create_order():
         }]
         especs['carteles'] = carteles
 
-    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente', 'precioUnitarioManual'):
+    for k in ('archivos', 'archivosOriginales', 'imgMetadata', 'servicios', 'demasiasConfig', 'material', 'calidad', 'alto', 'ancho', 'copias', 'batchId', 'loteId', 'loteNombre', 'descripcionItem', 'nombreTarea', 'bobinaAsignada', 'consumoEstimado', 'precioMl', 'precioDetalle', 'envio', 'sena', 'senaMonto', 'senaMetodo', 'senaPorcentaje', 'saldoPendiente', 'precioUnitarioManual', 'tags'):
         if k in data:
             especs[k] = data[k]
 

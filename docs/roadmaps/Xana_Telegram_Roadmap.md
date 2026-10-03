@@ -4,19 +4,23 @@ Este documento establece el plan de acción para conectar el sistema de memoria 
 
 ---
 
-## Fase 1: Fundaciones y Monitoreo (Modo Observador)
+## Fase 1: Fundaciones y Monitoreo (Modo Observador) ✅ COMPLETADA (03/10/2026)
 **Objetivo:** Conectar el bot de Telegram al backend de LuXius para poder visualizar el estado de la IA a distancia.
 
 1. **Creación del Bot (BotFather):** 
-   - Generar el Token de acceso en Telegram.
-   - Definir comandos básicos en el menú del bot.
+   - Token de acceso configurable vía variable de entorno `TELEGRAM_BOT_TOKEN`.
+   - Definidos comandos de monitoreo y taller.
 2. **Infraestructura Backend:** 
-   - Crear un script `telegram_service.py` en el backend de LuXius utilizando la librería `python-telegram-bot` (o configurar Webhooks hacia Render).
-   - Asegurar el bot (solo tú, mediante tu Chat ID, podrás darle órdenes).
-3. **Comandos de Lectura:**
-   - Implementar `/status`: Responde con el estado del backend y si la IA está activa.
-   - Implementar `/tareas`: Lee de la base de datos de Xana y devuelve una lista de las tareas en progreso (`in_progress`) y completadas (`completed`).
-   - Implementar `/sesiones`: Resumen de los últimos agentes y modelos que han modificado el código.
+   - Módulo `services/telegram_service.py` con cliente HTTP directo (sin dependencias pesadas).
+   - Rutas Blueprint `/api/telegram/webhook`, `/api/telegram/status` y `/api/telegram/setup-webhook`.
+   - Seguridad estricta por `TELEGRAM_ADMIN_CHAT_ID` (soporta múltiples IDs separados por coma). Respuestas denegadas automáticas a usuarios no autorizados.
+3. **Comandos de Lectura Implementados:**
+   - `/start` o `/ayuda`: Menú interactivo de comandos disponibles.
+   - `/status`: Estado en tiempo real del backend, latencia de base de datos Neon PostgreSQL y conteo de órdenes/máquinas.
+   - `/taller`: Cola de impresión activa, conteo de OTs en taller, estimación de metros lineales pendientes y lista de órdenes urgentes (`🚨 URGENTE`).
+   - `/alertas`: Detección en vivo de materiales con stock crítico o bajo el mínimo.
+   - `/tareas`: Lectura de la memoria de Xana (`in_progress` y `completed`).
+   - `/sesiones`: Resumen de agentes, modelos y últimos commits registrados.
 
 ---
 
@@ -47,4 +51,4 @@ Este documento establece el plan de acción para conectar el sistema de memoria 
 ---
 
 > NOTA
-> **Estado Actual:** Pendiente de ejecución. Este archivo vivirá en tu repositorio para que podamos retomarlo en el futuro simplemente escribiendo: *"Ejecuta la Fase 1 del Xana Telegram Roadmap"*.
+> **Estado Actual:** Fase 1 COMPLETADA y verificada. La infraestructura del bot está desplegada y lista para operar vía Webhook en `/api/telegram/webhook`.

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
-import { statusColors, statusLabels } from '../../types/orden'
+import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag } from '../../types/orden'
 import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
@@ -15,6 +15,87 @@ import { computeStockForecast, canViewStockAlerts } from '@/utils/stockForecast'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
 import './Entrada.css'
+
+interface OrderTagBadgesProps {
+    order: Order;
+    tagPopoverOrderId: number | string | null;
+    setTagPopoverOrderId: (id: number | string | null) => void;
+    onToggleTag: (order: Order, tagId: string, e?: React.MouseEvent) => void;
+}
+
+function OrderTagBadges({ order, tagPopoverOrderId, setTagPopoverOrderId, onToggleTag }: OrderTagBadgesProps) {
+    const orderKey = order.id || order.ot;
+    const isPopoverOpen = tagPopoverOrderId === orderKey;
+    const tags = order.tags || [];
+
+    return (
+        <div className="order-tags-container" onClick={(e) => e.stopPropagation()}>
+            <div className="order-tags-list">
+                {tags.map(tId => {
+                    const tag = getOrderTag(tId);
+                    if (!tag) return null;
+                    return (
+                        <span
+                            key={tId}
+                            className="order-tag-badge"
+                            style={{
+                                color: tag.color,
+                                backgroundColor: tag.bgColor,
+                                borderColor: tag.borderColor
+                            }}
+                            title={`Etiqueta: ${tag.label}. Clic para editar`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setTagPopoverOrderId(isPopoverOpen ? null : orderKey);
+                            }}
+                        >
+                            <span className="tag-icon">{tag.icon}</span>
+                            <span className="tag-label">{tag.label}</span>
+                        </span>
+                    );
+                })}
+                <button
+                    type="button"
+                    className="order-tag-add-btn"
+                    title="Asignar o editar etiquetas operativas"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setTagPopoverOrderId(isPopoverOpen ? null : orderKey);
+                    }}
+                >
+                    🏷️{tags.length === 0 ? ' +' : ''}
+                </button>
+            </div>
+
+            {isPopoverOpen && (
+                <div className="tag-picker-popover animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="tag-picker-header">
+                        <span>🏷️ Etiquetas ({order.ot || `OT-${order.id}`})</span>
+                        <button type="button" className="tag-picker-close" onClick={() => setTagPopoverOrderId(null)}>×</button>
+                    </div>
+                    <div className="tag-picker-grid">
+                        {PRESET_ORDER_TAGS.map(pt => {
+                            const isSelected = tags.includes(pt.id);
+                            return (
+                                <button
+                                    key={pt.id}
+                                    type="button"
+                                    className={`tag-picker-option ${isSelected ? 'is-selected' : ''}`}
+                                    style={isSelected ? { borderColor: pt.color, backgroundColor: pt.bgColor, color: pt.color } : {}}
+                                    onClick={(e) => onToggleTag(order, pt.id, e)}
+                                >
+                                    <span className="option-icon">{pt.icon}</span>
+                                    <span className="option-label">{pt.label}</span>
+                                    <span className="option-check">{isSelected ? '✓' : '+'}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default function Entrada() {
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -66,11 +147,20 @@ export default function Entrada() {
     const [calidadFilter] = useState('')
     const [materialFilter, setMaterialFilter] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
+    const [tagFilter, setTagFilter] = useState<string>('')
+    const [tagPopoverOrderId, setTagPopoverOrderId] = useState<number | string | null>(null)
+
+    // Close tag popover on outside click
+    useEffect(() => {
+        const handleDocClick = () => setTagPopoverOrderId(null);
+        window.addEventListener('click', handleDocClick);
+        return () => window.removeEventListener('click', handleDocClick);
+    }, []);
 
     // Clear selection when switching tabs or changing filters
     useEffect(() => {
         setSelectedIds(new Set())
-    }, [viewTab, searchTerm, statusFilter, materialFilter, categoryFilter])
+    }, [viewTab, searchTerm, statusFilter, materialFilter, categoryFilter, tagFilter])
 
     const { user } = useAuthStore()
     const [allClientes, setAllClientes] = useState<Cliente[]>(getClientes())
@@ -81,6 +171,48 @@ export default function Entrada() {
         setAllMateriales(getMateriales())
     }, [orders])
 
+    const handleToggleOrderTag = async (targetOrder: Order, tagId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const currentTags = targetOrder.tags || [];
+        const newTags = currentTags.includes(tagId)
+            ? currentTags.filter(t => t !== tagId)
+            : [...currentTags, tagId];
+
+        setOrders(prev => prev.map(o => (o.id === targetOrder.id || (o.ot && o.ot === targetOrder.ot)) ? { ...o, tags: newTags } : o));
+
+        try {
+            await saveOrden({ id: targetOrder.id, ot: targetOrder.ot, tags: newTags });
+        } catch (err) {
+            console.error('Error guardando tag:', err);
+        }
+    };
+
+    const handleBulkApplyTag = async (tagId: string) => {
+        if (selectedIds.size === 0) return;
+        const selectedOrders = orders.filter(o => selectedIds.has(String(o.id || o.ot)));
+        if (selectedOrders.length === 0) return;
+
+        setOrders(prev => prev.map(o => {
+            if (selectedIds.has(String(o.id || o.ot))) {
+                const cur = o.tags || [];
+                const updated = cur.includes(tagId) ? cur : [...cur, tagId];
+                return { ...o, tags: updated };
+            }
+            return o;
+        }));
+
+        for (const order of selectedOrders) {
+            const cur = order.tags || [];
+            if (!cur.includes(tagId)) {
+                try {
+                    await saveOrden({ id: order.id, ot: order.ot, tags: [...cur, tagId] });
+                } catch (err) {
+                    console.error(`Error aplicando etiqueta a ${order.ot}:`, err);
+                }
+            }
+        }
+    };
+
     const filteredOrders = orders.filter(order => {
         const matchesSearch =
             (order.clienteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -90,12 +222,17 @@ export default function Entrada() {
             (order.nombreTarea?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
             (order.loteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
             (order.descripcionItem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.observaciones?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+            (order.observaciones?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (order.tags && order.tags.some(t => {
+                const def = getOrderTag(t);
+                return t.toLowerCase().includes(searchTerm.toLowerCase()) || (def && def.label.toLowerCase().includes(searchTerm.toLowerCase()));
+            }));
 
         const matchesStatus = statusFilter === '' || order.status === statusFilter;
         const matchesCalidad = calidadFilter === '' || order.calidad === calidadFilter;
         const matchesMaterial = materialFilter === '' || order.material === materialFilter;
         const matchesCategory = categoryFilter === '' || order.category === categoryFilter;
+        const matchesTag = !tagFilter || (order.tags && order.tags.includes(tagFilter));
 
         const isArtista = user?.role === 'artista';
         const isImpresor = user?.role === 'impresion';
@@ -120,7 +257,7 @@ export default function Entrada() {
         if (isArtista && !isRelevantForArtista) return false;
         if (isImpresor && !isRelevantForImpresor) return false;
 
-        return matchesSearch && matchesStatus && matchesCalidad && matchesMaterial && matchesCategory;
+        return matchesSearch && matchesStatus && matchesCalidad && matchesMaterial && matchesCategory && matchesTag;
     })
 
     const displayedOrders = viewTab === 'trash'
@@ -606,6 +743,7 @@ export default function Entrada() {
         setStatusFilter('')
         setMaterialFilter('')
         setCategoryFilter('')
+        setTagFilter('')
     }
 
     // BATCH ACTIONS
@@ -764,36 +902,64 @@ export default function Entrada() {
             <Header title="Entrada / Ordenes" subtitle="Gestión general de pedidos" />
 
             {/* ACTION BAR */}
-            <div className="filters-bar animate-slide-down">
-                <div className="filter-group">
-                    <div className="search-wrapper">
-                        <input
-                            type="text"
-                            placeholder="Buscar por Cliente, OT, ID..."
-                            className="search-input"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+            <div className="filters-bar animate-slide-down" style={{ flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '12px', flexWrap: 'wrap' }}>
+                    <div className="filter-group">
+                        <div className="search-wrapper">
+                            <input
+                                type="text"
+                                placeholder="Buscar por Cliente, OT, ID, Etiqueta..."
+                                className="search-input"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+
+                        <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                            <option value="">Todos los Estados</option>
+                            <option value="preorden">Pre-Orden (Diseño)</option>
+                            <option value="orden">Para Imprimir</option>
+                            <option value="impreso">Impreso</option>
+                            <option value="entregado">Entregado</option>
+                        </select>
+
+                        <Button variant="ghost" onClick={handleClearFilters} size="sm">Limpiar</Button>
                     </div>
 
-                    <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="">Todos los Estados</option>
-                        <option value="preorden">Pre-Orden (Diseño)</option>
-                        <option value="orden">Para Imprimir</option>
-                        <option value="impreso">Impreso</option>
-                        <option value="entregado">Entregado</option>
-                    </select>
-
-                    <Button variant="ghost" onClick={handleClearFilters} size="sm">Limpiar</Button>
+                    <div className="filter-actions">
+                        <span className="results-count">
+                            {filteredOrders.length} ordenes
+                        </span>
+                        <Button variant="primary" onClick={handleNewOrder} size="sm" className="btn-glow">
+                            + Nuevo Pedido
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="filter-actions">
-                    <span className="results-count">
-                        {filteredOrders.length} ordenes
-                    </span>
-                    <Button variant="primary" onClick={handleNewOrder} size="sm" className="btn-glow">
-                        + Nuevo Pedido
-                    </Button>
+                {/* TAG FILTER CHIPS */}
+                <div className="tag-filter-chips">
+                    <button
+                        type="button"
+                        className={`tag-chip ${tagFilter === '' ? 'is-active' : ''}`}
+                        onClick={() => setTagFilter('')}
+                    >
+                        🏷️ Todas ({orders.length})
+                    </button>
+                    {PRESET_ORDER_TAGS.map(tag => {
+                        const count = orders.filter(o => o.tags && o.tags.includes(tag.id)).length;
+                        const isActive = tagFilter === tag.id;
+                        return (
+                            <button
+                                key={tag.id}
+                                type="button"
+                                className={`tag-chip ${isActive ? 'is-active' : ''}`}
+                                style={isActive ? { background: tag.bgColor, borderColor: tag.color, color: tag.color } : {}}
+                                onClick={() => setTagFilter(isActive ? '' : tag.id)}
+                            >
+                                <span>{tag.icon}</span> {tag.label} {count > 0 && <span style={{ opacity: 0.85, fontSize: '0.65rem' }}>({count})</span>}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -851,6 +1017,21 @@ export default function Entrada() {
                             {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
                                 <span>Total $: <strong>{selectedTotals.price.toLocaleString()}</strong></span>
                             )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', borderLeft: '1px solid var(--border-color)', paddingLeft: '1rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Etiquetar:</span>
+                            {PRESET_ORDER_TAGS.map(pt => (
+                                <button
+                                    key={pt.id}
+                                    type="button"
+                                    className="btn-batch-tag"
+                                    style={{ borderColor: pt.borderColor, color: pt.color, background: pt.bgColor }}
+                                    onClick={() => handleBulkApplyTag(pt.id)}
+                                    title={`Aplicar ${pt.label} a ${selectedIds.size} órdenes seleccionadas`}
+                                >
+                                    {pt.icon} {pt.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1260,6 +1441,12 @@ export default function Entrada() {
                                                                         {childLabel}
                                                                     </span>
                                                                 )}
+                                                                <OrderTagBadges
+                                                                    order={order}
+                                                                    tagPopoverOrderId={tagPopoverOrderId}
+                                                                    setTagPopoverOrderId={setTagPopoverOrderId}
+                                                                    onToggleTag={handleToggleOrderTag}
+                                                                />
                                                             </div>
                                                         </td>
                                                         <td>
@@ -1459,6 +1646,12 @@ export default function Entrada() {
                                                         {cleanDesc}
                                                     </span>
                                                 )}
+                                                <OrderTagBadges
+                                                    order={order}
+                                                    tagPopoverOrderId={tagPopoverOrderId}
+                                                    setTagPopoverOrderId={setTagPopoverOrderId}
+                                                    onToggleTag={handleToggleOrderTag}
+                                                />
                                             </div>
                                         </td>
                                         <td>
