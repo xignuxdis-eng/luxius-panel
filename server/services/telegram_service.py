@@ -14,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 import requests
 from models import db, Presupuesto, Cliente, Maquina, Vendedor, ConfigGlobal
-from services.briefing_service import generate_daily_briefing
+from services.briefing_service import generate_daily_briefing, resolve_material_name, resolve_bobina_ancho
 
 AR_TZ = timezone(timedelta(hours=-3))
 
@@ -346,10 +346,16 @@ def cmd_status() -> str:
 
 def cmd_taller() -> str:
     try:
+        # Filtrar estrictamente órdenes pendientes de impresión (excluye ya impresas)
         ordenes = Presupuesto.query.filter(
             Presupuesto.deleted_at.is_(None),
-            Presupuesto.estado.in_(['orden', 'ORDEN_DE_TRABAJO', 'impreso', 'post', 'borrador'])
+            Presupuesto.estado.in_(['orden', 'ORDEN_DE_TRABAJO'])
         ).order_by(Presupuesto.created_at.asc()).all()
+
+        total_impresas = Presupuesto.query.filter(
+            Presupuesto.deleted_at.is_(None),
+            Presupuesto.estado.in_(['impreso', 'IMPRESO'])
+        ).count()
 
         total_taller = len(ordenes)
         total_ml = 0.0
@@ -369,13 +375,15 @@ def cmd_taller() -> str:
             total_ml += ml
 
             cname = p.cliente.nombre if p.cliente else 'Cliente'
-            mat = esp.get('material') or 'Sustrato'
+            raw_mat = esp.get('material')
+            mat_name = resolve_material_name(raw_mat)
+            bob_ancho = resolve_bobina_ancho(esp, raw_mat)
             ot_code = f"OT-{str(p.id)[:8].upper()}"
 
             entry = {
                 'ot': ot_code,
                 'cliente': cname,
-                'material': mat,
+                'material': f"{mat_name} ({bob_ancho})",
                 'ml': round(ml, 2),
                 'urgente': is_urgente,
                 'estado': p.estado
@@ -388,25 +396,26 @@ def cmd_taller() -> str:
 
         lines = [
             "🏭 *Estado del Taller y Cola de Impresión*",
-            f"• *Total en Proceso:* {total_taller} OTs",
-            f"• *Metros Lineales Pendientes:* {total_ml:.2f} ml",
-            f"• *🚨 OTs Urgentes:* {len(urgentes)}\n"
+            f"• *Pendientes para Imprimir:* {total_taller} OTs",
+            f"• *Metros Lineales en Cola:* {total_ml:.2f} ml",
+            f"• *🚨 OTs Urgentes / VIP:* {len(urgentes)}",
+            f"• *✅ Ya Impresas en Taller:* {total_impresas} OTs\n"
         ]
 
         if urgentes:
             lines.append("🔥 *URGENCIAS ACTIVAS:*")
             for u in urgentes[:5]:
-                lines.append(f"• 🚨 *{u['ot']}* | {u['cliente']} ({u['material']}) — {u['ml']} ml [{u['estado']}]")
+                lines.append(f"• 🚨 *{u['ot']}* | {u['cliente']} — {u['material']} ({u['ml']} ml)")
             lines.append("")
 
-        lines.append("📋 *Próximas en Cola:*")
+        lines.append("📋 *Próximas OTs en Cola de Producción:*")
         all_sorted = urgentes + regular_queue
-        for idx, item in enumerate(all_sorted[:6], 1):
+        for idx, item in enumerate(all_sorted[:8], 1):
             badge = "🚨 " if item['urgente'] else ""
             lines.append(f"{idx}. {badge}*{item['ot']}* — {item['cliente']} ({item['material']}) · {item['ml']} ml")
 
         if not all_sorted:
-            lines.append("✨ *No hay trabajos pendientes en taller.*")
+            lines.append("✨ *Taller al día: No hay trabajos pendientes de impresión.*")
 
         return "\n".join(lines)
     except Exception as e:
