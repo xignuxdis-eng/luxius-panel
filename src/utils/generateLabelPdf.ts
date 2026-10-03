@@ -215,7 +215,7 @@ const LABEL_CSS = `
     }
 
     @page {
-        size: ${LABEL_CONFIG.labelWidthMM}mm auto;
+        size: ${LABEL_CONFIG.labelWidthMM}mm 297mm;
         margin: 0;
     }
 
@@ -234,6 +234,10 @@ const LABEL_CSS = `
         font-weight: 600;
         font-size: 13px;
         line-height: 1.35;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     .no-print-bar {
@@ -242,9 +246,10 @@ const LABEL_CSS = `
         align-items: center;
         background: #0f172a;
         color: #fff;
-        padding: 12px 20px;
-        width: 100%;
+        padding: 12px 18px;
+        width: ${LABEL_CONFIG.labelWidthMM}mm;
         max-width: ${LABEL_CONFIG.labelWidthMM}mm;
+        box-sizing: border-box;
         margin: 14px auto 8px auto;
         border-radius: 8px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.3);
@@ -277,25 +282,37 @@ const LABEL_CSS = `
 
     @media print {
         .no-print-bar { display: none !important; }
-        html, body { background: #fff !important; }
+        html, body {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            display: block !important;
+        }
         .label-page {
             box-shadow: none !important;
-            margin: 0 !important;
-            border: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 8mm 6mm !important;
+            margin: 0 auto !important;
+            border: 2px solid #0f172a !important;
+            width: ${LABEL_CONFIG.labelWidthMM}mm !important;
+            max-width: ${LABEL_CONFIG.labelWidthMM}mm !important;
+            min-width: ${LABEL_CONFIG.labelWidthMM}mm !important;
+            box-sizing: border-box !important;
+            padding: 6mm 5mm !important;
+            page-break-inside: auto;
         }
     }
 
     .label-page {
         width: ${LABEL_CONFIG.labelWidthMM}mm;
-        margin: 12px auto 40px auto;
+        max-width: ${LABEL_CONFIG.labelWidthMM}mm;
+        min-width: ${LABEL_CONFIG.labelWidthMM}mm;
+        box-sizing: border-box;
+        margin: 10px auto 40px auto;
         background: #fff;
         border: 2.5px solid #0f172a;
         border-radius: 8px;
         box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-        padding: 20px 18px;
+        padding: 18px 16px;
     }
 
     /* Logo prominente y de impacto */

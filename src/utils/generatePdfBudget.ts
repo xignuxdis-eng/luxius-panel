@@ -316,10 +316,12 @@ const SHARED_CSS = `
             -webkit-backdrop-filter: none !important;
         }
         .a4-page {
-            width: 100% !important;
+            width: 210mm !important;
+            max-width: 210mm !important;
+            min-width: 210mm !important;
             height: auto !important;
             min-height: auto !important;
-            margin: 0 !important;
+            margin: 0 auto !important;
             padding: 12mm 15mm 10mm 15mm !important;
             box-shadow: none !important;
             overflow: visible !important;

@@ -427,8 +427,10 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                     html, body { background: #ffffff !important; }
                     .a4-page {
                         box-shadow: none !important;
-                        margin: 0 !important;
-                        width: 100% !important;
+                        margin: 0 auto !important;
+                        width: 210mm !important;
+                        max-width: 210mm !important;
+                        min-width: 210mm !important;
                         min-height: auto !important;
                         height: auto !important;
                         padding: 10mm 15mm !important;
