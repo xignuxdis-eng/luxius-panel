@@ -119,6 +119,32 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const [upscalerSplitPos, setUpscalerSplitPos] = useState<number>(50);
     const [isSavingUpscale, setIsSavingUpscale] = useState<boolean>(false);
     const [upscaleSaveFeedback, setUpscaleSaveFeedback] = useState<string | null>(null);
+    const [engineStatus, setEngineStatus] = useState<any>(null);
+
+    useEffect(() => {
+        if (showUpscalerModal) {
+            const checkStatus = async () => {
+                const endpoints = [
+                    `${API_URL}/upscaler/status`,
+                    'http://localhost:5000/api/upscaler/status',
+                    'https://luxius-backend.onrender.com/api/upscaler/status'
+                ];
+                for (const ep of endpoints) {
+                    try {
+                        const res = await fetch(ep);
+                        if (res.ok) {
+                            const d = await res.json();
+                            if (d.success && d.status) {
+                                setEngineStatus(d.status);
+                                break;
+                            }
+                        }
+                    } catch (_) { }
+                }
+            };
+            checkStatus();
+        }
+    }, [showUpscalerModal]);
 
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -425,43 +451,122 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const handleRunUpscale = async () => {
         if (!previewUrl && !file) return;
         setIsUpscaling(true);
-        setUpscaleStatus('Conectando con motor neuronal Vulkan...');
+        setUpscaleStatus('Preparando imagen...');
         setUpscaleError(null);
         setUpscaleSaveFeedback(null);
 
         const startTime = Date.now();
         try {
-            let res: Response;
-            if (file) {
-                setUpscaleStatus('Cargando archivo original en GPU...');
+            // 1. Extraer Blob de imagen válido (incluso si el archivo original fue PDF o CDR)
+            let imageBlob: Blob | null = null;
+            let filename = metadata?.name || 'arte.png';
+
+            if (file && file.type.startsWith('image/')) {
+                imageBlob = file;
+            } else if (previewUrl) {
+                if (previewUrl.startsWith('data:')) {
+                    const [metaPart, b64] = previewUrl.split(',');
+                    const mime = metaPart.match(/:(.*?);/)?.[1] || 'image/png';
+                    const binStr = atob(b64);
+                    const len = binStr.length;
+                    const u8arr = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        u8arr[i] = binStr.charCodeAt(i);
+                    }
+                    imageBlob = new Blob([u8arr], { type: mime });
+                } else if (previewUrl.startsWith('blob:')) {
+                    try {
+                        const blobRes = await fetch(previewUrl);
+                        imageBlob = await blobRes.blob();
+                    } catch (e) {
+                        console.warn('[Upscaler] Error leyendo blob URL:', e);
+                    }
+                } else {
+                    try {
+                        const blobRes = await fetch(previewUrl);
+                        if (blobRes.ok) {
+                            imageBlob = await blobRes.blob();
+                        }
+                    } catch (_) { }
+                }
+            } else if (file) {
+                imageBlob = file;
+            }
+
+            // 2. Preparar cuerpo de petición (FormData preferente con Blob real)
+            let bodyData: any;
+            let isFormData = false;
+
+            if (imageBlob) {
                 const formData = new FormData();
-                formData.append('file', file);
+                const cleanExt = (imageBlob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                const cleanName = `${filename.replace(/\.[^/.]+$/, '')}.${cleanExt}`;
+                formData.append('file', imageBlob, cleanName);
                 formData.append('scale', String(upscalerScale));
                 formData.append('model', upscalerModel);
                 if (order?.id) {
                     formData.append('orderId', String(order.id));
                 }
-                res = await fetch(`${API_URL}/upscaler/process`, {
-                    method: 'POST',
-                    body: formData,
-                });
+                bodyData = formData;
+                isFormData = true;
             } else {
-                setUpscaleStatus('Enviando imagen al motor Real-ESRGAN...');
-                res = await fetch(`${API_URL}/upscaler/process`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        imageUrl: previewUrl,
-                        scale: upscalerScale,
-                        model: upscalerModel,
-                        orderId: order?.id,
-                    }),
+                bodyData = JSON.stringify({
+                    imageUrl: previewUrl,
+                    scale: upscalerScale,
+                    model: upscalerModel,
+                    orderId: order?.id,
                 });
+            }
+
+            // 3. Conexión resiliente: intenta endpoint primario y fallback automático
+            const localEndpoint = 'http://localhost:5000/api/upscaler/process';
+            const cloudEndpoint = 'https://luxius-backend.onrender.com/api/upscaler/process';
+
+            const endpointsToTry = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+                ? [localEndpoint, cloudEndpoint]
+                : [cloudEndpoint, localEndpoint];
+
+            let res: Response | null = null;
+            let lastFetchError: any = null;
+
+            for (const endpoint of endpointsToTry) {
+                try {
+                    const isLocal = endpoint.includes('localhost') || endpoint.includes('127.0.0.1');
+                    setUpscaleStatus(isLocal 
+                        ? 'Ejecutando en GPU Vulkan local (AMD Radeon)...' 
+                        : 'Conectando con Servidor Cloud...');
+
+                    const headers = isFormData ? {} : { 'Content-Type': 'application/json' };
+                    const token = localStorage.getItem('luxius_auth_token') || localStorage.getItem('token');
+                    if (token) {
+                        (headers as any)['Authorization'] = `Bearer ${token}`;
+                    }
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: isFormData ? (token ? { 'Authorization': `Bearer ${token}` } : undefined) : headers,
+                        body: bodyData,
+                    });
+
+                    if (response) {
+                        res = response;
+                        break;
+                    }
+                } catch (epErr) {
+                    lastFetchError = epErr;
+                    console.warn(`[Upscaler] Fallo al conectar con ${endpoint}:`, epErr);
+                }
+            }
+
+            if (!res) {
+                throw new Error(lastFetchError?.message === 'Failed to fetch' 
+                    ? 'No se pudo conectar con el motor de IA. Inicia el servidor local (puerto 5000) o verifica tu conexión a internet.' 
+                    : (lastFetchError?.message || 'Error de red al conectar con el servidor'));
             }
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `Error ${res.status} en el escalador`);
+                throw new Error(errData.error || `Error ${res.status} al procesar imagen`);
             }
 
             const data = await res.json();
@@ -1969,9 +2074,16 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div className="xpress-upscaler-badge-gpu">
-                            <span>⚡</span>
-                            <span>Vulkan GPU Engine</span>
+                        <div 
+                            className="xpress-upscaler-badge-gpu"
+                            style={{
+                                background: engineStatus?.vulkan_available ? 'rgba(16, 185, 129, 0.18)' : 'rgba(56, 189, 248, 0.18)',
+                                borderColor: engineStatus?.vulkan_available ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.4)',
+                                color: engineStatus?.vulkan_available ? '#34d399' : '#38bdf8'
+                            }}
+                        >
+                            <span>{engineStatus?.vulkan_available ? '⚡' : '☁️'}</span>
+                            <span>{engineStatus?.vulkan_available ? 'Vulkan GPU (Radeon)' : (engineStatus?.engine_name || 'AI Engine')}</span>
                         </div>
                         <button
                             type="button"
