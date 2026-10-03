@@ -37,7 +37,13 @@ def _build_llm(temperature: float = 0.3):
     api_key = os.environ.get('GEMINI_API_KEY')
     if not api_key:
         raise ValueError("GEMINI_API_KEY no configurada")
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=temperature)
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        google_api_key=api_key,
+        temperature=temperature,
+        max_retries=0,
+        timeout=10.0
+    )
 
 
 # ================================================================
@@ -514,6 +520,29 @@ def _format_tool_result(name: str, result: Dict[str, Any]) -> str:
 
     if name == 'crear_orden_trabajo':
         return f"✅ {result.get('mensaje', 'Orden creada.')}\n• N° {result.get('ot')} — Estado: {result.get('estado')}"
+
+    if name == 'cotizar_trabajo':
+        if not result.get('ok', True):
+            return f"⚠️ {result.get('error', 'Error al calcular la cotización.')}"
+        return (
+            f"💰 **Cotización de Trabajo ({result.get('material', '')})**\n"
+            f"• Medidas: {result.get('ancho_m', 0):.2f}m x {result.get('alto_m', 0):.2f}m ({result.get('copias', 1)} copias)\n"
+            f"• Área útil: {result.get('area_m2_util', 0):.2f} m² | Facturada: {result.get('area_m2_facturada', 0):.2f} m²\n"
+            f"• Bobina óptima: {result.get('bobina_optima_m', 0):.2f} m (desperdicio: {result.get('desperdicio_pct', 0):.1f}%)\n"
+            f"• Precio base: ${result.get('subtotal_impresion', 0):,.2f}\n"
+            f"• Total final: **${result.get('precio_total', 0):,.2f}**"
+        )
+
+    if name == 'consultar_especificacion_tecnica':
+        if not result.get('ok', True):
+            return f"ℹ️ {result.get('error', 'Especificación técnica no encontrada.')}"
+        return (
+            f"📐 **Especificación Técnica — {result.get('parametro', '')}**\n"
+            f"• Valor verificado: **{result.get('valor_oficial', '')}**\n"
+            f"• Contexto de taller: {result.get('descripcion', '')}\n"
+            f"• Tolerancia: {result.get('tolerancia', 'Sin tolerancia')}"
+        )
+
 
     return "✅ Operación completada."
 
