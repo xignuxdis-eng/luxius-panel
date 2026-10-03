@@ -66,14 +66,14 @@ export default function Header({ title, subtitle }: HeaderProps) {
             <div className="header-right">
                 {canViewAlerts && (
                     <button
-                        className="pixel-btn pixel-btn-warning"
+                        className="header-action-btn header-stock-btn"
                         onClick={() => navigate('/stock')}
                         title={`${stockAlertCount} grupo(s) en riesgo de faltante de stock`}
-                        style={{ fontSize: '11px', padding: '4px 10px', position: 'relative' }}
                     >
-                        🔔 STOCK
+                        <span>🔔</span>
+                        <span>STOCK</span>
                         {stockAlertCount > 0 && (
-                            <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ef4444', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span className="header-stock-badge">
                                 {stockAlertCount}
                             </span>
                         )}
@@ -81,35 +81,22 @@ export default function Header({ title, subtitle }: HeaderProps) {
                 )}
 
                 <button
-                    className="pixel-btn pixel-btn-info"
+                    className="header-action-btn header-sync-btn"
                     onClick={handleQuickSync}
                     disabled={isSyncing}
                     title="Sincronizar datos de la base de datos y forzar actualización de versión"
-                    style={{ 
-                        fontSize: '11px', 
-                        padding: '6px 12px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px',
-                        background: 'linear-gradient(135deg, #0284c7, #0369a1)',
-                        color: '#ffffff',
-                        border: '1px solid #38bdf8',
-                        boxShadow: '0 0 10px rgba(56, 189, 248, 0.35)',
-                        fontWeight: 700,
-                        letterSpacing: '0.5px'
-                    }}
                 >
-                    <span style={{ display: 'inline-block', animation: isSyncing ? 'rotation 1s linear infinite' : 'none' }}>🔄</span>
+                    <span className={`header-sync-icon ${isSyncing ? 'spinning' : ''}`}>🔄</span>
                     <span>{isSyncing ? 'SINCRONIZANDO...' : 'SINCRONIZAR'}</span>
                 </button>
 
                 <button
-                    className="pixel-btn pixel-btn-warning"
+                    className="header-action-btn header-arcade-btn"
                     onClick={() => setIsArcadeOpen(true)}
                     title="Abrir Arcade Center de Minijuegos"
-                    style={{ fontSize: '11px', padding: '4px 10px' }}
                 >
-                    🕹️ ARCADE
+                    <span>🕹️</span>
+                    <span>ARCADE</span>
                 </button>
 
                 <div className="header-datetime">

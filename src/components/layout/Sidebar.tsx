@@ -99,12 +99,11 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <ThemeToggle />
                     <button
-                        className="pixel-btn pixel-btn-warning"
+                        className="sidebar-arcade-btn"
                         onClick={() => setIsArcadeOpen(true)}
                         title="Abrir Arcade Center de Minijuegos"
-                        style={{ fontSize: '11px', padding: '4px 8px' }}
                     >
-                        🕹️ ARCADE
+                        🕹️ Arcade
                     </button>
                     <button className="logout-btn" onClick={handleLogout}>
                         Salir
