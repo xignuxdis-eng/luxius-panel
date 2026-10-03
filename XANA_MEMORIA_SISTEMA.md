@@ -697,6 +697,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   3. Repartir las contraseñas de `CREDENCIALES_NUEVAS.txt` y borrar el archivo; dar contraseña a los usuarios cliente si van a usar el portal (hoy no tienen).
   4. Opcional: rotar claves Gemini/OpenAI; separar `server/` del repo público (o repo privado + repo público solo con el build) y reescribir el historial público (destructivo, requiere confirmación explícita).
   5. **Transitorio R2**: como Render no tenia variables R2_*, el backend PRIVADO usa private_legacy_r2.py (solo en luXius-Backend, ignorado en luxius-panel) como respaldo para no cortar las imagenes. /health muestra storage: r2-legacy hasta que se carguen las claves rotadas en Render; despues borrar ese archivo.
+  6. **Seguimiento (03/10 noche)**: `getUsuarios()` purga contraseñas viejas cacheadas en localStorage de cada navegador. Causa de que las contraseñas 'ya cambiadas' siguieran siendo las de fábrica: antes del commit `dbccec1` (03/09/2026) `saveUsuario` solo guardaba en localStorage. `npm audit`: 2 moderadas en react-router 6.x (open redirect con backslash / SSR) — riesgo bajo (no se navega a URLs del usuario ni hay SSR); el fix exige migrar a react-router 7 (breaking), planificar. `src/pages/Dashboard/Profile.tsx` es código muerto (no se importa; usa `/api/users` inexistente).
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 

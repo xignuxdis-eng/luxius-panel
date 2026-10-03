@@ -1255,6 +1255,15 @@ export function getUsuarios(): Usuario[] {
         } catch (e) { }
     }
 
+    // SEGURIDAD: versiones anteriores guardaban contraseñas en localStorage → purgarlas
+    if (sessionItems.some(u => u && (u as any).password)) {
+        sessionItems = sessionItems.map(u => {
+            const { password: _omit, ...rest } = u as any;
+            return rest as Usuario;
+        });
+        localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
+    }
+
     if (localStorage.getItem(versionKey) !== 'v7') {
         const sessionIds = new Set(sessionItems.map(u => u.id));
         const sessionUsernames = new Set(sessionItems.map(u => (u.username || '').toLowerCase()));
