@@ -78,29 +78,76 @@ function sanitizeFileName(rawName: string): string {
     }
 }
 
-/** Formatea medidas en centímetros, ej: "135 × 267 cm" (con x2 si copias > 1) */
+/** Formatea medidas en centímetros con x estándar, ej: "135 x 267 cm" (con x2 si copias > 1) */
 function formatDimensions(ancho?: number, alto?: number, copias?: number): string {
     if (!ancho && !alto) return ''
     const w = ancho ? (ancho < 20 ? Math.round(ancho * 100) : Math.round(ancho)) : 0
     const h = alto ? (alto < 20 ? Math.round(alto * 100) : Math.round(alto)) : 0
     let text = ''
     if (w > 0 && h > 0) {
-        text = `${w} × ${h} cm`
+        text = `${w} x ${h} cm`
     } else if (w > 0) {
         text = `${w} cm`
     } else if (h > 0) {
         text = `${h} cm`
     }
     if (text && copias && copias > 1) {
-        text += ` (×${copias})`
+        text += ` (x${copias})`
     }
     return text
 }
 
-/** Fecha de hoy formateada */
+/** Fecha de hoy formateada de forma segura */
 function todayFormatted(): string {
     const d = new Date()
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
+}
+
+/**
+ * Extrae EXCLUSIVAMENTE el nombre del Proyecto / Tarea,
+ * limpiando nombres de archivo, sufijos de ítems o medidas concatenadas.
+ */
+function extractProjectName(orders: Order[]): string {
+    // 1. Revisar loteNombre: si existe y no es un "Lote ..." por defecto
+    for (const order of orders) {
+        const lote = (order.loteNombre || '').trim()
+        if (lote && !lote.toLowerCase().startsWith('lote ') && !lote.toLowerCase().startsWith('lote_')) {
+            return lote
+        }
+    }
+
+    // 2. Extraer desde nombreTarea (en pedidos por lote se guarda como "Proyecto - NombreArchivo")
+    for (const order of orders) {
+        const raw = (order.nombreTarea || '').trim()
+        if (!raw) continue
+
+        // Si tiene separador " - ", la primera parte es el proyecto y la segunda es el archivo
+        if (raw.includes(' - ')) {
+            const parts = raw.split(' - ')
+            const firstPart = parts[0].trim()
+            if (firstPart) {
+                return firstPart
+            }
+        }
+
+        // Si contiene el nombre de algún archivo del pedido, removerlo para dejar solo el proyecto
+        let candidate = raw
+        if (order.archivosOriginales?.length) {
+            for (const f of order.archivosOriginales) {
+                const fBase = f.replace(/\.[^/.]+$/, '').trim()
+                if (fBase && candidate.toLowerCase().includes(fBase.toLowerCase())) {
+                    candidate = candidate.replace(new RegExp(fBase, 'gi'), '').trim()
+                    candidate = candidate.replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, '').trim()
+                }
+            }
+        }
+        if (candidate) return candidate
+    }
+
+    return ''
 }
 
 function escHtml(text: string): string {
@@ -477,10 +524,8 @@ export async function generateProductionLabel(orders: Order[]): Promise<void> {
     try {
         const firstOrder = orders[0]
 
-        // 2. Proyecto / Etiqueta / Nombre Trabajo
-        const projectName = orders
-            .map(o => (o.nombreTarea || o.loteNombre || '').trim())
-            .find(n => n.length > 0) || ''
+        // 2. Proyecto / Etiqueta / Nombre Trabajo (aislado de nombres de archivo y medidas)
+        const projectName = extractProjectName(orders)
 
         // 3. Destinatario (Cliente)
         const clientName = (firstOrder.clienteNombre || firstOrder.clientName || '').trim()
@@ -646,7 +691,7 @@ function buildLabelHtml(data: LabelData): string {
         <div class="label-project-block">
             ${projectName ? `<h1 class="project-title">${escHtml(projectName)}</h1>` : ''}
             <div class="project-meta">
-                <span>📅 Fecha: <strong>${todayFormatted()}</strong></span>
+                <span>Fecha: <strong>${todayFormatted()}</strong></span>
             </div>
             ${materialBadge}
         </div>
