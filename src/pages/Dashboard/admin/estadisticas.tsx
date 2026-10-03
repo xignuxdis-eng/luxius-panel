@@ -28,7 +28,7 @@ export default function EstadisticasPage() {
         setLoading(true);
         setError('');
         try {
-            const res = await fetch(`${API_URL}/api/stats/advanced`, {
+            const res = await fetch(`${API_URL}/stats/advanced`, {
                 headers: getAuthHeaders()
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);

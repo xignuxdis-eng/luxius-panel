@@ -12,7 +12,7 @@ import base64
 import urllib.request
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
-from middleware.auth import login_required
+from middleware.auth import login_required, operator_required
 from models import db, Presupuesto
 from services.upscaler_service import upscale_image, get_engine_status, calculate_dpi
 
@@ -32,7 +32,48 @@ def upscaler_status():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _fetch_image_bytes(image_url):
+    """Obtiene la imagen: si es de nuestro /uploads se lee local/R2; si es externa,
+    se descarga con validación anti-SSRF en cada redirección."""
+    from urllib.parse import unquote, urljoin
+    if '/uploads/' in image_url or image_url.startswith('uploads/'):
+        name = unquote(image_url.split('/uploads/')[-1] if '/uploads/' in image_url else image_url[len('uploads/'):]).split('?')[0]
+        if not name or '..' in name or name.startswith('/') or '\\' in name:
+            raise ValueError('Nombre de archivo inválido')
+        uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads')
+        local_path = os.path.join(uploads_dir, name)
+        if os.path.isfile(local_path):
+            with open(local_path, 'rb') as fh:
+                return fh.read()
+        from services.r2_storage import r2_storage
+        for key in (f"uploads/{name}", f"thumbnails/{name}", name):
+            try:
+                obj = r2_storage.client.get_object(Bucket=r2_storage.bucket_name, Key=key)
+                return obj['Body'].read()
+            except Exception:
+                continue
+        raise FileNotFoundError('Archivo no encontrado en uploads/R2')
+
+    import requests as _rq
+    from services.security_utils import is_safe_url
+    current = image_url
+    for _ in range(6):
+        if not is_safe_url(current):
+            raise ValueError('URL no permitida')
+        resp = _rq.get(current, timeout=30, allow_redirects=False,
+                       headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get('Location'):
+            current = urljoin(current, resp.headers['Location'])
+            continue
+        resp.raise_for_status()
+        if len(resp.content) > 80 * 1024 * 1024:
+            raise ValueError('Imagen demasiado grande')
+        return resp.content
+    raise ValueError('Demasiadas redirecciones')
+
+
 @upscaler_bp.post('/process')
+@operator_required
 def process_upscale():
     """
     Escala una imagen mediante IA (Real-ESRGAN x4plus o x4plus-anime).
@@ -79,11 +120,9 @@ def process_upscale():
             except Exception as e:
                 return jsonify({'success': False, 'error': f'Error decodificando Base64: {e}'}), 400
         else:
-            # Descargar de URL externa o Cloudflare R2
+            # Descargar de nuestro /uploads (local/R2) o de URL externa validada
             try:
-                req = urllib.request.Request(image_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    image_bytes = resp.read()
+                image_bytes = _fetch_image_bytes(image_url)
                 original_filename = os.path.basename(image_url.split('?')[0])
             except Exception as e:
                 return jsonify({'success': False, 'error': f'No se pudo descargar la imagen original: {e}'}), 400

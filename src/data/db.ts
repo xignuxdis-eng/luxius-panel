@@ -1185,8 +1185,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         email: "adrian@luxius.com",
         rol: "principal",
         role: "principal",
-        habilitado: true,
-        password: "nueva98261"
+        habilitado: true
     },
     {
         id: 2,
@@ -1195,8 +1194,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         email: "admin@luxius.com",
         rol: "administrador",
         role: "administrador",
-        habilitado: true,
-        password: "admin123"
+        habilitado: true
     },
     {
         id: 3,
@@ -1205,8 +1203,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         email: "vendedor@luxius.com",
         rol: "vendedor",
         role: "vendedor",
-        habilitado: true,
-        password: "vendedor123"
+        habilitado: true
     },
     {
         id: 4,
@@ -1215,8 +1212,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         email: "impresion@luxius.com",
         rol: "impresion",
         role: "impresion",
-        habilitado: true,
-        password: "impresion123"
+        habilitado: true
     },
     {
         id: 5,
@@ -1225,8 +1221,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         email: "diseno@luxius.com",
         rol: "artista",
         role: "artista",
-        habilitado: true,
-        password: "diseno123"
+        habilitado: true
     },
     {
         id: 6,
@@ -1236,8 +1231,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         rol: "cliente",
         role: "cliente",
         clientId: 826300,
-        habilitado: true,
-        password: "cliente123"
+        habilitado: true
     },
     {
         id: 830011,
@@ -1246,8 +1240,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
         email: "carlos@luxius.com",
         rol: "impresion",
         role: "impresion",
-        habilitado: true,
-        password: "carlos123"
+        habilitado: true
     }
 ];
 
@@ -1303,9 +1296,8 @@ export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
 
     if (existingIndex !== -1) {
         const updatedUser = { ...sessionItems[existingIndex], ...usuario } as Usuario;
-        if (!usuario.password) {
-            updatedUser.password = sessionItems[existingIndex].password;
-        }
+        // SEGURIDAD: nunca guardar contraseñas en localStorage
+        delete updatedUser.password;
         sessionItems[existingIndex] = updatedUser;
         result = sessionItems[existingIndex];
     } else {
@@ -1316,7 +1308,7 @@ export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
             email: usuario.email || '',
             rol: usuario.rol || 'vendedor',
             habilitado: usuario.habilitado !== undefined ? usuario.habilitado : true,
-            password: usuario.password || ''
+            password: ''
         };
         sessionItems.unshift(newUsuario);
         result = newUsuario;

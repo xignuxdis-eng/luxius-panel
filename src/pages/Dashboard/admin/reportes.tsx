@@ -27,7 +27,7 @@ export default function ReportesPage() {
         setLoading(true);
         setError('');
         try {
-            const res = await fetch(`${API_URL}/api/stats/reportes`, {
+            const res = await fetch(`${API_URL}/stats/reportes`, {
                 headers: getAuthHeaders()
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);

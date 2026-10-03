@@ -7,10 +7,32 @@ al formato que el frontend consume, y viceversa.
 """
 
 from datetime import datetime, timezone, timedelta
-from flask import jsonify, request
-from models import db, Presupuesto, Cliente, Vendedor
+from flask import jsonify, request, g
+from models import db, Presupuesto, Cliente, Vendedor, Usuario
 from routes import orders_bp
-from middleware.auth import login_required
+from middleware.auth import login_required, operator_required
+
+
+# ================================================================
+# SEGURIDAD — alcance por rol (los clientes solo acceden a SUS órdenes)
+# ================================================================
+
+def _client_scope_id():
+    """None para personal interno; para rol 'cliente' devuelve su cliente_id
+    (o -1 si no está vinculado, de modo que no vea ninguna orden)."""
+    if getattr(g, 'user_rol', None) != 'cliente':
+        return None
+    u = db.session.get(Usuario, getattr(g, 'user_id', None)) if getattr(g, 'user_id', None) else None
+    return (u.client_id if u and u.client_id else -1)
+
+
+def _can_access(p):
+    scope = _client_scope_id()
+    return scope is None or (p is not None and p.cliente_id == scope)
+
+
+def _forbidden():
+    return jsonify({'error': 'Acceso denegado a esta orden'}), 403
 
 # ================================================================
 # MAPEO DE ESTADOS  BD → Frontend y viceversa
@@ -432,9 +454,11 @@ def _apply_order_to_presupuesto(p, data):
 @orders_bp.get('')
 @login_required
 def get_orders():
-    presupuestos = Presupuesto.query.filter(
-        Presupuesto.deleted_at.is_(None)
-    ).order_by(Presupuesto.created_at.desc()).all()
+    q = Presupuesto.query.filter(Presupuesto.deleted_at.is_(None))
+    scope = _client_scope_id()
+    if scope is not None:
+        q = q.filter(Presupuesto.cliente_id == scope)
+    presupuestos = q.order_by(Presupuesto.created_at.desc()).all()
 
     return jsonify([_presupuesto_to_order(p) for p in presupuestos])
 
@@ -452,6 +476,8 @@ def get_order(order_id):
     ).all()
 
     for p in presupuestos:
+        if not _can_access(p):
+            continue
         order = _presupuesto_to_order(p)
         if order['id'] == order_id:
             return jsonify(order)
@@ -506,9 +532,20 @@ def create_order():
     if not data:
         return jsonify({'error': 'Cuerpo requerido'}), 400
 
+    scope = _client_scope_id()
+    if scope is not None:
+        if scope == -1:
+            return jsonify({'error': 'Tu usuario no está vinculado a un cliente'}), 403
+        # Un cliente siempre crea/edita órdenes a su propio nombre
+        data['clientId'] = scope
+        data.pop('clienteId', None)
+
     order_id = data.get('id')
     ot_val = data.get('ot')
     p = _find_presupuesto(order_id) or _find_presupuesto(ot_val)
+
+    if p and not _can_access(p):
+        return _forbidden()
 
     if p:
         prev_tags = list((p.especificaciones or {}).get('tags') or [])
@@ -616,6 +653,11 @@ def update_order(order_id):
 
     if not target:
         return jsonify({'error': 'Orden no encontrada'}), 404
+    if not _can_access(target):
+        return _forbidden()
+    if _client_scope_id() is not None:
+        data['clientId'] = target.cliente_id
+        data.pop('clienteId', None)
 
     prev_tags = list((target.especificaciones or {}).get('tags') or [])
     _apply_order_to_presupuesto(target, data)
@@ -636,6 +678,8 @@ def delete_order(order_id):
 
     if not target:
         return jsonify({'error': 'Orden no encontrada'}), 404
+    if not _can_access(target):
+        return _forbidden()
 
     target.deleted_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -647,7 +691,7 @@ def delete_order(order_id):
 # ================================================================
 
 @orders_bp.post('/batch')
-@login_required
+@operator_required
 def batch_orders():
     data = request.get_json(force=True)
     action = data.get('action')
@@ -685,6 +729,8 @@ def get_order_messages(order_id):
     target = _find_presupuesto(order_id)
     if not target:
         return jsonify({'error': 'Orden no encontrada'}), 404
+    if not _can_access(target):
+        return _forbidden()
     especs = target.especificaciones or {}
     return jsonify({'success': True, 'messages': especs.get('mensajes', [])})
 
@@ -696,6 +742,8 @@ def add_order_message(order_id):
     target = _find_presupuesto(order_id)
     if not target:
         return jsonify({'error': 'Orden no encontrada'}), 404
+    if not _can_access(target):
+        return _forbidden()
 
     data = request.get_json(force=True) or {}
     text = data.get('text', '').strip()

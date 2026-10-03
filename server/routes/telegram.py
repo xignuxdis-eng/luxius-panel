@@ -15,24 +15,53 @@ from services.telegram_service import (
     cmd_briefing,
     register_telegram_bot_commands
 )
-from middleware.auth import login_required
+from middleware.auth import login_required, admin_required
+from services.security_utils import telegram_webhook_secret
 
 telegram_bp = Blueprint('telegram_bp', __name__, url_prefix='/api/telegram')
+
+DEFAULT_WEBHOOK_URL = 'https://luxius-backend.onrender.com/api/telegram/webhook'
+
+
+def _set_webhook(token, url=None, timeout=10):
+    """Registra el webhook en Telegram SIEMPRE con secret_token (anti-spoofing)."""
+    payload = {'url': url or DEFAULT_WEBHOOK_URL, 'drop_pending_updates': False}
+    secret = telegram_webhook_secret(token)
+    if secret:
+        payload['secret_token'] = secret
+    return requests.post(f"https://api.telegram.org/bot{token}/setWebhook", json=payload, timeout=timeout)
+
+
+def _is_allowed_webhook_url(url):
+    """Solo se permite apuntar el webhook a este backend (evita secuestro del bot)."""
+    allowed = {DEFAULT_WEBHOOK_URL}
+    extra = os.environ.get('TELEGRAM_WEBHOOK_URL', '').strip()
+    if extra:
+        allowed.add(extra)
+    return url in allowed
 
 
 @telegram_bp.post('/webhook')
 def telegram_webhook():
     """Recibe webhooks de la API de Telegram (mensajes de texto y notas de voz)."""
+    import hmac as _hmac
+    expected = telegram_webhook_secret(get_telegram_token())
+    received = request.headers.get('X-Telegram-Bot-Api-Secret-Token', '')
+    if not expected or not _hmac.compare_digest(expected, received):
+        # Respuesta neutra: no revelar nada a quien falsifique updates
+        return jsonify({'ok': False}), 403
+
     try:
         data = request.get_json(force=True)
-    except Exception as e:
-        return jsonify({'ok': False, 'error': f'JSON inválido: {e}'}), 400
+    except Exception:
+        return jsonify({'ok': False, 'error': 'JSON inválido'}), 400
 
     result = process_telegram_update(data)
     return jsonify(result)
 
 
 @telegram_bp.get('/status')
+@login_required
 def telegram_status():
     """Verifica si el bot de Telegram está configurado y accesible."""
     cfg = get_telegram_config()
@@ -76,7 +105,7 @@ def telegram_status():
 
 
 @telegram_bp.post('/config')
-@login_required
+@admin_required
 def telegram_save_config():
     """Guarda o actualiza las credenciales de Telegram en base de datos (ConfigGlobal)."""
     data = request.get_json(silent=True) or {}
@@ -104,12 +133,10 @@ def telegram_save_config():
     webhook_res = None
     if effective_token:
         try:
-            w_url = data.get('webhook_url') or 'https://luxius-backend.onrender.com/api/telegram/webhook'
-            w_resp = requests.post(
-                f"https://api.telegram.org/bot{effective_token}/setWebhook",
-                json={'url': w_url},
-                timeout=8
-            )
+            w_url = data.get('webhook_url') or DEFAULT_WEBHOOK_URL
+            if not _is_allowed_webhook_url(w_url):
+                w_url = DEFAULT_WEBHOOK_URL
+            w_resp = _set_webhook(effective_token, w_url, timeout=8)
             webhook_res = w_resp.json() if w_resp.ok else None
         except Exception:
             pass
@@ -123,6 +150,7 @@ def telegram_save_config():
 
 
 @telegram_bp.post('/setup-webhook')
+@admin_required
 def telegram_setup_webhook():
     """Configura o elimina la URL del webhook en los servidores de Telegram."""
     data = request.get_json(silent=True) or {}
@@ -131,16 +159,14 @@ def telegram_setup_webhook():
     if not token:
         return jsonify({'ok': False, 'error': 'TELEGRAM_BOT_TOKEN no configurado.'}), 400
 
-    webhook_url = data.get('url') or data.get('webhook_url') or 'https://luxius-backend.onrender.com/api/telegram/webhook'
+    webhook_url = data.get('url') or data.get('webhook_url') or DEFAULT_WEBHOOK_URL
 
     if webhook_url and webhook_url != 'delete':
+        if not _is_allowed_webhook_url(webhook_url):
+            return jsonify({'ok': False, 'error': 'URL de webhook no permitida'}), 400
         # Registrar también los comandos nativos en Telegram
         register_telegram_bot_commands()
-        resp = requests.post(
-            f"https://api.telegram.org/bot{token}/setWebhook",
-            json={'url': webhook_url},
-            timeout=10
-        )
+        resp = _set_webhook(token, webhook_url, timeout=10)
     else:
         resp = requests.post(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=10)
 
@@ -153,7 +179,7 @@ def telegram_setup_webhook():
 
 
 @telegram_bp.post('/register-commands')
-@login_required
+@admin_required
 def telegram_register_commands():
     """Registra los comandos de menú en Telegram API."""
     ok = register_telegram_bot_commands()
@@ -164,7 +190,7 @@ def telegram_register_commands():
 
 
 @telegram_bp.post('/notify')
-@login_required
+@admin_required
 def telegram_notify():
     """Envía una notificación push directa a los administradores de Telegram."""
     data = request.get_json(silent=True) or {}
@@ -181,7 +207,7 @@ def telegram_notify():
 
 
 @telegram_bp.post('/briefing/trigger')
-@login_required
+@admin_required
 def trigger_briefing_broadcast():
     """Genera y envía el briefing matutino a todos los administradores."""
     text = cmd_briefing()

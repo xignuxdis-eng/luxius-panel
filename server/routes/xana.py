@@ -12,7 +12,7 @@ Endpoint de Xana AI — Rutas para LangGraph, Memoria Persistente y Diagnóstico
 
 from flask import request, jsonify
 from routes import xana_bp
-from middleware.auth import login_required
+from middleware.auth import login_required, operator_required
 from datetime import datetime, timezone, timedelta
 import subprocess
 import sys
@@ -605,6 +605,7 @@ def xana_health():
 # ================================================================
 
 @xana_bp.get('/shadow/stats')
+@operator_required
 def xana_shadow_stats():
     """Retorna métricas de evaluación del Shadow Mode (Gate A2): router LLM vs router regex."""
     try:
@@ -642,6 +643,7 @@ def xana_shadow_stats():
 
 
 @xana_bp.get('/calibration/report')
+@operator_required
 def xana_calibration_report():
     """Reporte formal de los Gates de Calibración A1 a A6 del Asistente Xana."""
     try:

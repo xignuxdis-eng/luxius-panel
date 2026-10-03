@@ -21,15 +21,24 @@ def _verify_user_password(user, password):
 
 @auth_bp.post('/login')
 def login():
-    data = request.get_json(force=True)
-    if not data:
+    from services.security_utils import login_throttle, client_ip
+
+    data = request.get_json(force=True, silent=True)
+    if not data or not isinstance(data, dict):
         return jsonify({'error': 'Cuerpo requerido'}), 400
 
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
+    username = str(data.get('username', '') or '').strip()
+    password = str(data.get('password', '') or '')
 
     if not username or not password:
         return jsonify({'error': 'Usuario y contraseña requeridos'}), 400
+
+    ip = client_ip(request)
+    wait = login_throttle.retry_after(ip, username)
+    if wait:
+        resp = jsonify({'error': f'Demasiados intentos fallidos. Probá de nuevo en {max(1, wait // 60)} min.'})
+        resp.headers['Retry-After'] = str(wait)
+        return resp, 429
 
     from sqlalchemy import func
     user = Usuario.query.filter(
@@ -37,14 +46,15 @@ def login():
         (func.lower(Usuario.email) == func.lower(username))
     ).first()
 
-    if not user:
+    # Siempre verificar la contraseña ANTES de revelar cualquier estado de la cuenta
+    if not user or not _verify_user_password(user, password):
+        login_throttle.register_failure(ip, username)
         return jsonify({'error': 'Credenciales inválidas'}), 401
+
+    login_throttle.register_success(ip, username)
 
     if not user.habilitado:
         return jsonify({'error': 'Usuario deshabilitado'}), 403
-
-    if not _verify_user_password(user, password):
-        return jsonify({'error': 'Credenciales inválidas'}), 401
 
     # ── Restricción de rol para la autenticación ──
     ROLES_PERMITIDOS = {'administrador', 'jefe_produccion', 'principal', 'vendedor', 'impresion', 'artista', 'cliente', 'operario'}

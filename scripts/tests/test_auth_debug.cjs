@@ -18,13 +18,13 @@ function post(path, data) {
 
 async function testAuth() {
     console.log("Testing Login system...");
-    const r1 = await post('/auth/login', { username: 'sistema', password: 'sistema123' });
+    const r1 = await post('/auth/login', { username: process.env.LUXIUS_TEST_USER || 'sistema', password: process.env.LUXIUS_TEST_PASS || '' });
     console.log("Login sistema status:", r1.status, "body:", r1.body);
 
-    const r2 = await post('/auth/login', { username: 'vendedor', password: 'vendedor' });
+    const r2 = await post('/auth/login', { username: process.env.LUXIUS_TEST_USER2 || 'vendedor', password: process.env.LUXIUS_TEST_PASS2 || '' });
     console.log("Login vendedor status:", r2.status, "body:", r2.body);
 
-    const r3 = await post('/auth/login', { username: 'adrian', password: 'nueva98261' });
+    const r3 = await post('/auth/login', { username: process.env.LUXIUS_TEST_USER3 || 'adrian', password: process.env.LUXIUS_TEST_PASS3 || '' });
     console.log("Login adrian status:", r3.status, "body:", r3.body);
 }
 

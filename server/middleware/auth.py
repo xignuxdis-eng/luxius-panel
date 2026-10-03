@@ -120,6 +120,17 @@ def _resolve_payload(auth_header):
         return None
 
 
+def payload_from_request(allow_query_token=False):
+    """Resuelve el JWT desde el header Authorization (o ?token= si se permite,
+    útil para descargas abiertas con <a href> / window.open)."""
+    payload = _resolve_payload(request.headers.get('Authorization', ''))
+    if not payload and allow_query_token:
+        qtoken = request.args.get('token', '').strip()
+        if qtoken:
+            payload = _resolve_payload(f'Bearer {qtoken}')
+    return payload
+
+
 
 def login_required(f):
     """Decorator: requires a valid JWT token."""

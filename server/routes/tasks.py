@@ -200,10 +200,12 @@ def delete_task(presupuesto_id):
 @tasks_bp.get('/<presupuesto_id>/messages')
 @login_required
 def get_task_messages(presupuesto_id):
-    from routes.orders import _find_presupuesto
+    from routes.orders import _find_presupuesto, _can_access
     presupuesto = _find_presupuesto(presupuesto_id)
     if not presupuesto:
         return jsonify({'error': 'Presupuesto no encontrado'}), 404
+    if not _can_access(presupuesto):
+        return jsonify({'error': 'Acceso denegado a esta orden'}), 403
 
     especs = presupuesto.especificaciones or {}
     mensajes = especs.get('mensajes', [])
@@ -213,11 +215,13 @@ def get_task_messages(presupuesto_id):
 @tasks_bp.post('/<presupuesto_id>/messages')
 @login_required
 def add_task_message(presupuesto_id):
-    from routes.orders import _find_presupuesto
+    from routes.orders import _find_presupuesto, _can_access
     from sqlalchemy.orm.attributes import flag_modified
     presupuesto = _find_presupuesto(presupuesto_id)
     if not presupuesto:
         return jsonify({'error': 'Presupuesto no encontrado'}), 404
+    if not _can_access(presupuesto):
+        return jsonify({'error': 'Acceso denegado a esta orden'}), 403
 
     data = request.get_json(force=True) or {}
     text = data.get('text', '').strip()

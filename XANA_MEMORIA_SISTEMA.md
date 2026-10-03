@@ -673,6 +673,30 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 ---
 
+### Sesión 03/10/2026 (8ª parte): Auditoría de Seguridad Integral y Endurecimiento para Producción (completado)
+- **Contexto**: auditoría completa (backend Flask + frontend React + repos + producción). `luxius-panel` es PÚBLICO (necesario para gh-pages), por lo que todo lo que está en `server/` y en el historial git es visible para cualquiera.
+- **CRÍTICO resuelto**:
+  - 6 cuentas de producción (`admin`, `adrian`, `sistema`, `impresion`, `diseño`, `vendedor`) usaban contraseñas por defecto publicadas en el código (`admin/admin` con rol administrador). **Rotadas** con contraseñas aleatorias fuertes (token_version incrementado → sesiones cerradas). Las nuevas quedaron SOLO en `f:\luXius-Backend\CREDENCIALES_NUEVAS.txt` (git-ignorado) para repartir y borrar.
+  - Seed de usuarios (`app.py`) ya no tiene contraseñas fijas (aleatorias, solo con BD vacía). `src/data/db.ts` ya no publica contraseñas en el bundle y no cachea contraseñas en localStorage. Tests/seeds leen credenciales de `LUXIUS_TEST_USER/PASS`.
+  - Secretos hardcodeados eliminados: `config.py` (JWT default + credenciales R2), `sync_uploads_to_r2.py`, `make_full_backup.py` (URL Neon), `server/middleware/auth.py` legacy. Todo sale de variables de entorno. Logs enmascaran la URL de BD.
+  - Escalada de privilegios: `POST/PUT /api/usuarios` permitía a cualquier usuario (incluso cliente) cambiar su `rol` a administrador u otros usuarios. Ahora solo admins (`ADMIN_ROLES`) crean usuarios o cambian rol/habilitado/clientId; el resto solo edita su propio perfil. Cambio de rol/deshabilitar invalida tokens.
+  - Telegram: `/webhook` exige header `X-Telegram-Bot-Api-Secret-Token` (secreto = `TELEGRAM_WEBHOOK_SECRET` o HMAC-SHA256(JWT_SECRET_KEY, bot_token)); todo `setWebhook` envía `secret_token`; en Render se re-registra automáticamente al arrancar (desactivable con `TELEGRAM_AUTO_WEBHOOK=0`). `/setup-webhook`, `/config`, `/notify`, `/briefing/trigger`, `/register-commands` → `admin_required` y solo aceptan la URL oficial; `/status` → login.
+- **ALTO resuelto**:
+  - Endpoints que eran públicos ahora requieren sesión: `/api/analytics/*` (operator), `/api/production/briefing`, `/api/xana/shadow/stats`, `/api/xana/calibration/report` (operator), `/api/xana/smart-order/status/<id>`, `/api/google-drive/vault/reconcile/status/<id>`, `/api/stats/advanced|reportes` (operator).
+  - SSRF: `/api/upscaler/process` (era público, aceptaba `file://`) → `operator_required` + lectura directa de `/uploads` (local/R2) + `is_safe_url` en cada redirección. `/api/download` → URLs externas requieren token (header o `?token=`) + anti-SSRF por salto.
+  - IDOR órdenes: rol `cliente` solo lista/lee/edita/borra/comenta SUS órdenes (`Usuario.client_id`); al crear se fuerza su `clientId`; `/api/orders/batch` → operator. Mismo control en `/api/tasks/<id>/messages`.
+  - Colecciones: cliente solo ve su usuario/ficha/presupuestos; proveedores/calendar/vendedores → []. Altas/bajas/modificaciones de clientes, máquinas y colecciones JSON (materiales, servicios, roles…) → `operator_required`.
+  - Login: bloqueo anti fuerza bruta (5 fallos por IP+usuario → 15 min, 20 por IP) y la contraseña se verifica antes de revelar "Usuario deshabilitado".
+- **MEDIO resuelto**: path traversal en `/uploads` (validación tras decodificar + `realpath`), SVG/HTML servidos con CSP `sandbox`, `drive_id` validado por regex en `/api/import-cloud/file`, errores ya no filtran excepciones internas, archivos sensibles des-trackeados del repo privado (`backups/*.db`, `instance/luxius.db`, `db_users_list.txt`, `backend.log`), bundle viejo `assets/` eliminado del repo público.
+- **Frontend**: nuevo interceptor global `src/utils/authFetch.ts` (inicializado en `main.tsx`) que agrega `Authorization: Bearer` a toda llamada al backend que no lo traiga. Corregido doble `/api/api/` en `TelegramView.tsx`, `estadisticas.tsx` y `reportes.tsx`.
+- **Nuevo módulo**: `services/security_utils.py` (`is_safe_url`, `LoginThrottle`, `telegram_webhook_secret`, `client_ip`).
+- **Verificación**: 33/33 tests de seguridad locales OK (scratch `test_security.py`), mapa de rutas: solo quedan públicas `/health`, `/uploads`, `/api/download` (solo /uploads sin token), `/api/tarifas`, `/api/auth/login`, `/api/import-cloud/file`, `/api/telegram/webhook` (con secreto), `/api/upscaler/status`, `/api/xana/health`.
+- **PENDIENTE (acciones del usuario, no automatizables)**:
+  1. **URGENTE** rotar el token API de Cloudflare R2 (las claves viejas siguen en el historial público de `luxius-panel`) y cargar las nuevas en Render (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`) y en los `.env` locales. Verificar con `GET /health` → `"storage": "r2"`.
+  2. Rotar la contraseña de Neon (estuvo en el repo privado y en el historial) y actualizar `DATABASE_URL` en Render y `.env` locales.
+  3. Repartir las contraseñas de `CREDENCIALES_NUEVAS.txt` y borrar el archivo; dar contraseña a los usuarios cliente si van a usar el portal (hoy no tienen).
+  4. Opcional: rotar claves Gemini/OpenAI; separar `server/` del repo público (o repo privado + repo público solo con el build) y reescribir el historial público (destructivo, requiere confirmación explícita).
+
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 
 Migración de respaldo: baja objetos de Cloudflare R2 con antigüedad mayor a

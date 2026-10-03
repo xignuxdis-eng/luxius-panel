@@ -23,7 +23,7 @@ import io, json, os, sys
 from urllib.parse import urlparse
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
-from middleware.auth import login_required, admin_required
+from middleware.auth import login_required, admin_required, operator_required
 
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
@@ -96,6 +96,31 @@ app.register_blueprint(upscaler_bp)
 app.register_blueprint(briefing_bp)
 
 
+def _ensure_telegram_webhook_secret():
+    """En producción (Render) re-registra el webhook de Telegram con secret_token al arrancar."""
+    import threading, time as _time
+
+    def _run():
+        _time.sleep(8)
+        try:
+            with app.app_context():
+                from services.telegram_service import get_telegram_token
+                from routes.telegram import _set_webhook
+                token = get_telegram_token()
+                if not token:
+                    return
+                resp = _set_webhook(token, os.environ.get('TELEGRAM_WEBHOOK_URL') or None, timeout=15)
+                print(f"[TELEGRAM] Webhook re-registrado con secret: HTTP {resp.status_code}", file=sys.stderr)
+        except Exception as exc:
+            print(f"[TELEGRAM] No se pudo re-registrar el webhook: {exc}", file=sys.stderr)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+if os.environ.get('RENDER') and os.environ.get('TELEGRAM_AUTO_WEBHOOK', '1') != '0':
+    _ensure_telegram_webhook_secret()
+
+
 # Rate limits are configured directly on routes or via limiter default limits
 
 # ================================================================
@@ -143,7 +168,11 @@ def handle_404(e):
 @app.route('/health', methods=['GET'])
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'timestamp': datetime.now(timezone.utc).isoformat()})
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'storage': 'r2' if (Config.R2_ACCESS_KEY_ID and Config.R2_SECRET_ACCESS_KEY) else 'local',
+    })
 
 
 # DB health check — verifies connection to PostgreSQL (admin only)
@@ -162,20 +191,50 @@ def health_db():
 import mimetypes
 from urllib.parse import urlparse, unquote
 
+_UPLOADS_ROOT_REAL = os.path.realpath(UPLOADS_DIR)
+_ACTIVE_CONTENT_EXT = ('.svg', '.svgz', '.html', '.htm', '.xhtml', '.xml')
+
+
+def _safe_upload_relpath(raw_name):
+    """Decodifica y valida que la ruta quede DENTRO de uploads/ (anti path-traversal).
+    Devuelve la ruta relativa normalizada (con '/') o None si es inválida."""
+    name = unquote(str(raw_name or '')).replace('\\', '/').strip()
+    if not name or name.startswith('/') or '\x00' in name or '..' in unquote(name):
+        return None
+    parts = [p for p in name.split('/') if p not in ('', '.')]
+    if any(p == '..' for p in parts):
+        return None
+    rel = '/'.join(parts)
+    full = os.path.realpath(os.path.join(UPLOADS_DIR, rel))
+    if full != _UPLOADS_ROOT_REAL and not full.startswith(_UPLOADS_ROOT_REAL + os.sep):
+        return None
+    return rel
+
+
+def _harden_upload_response(resp, filename):
+    """Contenido activo (SVG/HTML) se sirve en sandbox para evitar XSS en el dominio del backend."""
+    try:
+        if str(filename).lower().endswith(_ACTIVE_CONTENT_EXT):
+            resp.headers['Content-Security-Policy'] = "default-src 'none'; img-src * data:; style-src 'unsafe-inline'; sandbox"
+    except Exception:
+        pass
+    return resp
+
+
 @app.route('/uploads/<path:filename>', methods=['GET', 'OPTIONS'])
 @app.route('/api/preview/<path:filename>', methods=['GET', 'OPTIONS'])
 def serve_upload(filename):
     if request.method == 'OPTIONS':
         return '', 200
-    if '..' in filename or filename.startswith('/'):
+    filename = _safe_upload_relpath(filename)
+    if not filename:
         return jsonify({'error': 'Nombre de archivo inválido'}), 400
 
-    filename = unquote(filename)
     local_path = os.path.join(UPLOADS_DIR, filename)
 
     # 1. Si existe localmente en disco, servirlo
     if os.path.isfile(local_path):
-        return send_from_directory(UPLOADS_DIR, filename)
+        return _harden_upload_response(send_from_directory(UPLOADS_DIR, filename), filename)
 
     # 2. Si no existe en disco local (Render), buscar en Cloudflare R2 y servir
     try:
@@ -196,19 +255,20 @@ def serve_upload(filename):
                     os.makedirs(os.path.dirname(local_path), exist_ok=True)
                     with open(local_path, 'wb') as f:
                         f.write(obj['Body'].read())
-                    return send_from_directory(UPLOADS_DIR, filename)
+                    return _harden_upload_response(send_from_directory(UPLOADS_DIR, filename), filename)
                 except Exception:
                     from flask import Response
-                    return Response(obj['Body'].read(), mimetype=content_type)
+                    return _harden_upload_response(Response(obj['Body'].read(), mimetype=content_type), filename)
             except Exception:
                 continue
     except Exception as e:
         app.logger.warning(f"[R2 Serve] Error checking R2 for {filename}: {e}")
 
-    return jsonify({'error': f'Archivo no encontrado: {filename}'}), 404
+    return jsonify({'error': 'Archivo no encontrado'}), 404
 
 @app.route('/api/download', methods=['GET'])
 def proxy_download():
+    from middleware.auth import payload_from_request
     file_url = request.args.get('url')
     custom_filename = request.args.get('filename', 'archivo_descargado')
     if not file_url:
@@ -222,10 +282,11 @@ def proxy_download():
     if '/uploads/' in file_url:
         clean_name = file_url.split('/uploads/')[-1].split('?')[0]
     elif file_url.startswith('uploads/'):
-        clean_name = file_url.replace('uploads/', '').split('?')[0]
+        clean_name = file_url.replace('uploads/', '', 1).split('?')[0]
 
     if clean_name:
-        if '..' in clean_name:
+        clean_name = _safe_upload_relpath(clean_name)
+        if not clean_name:
             return jsonify({'error': 'Nombre de archivo inválido'}), 400
         
         local_path = os.path.join(UPLOADS_DIR, clean_name)
@@ -256,12 +317,28 @@ def proxy_download():
             app.logger.warning(f"[R2 Download] Error reading {clean_name} from R2: {e}")
 
     # 2. Descarga remota si es una URL externa (R2 presigned, Google Drive, etc.)
+    #    SEGURIDAD: requiere sesión válida (header o ?token=) y validación anti-SSRF en cada salto.
+    if not payload_from_request(allow_query_token=True):
+        return jsonify({'error': 'Token requerido o inválido'}), 401
+
+    from services.security_utils import is_safe_url
     import requests as http_requests
     from flask import Response
     try:
-        resp = http_requests.get(file_url, stream=True, timeout=60)
-        if resp.status_code != 200:
-            return jsonify({'error': f'Error al descargar archivo remoto: HTTP {resp.status_code}'}), 400
+        current_url = file_url
+        resp = None
+        for _ in range(6):
+            if not is_safe_url(current_url):
+                return jsonify({'error': 'URL no permitida'}), 400
+            resp = http_requests.get(current_url, stream=True, timeout=60, allow_redirects=False)
+            if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get('Location'):
+                from urllib.parse import urljoin
+                current_url = urljoin(current_url, resp.headers['Location'])
+                resp.close()
+                continue
+            break
+        if resp is None or resp.status_code != 200:
+            return jsonify({'error': f'Error al descargar archivo remoto: HTTP {getattr(resp, "status_code", "?")}'}), 400
 
         def generate():
             for chunk in resp.iter_content(chunk_size=65536):
@@ -275,7 +352,7 @@ def proxy_download():
         return Response(generate(), headers=headers)
     except Exception as e:
         app.logger.error(f"[Download Error] {e}")
-        return jsonify({'error': f'Error al descargar el archivo: {str(e)}'}), 500
+        return jsonify({'error': 'Error al descargar el archivo'}), 500
 
 # Upload file extension whitelist
 ALLOWED_UPLOAD_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
@@ -327,7 +404,7 @@ with app.app_context():
     import sys
     print("=" * 60, file=sys.stderr)
     print("[LUXIUS] Starting unified backend v2.0", file=sys.stderr)
-    print(f"[LUXIUS] DB URI: {app.config['SQLALCHEMY_DATABASE_URI'][:50]}...", file=sys.stderr)
+    print(f"[LUXIUS] DB URI: {Config._mask_db_url(app.config['SQLALCHEMY_DATABASE_URI'])}", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
     try:
         db.create_all()
@@ -340,16 +417,20 @@ with app.app_context():
         if Usuario.query.first():
             return
         from werkzeug.security import generate_password_hash
+        import secrets as _secrets
+        # SEGURIDAD: nunca contraseñas fijas en el código. Solo se ejecuta con la BD vacía;
+        # las contraseñas iniciales aleatorias se imprimen UNA vez en el log del servidor.
         defaults = [
-            {'id': 1, 'nombre': 'SISTEMA', 'username': 'sistema', 'email': 'sistema@luxius.com', 'rol': 'principal', 'password': 'sistema123'},
-            {'id': 10, 'nombre': 'ADRIAN', 'username': 'adrian', 'email': 'adrian@luxius.com', 'rol': 'principal', 'password': 'nueva98261'},
-            {'id': 99, 'nombre': 'Administrador Central', 'username': 'admin', 'email': 'admin@luxius.com', 'rol': 'administrador', 'password': 'admin'},
-            {'id': 7, 'nombre': 'IMPRESION', 'username': 'impresion', 'email': 'impresion@luxius.com', 'rol': 'impresion', 'password': 'impresion123'},
-            {'id': 412540, 'nombre': 'Diseño', 'username': 'diseño', 'email': 'xignux.dis@gmail.com', 'rol': 'artista', 'password': 'diseño123'},
-            {'id': 621671, 'nombre': 'VENDEDOR', 'username': 'vendedor', 'email': 'vendedor@xignux.com.ar', 'rol': 'vendedor', 'password': 'vendedor'},
+            {'id': 1, 'nombre': 'SISTEMA', 'username': 'sistema', 'email': 'sistema@luxius.com', 'rol': 'principal'},
+            {'id': 10, 'nombre': 'ADRIAN', 'username': 'adrian', 'email': 'adrian@luxius.com', 'rol': 'principal'},
+            {'id': 99, 'nombre': 'Administrador Central', 'username': 'admin', 'email': 'admin@luxius.com', 'rol': 'administrador'},
+            {'id': 7, 'nombre': 'IMPRESION', 'username': 'impresion', 'email': 'impresion@luxius.com', 'rol': 'impresion'},
+            {'id': 412540, 'nombre': 'Diseño', 'username': 'diseño', 'email': 'xignux.dis@gmail.com', 'rol': 'artista'},
+            {'id': 621671, 'nombre': 'VENDEDOR', 'username': 'vendedor', 'email': 'vendedor@xignux.com.ar', 'rol': 'vendedor'},
         ]
         for u_data in defaults:
-            pwd = u_data.pop('password')
+            pwd = _secrets.token_urlsafe(12)
+            print(f"[Seed] Usuario inicial '{u_data['username']}' creado con contraseña temporal: {pwd}", file=sys.stderr)
             u = Usuario.query.filter_by(username=u_data['username']).first()
             if not u:
                 u = Usuario.query.get(u_data['id'])
@@ -402,24 +483,54 @@ with app.app_context():
         print(f"[Seed] Error seeding: {e}")
 
 
-def _apply_usuario_fields(user, item):
+def _is_admin_session():
+    from flask import g
+    from middleware.auth import ADMIN_ROLES
+    return getattr(g, 'user_rol', None) in ADMIN_ROLES
+
+
+def _current_cliente_id():
+    """Para sesiones con rol 'cliente' devuelve su cliente_id vinculado (o None)."""
+    from flask import g
+    if getattr(g, 'user_rol', None) != 'cliente':
+        return None
+    u = db.session.get(Usuario, getattr(g, 'user_id', None)) if getattr(g, 'user_id', None) else None
+    return getattr(u, 'client_id', None) if u else None
+
+
+def _apply_usuario_fields(user, item, privileged=False):
+    """Aplica campos de usuario. Los campos sensibles (rol, habilitado, clientId)
+    SOLO los puede modificar un administrador (privileged=True)."""
     from werkzeug.security import generate_password_hash
     from middleware.auth import invalidate_user_token_version
     if 'nombre' in item and item['nombre']:
-        user.nombre = item['nombre'].strip()
+        user.nombre = str(item['nombre']).strip()
     if 'username' in item and item['username']:
-        user.username = item['username'].lower().strip()
+        user.username = str(item['username']).lower().strip()
     if 'email' in item:
         user.email = (item['email'] or '').strip()
-    if 'rol' in item and item['rol']:
-        user.rol = item['rol'].lower().strip()
-    if 'clientId' in item:
-        user.client_id = item['clientId']
-    if 'habilitado' in item:
-        user.habilitado = bool(item['habilitado'])
+    if privileged:
+        new_rol = (str(item.get('rol') or '')).lower().strip()
+        if new_rol and new_rol != (user.rol or ''):
+            user.rol = new_rol
+            # Cambio de rol => invalidar tokens emitidos con el rol anterior
+            user.token_version = (getattr(user, 'token_version', 1) or 1) + 1
+            if getattr(user, 'id', None):
+                invalidate_user_token_version(user.id)
+        if 'clientId' in item:
+            user.client_id = item['clientId']
+        if 'habilitado' in item:
+            new_hab = bool(item['habilitado'])
+            if user.habilitado and not new_hab:
+                user.token_version = (getattr(user, 'token_version', 1) or 1) + 1
+                if getattr(user, 'id', None):
+                    invalidate_user_token_version(user.id)
+            user.habilitado = new_hab
 
     password = (item.get('password') or '').strip()
     if password:
+        if len(password) < 6:
+            raise ValueError('La contraseña debe tener al menos 6 caracteres')
         user.password_hash = generate_password_hash(password)
         user.token_version = (getattr(user, 'token_version', 1) or 1) + 1
         if getattr(user, 'id', None):
@@ -500,8 +611,32 @@ def _save_json_collection(name, data):
 @app.get('/api/<collection>')
 @login_required
 def get_collection(collection: str):
+    from flask import g
     if collection not in ALLOWED:
         return jsonify({'error': 'Invalid collection'}), 403
+
+    # SEGURIDAD: el rol 'cliente' solo ve sus propios datos
+    is_cliente = getattr(g, 'user_rol', None) == 'cliente'
+    own_cid = _current_cliente_id() if is_cliente else None
+    if is_cliente:
+        if collection in ('proveedores', 'calendar', 'vendedores'):
+            return jsonify([])
+        if collection == 'clientes':
+            c = db.session.get(Cliente, own_cid) if own_cid else None
+            return jsonify([c.to_dict()] if c else [])
+        if collection == 'usuarios':
+            u = db.session.get(Usuario, g.user_id)
+            if not u:
+                return jsonify([])
+            d = u.to_dict()
+            d['rol'] = u.rol
+            d['role'] = 'cliente'
+            return jsonify([d])
+        if collection == 'presupuestos':
+            if not own_cid:
+                return jsonify([])
+            rows = Presupuesto.query.filter_by(cliente_id=own_cid).order_by(Presupuesto.created_at.desc()).all()
+            return jsonify([p.to_dict() for p in rows])
 
     if collection in JSON_COLLECTIONS:
         items = _get_json_collection(collection)
@@ -549,7 +684,7 @@ def get_collection(collection: str):
 # ================================================================
 
 @app.post('/api/clientes')
-@login_required
+@operator_required
 def post_clientes():
     item = request.get_json(force=True)
     if not item:
@@ -587,7 +722,7 @@ def post_clientes():
 # ================================================================
 
 @app.put('/api/clientes/<int:id>')
-@login_required
+@operator_required
 def put_clientes(id: int):
     item = request.get_json(force=True)
     cliente = Cliente.query.get(id)
@@ -604,7 +739,7 @@ def put_clientes(id: int):
 # ================================================================
 
 @app.delete('/api/clientes/<int:id>')
-@login_required
+@operator_required
 def delete_clientes(id: int):
     cliente = Cliente.query.get(id)
     if not cliente:
@@ -642,7 +777,7 @@ def _apply_maquina_fields(maquina, item):
 # ================================================================
 
 @app.post('/api/maquinas')
-@login_required
+@operator_required
 def post_maquinas():
     item = request.get_json(force=True)
     if not item:
@@ -670,7 +805,7 @@ def post_maquinas():
 # ================================================================
 
 @app.put('/api/maquinas/<int:id>')
-@login_required
+@operator_required
 def put_maquinas(id: int):
     item = request.get_json(force=True)
     maquina = Maquina.query.get(id)
@@ -686,7 +821,7 @@ def put_maquinas(id: int):
 # ================================================================
 
 @app.delete('/api/maquinas/<int:id>')
-@login_required
+@operator_required
 def delete_maquinas(id: int):
     maquina = Maquina.query.get(id)
     if not maquina:
@@ -721,13 +856,19 @@ def post_usuarios():
     if not user and u_username:
         user = Usuario.query.filter_by(username=u_username).first()
 
+    from flask import g
+    privileged = _is_admin_session()
     is_new = user is None
+    if not privileged:
+        # Un usuario no administrador solo puede editar su PROPIO perfil
+        if is_new or str(user.id) != str(getattr(g, 'user_id', '')):
+            return jsonify({'error': 'Acceso denegado: solo un administrador puede crear o editar otros usuarios'}), 403
     if is_new:
         user = Usuario()
         db.session.add(user)
 
     try:
-        _apply_usuario_fields(user, item)
+        _apply_usuario_fields(user, item, privileged=privileged)
         db.session.commit()
 
         if user.rol in ('vendedor', 'principal', 'administrador'):
@@ -749,12 +890,16 @@ def post_usuarios():
             resp_data['newToken'] = generate_token(user.id, user.rol, user.username, token_version=getattr(user, 'token_version', 1))
 
         return jsonify(resp_data)
+    except ValueError as ve:
+        db.session.rollback()
+        return jsonify({'error': str(ve)}), 400
     except Exception as e:
         db.session.rollback()
         err_msg = str(e)
         if 'unique' in err_msg.lower() or 'duplicate' in err_msg.lower():
             return jsonify({'error': 'El nombre de usuario o email ya está en uso'}), 409
-        return jsonify({'error': f'Error al guardar usuario en base de datos: {err_msg}'}), 500
+        app.logger.error(f'[usuarios POST] {err_msg}')
+        return jsonify({'error': 'Error al guardar usuario en base de datos'}), 500
 
 
 
@@ -766,8 +911,13 @@ def put_usuarios(id: int):
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
+    from flask import g
+    privileged = _is_admin_session()
+    if not privileged and str(user.id) != str(getattr(g, 'user_id', '')):
+        return jsonify({'error': 'Acceso denegado: solo un administrador puede editar otros usuarios'}), 403
+
     try:
-        _apply_usuario_fields(user, item)
+        _apply_usuario_fields(user, item, privileged=privileged)
         user.updated_at = datetime.now(timezone.utc)
         db.session.commit()
 
@@ -787,12 +937,16 @@ def put_usuarios(id: int):
             resp_data['newToken'] = generate_token(user.id, user.rol, user.username, token_version=getattr(user, 'token_version', 1))
 
         return jsonify(resp_data)
+    except ValueError as ve:
+        db.session.rollback()
+        return jsonify({'error': str(ve)}), 400
     except Exception as e:
         db.session.rollback()
         err_msg = str(e)
         if 'unique' in err_msg.lower() or 'duplicate' in err_msg.lower():
             return jsonify({'error': 'El nombre de usuario o email ya está en uso'}), 409
-        return jsonify({'error': f'Error al actualizar usuario: {err_msg}'}), 500
+        app.logger.error(f'[usuarios PUT] {err_msg}')
+        return jsonify({'error': 'Error al actualizar usuario'}), 500
 
 
 @app.delete('/api/usuarios/<int:id>')
@@ -810,7 +964,7 @@ def delete_usuarios(id: int):
 # ================================================================
 
 @app.post('/api/<collection>')
-@login_required
+@operator_required
 def post_json_collection(collection: str):
     """Upsert a single item in a JSON collection (used by frontend syncSave)."""
     if collection not in JSON_COLLECTIONS:
@@ -840,7 +994,7 @@ def post_json_collection(collection: str):
 
 
 @app.delete('/api/<collection>/<int:item_id>')
-@login_required
+@operator_required
 def delete_json_collection_item(collection: str, item_id: int):
     """Delete an item from a JSON collection by ID."""
     if collection not in JSON_COLLECTIONS:
@@ -1074,6 +1228,7 @@ def put_tarifas():
 # ================================================================
 
 @app.get('/api/analytics/stats')
+@operator_required
 def get_analytics_stats():
     """Métricas de producción derivadas de órdenes impresas (estimadas, sin logs RIP reales)."""
     try:
@@ -1116,6 +1271,7 @@ def get_analytics_stats():
         return jsonify({'error': str(e)}), 500
 
 @app.get('/api/analytics/dashboard')
+@operator_required
 def get_analytics_dashboard():
     try:
         from collections import defaultdict
@@ -1331,6 +1487,7 @@ def get_analytics_dashboard():
         return jsonify({'error': str(e)}), 500
 
 @app.get('/api/analytics/reconciliation')
+@operator_required
 def get_analytics_reconciliation():
     """Cruce de órdenes vs producción. Sin logs RIP reales se estima real≈teórico para impresas."""
     try:

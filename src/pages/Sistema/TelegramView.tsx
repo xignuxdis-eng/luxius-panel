@@ -35,7 +35,7 @@ export default function TelegramView() {
     const fetchStatus = async () => {
         setLoading(true);
         try {
-            const resp = await fetch(`${API_URL}/api/telegram/status`, {
+            const resp = await fetch(`${API_URL}/telegram/status`, {
                 headers: getAuthHeaders(),
             });
             const data = await resp.json();
@@ -69,7 +69,7 @@ export default function TelegramView() {
         setActionLoading('save');
         setFeedback(null);
         try {
-            const resp = await fetch(`${API_URL}/api/telegram/config`, {
+            const resp = await fetch(`${API_URL}/telegram/config`, {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -106,7 +106,7 @@ export default function TelegramView() {
         setActionLoading('webhook');
         setFeedback(null);
         try {
-            const resp = await fetch(`${API_URL}/api/telegram/setup-webhook`, {
+            const resp = await fetch(`${API_URL}/telegram/setup-webhook`, {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -139,7 +139,7 @@ export default function TelegramView() {
         setActionLoading('test');
         setFeedback(null);
         try {
-            const resp = await fetch(`${API_URL}/api/telegram/notify`, {
+            const resp = await fetch(`${API_URL}/telegram/notify`, {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: testMessage })
@@ -164,7 +164,7 @@ export default function TelegramView() {
         setActionLoading('briefing');
         setFeedback(null);
         try {
-            const resp = await fetch(`${API_URL}/api/telegram/briefing/trigger`, {
+            const resp = await fetch(`${API_URL}/telegram/briefing/trigger`, {
                 method: 'POST',
                 headers: getAuthHeaders()
             });
@@ -185,7 +185,7 @@ export default function TelegramView() {
         setActionLoading('commands');
         setFeedback(null);
         try {
-            const resp = await fetch(`${API_URL}/api/telegram/register-commands`, {
+            const resp = await fetch(`${API_URL}/telegram/register-commands`, {
                 method: 'POST',
                 headers: getAuthHeaders()
             });

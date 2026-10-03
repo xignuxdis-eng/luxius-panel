@@ -483,6 +483,7 @@ def create_smart_order_draft():
 
 
 @smart_order_bp.route('/status/<job_id>', methods=['GET'])
+@login_required
 def get_smart_order_status(job_id):
     """
     Endpoint de sondeo (polling) ultra-ligero (<1ms) para obtener el estado del análisis de archivos.

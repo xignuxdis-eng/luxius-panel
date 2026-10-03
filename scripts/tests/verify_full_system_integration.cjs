@@ -60,7 +60,7 @@ async function runFullSystemAudit() {
     try {
         // 1. Auth Login
         console.log("--- 1. AUTHENTICATION & PROFILES ---");
-        const loginRes = await request('POST', '/auth/login', { username: 'adrian', password: 'nueva98261' });
+        const loginRes = await request('POST', '/auth/login', { username: process.env.LUXIUS_TEST_USER || 'adrian', password: process.env.LUXIUS_TEST_PASS || '' });
         assertTest("Login Backend (adrian)", loginRes.status === 200 && loginRes.body.token, `User: ${loginRes.body.user?.nombre}`);
 
         const token = loginRes.body.token;

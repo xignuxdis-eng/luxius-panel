@@ -47,7 +47,12 @@ def stream_cloud_file():
     if not drive_id:
         return jsonify({"error": "Falta el identificador del archivo"}), 400
 
-    safe_name = os.path.basename(file_name) or "archivo"
+    import re as _re
+    if not _re.fullmatch(r'[A-Za-z0-9_-]{10,200}', drive_id):
+        return jsonify({"error": "Identificador de archivo inválido"}), 400
+
+    from werkzeug.utils import secure_filename as _secure
+    safe_name = _secure(os.path.basename(file_name)) or "archivo"
 
     # Attempt 1: Direct stream from Google Drive uc export
     try:

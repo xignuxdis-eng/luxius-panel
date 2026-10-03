@@ -5,6 +5,10 @@ import App from './App'
 import './styles/index.css'
 import { initErrorRecorder } from './utils/errorRecorder'
 import { initVersionEngine } from './utils/versionCheck'
+import { initAuthFetch } from './utils/authFetch'
+
+// Adjuntar el token JWT a todas las llamadas al backend (seguridad)
+initAuthFetch()
 
 // Inicializar diagnóstico de errores y motor de versiones anti-caché
 initErrorRecorder()

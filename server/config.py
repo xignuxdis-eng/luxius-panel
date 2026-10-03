@@ -15,25 +15,42 @@ class Config:
     _db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'luxius.db')
     _sqlite_uri = f'sqlite:///{_db_path}'
 
+    @staticmethod
+    def _mask_db_url(url):
+        """Oculta usuario/contraseña de la URL de BD antes de loguearla."""
+        try:
+            from urllib.parse import urlsplit
+            parts = urlsplit(url)
+            host = parts.hostname or ''
+            return f"{parts.scheme}://***:***@{host}{parts.path}"
+        except Exception:
+            return '***'
+
     if _raw_db_url and 'postgresql' in _raw_db_url:
         SQLALCHEMY_DATABASE_URI = _raw_db_url
-        print(f"[CONFIG] Using PostgreSQL: {_raw_db_url[:50]}...", file=sys.stderr)
+        print(f"[CONFIG] Using PostgreSQL: {_mask_db_url.__func__(_raw_db_url)}", file=sys.stderr)
     else:
         SQLALCHEMY_DATABASE_URI = _sqlite_uri if not _raw_db_url else _raw_db_url
-        print(f"[CONFIG] Using: {SQLALCHEMY_DATABASE_URI[:50]}...", file=sys.stderr)
+        print(f"[CONFIG] Using: {_mask_db_url.__func__(SQLALCHEMY_DATABASE_URI) if '@' in SQLALCHEMY_DATABASE_URI else SQLALCHEMY_DATABASE_URI}", file=sys.stderr)
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
     }
-    SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'da72dc6fbc016729e3cea397466aad8e7db9b2fbebaa6f09a8a76372f3853519')
+    # SEGURIDAD: ningún secreto puede tener valor por defecto en el código (repo público).
+    # Si falta JWT_SECRET_KEY se usa una clave aleatoria por proceso (fail-safe: tokens inválidos).
+    SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET') or os.urandom(64).hex()
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
-    # Cloudflare R2 Configuration
-    R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID', '62e10a84196d5f6cfb46c97af6e5931d')
-    R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '178b4702bd26eb05de12c6f9077a92f4')
-    R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '5d878d399c74a0d116b65097099d0664e269964c748924fa034c3268b3c0aecc')
+    # Cloudflare R2 Configuration (solo variables de entorno)
+    R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID', '')
+    R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '')
+    R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '')
     R2_BUCKET_NAME = os.environ.get('R2_BUCKET_NAME', 'luxius-media')
-    R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL', 'https://62e10a84196d5f6cfb46c97af6e5931d.r2.cloudflarestorage.com')
+    R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL') or (
+        f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else ''
+    )
+    if not (R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY):
+        print("[CONFIG] ADVERTENCIA: credenciales R2 no configuradas (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY)", file=sys.stderr)
 

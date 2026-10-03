@@ -119,9 +119,9 @@ def main():
                 u.email      = rec.get('email', '')
                 u.rol        = rec.get('rol', 'vendedor')
                 u.habilitado = rec.get('habilitado', True)
-                pwd = rec.get('password', 'xignux2026')
+                pwd = rec.get('password') or __import__('secrets').token_urlsafe(12)
                 u.password_hash = generate_password_hash(pwd)
-                u.extra = {**(u.extra or {}), 'password': pwd}
+                u.extra = {k: v for k, v in (u.extra or {}).items() if k != 'password'}  # nunca guardar contraseñas en texto plano
                 db.session.flush()
             except Exception as e:
                 db.session.rollback()
@@ -162,7 +162,7 @@ def main():
                 headers = {}
                 # Intentar via API local (ya levantada)
                 login = req_lib.post('http://localhost:5000/api/auth/login',
-                                     json={'username': 'admin', 'password': 'admin'}, timeout=5)
+                                     json={'username': os.environ.get('LUXIUS_TEST_USER', 'admin'), 'password': os.environ.get('LUXIUS_TEST_PASS', '')}, timeout=5)
                 if login.ok:
                     token = login.json().get('token', '')
                     headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}

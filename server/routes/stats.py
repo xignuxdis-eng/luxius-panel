@@ -8,14 +8,14 @@ con métricas reales calculadas desde la tabla presupuestos.
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, jsonify, request
 from models import db, Presupuesto, Cliente, Maquina, Usuario, ConfigGlobal
-from middleware.auth import login_required, admin_required
+from middleware.auth import login_required, admin_required, operator_required
 from sqlalchemy import func, text, extract, case
 
 stats_bp = Blueprint('stats', __name__, url_prefix='/api/stats')
 
 
 @stats_bp.get('/advanced')
-@login_required
+@operator_required
 def get_advanced_stats():
     """Estadísticas avanzadas para el panel admin — reemplaza datos mock."""
     try:
@@ -135,7 +135,7 @@ def get_advanced_stats():
 
 
 @stats_bp.get('/reportes')
-@login_required
+@operator_required
 def get_reportes_stats():
     """Estadísticas para el Centro de Reportes — reemplaza datos mock."""
     try:
