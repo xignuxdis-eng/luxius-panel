@@ -13,7 +13,7 @@ import base64
 import re
 import io
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Union
 import requests
 from PIL import Image, ImageDraw
 
@@ -670,16 +670,33 @@ def cmd_sesiones() -> str:
         return f"⚠️ Error consultando sesiones: {e}"
 
 
-def cmd_execute(instruction: str) -> str:
-    """Ejecuta una consulta directa con el motor de Xana."""
+TELEGRAM_CHAT_HISTORIES: Dict[str, List[Dict[str, str]]] = {}
+
+
+def cmd_execute(instruction: str, chat_id: Optional[Union[int, str]] = None) -> str:
+    """Ejecuta una consulta directa con el motor de Xana manteniendo contexto conversacional."""
     clean = instruction.strip()
     if not clean:
         return "⚠️ Debes ingresar una directiva para ejecutar. Ej: `/execute consultar stock de vinilo`"
 
     try:
         from services.xana_graph import run_xana_chat
-        res = run_xana_chat(clean, user_role='admin', username='TelegramAdmin')
+        history = None
+        cid_str = str(chat_id) if chat_id else ""
+        if cid_str:
+            history = TELEGRAM_CHAT_HISTORIES.get(cid_str, [])
+
+        res = run_xana_chat(clean, user_role='admin', username='TelegramAdmin', history=history)
         reply = res.get('reply') or "No se obtuvo respuesta del motor de Xana."
+
+        if cid_str:
+            if cid_str not in TELEGRAM_CHAT_HISTORIES:
+                TELEGRAM_CHAT_HISTORIES[cid_str] = []
+            TELEGRAM_CHAT_HISTORIES[cid_str].append({'role': 'user', 'content': clean})
+            TELEGRAM_CHAT_HISTORIES[cid_str].append({'role': 'assistant', 'content': reply})
+            if len(TELEGRAM_CHAT_HISTORIES[cid_str]) > 12:
+                TELEGRAM_CHAT_HISTORIES[cid_str] = TELEGRAM_CHAT_HISTORIES[cid_str][-12:]
+
         return f"⚡ *Ejecución de Xana:*\n\n{reply}"
     except Exception as e:
         return f"⚠️ Error ejecutando comando agéntico: {e}"
@@ -1399,9 +1416,9 @@ def process_telegram_update(update: dict) -> dict:
     elif cmd in ('/sesiones', '/agentes', '/commits'):
         send_telegram_message(chat_id, cmd_sesiones())
     elif cmd in ('/execute', '/ejecutar', '/xana'):
-        send_telegram_message(chat_id, cmd_execute(arg))
+        send_telegram_message(chat_id, cmd_execute(arg, chat_id=chat_id))
     else:
         # Si escribe texto libre sin comando, lo tratamos como consulta interactiva a Xana
-        send_telegram_message(chat_id, cmd_execute(text))
+        send_telegram_message(chat_id, cmd_execute(text, chat_id=chat_id))
 
     return {"ok": True, "command": cmd, "chat_id": chat_id}

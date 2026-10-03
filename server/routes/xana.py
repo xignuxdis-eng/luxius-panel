@@ -167,36 +167,9 @@ DEFAULT_XANA_DATA = {
             "task_id": "TASK-015",
             "project": "Xana AI — Fase 0 Estabilización",
             "objective": "Corrección de bugs críticos del asistente Xana: detección de roles vía luxius-auth-v6 con mapeo de valores reales (administrador/principal→admin, impresion→impresor, cliente/vendedor/artista), token JWT en /xana/chat, fallback de commits sin devolver tareas, guard anti-OOM en análisis de imágenes y regex de escala sin falsos positivos (110x200 ya no se lee como 1:10).",
-            "status": "completed",
+            "status": "in_progress",
             "created_at": "2026-09-27T00:35:00-03:00",
-            "updated_at": "2026-09-27T01:50:00-03:00"
-        },
-        {
-            "id": 16,
-            "task_id": "TASK-016",
-            "project": "Xana AI — Fase 1 Function Calling",
-            "objective": "Tool layer determinista (xana_tools.py: obtener_estado_ot, consultar_stock_materiales, obtener_metricas_ventas_cliente, crear_orden_trabajo), function calling en xana_graph.py con fallback regex (shadow mode), adaptador de proveedor LLM (Gemini/DeepSeek) y logging de shadow mode en collection_xana_shadow. Verificado en producción: function calling funciona con Gemini y los probes anti-alucinación (material/cliente/orden inexistente) no inventan datos.",
-            "status": "completed",
-            "created_at": "2026-09-27T01:50:00-03:00",
-            "updated_at": "2026-09-27T02:17:00-03:00"
-        },
-        {
-            "id": 17,
-            "task_id": "TASK-017",
-            "project": "Xana AI — Fase 2 Knowledge Base + RAG",
-            "objective": "Base de conocimiento estructurada (materiales, bobinas, precios, tolerancias, procedimientos) sincronizada desde collection_materiales + RAG pragmático con índice plano (sentence-transformers all-MiniLM-L6-v2) para manuales/guías. 6 tools de conocimiento, nodo knowledge_node en LangGraph, citas obligatorias, telemetría Gate A3 (latencia ≤300ms, corpus ≤500 docs/5MB). Endpoints de gestión: /kb/sync, /kb/rag/ingest, /kb/rag/search, /kb/rag/stats, /kb/stats. Corpus inicial: 3 guías técnicas.",
-            "status": "completed",
-            "created_at": "2026-09-27T02:30:00-03:00",
-            "updated_at": "2026-09-27T02:45:00-03:00"
-        },
-        {
-            "id": 18,
-            "task_id": "TASK-018",
-            "project": "Xana AI — Fase 3 Analytics Seguro",
-            "objective": "Vistas SQL parametrizadas de solo lectura (v_ventas_cliente, v_consumo_material, v_rendimiento_maquina, v_resumen_financiero) compatibles SQLite/PostgreSQL. 5 tools analíticas tipadas, timeouts 3s, límite 100 filas, control de acceso por rol. Telemetría Gate A4 integrada. Nodo analytics_node en LangGraph. Endpoints: /analytics/telemetry, /analytics/query.",
-            "status": "completed",
-            "created_at": "2026-09-27T03:00:00-03:00",
-            "updated_at": "2026-09-27T03:15:00-03:00"
+            "updated_at": "2026-09-27T00:35:00-03:00"
         }
     ],
     "decisions": [
@@ -329,36 +302,6 @@ DEFAULT_XANA_DATA = {
             "alternatives_rejected": ["Fine-tuning desde cero", "Microservicio separado (FastAPI/Ray)", "Text-to-SQL libre", "Vector DB pesada (Qdrant/ChromaDB/LlamaIndex) en esta etapa"],
             "reason": "Evoluciona el motor LangGraph existente sin reescritura, mantiene controlada la latencia del chat y evita alucinaciones en cotizaciones al consultar precios deterministas.",
             "created_at": "2026-09-27T00:35:00-03:00"
-        },
-        {
-            "id": 14,
-            "decision_id": "DEC-014",
-            "task_id": "TASK-016",
-            "topic": "Validación de Function Calling y Anti-Alucinación en producción",
-            "choice": "Function calling con Gemini como proveedor activo (XANA_LLM_PROVIDER=gemini) + tools deterministas. Verificado end-to-end: consultar_stock_materiales devuelve datos reales y los probes de alucinación (material/cliente/orden inexistentes, precio inventado) devuelven negación explícita sin inventar.",
-            "alternatives_rejected": ["RAG con vector DB para datos paramétricos", "DeepSeek como único proveedor en esta etapa"],
-            "reason": "Las tools tipadas sobre collection_materiales/Presupuesto son la fuente de verdad y eliminan la alucinación de precios. DeepSeek queda pendiente del gate A1 (cross-model).",
-            "created_at": "2026-09-27T02:17:00-03:00"
-        },
-        {
-            "id": 15,
-            "decision_id": "DEC-015",
-            "task_id": "TASK-017",
-            "topic": "Arquitectura Knowledge Base Fase 2 (Estructurada + RAG)",
-            "choice": "Capa Estructurada sincronizada desde collection_materiales (fuente de verdad única) + RAG plano con sentence-transformers all-MiniLM-L6-v2 (~22MB, CPU-only) para manuales/guías únicamente. Sin Qdrant/ChromaDB/LlamaIndex. 6 tools tipadas con citas obligatorias. Telemetría Gate A3 integrada. Límites: corpus ≤500 docs / ≤5MB, threshold 0.35, top-k 4.",
-            "alternatives_rejected": ["Vector DB gestionada (Qdrant Cloud, Pinecone)", "LlamaIndex con múltiples índices", "Fine-tuning con conocimiento de dominio", "RAG para datos paramétricos (precios, stock)"],
-            "reason": "Reutiliza motor de precios existente, evita dependencias pesadas, controla latencia (Gate A3), y separa estrictamente datos estructurados (tools deterministas) de prosa (RAG) para anti-alucinación.",
-            "created_at": "2026-09-27T02:45:00-03:00"
-        },
-        {
-            "id": 16,
-            "decision_id": "DEC-016",
-            "task_id": "TASK-018",
-            "topic": "Arquitectura Analytics Seguro Fase 3 (Vistas SQL Parametrizadas)",
-            "choice": "Vistas SQL de solo lectura definidas como CTEs parametrizadas (no Text-to-SQL), compatibles SQLite y PostgreSQL. 5 tools analíticas tipadas con timeouts (3s), límites de filas (100), busy_timeout SQLite. Control de acceso por rol (admin/principal/impresion). Telemetría Gate A4 (latencia, success rate).",
-            "alternatives_rejected": ["Text-to-SQL libre con LLM", "Vistas materializadas en BD", "Microservicio analítico separado", "Raw SQL expuesto al LLM"],
-            "reason": "Elimina riesgo de inyección SQL y consultas pesadas que bloqueen el hilo principal Flask. Vistas parametrizadas son deterministas, auditables y portables entre dialectos. Timeouts y límites protegen estabilidad.",
-            "created_at": "2026-09-27T03:15:00-03:00"
         }
     ],
     "sessions": [
@@ -621,6 +564,7 @@ def xana_chat_endpoint():
     user_id = data.get('userId', 0)
     client_logs = data.get('clientLogs', [])
     current_url = data.get('currentUrl', '/')
+    history = data.get('history', [])
 
     try:
         result = run_xana_chat(
@@ -629,7 +573,8 @@ def xana_chat_endpoint():
             username=username,
             user_id=user_id,
             client_logs=client_logs,
-            current_url=current_url
+            current_url=current_url,
+            history=history
         )
         return jsonify({
             'success': True,
@@ -643,185 +588,6 @@ def xana_chat_endpoint():
             'success': False,
             'error': f'Error en el motor LangGraph de Xana: {str(e)}'
         }), 500
-
-
-# ================================================================
-# KNOWLEDGE BASE MANAGEMENT (FASE 2)
-# ================================================================
-
-@xana_bp.post('/kb/sync')
-@login_required
-def xana_kb_sync():
-    """Sincroniza materiales de collection_materiales a la KB estructurada."""
-    try:
-        from services.xana_knowledge import sync_materials_to_kb
-        kb = sync_materials_to_kb()
-        return jsonify({
-            'success': True,
-            'materials_synced': len(kb.get('materials', {})),
-            'bobinas_indexed': len(kb.get('bobinas', {})),
-            'precios_indexed': len(kb.get('precios_m2', {})),
-            'updated_at': kb.get('updated_at')
-        }), 200
-    except Exception as e:
-        print(f"[Xana KB Sync Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@xana_bp.post('/kb/rag/ingest')
-@login_required
-def xana_kb_rag_ingest():
-    """Ingiere documentos del corpus RAG (manuales, guías)."""
-    try:
-        from services.xana_knowledge import rag_index
-        data = request.get_json(force=True) or {}
-        directory = data.get('directory')  # opcional, usa default si no se pasa
-        
-        count = rag_index.ingest_directory(directory)
-        return jsonify({
-            'success': True,
-            'documents_ingested': count,
-            'total_corpus_size': len(rag_index.documents),
-            'corpus_mb': round(sum(len(d['content']) for d in rag_index.documents) / (1024 * 1024), 2)
-        }), 200
-    except Exception as e:
-        print(f"[Xana RAG Ingest Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@xana_bp.get('/kb/rag/stats')
-@login_required
-def xana_kb_rag_stats():
-    """Estadísticas del índice RAG y telemetría (Gate A3)."""
-    try:
-        from services.xana_knowledge import rag_index
-        stats = rag_index.get_telemetry_stats()
-        return jsonify({
-            'success': True,
-            'stats': stats
-        }), 200
-    except Exception as e:
-        print(f"[Xana RAG Stats Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@xana_bp.post('/kb/rag/search')
-@login_required
-def xana_kb_rag_search():
-    """Búsqueda directa en el índice RAG (para testing/debug)."""
-    try:
-        from services.xana_knowledge import rag_index
-        data = request.get_json(force=True) or {}
-        query = data.get('query', '')
-        top_k = data.get('top_k', 4)
-        threshold = data.get('threshold', 0.35)
-        
-        if not query:
-            return jsonify({'error': 'Query requerido'}), 400
-        
-        results = rag_index.search(query, top_k=top_k, threshold=threshold)
-        return jsonify({
-            'success': True,
-            'query': query,
-            'results': results,
-            'count': len(results)
-        }), 200
-    except Exception as e:
-        print(f"[Xana RAG Search Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@xana_bp.get('/kb/stats')
-@login_required
-def xana_kb_stats():
-    """Estadísticas generales de la Knowledge Base."""
-    try:
-        from services.xana_knowledge import get_structured_kb, rag_index
-        kb = get_structured_kb()
-        
-        return jsonify({
-            'success': True,
-            'structured': {
-                'materials': len(kb.get('materials', {})),
-                'bobinas': len(kb.get('bobinas', {})),
-                'precios_m2': len(kb.get('precios_m2', {})),
-                'tolerancias': len(kb.get('tolerancias', {})),
-                'procedimientos': len(kb.get('procedimientos', {})),
-                'version': kb.get('version'),
-                'updated_at': kb.get('updated_at')
-            },
-            'rag': {
-                'documents': len(rag_index.documents),
-                'corpus_mb': round(sum(len(d['content']) for d in rag_index.documents) / (1024 * 1024), 2),
-                'corpus_dir': rag_index.corpus_dir,
-                'index_path': rag_index.index_path
-            }
-        }), 200
-    except Exception as e:
-        print(f"[Xana KB Stats Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ================================================================
-# ANALYTICS MANAGEMENT (FASE 3)
-# ================================================================
-
-@xana_bp.get('/analytics/telemetry')
-@login_required
-def xana_analytics_telemetry():
-    """Telemetría de queries analíticas (Gate A4)."""
-    try:
-        from services.xana_analytics import get_analytics_telemetry_stats
-        stats = get_analytics_telemetry_stats()
-        return jsonify({
-            'success': True,
-            'stats': stats
-        }), 200
-    except Exception as e:
-        print(f"[Xana Analytics Telemetry Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@xana_bp.post('/analytics/query')
-@login_required
-def xana_analytics_query():
-    """Ejecuta una query analítica parametrizada (para testing/debug)."""
-    try:
-        from services.xana_analytics import (
-            tool_obtener_ventas_cliente,
-            tool_obtener_consumo_materiales,
-            tool_obtener_rendimiento_maquinas,
-            tool_obtener_resumen_financiero,
-            tool_obtener_top_clientes
-        )
-        data = request.get_json(force=True) or {}
-        query_type = data.get('type', '')
-        params = data.get('params', {})
-        
-        if not query_type:
-            return jsonify({'error': 'Tipo de query requerido'}), 400
-        
-        executors = {
-            'ventas_cliente': tool_obtener_ventas_cliente,
-            'consumo_materiales': tool_obtener_consumo_materiales,
-            'rendimiento_maquinas': tool_obtener_rendimiento_maquinas,
-            'resumen_financiero': tool_obtener_resumen_financiero,
-            'top_clientes': tool_obtener_top_clientes
-        }
-        
-        fn = executors.get(query_type)
-        if not fn:
-            return jsonify({'error': f'Tipo de query desconocido: {query_type}'}), 400
-        
-        result = fn(**params)
-        return jsonify({
-            'success': True,
-            'type': query_type,
-            'result': result
-        }), 200
-    except Exception as e:
-        print(f"[Xana Analytics Query Error]: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @xana_bp.get('/health')

@@ -630,6 +630,47 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - `services/telegram_service.py` sincronizado al 100% entre `luXius-Backend` y `Sitio XignuX/server`.
   - Verificado con test de integración simulado (`test_voice_flow.py`) con fallback exitoso y verificado.
 
+### Sesión 03/10/2026 (7ª parte): Super-Xana AI — Inteligencia Gráfica Experta, Asesoramiento de Preimpresión y Resolución (DPI / Escalador IA Real-ESRGAN Vulkan), Gestión de Color (CMYK vs RGB / Rich Black), Sustratos, 13 Tools Deterministas y Memoria Multi-Turn (completado)
+- [x] **Diagnóstico y Causa Raíz de Limitación Cognitiva**:
+  - `_build_llm()` en `xana_graph.py` tenía `gemini-2.5-flash` hardcodeado con timeout corto de 10s.
+  - Al agotarse la cuota diaria gratuita de ese modelo (HTTP 429), Xana caía silenciosamente al fallback estático local que solo conocía 3 respuestas fijas ('hola', 'vinilo', 'lona'), perdiendo toda su capacidad agéntica.
+- [x] **Motor de Cascada Multi-Modelo Resiliente (`MODELS_CASCADE`)**:
+  - Cascada de modelos configurada: `['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.6-flash', 'gemini-3.5-flash']`.
+  - Priorización de variantes `-lite` con latencias ultrarrápidas (1.2s a 1.5s) y pools de cuotas independientes con disponibilidad continua.
+  - Manejo seguro de tipos de contenido de LangChain mediante `_extract_text(content)`.
+- [x] **Conocimiento Maestro de la Industria Gráfica & Preimpresión**:
+  - **Resolución DPI y Distancia de Visualización**:
+    - Distancia > 5m (gigantografías, vallas de ruta): 35 a 72 DPI reales a escala 1:1. El ojo humano no percibe mayor resolución a esa distancia y colapsa el RIP.
+    - Distancia 2 a 5m (marquesinas, banners, fondos de prensa): 100 a 150 DPI reales.
+    - Distancia < 1m (gráfica vehicular, vidrieras, cuadros Canvas): 150 a 300 DPI reales.
+    - Regla de Escala 1:10: mínimo 300 DPI en archivo para conservar al menos 30 DPI al escalar al 100% en taller.
+  - **Gestión de Color y Tintas**:
+    - Espacio CMYK estricto (Fogra39 / US Web Coated SWOP). Advertencia al usuario sobre pérdida de brillo en tonos RGB flúor.
+    - Negro Enriquecido (Rich Black): `C:40 M:30 Y:30 K:100` o `C:50 M:40 Y:40 K:100` para fondos plenos oscuros. Nunca K:100 solo (queda gris lavado).
+    - Negro Puro: `K:100` puro sin CMY para textos chicos (< 24pt) y líneas finas para evitar desfasaje de registro de cabezales.
+    - Prevención de virado azul a violeta: Mantener Magenta 30-40% por debajo de Cyan (ej. C:100 M:60).
+  - **Sustratos y Lonas**:
+    - Monomérico (1-2 años, superficies planas), Polimérico (3-5 años exterior), Cast/Wrap (rotulación vehicular deformable con calor), Microperforado (60/40 para lunetas y vidrieras).
+    - Lona Frontlight 13oz (luz frontal), Backlight 15oz (cajas de luz con mayor carga de tinta), Blackout (doble faz opaca), Mesh (microperforada para viento).
+  - **Asesoramiento de Imágenes & Escalador IA**:
+    - Diagnóstico de imágenes pixeladas de clientes (WhatsApp/Google) y recomendación activa del módulo **Escalador IA (Real-ESRGAN Vulkan)** de LuXius en Xpress Studio (4x por GPU).
+- [x] **Ampliación de Herramientas Operativas a 13 Tools (`xana_tools.py`)**:
+  - `consultar_resumen_taller_y_cola`: OTs pendientes, metros lineales, desglose por bobina (1.37 vs 1.52) y urgencias.
+  - `consultar_metricas_facturacion`: Facturación, cobranzas, saldo pendiente y ticket promedio.
+  - `consultar_ranking_clientes`: Top clientes por volumen y facturación.
+  - `buscar_ordenes_avanzado`: Búsqueda multicriterio por cliente, OT o material con filtro de urgencias.
+  - `consultar_alertas_stock_critico`: Insumos y bobinas por debajo del mínimo de seguridad.
+  - `consultar_asesoramiento_grafico`: Base de conocimiento gráfico determinista.
+  - `consultar_tarifario_oficial`: Lista de precios oficial por m² y ml.
+- [x] **Memoria Conversacional Multi-Turn**:
+  - Soporte de `history` en `general_chat_node`, endpoint web `/api/xana/chat` y `cmd_execute` de Telegram (`TELEGRAM_CHAT_HISTORIES`).
+- [x] **Frontend Web (`XanaAssistant.tsx`)**:
+  - Agregadas opciones de acceso rápido en el menú desplegable: `🎨 Consejos Gráficos & DPI` y `🖨️ Cola de Taller`.
+- [x] **Verificación y Pruebas Unitarias**:
+  - Probada resolución de preguntas gráficas complejas (DPI para 6x3m, solución a imágenes pixeladas de WhatsApp, negro enriquecido y Luneta Hilux) con respuestas exhaustivas y precisas.
+  - `npm run build` ejecutado en 6.27s sin errores.
+  - Backend daemon en puerto 5000 activo y operativo.
+
 ---
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)

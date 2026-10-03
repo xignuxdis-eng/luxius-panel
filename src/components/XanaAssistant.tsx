@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
     X, Send, Bot, Sparkles, AlertTriangle, Database, 
-    Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle, Mic, MicOff
+    Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle, Mic, MicOff, Palette, Printer
 } from 'lucide-react';
 import { getRecentLogs, clearLogs, RecordedError } from '../utils/errorRecorder';
 import { API_URL } from '../data/db';
@@ -517,6 +517,32 @@ const menuRef = useRef<HTMLDivElement>(null);
                                             </div>
                                         </button>
                                     )}
+
+                                    {/* Cola de Taller (Admin / Impresor) */}
+                                    {isImpresor && (
+                                        <button 
+                                            className="dropdown-item item-queue"
+                                            onClick={() => sendMessage('¿Cuántas órdenes y metros lineales tenemos pendientes en la cola de taller?')}
+                                        >
+                                            <Printer size={15} />
+                                            <div>
+                                                <strong>Cola de Taller</strong>
+                                                <small>Metros y órdenes a imprimir</small>
+                                            </div>
+                                        </button>
+                                    )}
+
+                                    {/* Asesoramiento Gráfico Profesional (Todos) */}
+                                    <button 
+                                        className="dropdown-item item-graphic"
+                                        onClick={() => sendMessage('Dame consejos de resolución DPI para gigantografía y cómo preparar archivos de imagen para impresión')}
+                                    >
+                                        <Palette size={15} />
+                                        <div>
+                                            <strong>Consejos Gráficos & DPI</strong>
+                                            <small>Resolución, colores y sustratos</small>
+                                        </div>
+                                    </button>
 
                                     {/* Materiales y Formatos (Cliente) */}
                                     {isCliente && (
