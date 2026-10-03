@@ -807,6 +807,10 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 <RedrawerStudio 
                     initialImageUrl={previewUrl}
                     initialFileName={file?.name ? file.name.replace(/\.[^/.]+$/, '') : (metadata?.name ? metadata.name.replace(/\.[^/.]+$/, '') : 'archivo')}
+                    order={order}
+                    onOrderUpdated={(savedOrder) => {
+                        setOrder(savedOrder);
+                    }}
                     onSendToViewer={(svgUrl, newFileName) => {
                         setPreviewUrl(svgUrl);
                         setMetadata({

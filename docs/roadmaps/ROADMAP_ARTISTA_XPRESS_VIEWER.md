@@ -23,9 +23,9 @@ El **Rol Artista** (`role: 'artista'`) es el encargado de:
 | :--- | :--- | :--- | :--- |
 | **Fase 1** | **Acceso, Permisos y Navegación de Artista** | ✅ **COMPLETADA** | `src/types/auth.ts`, `src/components/layout/Sidebar.tsx` |
 | **Fase 2** | **Apertura Contextual de Órdenes y Archivos** | ✅ **COMPLETADA** | `src/pages/XpressViewer/XpressViewer.tsx`, `src/pages/Diseno/Diseno.tsx`, `src/components/shared/SharedFileViewerModal.tsx` |
-| **Fase 3** | **Herramientas de Preimpresión en Tiempo Real** | 🟡 **LISTA PARA EJECUCIÓN** | `src/pages/XpressViewer/XpressViewer.tsx`, `src/types/orden.ts` |
-| **Fase 4** | **Redrawer AI: Guardado y Reemplazo Directo en OT** | ⚪ *Planificada* | `src/pages/XpressViewer/RedrawerStudio.tsx`, `src/services/api.ts` |
-| **Fase 5** | **Aprobación Técnica y Pase a Impresión desde el Visor** | ⚪ *Planificada* | `src/pages/XpressViewer/XpressViewer.tsx`, `src/pages/Entrada/StatusChangeModal.tsx` |
+| **Fase 3** | **Herramientas de Preimpresión en Tiempo Real** | ✅ **COMPLETADA** | `src/pages/XpressViewer/XpressViewer.tsx`, `src/types/orden.ts` |
+| **Fase 4** | **Redrawer AI: Guardado y Reemplazo Directo en OT** | ✅ **COMPLETADA** | `src/pages/XpressViewer/RedrawerStudio.tsx`, `src/data/db.ts` |
+| **Fase 5** | **Aprobación Técnica y Pase a Impresión desde el Visor** | ✅ **COMPLETADA** | `src/pages/XpressViewer/XpressViewer.tsx`, `src/data/db.ts` |
 
 ---
 
@@ -47,52 +47,27 @@ El **Rol Artista** (`role: 'artista'`) es el encargado de:
 
 ---
 
-### 🟡 FASE 3: Herramientas de Preimpresión en Tiempo Real (Siguiente Paso)
-
-**Objetivo:** Permitir al Artista verificar y ajustar parámetros técnicos dentro del mismo visor antes de enviar a taller.
-
-#### 1. Calibrador de Demasías y Sangrado Visual
-- **Ubicación:** `src/pages/XpressViewer/XpressViewer.tsx` (herramienta `toolMode === 'bleed'`).
-- **Funcionalidad:**
-  - Permitir ingresar demasía en centímetros (ej: 2cm, 5cm para bolsillo de lona, o 0.5cm para sangrado de vinilo de corte).
-  - Dibujar una guía perimetral semitransparente sobre el canvas/preview con líneas discontinuas cyan/magenta indicando la línea de corte y la línea de seguridad.
-  - Guardar la configuración de demasías (`demasiasConfig`: `{ top, bottom, left, right, cm }`) en la orden asociada si se pasa `orderId` en la URL (`/xpress-viewer?orderId=123`).
-
-#### 2. Inspector Automático de DPI a Escala 1:1
-- Comparar las dimensiones en píxeles del archivo contra las medidas solicitadas en la orden (`ancho` y `alto` en metros):
-  $$\text{DPI Calculado} = \frac{\text{Pixeles de Ancho}}{\text{Ancho en Metros} \times 39.3701}$$
-- Mostrar un badge interactivo con semáforo de calidad:
-  - 🟢 **Óptimo (>150 DPI)**: Alta definición para vinilo de corte / cartelería cercana.
-  - 🟡 **Aceptable (72 - 150 DPI)**: Apto para gigantografías y lonas front/backlight vistas a distancia (>3 metros).
-  - 🔴 **Crítico (<72 DPI)**: Advertencia de pixelado severo con botón para abrir automáticamente en el **Redrawer Studio**.
-
-#### 3. Detección y Alerta CMYK vs RGB
-- Analizar el perfil del archivo. Si es RGB, alertar al artista con una sugerencia de previsualización de virado de color típico de tintas solventes/UV (alerta de negros no enriquecidos y saturación de verdes/azules fosforescentes).
+### ✅ FASE 3: Herramientas de Preimpresión en Tiempo Real (Completada)
+- **Logro:**
+  1. Calibrador de demasías y sangrado visual perimetral (presets 2cm, 5cm, 10cm bolsillo lona) con renderizado en canvas y persistencia a la orden.
+  2. Inspector de DPI a escala física 1:1 reactivo con semáforo interactivo (>150 verde, 72-150 amarillo, <72 rojo).
+  3. Simulador de virado solvente CMYK con filtro interactivo y aviso de perfil.
 
 ---
 
-### ⚪ FASE 4: Redrawer AI con Guardado y Reemplazo Directo a la OT
-
-**Objetivo:** Que el Artista pueda vectorizar un logo de mala calidad y vincular el SVG resultante directamente a la orden sin descargarlo y volverlo a subir manualmente.
-
-- **Ubicación:** `src/pages/XpressViewer/RedrawerStudio.tsx`.
-- **Flujo:**
-  1. Si `orderId` está presente en la URL, mostrar el botón: `⚡ Guardar Vector en Orden #OT`.
-  2. Al hacer clic, convertir el SVG a Blob y enviarlo a `POST /api/ordenes/<id>/archivos` o subirlo a Cloudflare R2 vía `/api/upload`.
-  3. Registrar en el historial de la OT: *"Arte vectorizado con Redrawer Studio por [Artista]"*.
+### ✅ FASE 4: Redrawer AI con Guardado y Reemplazo Directo a la OT (Completada)
+- **Logro:**
+  1. Si `order` está presente en Redrawer Studio, se muestra la tarjeta de OT vinculada y el botón `⚡ Guardar Vector en Orden #OT`.
+  2. Modal de guardado con opciones: "Reemplazar arte principal" (coloca el vector en `archivos[0]` y preserva el arte anterior) o "Agregar como archivo adicional".
+  3. Conversión del SVG con retoques a Blob/File, subida directa a Cloudflare R2 vía `uploadFile()`, persistencia en PostgreSQL vía `saveOrden()` y registro en historial/observaciones.
+  4. Opción de aprobación automática: cambia el estado a `orden` (listo para taller).
 
 ---
 
-### ⚪ FASE 5: Aprobación Técnica y Pase a Impresión desde Xpress Viewer
-
-**Objetivo:** Cerrar el ciclo de diseño sin salir del visor.
-
-- **Ubicación:** `src/pages/XpressViewer/XpressViewer.tsx`.
-- **Flujo:**
-  1. Barra inferior con selector de acción rápida:
-     - 🚀 **Aprobar y Pasar a Impresión**: Cambia el estado de la orden a `orden` o `impresion`.
-     - ↩️ **Rebotar a Vendedor/Cliente**: Abre un modal breve para redactar motivo (ej: *"Resolución insuficiente, se solicitó archivo en curvas"*).
-  2. Notificación en tiempo real vía WebSocket o actualización de estado en base de datos.
+### ✅ FASE 5: Aprobación Técnica y Pase a Impresión desde Xpress Viewer (Completada)
+- **Logro:**
+  1. Barra de aprobación técnica en el visor: botón `Aprobar para Impresión` (avanza estado de la OT a `ORDEN_DE_TRABAJO`).
+  2. Botón `Rebotar al Vendedor` con modal de motivos para notificar resolución deficiente o falta de curvas.
 
 ---
 

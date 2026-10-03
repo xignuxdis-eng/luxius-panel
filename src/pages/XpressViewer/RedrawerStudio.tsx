@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ImageTracer, { ImageTracerOptions } from 'imagetracerjs';
 import { svgToDxf, triggerFileDownload } from '../../utils/vectorUtils';
+import { Order } from '../../types/orden';
+import { uploadFile, saveOrden } from '../../data/db';
 import './RedrawerStudio.css';
 
 export interface RedrawerStudioProps {
     initialImageUrl?: string | null;
     initialFileName?: string;
+    order?: Order | null;
+    onOrderUpdated?: (order: Order) => void;
     onSendToViewer?: (svgUrl: string, fileName: string) => void;
     onClose?: () => void;
 }
@@ -17,6 +21,8 @@ type DrawTool = 'pan' | 'pen' | 'line' | 'eraser';
 export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
     initialImageUrl,
     initialFileName = 'imagen_vectorizada',
+    order,
+    onOrderUpdated,
     onSendToViewer,
     onClose
 }) => {
@@ -52,6 +58,14 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
     const [isDrawing, setIsDrawing] = useState<boolean>(false);
     const [contourAdded, setContourAdded] = useState<boolean>(false);
     const [copySuccess, setCopySuccess] = useState<boolean>(false);
+
+    // Guardado Directo a la Orden (Fase 4 Artista)
+    const [showSaveOrderModal, setShowSaveOrderModal] = useState<boolean>(false);
+    const [saveMode, setSaveMode] = useState<'replace' | 'append'>('replace');
+    const [approveAndAdvance, setApproveAndAdvance] = useState<boolean>(true);
+    const [isSavingToOrder, setIsSavingToOrder] = useState<boolean>(false);
+    const [uploadProgress, setUploadProgress] = useState<number>(0);
+    const [orderSaveFeedback, setOrderSaveFeedback] = useState<string | null>(null);
 
     // Métricas del Vector
     const [pathCount, setPathCount] = useState<number>(0);
@@ -567,6 +581,97 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
         const url = URL.createObjectURL(blob);
         if (onSendToViewer) {
             onSendToViewer(url, `${fileName}_vector.svg`);
+        }
+    };
+
+    // Exportación 6: Guardar y Vincular Directamente a la Orden (Fase 4 Artista)
+    const handleSaveVectorToOrder = async () => {
+        if (!order || !vectorSvg) return;
+        setIsSavingToOrder(true);
+        setUploadProgress(0);
+        setOrderSaveFeedback(null);
+
+        try {
+            const finalSvg = getFinalSvgWithStrokes();
+            const cleanBaseName = fileName.replace(/\.[^/.]+$/, '').trim() || 'vector';
+            const svgFileName = `${cleanBaseName}_vector.svg`;
+            const svgBlob = new Blob([finalSvg], { type: 'image/svg+xml;charset=utf-8' });
+            const svgFile = new File([svgBlob], svgFileName, { type: 'image/svg+xml' });
+
+            // 1. Subir a R2 / servidor
+            const uploadRes = await uploadFile(svgFile, (percent) => {
+                setUploadProgress(percent);
+            });
+
+            const newFilePath = uploadRes.path || `/uploads/${uploadRes.filename}`;
+            const newOriginalName = svgFileName;
+
+            // 2. Armar nuevos arreglos de archivos
+            let updatedArchivos: string[] = [];
+            let updatedOriginales: string[] = [];
+
+            const currentArchivos = Array.isArray(order.archivos) ? [...order.archivos] : [];
+            const currentOriginales = Array.isArray(order.archivosOriginales) ? [...order.archivosOriginales] : [];
+
+            if (saveMode === 'replace') {
+                const otherArchivos = currentArchivos.filter(a => a !== newFilePath);
+                updatedArchivos = [newFilePath, ...otherArchivos];
+
+                const otherOriginales = currentOriginales.filter(o => o !== newOriginalName);
+                updatedOriginales = [newOriginalName, ...otherOriginales];
+            } else {
+                updatedArchivos = [...currentArchivos, newFilePath];
+                updatedOriginales = [...currentOriginales, newOriginalName];
+            }
+
+            // 3. Nota en observaciones / historial
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const logNote = `\n[${timeStr}] ⚡ Arte vectorizado con Redrawer Studio: ${newOriginalName}`;
+            const newObs = (order.observaciones || '') + logNote;
+
+            // 4. Determinar nuevo status si se seleccionó avanzar
+            let newStatus = order.status;
+            if (approveAndAdvance && ['diseno', 'preorden', 'rebotado', 'relevamiento'].includes(order.status)) {
+                newStatus = 'orden'; // Listo para impresión
+            }
+
+            const payload: Partial<Order> = {
+                id: order.id,
+                ot: order.ot,
+                archivos: updatedArchivos,
+                archivosOriginales: updatedOriginales,
+                observaciones: newObs,
+                status: newStatus,
+                imgMetadata: {
+                    ...(order.imgMetadata || {}),
+                    width: imageDimensions.width,
+                    height: imageDimensions.height,
+                    dpi: 300,
+                    format: 'SVG',
+                    colorMode: 'Vector SVG (Redrawer)',
+                    thumbnailUrl: newFilePath
+                }
+            };
+
+            const saved = await saveOrden(payload);
+            if (onOrderUpdated) {
+                onOrderUpdated(saved);
+            }
+
+            setOrderSaveFeedback(`¡Vector guardado y vinculado con éxito a la Orden #${order.ot}!`);
+            setShowSaveOrderModal(false);
+
+            if (onSendToViewer) {
+                const blobUrl = URL.createObjectURL(svgBlob);
+                onSendToViewer(blobUrl, newOriginalName);
+            }
+        } catch (err: any) {
+            console.error('[RedrawerStudio] Error guardando vector en la orden:', err);
+            alert(`Error al guardar en la orden: ${err?.message || 'Error de conexión'}`);
+        } finally {
+            setIsSavingToOrder(false);
+            setUploadProgress(0);
         }
     };
 
@@ -1091,6 +1196,46 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
                         </div>
                     )}
 
+                    {/* Tarjeta de Orden Vinculada (Fase 4 Artista) */}
+                    {order && (
+                        <div className="redrawer-card redrawer-order-card">
+                            <div className="redrawer-order-badge">
+                                <span>📋 ORDEN VINCULADA</span>
+                                <span className="redrawer-order-ot">OT #{order.ot}</span>
+                            </div>
+                            <div className="redrawer-order-details">
+                                <div className="redrawer-order-row">
+                                    <span className="redrawer-order-label">Cliente:</span>
+                                    <span className="redrawer-order-val">{order.clienteNombre}</span>
+                                </div>
+                                <div className="redrawer-order-row">
+                                    <span className="redrawer-order-label">Medidas OT:</span>
+                                    <span className="redrawer-order-val">{order.ancho}m × {order.alto}m ({order.material})</span>
+                                </div>
+                                <div className="redrawer-order-row">
+                                    <span className="redrawer-order-label">Estado:</span>
+                                    <span className={`redrawer-status-pill status-${order.status}`}>{order.status.toUpperCase()}</span>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="redrawer-btn-save-order"
+                                onClick={() => setShowSaveOrderModal(true)}
+                                disabled={!vectorSvg || isSavingToOrder}
+                                title={!vectorSvg ? "Primero genera o vectoriza una imagen" : "Sube el SVG a R2 y vincúlalo directamente a la OT"}
+                            >
+                                ⚡ Guardar Vector en Orden #{order.ot}
+                            </button>
+
+                            {orderSaveFeedback && (
+                                <div className="redrawer-order-feedback">
+                                    {orderSaveFeedback}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Tarjeta 5: Exportación y Acciones */}
                     <div className="redrawer-actions-container">
                         <button 
@@ -1143,6 +1288,149 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
 
                 </div>
             </div>
+
+            {/* Modal de Guardado Directo en la Orden (Fase 4 Artista) */}
+            {showSaveOrderModal && order && (
+                <div className="redrawer-modal-overlay" onClick={() => !isSavingToOrder && setShowSaveOrderModal(false)}>
+                    <div className="redrawer-save-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="redrawer-save-modal-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '1.4rem' }}>⚡</span>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f8fafc' }}>
+                                        Vincular Vector SVG a Orden #{order.ot}
+                                    </h3>
+                                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                        {order.clienteNombre} — {order.material} ({order.ancho}m × {order.alto}m)
+                                    </span>
+                                </div>
+                            </div>
+                            {!isSavingToOrder && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSaveOrderModal(false)}
+                                    className="redrawer-modal-close-btn"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="redrawer-save-modal-body">
+                            {/* Resumen del vector */}
+                            <div className="redrawer-vector-summary-box">
+                                <div className="summary-item">
+                                    <span className="label">Archivo resultante:</span>
+                                    <span className="value monospace">{fileName.replace(/\.[^/.]+$/, '').trim() || 'vector'}_vector.svg</span>
+                                </div>
+                                <div className="summary-item">
+                                    <span className="label">Trazos Bézier:</span>
+                                    <span className="value">{pathCount} paths</span>
+                                </div>
+                                <div className="summary-item">
+                                    <span className="label">Peso estimado:</span>
+                                    <span className="value">{svgSizeKb} KB</span>
+                                </div>
+                            </div>
+
+                            {/* Selector de Modo de Guardado */}
+                            <div style={{ marginTop: '16px' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0', display: 'block', marginBottom: '8px' }}>
+                                    Modo de Integración en la Orden:
+                                </label>
+                                <div className="redrawer-save-options">
+                                    <label className={`redrawer-option-card ${saveMode === 'replace' ? 'selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="saveMode"
+                                            value="replace"
+                                            checked={saveMode === 'replace'}
+                                            onChange={() => setSaveMode('replace')}
+                                            disabled={isSavingToOrder}
+                                        />
+                                        <div>
+                                            <div className="option-title">🌟 Reemplazar arte principal (Recomendado)</div>
+                                            <div className="option-desc">
+                                                Coloca el SVG vectorizado como el archivo maestro de impresión de la OT. El arte previo se conservará como respaldo secundario.
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    <label className={`redrawer-option-card ${saveMode === 'append' ? 'selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="saveMode"
+                                            value="append"
+                                            checked={saveMode === 'append'}
+                                            onChange={() => setSaveMode('append')}
+                                            disabled={isSavingToOrder}
+                                        />
+                                        <div>
+                                            <div className="option-title">➕ Agregar como archivo adicional</div>
+                                            <div className="option-desc">
+                                                Conserva el orden actual intacto y añade este vector como nuevo adjunto en la lista de archivos de la orden.
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Checkbox para avanzar estado si está en diseño */}
+                            {['diseno', 'preorden', 'rebotado', 'relevamiento'].includes(order.status) && (
+                                <div className="redrawer-advance-checkbox-box">
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={approveAndAdvance}
+                                            onChange={(e) => setApproveAndAdvance(e.target.checked)}
+                                            disabled={isSavingToOrder}
+                                            style={{ width: '18px', height: '18px', accentColor: '#10b981' }}
+                                        />
+                                        <span style={{ fontSize: '0.86rem', color: '#f1f5f9' }}>
+                                            <strong>Aprobar diseño y avanzar OT a Cola de Impresión</strong> (estado <code style={{ color: '#34d399' }}>ORDEN_DE_TRABAJO</code>)
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+
+                            {/* Barra de Progreso de Subida a Cloudflare R2 */}
+                            {isSavingToOrder && (
+                                <div className="redrawer-upload-progress-container">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '6px' }}>
+                                        <span>Subiendo a almacenamiento Cloudflare R2 / Servidor...</span>
+                                        <span style={{ fontWeight: 700, color: '#38bdf8' }}>{uploadProgress}%</span>
+                                    </div>
+                                    <div className="redrawer-progress-bar-track">
+                                        <div 
+                                            className="redrawer-progress-bar-fill" 
+                                            style={{ width: `${Math.max(5, uploadProgress)}%` }} 
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="redrawer-save-modal-footer">
+                            <button
+                                type="button"
+                                className="redrawer-modal-btn-cancel"
+                                onClick={() => setShowSaveOrderModal(false)}
+                                disabled={isSavingToOrder}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="redrawer-modal-btn-confirm"
+                                onClick={handleSaveVectorToOrder}
+                                disabled={isSavingToOrder || !vectorSvg}
+                            >
+                                {isSavingToOrder ? '⏳ Subiendo y guardando...' : '🚀 Confirmar y Vincular a OT'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
