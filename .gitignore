@@ -78,3 +78,4 @@ tools/realesrgan/
 # Credenciales locales (nunca subir)
 *CREDENCIALES*
 *CREDENTIALS*
+private_legacy_r2.py

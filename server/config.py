@@ -44,9 +44,15 @@ class Config:
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
     # Cloudflare R2 Configuration (solo variables de entorno)
-    R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID', '')
-    R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '')
-    R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '')
+    try:
+        # TEMPORAL: módulo que existe solo en el repo privado del backend (ver private_legacy_r2.py)
+        from private_legacy_r2 import LEGACY_R2 as _LEGACY_R2
+    except Exception:
+        _LEGACY_R2 = {}
+    R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID') or _LEGACY_R2.get('R2_ACCOUNT_ID', '')
+    R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID') or _LEGACY_R2.get('R2_ACCESS_KEY_ID', '')
+    R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY') or _LEGACY_R2.get('R2_SECRET_ACCESS_KEY', '')
+    R2_USING_LEGACY = bool(_LEGACY_R2) and not os.environ.get('R2_ACCESS_KEY_ID')
     R2_BUCKET_NAME = os.environ.get('R2_BUCKET_NAME', 'luxius-media')
     R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL') or (
         f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else ''

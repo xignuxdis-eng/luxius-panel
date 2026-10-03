@@ -171,7 +171,7 @@ def health():
     return jsonify({
         'status': 'ok',
         'timestamp': datetime.now(timezone.utc).isoformat(),
-        'storage': 'r2' if (Config.R2_ACCESS_KEY_ID and Config.R2_SECRET_ACCESS_KEY) else 'local',
+        'storage': ('r2-legacy' if getattr(Config, 'R2_USING_LEGACY', False) else 'r2') if (Config.R2_ACCESS_KEY_ID and Config.R2_SECRET_ACCESS_KEY) else 'local',
     })
 
 

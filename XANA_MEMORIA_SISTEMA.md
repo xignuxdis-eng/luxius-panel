@@ -696,6 +696,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   2. Rotar la contraseña de Neon (estuvo en el repo privado y en el historial) y actualizar `DATABASE_URL` en Render y `.env` locales.
   3. Repartir las contraseñas de `CREDENCIALES_NUEVAS.txt` y borrar el archivo; dar contraseña a los usuarios cliente si van a usar el portal (hoy no tienen).
   4. Opcional: rotar claves Gemini/OpenAI; separar `server/` del repo público (o repo privado + repo público solo con el build) y reescribir el historial público (destructivo, requiere confirmación explícita).
+  5. **Transitorio R2**: como Render no tenia variables R2_*, el backend PRIVADO usa private_legacy_r2.py (solo en luXius-Backend, ignorado en luxius-panel) como respaldo para no cortar las imagenes. /health muestra storage: r2-legacy hasta que se carguen las claves rotadas en Render; despues borrar ese archivo.
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 
