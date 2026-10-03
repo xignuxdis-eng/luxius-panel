@@ -3,6 +3,7 @@ import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import UsuariosView from './UsuariosView'
 import GoogleDriveView from './GoogleDriveView'
+import TelegramView from './TelegramView'
 import './Sistema.css'
 
 
@@ -304,7 +305,7 @@ export default function Sistema() {
                 <NavLink to="/sistema/google-drive" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Google Drive</NavLink>
                 <NavLink to="/sistema/respaldo" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Respaldo Email</NavLink>
                 <NavLink to="/sistema/db" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Utilidades DB</NavLink>
-                <NavLink to="/sistema/mensajes" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Mensajes</NavLink>
+                <NavLink to="/sistema/telegram" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>🤖 Telegram Bot</NavLink>
             </nav>
 
             <div className="abm-content">
@@ -313,6 +314,8 @@ export default function Sistema() {
                     <Route path="permisos" element={<PermisosView />} />
                     <Route path="google-drive" element={<GoogleDriveView />} />
                     <Route path="db" element={<UtilidadesDB />} />
+                    <Route path="telegram" element={<TelegramView />} />
+                    <Route path="mensajes" element={<TelegramView />} />
                     <Route path="respaldo" element={<div className="p-40 text-muted">Configuración de emails...</div>} />
                     <Route path="*" element={<Navigate to="usuarios" replace />} />
                 </Routes>

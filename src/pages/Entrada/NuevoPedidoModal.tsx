@@ -20,7 +20,7 @@ try {
 }
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
-import type { Order, DemasiasConfig } from '@/types'
+import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS } from '@/types'
 import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, round2 } from '@/utils/pricingCalculator'
 import './NuevoPedidoModal.css'
 
@@ -63,6 +63,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [saving, setSaving] = useState(false)
     const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0, errorCount: 0 })
     const [vendedores, setVendedores] = useState<any[]>([])
+    const [selectedTags, setSelectedTags] = useState<string[]>(order?.tags || [])
     const [uploadProgress, setUploadProgress] = useState<{ percent: number; loaded: string; total: string; fileName: string } | null>(null);
     const [isCloudImporting, setIsCloudImporting] = useState(false)
     const [cloudImportStatus, setCloudImportStatus] = useState<string>('')
@@ -453,6 +454,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         if (order) {
             setActiveTab('unitario')
             reset(order)
+            setSelectedTags(order.tags || [])
             const initSena = Number(order.sena ?? order.senaMonto ?? (order as any).sena_monto ?? 0);
             setSenaAmount(initSena);
             setSenaMetodo(order.senaMetodo || 'efectivo');
@@ -503,6 +505,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setPriceOverride(null)
             setIsPriceOverridden(false)
             setSenaAmount(0)
+            setSelectedTags([])
             setSenaMetodo('efectivo')
             setSenaPorcentajeOption('0')
             setFileName('')
@@ -1655,6 +1658,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 artistaId: user?.role === 'artista' ? user.id : order?.artistaId,
                                 fechaCreacion: new Date().toString(),
                                 fechaEntrega: data.fechaEntrega || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                tags: selectedTags,
                             }
 
                             const saved = await saveOrden(orderData)
@@ -1750,7 +1754,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         status: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') && numericData.status === 'orden') ? 'diseno' : (numericData.status || (order ? order.status : (currentDefaultStatus as any))),
                         category: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') || numericData.status === 'relevamiento' || numericData.status === 'diseno') ? 'diseno' : 'impresion',
                         artistaId: user?.role === 'artista' ? user.id : order?.artistaId,
-                        servicios: data.servicios
+                        servicios: data.servicios,
+                        tags: selectedTags,
                     })
                     onClose(true)
 
@@ -3237,6 +3242,53 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         <div className="form-group" style={{ gridColumn: 'span 4' }}>
                             <label>Observaciones generales</label>
                             <textarea {...register('observaciones')} placeholder="Notas sobre el pedido..." className="input-field" rows={2} style={{ resize: 'none' }} />
+                        </div>
+
+                        {/* Etiquetas Operativas */}
+                        <div className="form-group" style={{ gridColumn: 'span 4', marginTop: '4px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                🏷️ Etiquetas Operativas
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                                    (Prioridades o condiciones especiales como Urgente, VIP, Muestra, etc.)
+                                </span>
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                                {PRESET_ORDER_TAGS.map(tag => {
+                                    const isSelected = selectedTags.includes(tag.id);
+                                    return (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedTags(prev =>
+                                                    isSelected ? prev.filter(t => t !== tag.id) : [...prev, tag.id]
+                                                );
+                                            }}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '6px 14px',
+                                                borderRadius: '20px',
+                                                fontSize: '0.8rem',
+                                                fontWeight: isSelected ? 700 : 500,
+                                                cursor: 'pointer',
+                                                border: `1.5px solid ${isSelected ? tag.color : 'rgba(255,255,255,0.12)'}`,
+                                                backgroundColor: isSelected ? tag.bgColor : 'rgba(255,255,255,0.03)',
+                                                color: isSelected ? tag.color : 'var(--text-secondary)',
+                                                boxShadow: isSelected ? `0 0 10px ${tag.bgColor}` : 'none',
+                                                transition: 'all 0.18s ease'
+                                            }}
+                                        >
+                                            <span>{tag.icon}</span>
+                                            <span>{tag.label}</span>
+                                            <span style={{ fontSize: '0.75rem', opacity: isSelected ? 1 : 0.5 }}>
+                                                {isSelected ? '✓' : '+'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div> {/* Closes form-section */}
 
