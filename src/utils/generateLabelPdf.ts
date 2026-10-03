@@ -59,7 +59,7 @@ const LOADING_HTML = `<!DOCTYPE html>
 <body>
     <div class="spinner"></div>
     <h2>🏷️ Armando Etiqueta de Producción</h2>
-    <p>Cargando miniaturas y tipografías Artegra Sans...</p>
+    <p>Preparando documento de impresión...</p>
 </body>
 </html>`
 
