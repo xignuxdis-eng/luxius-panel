@@ -13,6 +13,8 @@ interface TelegramStatus {
     };
     admins_count: number;
     admins?: string[];
+    admin_chat_id?: string;
+    has_token?: boolean;
     message?: string;
     error?: string;
 }
@@ -24,6 +26,12 @@ export default function TelegramView() {
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const [testMessage, setTestMessage] = useState('🔔 Notificación de prueba desde LuXius Panel');
 
+    // Input fields for direct configuration
+    const [botToken, setBotToken] = useState('');
+    const [adminChatId, setAdminChatId] = useState('');
+    const [showToken, setShowToken] = useState(false);
+    const [webhookUrl, setWebhookUrl] = useState('https://luxius-backend.onrender.com/api/telegram/webhook');
+
     const fetchStatus = async () => {
         setLoading(true);
         try {
@@ -32,6 +40,9 @@ export default function TelegramView() {
             });
             const data = await resp.json();
             setStatus(data);
+            if (data.admin_chat_id && !adminChatId) {
+                setAdminChatId(data.admin_chat_id);
+            }
         } catch (err: any) {
             console.error('Error fetching telegram status:', err);
             setStatus({
@@ -49,7 +60,49 @@ export default function TelegramView() {
         fetchStatus();
     }, []);
 
+    const handleSaveConfig = async (autoWebhook = false) => {
+        if (!botToken.trim() && !status?.configured) {
+            setFeedback({ type: 'error', text: '⚠️ Por favor pega el Token del bot obtenido de @BotFather.' });
+            return;
+        }
+
+        setActionLoading('save');
+        setFeedback(null);
+        try {
+            const resp = await fetch(`${API_URL}/api/telegram/config`, {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bot_token: botToken.trim() || undefined,
+                    admin_chat_id: adminChatId.trim() || undefined,
+                    webhook_url: webhookUrl.trim()
+                })
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                let msg = '✅ Credenciales guardadas y bot verificado con éxito.';
+                if (data.webhook_registered) {
+                    msg += ' 🚀 ¡Webhook registrado automáticamente en Telegram!';
+                }
+                setFeedback({ type: 'success', text: msg });
+                fetchStatus();
+            } else {
+                setFeedback({ type: 'error', text: `❌ ${data.error || 'Error al guardar credenciales'}` });
+            }
+        } catch (err: any) {
+            setFeedback({ type: 'error', text: `❌ Error de red: ${err.message}` });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const handleSetupWebhook = async () => {
+        const tokenToUse = botToken.trim();
+        if (!tokenToUse && !status?.configured) {
+            setFeedback({ type: 'error', text: '⚠️ Ingresa primero el Token del bot en el campo de arriba para activar el webhook.' });
+            return;
+        }
+
         setActionLoading('webhook');
         setFeedback(null);
         try {
@@ -57,15 +110,22 @@ export default function TelegramView() {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    webhook_url: 'https://luxius-backend.onrender.com/api/telegram/webhook'
+                    url: webhookUrl.trim(),
+                    bot_token: tokenToUse || undefined
                 })
             });
             const data = await resp.json();
-            if (data.ok) {
-                setFeedback({ type: 'success', text: `✅ Webhook configurado exitosamente: ${data.webhook_url}` });
+            if (data.ok || resp.ok) {
+                setFeedback({
+                    type: 'success',
+                    text: `✅ Webhook configurado exitosamente en Telegram para: ${webhookUrl}`
+                });
                 fetchStatus();
             } else {
-                setFeedback({ type: 'error', text: `❌ Error al configurar webhook: ${data.error || 'Respuesta inválida'}` });
+                setFeedback({
+                    type: 'error',
+                    text: `❌ Error al configurar webhook: ${data.description || data.error || 'Verifica el token'}`
+                });
             }
         } catch (err: any) {
             setFeedback({ type: 'error', text: `❌ Fallo de red: ${err.message}` });
@@ -85,10 +145,13 @@ export default function TelegramView() {
                 body: JSON.stringify({ message: testMessage })
             });
             const data = await resp.json();
-            if (data.ok && data.sent > 0) {
-                setFeedback({ type: 'success', text: `✅ Mensaje enviado exitosamente a ${data.sent} administrador(es)` });
+            if (data.ok && data.sent_count > 0) {
+                setFeedback({ type: 'success', text: `✅ Notificación enviada con éxito a ${data.sent_count} destinatario(s) de Telegram.` });
             } else {
-                setFeedback({ type: 'error', text: `⚠️ No se pudo enviar: ${data.error || 'Verifica TELEGRAM_ADMIN_CHAT_ID'}` });
+                setFeedback({
+                    type: 'error',
+                    text: `⚠️ No se pudo entregar: ${data.error || 'Verifica haber ingresado tu Chat ID numérico en la configuración.'}`
+                });
             }
         } catch (err: any) {
             setFeedback({ type: 'error', text: `❌ Error: ${err.message}` });
@@ -106,10 +169,10 @@ export default function TelegramView() {
                 headers: getAuthHeaders()
             });
             const data = await resp.json();
-            if (data.ok && data.sent > 0) {
-                setFeedback({ type: 'success', text: `✅ Briefing matutino enviado a ${data.sent} administrador(es)` });
+            if (data.ok && data.sent_count > 0) {
+                setFeedback({ type: 'success', text: `✅ Briefing matutino despachado a ${data.sent_count} destinatario(s).` });
             } else {
-                setFeedback({ type: 'error', text: `⚠️ Error al enviar briefing: ${data.error || 'Sin destinatarios'}` });
+                setFeedback({ type: 'error', text: `⚠️ Error al enviar briefing: ${data.error || 'Verifica tu Chat ID'}` });
             }
         } catch (err: any) {
             setFeedback({ type: 'error', text: `❌ Error: ${err.message}` });
@@ -117,6 +180,8 @@ export default function TelegramView() {
             setActionLoading(null);
         }
     };
+
+    const canActivateWebhook = Boolean(status?.configured || botToken.trim());
 
     return (
         <div className="sistema-view telegram-view">
@@ -159,8 +224,8 @@ export default function TelegramView() {
                             </>
                         ) : (
                             <>
-                                <p className="card-main-text" style={{ color: '#f59e0b' }}>No Vinculado</p>
-                                <span className="card-subtext">{status?.message || 'Falta TELEGRAM_BOT_TOKEN'}</span>
+                                <p className="card-main-text" style={{ color: '#f59e0b' }}>Falta Vincular Token</p>
+                                <span className="card-subtext">Ingresá el token abajo o en variables de entorno</span>
                             </>
                         )}
                     </div>
@@ -169,14 +234,14 @@ export default function TelegramView() {
                 <div className="telegram-card">
                     <div className="card-header">
                         <span className="card-icon">👥</span>
-                        <h4>Administradores</h4>
+                        <h4>Destinatarios Alertas</h4>
                     </div>
                     <div className="card-body">
-                        <p className="card-main-text">{status?.admins_count ?? 0} Destinatario(s)</p>
+                        <p className="card-main-text">{status?.admins_configured ?? status?.admins_count ?? 0} Chat(s)</p>
                         <span className="card-subtext">
-                            {status?.admins_count && status.admins_count > 0
-                                ? 'Reciben alertas urgentes, VIP y briefings'
-                                : 'Configura TELEGRAM_ADMIN_CHAT_ID'}
+                            {(status?.admins_configured ?? status?.admins_count ?? 0) > 0
+                                ? 'Reciben alertas urgentes, VIP y briefings matutinos'
+                                : 'Ingresá tu Chat ID para recibir alertas push'}
                         </span>
                     </div>
                 </div>
@@ -184,12 +249,83 @@ export default function TelegramView() {
                 <div className="telegram-card">
                     <div className="card-header">
                         <span className="card-icon">⚡</span>
-                        <h4>Canal Webhook</h4>
+                        <h4>Servidor Webhook</h4>
                     </div>
                     <div className="card-body">
-                        <p className="card-main-text">luxius-backend.onrender.com</p>
-                        <span className="card-subtext">Puerto seguro HTTPS activo para comandos y notas de voz</span>
+                        <p className="card-main-text" style={{ fontSize: '1rem', wordBreak: 'break-all' }}>luxius-backend.onrender.com</p>
+                        <span className="card-subtext">Endpoint seguro HTTPS para recibir órdenes y audios de voz</span>
                     </div>
+                </div>
+            </div>
+
+            {/* DIRECT CREDENTIALS CONFIGURATION BOX */}
+            <div className="telegram-action-panel glass-panel" style={{ border: '1.5px solid var(--primary-color)' }}>
+                <h4 style={{ margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa' }}>
+                    <span>🔑</span> Configurar Credenciales del Bot (In-Situ)
+                </h4>
+                <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                    Podés vincular tu bot directamente desde acá sin necesidad de entrar a la consola de Render.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '14px' }}>
+                    <div className="form-group">
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Token HTTP de Telegram Bot:</span>
+                            <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontSize: '0.78rem', textDecoration: 'none' }}>
+                                Obtener con @BotFather ↗
+                            </a>
+                        </label>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                            <input
+                                type={showToken ? 'text' : 'password'}
+                                className="input-field"
+                                placeholder={status?.configured ? '••••••••••••••••••••••••••••••••' : 'Ej: 7123456789:AAHxxxxxxxxxxxxxxxxxxxxxx'}
+                                value={botToken}
+                                onChange={(e) => setBotToken(e.target.value)}
+                                style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() => setShowToken(!showToken)}
+                                title={showToken ? 'Ocultar' : 'Mostrar'}
+                                style={{ padding: '0 10px' }}
+                            >
+                                {showToken ? '🙈' : '👁️'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Tu Chat ID Personal o Grupo:</span>
+                            <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontSize: '0.78rem', textDecoration: 'none' }}>
+                                Obtener con @userinfobot ↗
+                            </a>
+                        </label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Ej: 145678901 (o varios separados por coma)"
+                            value={adminChatId}
+                            onChange={(e) => setAdminChatId(e.target.value)}
+                            style={{ width: '100%', marginTop: '4px', padding: '8px 12px', fontSize: '0.85rem' }}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleSaveConfig(true)}
+                        disabled={actionLoading === 'save'}
+                    >
+                        {actionLoading === 'save' ? 'Validando y Guardando...' : '💾 Guardar y Conectar Bot'}
+                    </Button>
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                        Al presionar Guardar, se verifica el token contra Telegram y se activa el webhook automáticamente.
+                    </span>
                 </div>
             </div>
 
@@ -206,14 +342,15 @@ export default function TelegramView() {
                             variant="primary"
                             size="sm"
                             onClick={handleSetupWebhook}
-                            disabled={actionLoading === 'webhook' || !status?.configured}
+                            disabled={actionLoading === 'webhook'}
+                            title={!canActivateWebhook ? 'Ingresá el Token arriba para activar' : 'Registrar webhook en Telegram'}
                         >
                             {actionLoading === 'webhook' ? 'Registrando...' : '🔗 Configurar Webhook en Telegram'}
                         </Button>
                     </div>
 
                     <div className="action-item">
-                        <h5>2. Enviar Mensaje de Prueba</h5>
+                        <h5>2. Enviar Notificación de Prueba</h5>
                         <p>Comprueba que las notificaciones lleguen directamente a tu chat privado o grupo de Telegram.</p>
                         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                             <input
@@ -227,7 +364,7 @@ export default function TelegramView() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={handleSendTest}
-                                disabled={actionLoading === 'test' || !status?.configured}
+                                disabled={actionLoading === 'test' || (!status?.configured && !botToken.trim())}
                             >
                                 {actionLoading === 'test' ? 'Enviando...' : '📤 Probar'}
                             </Button>
@@ -241,7 +378,7 @@ export default function TelegramView() {
                             variant="outline"
                             size="sm"
                             onClick={handleTriggerBriefing}
-                            disabled={actionLoading === 'briefing' || !status?.configured}
+                            disabled={actionLoading === 'briefing' || (!status?.configured && !botToken.trim())}
                         >
                             {actionLoading === 'briefing' ? 'Generando...' : '☀️ Despachar Briefing'}
                         </Button>
@@ -252,7 +389,7 @@ export default function TelegramView() {
             {/* SETUP GUIDE */}
             <div className="telegram-guide glass-panel">
                 <h4 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>📖</span> ¿Qué se necesita para operar con Telegram? (3 Pasos Simples)
+                    <span>📖</span> Instrucciones Paso a Paso (Solo toma 2 minutos)
                 </h4>
 
                 <div className="guide-steps">
@@ -261,13 +398,13 @@ export default function TelegramView() {
                         <div className="step-content">
                             <h5>Crear el Bot con @BotFather</h5>
                             <p>
-                                Abrí Telegram y buscá al bot oficial <strong>@BotFather</strong>. Enviá <code>/newbot</code>, elegí un nombre (ej. <em>LuXius Taller</em>) y un usuario (ej. <em>luxius_taller_bot</em>).
+                                Abrí Telegram y hacé clic en <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontWeight: 600 }}>@BotFather</a>. Enviá el comando <code>/newbot</code>, elegí un nombre (ej. <em>LuXius Taller</em>) y un alias (ej. <em>luxius_taller_bot</em>).
                             </p>
                             <div className="code-snippet">
-                                <span>Token generado: <code>123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ</code></span>
+                                <span>Ejemplo de Token: <code>7123456789:AAHxxxxxxxxxxxxxxxxxxxxxx</code></span>
                             </div>
-                            <p style={{ marginTop: '6px', fontSize: '0.8rem', color: '#94a3b8' }}>
-                                Copiá ese token y agregalo como variable <code>TELEGRAM_BOT_TOKEN</code> en el panel de Render (Environment Variables).
+                            <p style={{ marginTop: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                                Copiá ese token y pegalo directamente en el casillero <strong>Token HTTP de Telegram Bot</strong> arriba, o cargalo en Render como variable <code>TELEGRAM_BOT_TOKEN</code>.
                             </p>
                         </div>
                     </div>
@@ -277,10 +414,10 @@ export default function TelegramView() {
                         <div className="step-content">
                             <h5>Obtener tu Chat ID (@userinfobot)</h5>
                             <p>
-                                Buscá en Telegram al bot <strong>@userinfobot</strong> o <strong>@raw_data_bot</strong> y dale a Iniciar. Te devolverá tu número de usuario (ej. <code>123456789</code>).
+                                Abrí en Telegram <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontWeight: 600 }}>@userinfobot</a> y dale a <em>Iniciar</em>. Te devolverá tu número de identificación personal (ej. <code>145678901</code>).
                             </p>
-                            <p style={{ marginTop: '6px', fontSize: '0.8rem', color: '#94a3b8' }}>
-                                Agregalo como variable <code>TELEGRAM_ADMIN_CHAT_ID</code> en Render. Si son varios usuarios, sepralos con coma: <code>123456789,987654321</code>.
+                            <p style={{ marginTop: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                                Pegalo en el casillero <strong>Tu Chat ID</strong> arriba. Así el bot sabrá a qué cuenta mandar las alertas urgentes de taller y el briefing matutino.
                             </p>
                         </div>
                     </div>
@@ -288,16 +425,10 @@ export default function TelegramView() {
                     <div className="step-card">
                         <div className="step-number">3</div>
                         <div className="step-content">
-                            <h5>Activar el Webhook y ¡Listo!</h5>
+                            <h5>Guardar y Activar Webhook</h5>
                             <p>
-                                Una vez guardadas las variables en Render y reiniciado el servicio, volvé a esta pestaña y hacé clic en el botón <strong>🔗 Configurar Webhook en Telegram</strong>.
+                                Hacé clic en <strong>💾 Guardar y Conectar Bot</strong> o en <strong>🔗 Configurar Webhook en Telegram</strong>. El sistema conectará los servidores de Telegram con tu servidor de producción de inmediato.
                             </p>
-                            <p style={{ marginTop: '6px', fontSize: '0.8rem', color: '#94a3b8' }}>
-                                También podés activarlo abriendo en cualquier navegador:
-                            </p>
-                            <div className="code-snippet" style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>
-                                <code>https://api.telegram.org/bot&lt;TU_TOKEN&gt;/setWebhook?url=https://luxius-backend.onrender.com/api/telegram/webhook</code>
-                            </div>
                         </div>
                     </div>
                 </div>

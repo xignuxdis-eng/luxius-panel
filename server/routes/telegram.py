@@ -8,7 +8,9 @@ from flask import Blueprint, request, jsonify
 from services.telegram_service import (
     process_telegram_update,
     get_telegram_token,
+    get_telegram_config,
     get_admin_chat_ids,
+    save_telegram_config,
     send_telegram_broadcast,
     cmd_briefing
 )
@@ -32,14 +34,18 @@ def telegram_webhook():
 @telegram_bp.get('/status')
 def telegram_status():
     """Verifica si el bot de Telegram está configurado y accesible."""
-    token = get_telegram_token()
+    cfg = get_telegram_config()
+    token = cfg.get('token', '')
+    admin_id = cfg.get('admin_chat_id', '')
     admins = get_admin_chat_ids()
 
     if not token:
         return jsonify({
             'configured': False,
-            'message': 'TELEGRAM_BOT_TOKEN no configurado en variables de entorno.',
-            'admins_count': len(admins)
+            'message': 'TELEGRAM_BOT_TOKEN no configurado (puedes ingresarlo aquí mismo o en variables de entorno).',
+            'admins_count': len(admins),
+            'admin_chat_id': admin_id,
+            'has_token': False
         })
 
     bot_info = None
@@ -57,6 +63,8 @@ def telegram_status():
         'reachable': reachable,
         'bot_info': bot_info,
         'admins_configured': len(admins),
+        'admin_chat_id': admin_id,
+        'has_token': True,
         'phases': {
             'phase_1_monitoring': True,
             'phase_2_management_push': True,
@@ -66,17 +74,65 @@ def telegram_status():
     })
 
 
+@telegram_bp.post('/config')
+@login_required
+def telegram_save_config():
+    """Guarda o actualiza las credenciales de Telegram en base de datos (ConfigGlobal)."""
+    data = request.get_json(silent=True) or {}
+    token = data.get('bot_token', '').strip()
+    admin_id = str(data.get('admin_chat_id', '')).strip()
+
+    if token:
+        # Validar el token contra Telegram
+        try:
+            resp = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=6)
+            if not resp.ok:
+                return jsonify({'ok': False, 'error': f'Token inválido según Telegram: {resp.text}'}), 400
+        except Exception as e:
+            return jsonify({'ok': False, 'error': f'No se pudo verificar el token: {e}'}), 400
+
+    saved = save_telegram_config(
+        token=token if token else None,
+        admin_chat_id=admin_id if admin_id else None
+    )
+    if not saved:
+        return jsonify({'ok': False, 'error': 'Error guardando configuración en base de datos'}), 500
+
+    # Si se pasó token o ya existía, intentar registrar el webhook automáticamente
+    effective_token = token or get_telegram_token()
+    webhook_res = None
+    if effective_token:
+        try:
+            w_url = data.get('webhook_url') or 'https://luxius-backend.onrender.com/api/telegram/webhook'
+            w_resp = requests.post(
+                f"https://api.telegram.org/bot{effective_token}/setWebhook",
+                json={'url': w_url},
+                timeout=8
+            )
+            webhook_res = w_resp.json() if w_resp.ok else None
+        except Exception:
+            pass
+
+    return jsonify({
+        'ok': True,
+        'message': 'Configuración de Telegram guardada correctamente.',
+        'webhook_registered': webhook_res is not None,
+        'webhook_response': webhook_res
+    }), 200
+
+
 @telegram_bp.post('/setup-webhook')
 def telegram_setup_webhook():
     """Configura o elimina la URL del webhook en los servidores de Telegram."""
-    token = get_telegram_token()
+    data = request.get_json(silent=True) or {}
+    # Aceptar token opcional enviado desde el frontend si el usuario lo ingresó en vivo
+    token = data.get('bot_token', '').strip() or get_telegram_token()
     if not token:
         return jsonify({'ok': False, 'error': 'TELEGRAM_BOT_TOKEN no configurado.'}), 400
 
-    data = request.get_json(silent=True) or {}
-    webhook_url = data.get('url')
+    webhook_url = data.get('url') or data.get('webhook_url') or 'https://luxius-backend.onrender.com/api/telegram/webhook'
 
-    if webhook_url:
+    if webhook_url and webhook_url != 'delete':
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/setWebhook",
             json={'url': webhook_url},

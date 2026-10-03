@@ -23,15 +23,52 @@ def _now_ar_iso() -> str:
     return datetime.now(AR_TZ).isoformat()
 
 
+def get_telegram_config() -> dict:
+    token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+    admin_id = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '').strip()
+    if not token or not admin_id:
+        try:
+            cfg = ConfigGlobal.query.filter_by(clave='telegram_config').first()
+            if cfg and isinstance(cfg.valor, dict):
+                if not token:
+                    token = str(cfg.valor.get('bot_token', '')).strip()
+                if not admin_id:
+                    admin_id = str(cfg.valor.get('admin_chat_id', '')).strip()
+        except Exception:
+            pass
+    return {'token': token, 'admin_chat_id': admin_id}
+
+
 def get_telegram_token() -> str:
-    return os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+    return get_telegram_config().get('token', '')
 
 
 def get_admin_chat_ids() -> list:
-    raw = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '').strip()
+    raw = get_telegram_config().get('admin_chat_id', '')
     if not raw:
         return []
-    return [c.strip() for c in raw.split(',') if c.strip()]
+    return [c.strip() for c in str(raw).split(',') if c.strip()]
+
+
+def save_telegram_config(token: Optional[str] = None, admin_chat_id: Optional[str] = None) -> bool:
+    """Persiste el token o chat ID en la tabla config_global (clave='telegram_config')."""
+    try:
+        cfg = ConfigGlobal.query.filter_by(clave='telegram_config').first()
+        if not cfg:
+            cfg = ConfigGlobal(clave='telegram_config', valor={})
+            db.session.add(cfg)
+        val = dict(cfg.valor or {})
+        if token is not None:
+            val['bot_token'] = token.strip()
+        if admin_chat_id is not None:
+            val['admin_chat_id'] = str(admin_chat_id).strip()
+        cfg.valor = val
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"[telegram] Error guardando config en BD: {e}", file=sys.stderr)
+        return False
 
 
 def is_admin_chat(chat_id: int | str) -> bool:
