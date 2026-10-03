@@ -1,5 +1,5 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 03/10/2026 13:30 (En sincronía con Producción — Bot Telegram en Vivo + Depuración Métricas de Taller + Escalador IA)  
+> **Última Actualización:** 03/10/2026 20:30 (Auditoría Integral de Seguridad + Modelo de Roles y Permisos + Roadmap Maestro de Implementación para IAs)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -37,6 +37,11 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
      Copy-Item -Path "f:\Sitio XignuX\dist\*" -Destination "D:\XignuX\luxius-panel\dist\" -Recurse -Force
      ```
 6. **Políticas de Anti-Caché**: El frontend cuenta con un verificador de versiones (`versionCheck.ts` y `version.json` generado en build) que detecta nuevas versiones y fuerza la recarga de Service Workers y bundles.
+7. **Cero Secretos en Código o Repositorios**: Jamás commitear tokens, contraseñas, URLs de conexión o claves API (`.env`, `*.db`, archivos de credenciales). Todo secreto debe inyectarse por variables de entorno del hosting (`Render`) o `.env` local (estrictamente git-ignorado). En logs, enmascarar siempre contraseñas y connection strings.
+8. **Principio de Mínimo Privilegio en Endpoints (Flask)**: Todo nuevo endpoint en backend DEBE llevar decorador explícito (`@login_required`, `@operator_required` o `@admin_required`). Quedan terminantemente prohibidos los endpoints abiertos/públicos salvo justificación explícita de autenticación o assets estáticos con sanitización (ver lista blanca en Sección 4).
+9. **Prevención de SSRF y Path Traversal**: En toda descarga o procesamiento de URLs externas (ej. escalador, importador cloud) usar `services/security_utils.py:is_safe_url` en cada redirección para bloquear IPs privadas (127.0.0.1, 10.x, 169.254.x, etc.) y esquemas no HTTP(S). En `/uploads`, validar siempre con `_safe_upload_relpath` y servir SVGs con CSP `sandbox`.
+10. **Sincronización Dual de Servidor (`server/` y `luXius-Backend`)**: Al modificar código del backend en `luXius-Backend/`, mantener sincronizada la carpeta `f:\Sitio XignuX\server\` usando `scratch/sync_server.py`, respetando las divergencias conocidas (líneas de `voice_bp` y `vault_bp` en `app.py`).
+11. **Despliegue gh-pages sin Redirección de Errores**: Al invocar `.\scripts\deploy_gh_pages.ps1` en PowerShell, **NO** usar `2>&1` porque el script define `$ErrorActionPreference = 'Stop'` y cualquier warning no fatal en stderr aborta la ejecución. Ejecutarlo de forma directa: `.\scripts\deploy_gh_pages.ps1`.
 
 ---
 
@@ -114,6 +119,45 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
   - `/api/google-drive`: Integración nativa con Google Drive corporativo.
   - `/api/xana/*`: Endpoints para memoria, tareas (`/tasks`), sesiones (`/sessions`) y decisiones arquitectónicas (`/decisions`).
 
+### Modelo de Seguridad, Autenticación y Control de Acceso (Auditoría 03/10/2026)
+- **Jerarquía de Roles de Usuario**:
+  - `ADMIN_ROLES = {'administrador', 'principal', 'jefe_produccion'}`: Acceso total al sistema, gestión de usuarios, cambio de roles/habilitación, rotación de credenciales, configuración de webhooks y variables críticas.
+  - `OPERATOR_ROLES = ADMIN_ROLES | {'operario', 'vendedor', 'artista', 'disenador', 'impresion', 'impresor'}`: Operación de taller, gestión de órdenes, stock de materiales, máquinas, analytics y procesamiento de imágenes en escalador.
+  - `CLIENT_ROLE = {'cliente'}`: Mínimo privilegio estricto. Solo lectura y gestión de sus propias órdenes (`Usuario.client_id == Presupuesto.cliente_id`), creación de órdenes forzando su `clientId`, sin acceso a catálogos internos de proveedores, máquinas, balance bancario o configuraciones globales.
+- **Decoradores de Autorización (`middleware/auth.py`)**:
+  - `@login_required`: Requiere token JWT válido en cabecera `Authorization: Bearer <token>` (o `?token=` en descargas específicas). Valida `token_version` en BD.
+  - `@operator_required`: Verifica que el rol pertenezca a `OPERATOR_ROLES`.
+  - `@admin_required`: Verifica que el rol pertenezca a `ADMIN_ROLES`.
+  - `invalidate_user_token_version(user_id)`: Revoca instantáneamente todas las sesiones activas de un usuario al cambiar su contraseña o rol.
+- **Lista Blanca de Endpoints Públicos Autorizados**:
+  - `GET /health`: Monitoreo de estado de BD y almacenamiento.
+  - `POST /api/auth/login`: Login protegido por `LoginThrottle` (máx 5 intentos fallidos / 15 min por IP+usuario; máx 20 por IP).
+  - `GET /api/tarifas`: Catálogo público de precios base de producción.
+  - `GET /api/upscaler/status`: Diagnóstico de GPU Vulkan local y catálogo de modelos.
+  - `GET /api/xana/health`: Liveness del asistente IA.
+  - `POST /api/import-cloud/file`: Ingesta de enlaces externos con anti-SSRF y regex estricto de `drive_id`.
+  - `POST /api/telegram/webhook`: Webhook de Telegram protegido por `X-Telegram-Bot-Api-Secret-Token`.
+  - `GET /uploads/<filename>`: Archivos públicos con prevención de path traversal y CSP sandbox para SVG/HTML.
+  - `GET /api/download`: Descarga de archivos de producción; requiere token JWT para URLs externas.
+- **Utilidades Centralizadas de Seguridad (`services/security_utils.py`)**:
+  - `is_safe_url(url)`: Validación anti-SSRF completa (resuelve DNS, bloquea IPs privadas/loopback/cloud metadata `169.254.169.254`, valida esquema `http/https`).
+  - `LoginThrottle`: Rate limiting en memoria para mitigación de ataques de fuerza bruta.
+  - `telegram_webhook_secret(bot_token)`: Derivación HMAC-SHA256 del token o lectura de `TELEGRAM_WEBHOOK_SECRET`.
+  - `client_ip(req)`: Extracción segura de IP considerando proxies inversos (Render / Nginx).
+- **Frontend Global Auth Interceptor (`src/utils/authFetch.ts`)**:
+  - Intercepta todas las peticiones `fetch()` hacia el backend e inyecta automáticamente `Authorization: Bearer <token>` si el usuario está autenticado, evitando errores 401 por omisión de headers en llamadas nuevas.
+- **Inventario de Variables de Entorno del Backend**:
+  - `DATABASE_URL`: URI de conexión a PostgreSQL (Neon Serverless con SSL).
+  - `JWT_SECRET_KEY` / `JWT_SECRET`: Clave maestra para firma criptográfica de tokens JWT.
+  - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL`: Claves para Cloudflare R2 (almacenamiento S3 compatible).
+  - `TELEGRAM_BOT_TOKEN`: Token oficial del bot otorgado por @BotFather.
+  - `TELEGRAM_ADMIN_CHAT_ID`: ID del chat de Telegram autorizado para alertas y control de taller (`1499600102`).
+  - `TELEGRAM_WEBHOOK_SECRET`: Secreto criptográfico para validar autenticidad de peticiones de Telegram.
+  - `TELEGRAM_AUTO_WEBHOOK`: `1` (default en Render) para auto-registrar webhook al iniciar, `0` para deshabilitar.
+  - `GEMINI_API_KEY`: Clave API de Google AI Studio para capacidades multimodales y LangGraph.
+  - `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`: Proveedor LLM alternativo.
+  - `GOOGLE_SERVICE_ACCOUNT_JSON` / `credentials.json`: Credenciales para bóveda Google Drive.
+
 ---
 
 ## 5. 📱 Ecosistema App Móvil (XignuX Workfield Manager)
@@ -185,6 +229,9 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Certificación Gate A4 Suite Anti-Alucinación (Xana IA)** (**03/10/2026**) | Existía riesgo de alucinaciones en cotizaciones matemáticas, tolerancias técnicas de taller (ancho de plotter, demasía, consumo tinta) y consultas sobre clientes o pedidos inexistentes que podían degradar la confiabilidad del asistente. | Se blindó la capa determinista y se certificó formalmente la Suite A4: 1) Nuevas herramientas `cotizar_trabajo` (matemática exacta con optimización de bobina y recargos) y `consultar_especificacion_tecnica` (tolerancias reales verificadas de taller) en `services/xana_tools.py`. 2) Validación estricta en `tool_obtener_metricas_ventas_cliente` y `tool_obtener_estado_ot` retornando error estructurado ante entidades inexistentes sin inventar números. 3) Creación y ejecución de `scripts/test_suite_a4.py` evaluando las 23 pruebas de `SUITE_A4_ANTIALUCINACION.md`. Resultado: **23/23 casos aprobados (100.0%)** y 0 fallas en casos trampa. Reporte oficial generado en `docs/xana/REPORTE_GATE_A4_EJECUTADO.md`. | `server/services/xana_tools.py`<br>`luXius-Backend/services/xana_tools.py`<br>`luXius-Backend/services/xana_graph.py`<br>`server/scripts/test_suite_a4.py`<br>`luXius-Backend/scripts/test_suite_a4.py`<br>`docs/xana/SUITE_A4_ANTIALUCINACION.md`<br>`docs/xana/REPORTE_GATE_A4_EJECUTADO.md` |
 | **Calibración Gates A2 & A6 de Xana IA, Postergación Taller y Escalador Inteligente** (**03/10/2026**) | Se requería auditar el Shadow Mode (Gate A2) y el budget de latencia síncrona (Gate A6) de Xana IA, posponer la etapa física del taller hasta operar frente al RIP, y trazar la arquitectura para solucionar el pixelado en gigantografía cuando los clientes envían fotos de baja calidad. | 1) Se ejecutó la suite de calibración (`scripts/test_xana_calibration.py`) con 20 prompts representativos: **Gate A2 aprobado con 100.0% de acuerdo** entre router determinista y LLM; **Gate A6 aprobado con p95 de 2,726 ms (≤ 3,000 ms budget)** y promedio de 2,068 ms. 2) Se blindó `_build_llm()` con `max_retries=0` y `timeout=10.0` para fail-fast automático ante 429 de APIs externas. 3) Se agregaron endpoints `/api/xana/shadow/stats` y `/api/xana/calibration/report`. 4) La fase de Taller Físico (Daemon Hot Folder) se declaró formalmente **pausada por tiempo indeterminado** hasta estar in situ frente a la máquina. 5) Se redactó el roadmap arquitectónico del **Escalador Inteligente de Imágenes (AI Super-Resolution)** en `docs/roadmaps/ROADMAP_ESCALADOR_INTELIGENTE_IMAGENES.md` (arquitectura híbrida de 3 niveles: cliente WebGL/Lanczos-3 rápido para previews < 2s, worker asíncrono backend con Real-ESRGAN/GFPGAN para 4x/8x y restauración de rostros, integración directa en `XpressViewer.tsx` con split slider y guardado de versión HD en la OT). | `docs/xana/REPORTE_CALIBRACION_XANA_GATES_A2_A6.md`<br>`docs/roadmaps/ROADMAP_ESCALADOR_INTELIGENTE_IMAGENES.md`<br>`server/routes/xana.py`<br>`luXius-Backend/routes/xana.py`<br>`server/services/xana_graph.py`<br>`luXius-Backend/services/xana_graph.py` |
 | **Escalador Inteligente de Imágenes con Aceleración GPU Vulkan (Real-ESRGAN)** (**03/10/2026**) | Al ampliar artes de baja resolución de clientes para cartelería o gigantografías, la pérdida de definición y pixelado degradaban la calidad de impresión. | Se integró el motor neuronal local `realesrgan-ncnn-vulkan.exe` con aceleración directa por hardware en GPU AMD Radeon RX 5700 XT (modelos `x4plus` y `x4plus-anime`), con tiempos de inferencia récord de 906 ms a 2.3 s y fallback por CPU en PIL Lanczos. En el backend se creó `services/upscaler_service.py` y rutas `/api/upscaler/*`, y en el frontend se implementó el modal `UpscalerModal` en `XpressViewer.tsx` con split slider interactivo before/after (0-100%), cotas DPI en tiempo real y guardado/reemplazo directo en la OT. | `services/upscaler_service.py`<br>`routes/upscaler.py`<br>`src/pages/XpressViewer/XpressViewer.tsx`<br>`src/pages/XpressViewer/XpressViewer.css`<br>`docs/roadmaps/ROADMAP_ESCALADOR_INTELIGENTE_IMAGENES.md` |
+| **Auditoría de Seguridad Integral: Secretos expuestos, claves por defecto y falta de autenticación en endpoints** (**03/10/2026**) | 6 cuentas operativas tenían claves por defecto ('admin', 'adrian', 'sistema', 'impresion', 'diseño', 'vendedor') heredadas de seeds antiguos. Varios endpoints carecían de decoradores de auth. Endpoint `/api/usuarios` permitía auto-ascenso a administrador. Secretos hardcodeados en código. | Rotación de contraseñas de las 6 cuentas con hashes aleatorios seguros (`CREDENCIALES_NUEVAS.txt`), restricción estricta de ABM usuarios solo a administradores, invalidación de tokens (`token_version`), protección con decoradores `@login_required`/`@operator_required`, webhook Telegram con `secret_token`, anti-SSRF con `is_safe_url`, throttle anti fuerza bruta en login, e interceptor `authFetch.ts` en frontend. | `middleware/auth.py`<br>`services/security_utils.py`<br>`routes/auth.py`<br>`app.py`<br>`routes/orders.py`<br>`routes/telegram.py`<br>`routes/upscaler.py`<br>`src/utils/authFetch.ts`<br>`src/data/db.ts` |
+| **Falta de variables R2_* en Render causaba fallback a almacenamiento local** (**03/10/2026**) | En el dashboard de Render no estaban configuradas las variables de entorno `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, etc., provocando que el backend intentara guardar en disco efímero de Render o fallara en el streaming. | Implementado módulo transitorio `private_legacy_r2.py` en el repo privado para no interrumpir el servicio multimedia (`storage: r2-legacy` en `/health`), con plan de migración inmediata a claves rotadas cargadas en Render. | `config.py`<br>`luXius-Backend/private_legacy_r2.py` |
+| **Contraseñas cambiadas por el usuario no impactaban en la base de datos** (**03/10/2026**) | Hasta el commit `dbccec1` (03/09/2026), la función `saveUsuario` en el frontend solo persistía datos en el `localStorage` del navegador y no enviaba peticiones PUT/POST al backend, haciendo que la base de datos conservara los valores de fábrica. | Depuración completa de `saveUsuario` para sincronizar con `/api/usuarios`, invalidación de caché local en `getUsuarios()` y rotación definitiva en PostgreSQL. | `src/data/db.ts`<br>`app.py` |
 
 ---
 
@@ -193,7 +240,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:
 
 1. **Estado Actual de Producción (03/10/2026)**:
-   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` sincronizadas en GitHub con webhook de Telegram (`/api/telegram/webhook`), configuración persistente in-situ (`/api/telegram/config`), servicio de briefing matutino (`/api/production/briefing`), escalador IA (`/api/upscaler/*`) y calibración de gates Xana A2, A4 y A6 certificadas.
+   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK, storage: `r2-legacy` transitorio a la espera de variables R2 rotadas en Render). Ambas ramas `main` y `master` de `luXius-Backend` sincronizadas en GitHub con webhook de Telegram protegido con `secret_token` (`/api/telegram/webhook`), configuración in-situ protegida (`/api/telegram/config`), servicio de briefing matutino (`/api/production/briefing`), escalador IA seguro (`/api/upscaler/*`), cuentas de producción con contraseñas rotadas en `CREDENCIALES_NUEVAS.txt`, e interceptor global `authFetch` en frontend.
    - **Telegram Bot Activo**: Bot oficial `@LuXius_Taller_Bot` (ID `8862580603`) con webhook verificado en Render y chat admin `1499600102`. Comandos `/status`, `/taller`, `/briefing`, `/alertas`, `/tareas`, `/addtask`, `/done`, `/clear` y notas de voz multimodales vía Gemini activas.
    - **Frontend Web**: Publicado y funcional en `https://xignuxdis-eng.github.io/luxius-panel/` (rama `gh-pages` actualizada).
    - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Incluye panel de gestión de Telegram (`/sistema/telegram`), filtro estricto de órdenes pendientes vs impresas en taller, selector de etiquetas operativas en carga y lote, y suite de preimpresión/escalador IA en Xpress Studio.
@@ -698,6 +745,259 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   4. Opcional: rotar claves Gemini/OpenAI; separar `server/` del repo público (o repo privado + repo público solo con el build) y reescribir el historial público (destructivo, requiere confirmación explícita).
   5. **Transitorio R2**: como Render no tenia variables R2_*, el backend PRIVADO usa private_legacy_r2.py (solo en luXius-Backend, ignorado en luxius-panel) como respaldo para no cortar las imagenes. /health muestra storage: r2-legacy hasta que se carguen las claves rotadas en Render; despues borrar ese archivo.
   6. **Seguimiento (03/10 noche)**: `getUsuarios()` purga contraseñas viejas cacheadas en localStorage de cada navegador. Causa de que las contraseñas 'ya cambiadas' siguieran siendo las de fábrica: antes del commit `dbccec1` (03/09/2026) `saveUsuario` solo guardaba en localStorage. `npm audit`: 2 moderadas en react-router 6.x (open redirect con backslash / SSR) — riesgo bajo (no se navega a URLs del usuario ni hay SSR); el fix exige migrar a react-router 7 (breaking), planificar. `src/pages/Dashboard/Profile.tsx` es código muerto (no se importa; usa `/api/users` inexistente).
+
+
+---
+
+### 🔮 Roadmap Maestro de Cambios Futuros (Guía de Implementación Paso a Paso para Cualquier Modelo de IA)
+
+> **Instrucciones para Agentes de IA (Antigravity, Cursor, Windsurf, Claude, Copilot, etc.)**:
+> Cada una de las siguientes tareas está diseñada para ser autosuficiente. Contiene objetivo, dependencias, archivos específicos, paso a paso técnico, criterios de verificación y mitigación de riesgos.
+> Al abordar una tarea:
+> 1. Leer cuidadosamente los archivos afectados antes de editarlos.
+> 2. Implementar los cambios siguiendo la arquitectura existente (respetar TypeScript estricto, SQLAlchemy 2.0 y Vanilla CSS).
+> 3. Ejecutar los comandos de verificación especificados.
+> 4. Actualizar el estado de la tarea en este documento (`[ ]` ➔ `[x]`).
+> 5. Commitear con mensaje descriptivo y pushear a los repositorios correspondientes siguiendo las reglas de la Sección 2.
+
+---
+
+#### 🚨 Nivel P0: Acciones Inmediatas del Usuario (Credenciales y Seguridad Crítica)
+
+##### [ ] Tarea P0.1: Rotación de Token API de Cloudflare R2 y Desactivación de Fallback Transitorio
+- **Objetivo**: Garantizar el almacenamiento multimedia en Cloudflare R2 con credenciales rotadas y privadas, eliminando el fallback transitorio `private_legacy_r2.py`.
+- **Prerrequisitos**: Acceso a la consola de Cloudflare (cuenta XignuX) y al panel de control de Render (`luxius-backend`).
+- **Archivos Afectados**:
+  - Panel Render: `Environment Variables`
+  - `f:\luXius-Backend\.env` y `f:\Sitio XignuX\.env`
+  - `f:\luXius-Backend\config.py`
+  - `f:\luXius-Backend\private_legacy_r2.py` (a eliminar tras verificar)
+- **Paso a Paso de Implementación**:
+  1. *[Acción Usuario]* En Cloudflare Dashboard > R2 > Manage R2 API Tokens: crear un nuevo API Token con permisos de lectura y escritura (`Object Read & Write`) sobre el bucket `luxius-media`. Revocar el token anterior.
+  2. *[Acción Usuario]* En Render Dashboard > Web Service `luxius-backend` > Environment:
+     - Configurar `R2_ACCOUNT_ID` = `<tu_account_id>`
+     - Configurar `R2_ACCESS_KEY_ID` = `<nuevo_access_key>`
+     - Configurar `R2_SECRET_ACCESS_KEY` = `<nuevo_secret_access_key>`
+     - Configurar `R2_BUCKET_NAME` = `luxius-media`
+     - Guardar cambios (Render reiniciará automáticamente el servicio).
+  3. *[Acción Usuario o IA]* Actualizar las variables homónimas en los archivos locales `.env` (`f:\luXius-Backend\.env` y `f:\Sitio XignuX\.env`).
+  4. *[Acción IA]* Ejecutar probe: `python -c "import urllib.request, json; res = json.loads(urllib.request.urlopen('https://luxius-backend.onrender.com/health').read()); print(res.get('storage'))"`.
+  5. *[Acción IA]* Una vez que la respuesta sea `"storage": "r2"` (y ya no `"r2-legacy"`):
+     - Borrar el archivo transitorio: `Remove-Item f:\luXius-Backend\private_legacy_r2.py`
+     - En `f:\luXius-Backend\config.py`, retirar el bloque try/except de importación de `private_legacy_r2` y la bandera `R2_USING_LEGACY`.
+     - Commitear y pushear a `main` y `main:master`.
+- **Criterio de Verificación**:
+  - `GET https://luxius-backend.onrender.com/health` responde `{"status": "ok", "storage": "r2"}`.
+  - Subida de un archivo de prueba vía `/api/cloud-import` o `/xpress-viewer` confirmada en el bucket.
+- **Riesgo y Rollback**: Si las credenciales son incorrectas, `boto3` fallará al conectar con S3; el servicio caerá al fallback local o emitirá error 500 al subir archivos. Rollback: verificar sintaxis de claves en Render sin espacios adicionales.
+
+##### [ ] Tarea P0.2: Rotación de Contraseña de Base de Datos Neon PostgreSQL
+- **Objetivo**: Invalidar las credenciales históricas de Neon que estuvieron expuestas en commits antiguos y aislar el acceso a la base de datos de producción.
+- **Prerrequisitos**: Acceso a la consola de Neon (`neon.tech`) del proyecto LuXius.
+- **Archivos Afectados**:
+  - Consola Neon
+  - Panel Render: Variable `DATABASE_URL`
+  - `f:\luXius-Backend\.env`, `f:\Sitio XignuX\.env` y `f:\Sitio XignuX\server\.env`
+- **Paso a Paso de Implementación**:
+  1. *[Acción Usuario]* En la consola de Neon, ir a Roles/Users > Seleccionar el usuario de conexión > Reset Password.
+  2. *[Acción Usuario]* Copiar la nueva cadena de conexión SSL (`postgresql://usuario:nueva_pass@ep-....neon.tech/luxius_db?sslmode=require`).
+  3. *[Acción Usuario]* En Render > Environment Variables de `luxius-backend`: actualizar `DATABASE_URL` con la nueva cadena. Guardar y esperar el deploy.
+  4. *[Acción Usuario]* Actualizar la variable `DATABASE_URL` en los archivos `.env` locales.
+- **Criterio de Verificación**:
+  - `GET https://luxius-backend.onrender.com/health` responde `{"database": "connected", "status": "ok"}`.
+  - En local, levantar `python app.py` y verificar que conecta con éxito sin error de autenticación.
+- **Riesgo y Rollback**: Si se cambia la contraseña en Neon antes de actualizarla en Render, habrá una ventana de caída del backend (HTTP 500 / Database Connection Error) hasta que Render aplique la nueva variable. Realizar el cambio en horarios de baja actividad de taller.
+
+##### [ ] Tarea P0.3: Distribución de Nuevas Contraseñas y Purga de `CREDENCIALES_NUEVAS.txt`
+- **Objetivo**: Proveer las nuevas credenciales seguras al personal de producción (`admin`, `adrian`, `sistema`, `impresion`, `diseño`, `vendedor`) y eliminar de disco el archivo temporal con las contraseñas en texto claro.
+- **Prerrequisitos**: `f:\luXius-Backend\CREDENCIALES_NUEVAS.txt` existente.
+- **Archivos Afectados**:
+  - `f:\luXius-Backend\CREDENCIALES_NUEVAS.txt` (a eliminar)
+- **Paso a Paso de Implementación**:
+  1. *[Acción Usuario]* Comunicar de forma segura a cada usuario su nueva contraseña generada.
+  2. *[Acción Usuario]* Verificar que cada usuario puede iniciar sesión en `https://xignuxdis-eng.github.io/luxius-panel/`.
+  3. *[Acción Usuario]* Una vez distribuidas, borrar físicamente el archivo `CREDENCIALES_NUEVAS.txt`:
+     `Remove-Item "f:\luXius-Backend\CREDENCIALES_NUEVAS.txt" -Force`
+- **Criterio de Verificación**: Archivo `CREDENCIALES_NUEVAS.txt` inexistente en disco y personal logueado exitosamente.
+
+##### [ ] Tarea P0.4: Habilitación y Asignación de Contraseñas a Usuarios Clientes
+- **Objetivo**: Permitir que los clientes (`Axis`, `MaderHaus`, etc.) tengan acceso seguro al portal web para ver sus pedidos sin compartir permisos con otros clientes.
+- **Prerrequisitos**: Usuarios cliente creados en BD (actualmente 3 carecen de `client_id` y todos carecen de `password_hash`).
+- **Archivos Afectados**:
+  - Base de Datos PostgreSQL (`usuarios`, `clientes`)
+  - `src/pages/ABM/ABM.tsx` (Gestión de Usuarios)
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA/Usuario]* En el panel web de Administración (rol Administrador), editar cada usuario con rol `cliente`:
+     - Asignar el `clientId` correspondiente a su entidad en el ABM de Clientes.
+     - Asignar una contraseña segura y marcar `habilitado = true`.
+  2. *[Acción IA]* Alternativamente, ejecutar script puntual en `scratch/` que vincule `usuarios.client_id` basándose en el nombre de fantasía del cliente en `clientes`.
+- **Criterio de Verificación**:
+  - Iniciar sesión con un usuario cliente; la API `/api/orders` solo debe devolver las órdenes pertenecientes a ese cliente (`_client_scope_id`). Intentos de consultar órdenes de otros clientes deben arrojar HTTP 403 Forbidden.
+
+---
+
+#### 🛠️ Nivel P1: Mejoras Críticas de Arquitectura y Dependencias
+
+##### [ ] Tarea P1.1: Desacople de `server/` del Repositorio Público `luxius-panel`
+- **Objetivo**: Evitar la exposición innecesaria del código fuente y endpoints del backend en el repositorio público de frontend de GitHub Pages.
+- **Contexto**: El repositorio `luxius-panel` es público para permitir el hosting gratuito de GitHub Pages. La carpeta `server/` es un espejo del backend `luXius-Backend` (que sí es privado). Si bien los secretos ya fueron eliminados del código, exponer la lógica de endpoints y esquemas facilita el reconocimiento a atacantes.
+- **Archivos Afectados**:
+  - `f:\Sitio XignuX\server\`
+  - `.gitignore` de `luxius-panel`
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* Verificar que todos los cambios de `f:\Sitio XignuX\server\` estén debidamente incorporados en `f:\luXius-Backend\`.
+  2. *[Acción IA]* Realizar un untrack de la carpeta en Git sin borrar los archivos del disco local:
+     ```powershell
+     cd "f:\Sitio XignuX"
+     git rm -r --cached server
+     ```
+  3. *[Acción IA]* Agregar `server/` al archivo `f:\Sitio XignuX\.gitignore`.
+  4. *[Acción IA]* Compilar frontend para asegurar que ninguna ruta o módulo de Vite importe código desde `server/` (`npm run build`).
+  5. *[Acción IA]* Commitear en `luxius-panel`: `git commit -m "chore(security): untrack server directory from public frontend repository" && git push origin master`.
+  6. *(Opcional / Requiere Confirmación de Usuario)*: Reescribir el historial de Git del repositorio público con `git-filter-repo` para purgar commits históricos con secretos antiguos. **ADVERTENCIA: Esta operación es destructiva y reescribe los hashes de Git**. No ejecutar sin confirmación explícita del usuario.
+- **Criterio de Verificación**:
+  - En GitHub (`https://github.com/xignuxdis-eng/luxius-panel`), la carpeta `server/` ya no figura en la rama `master`.
+  - El frontend compila y despliega en `gh-pages` con total normalidad.
+
+##### [ ] Tarea P1.2: Migración de `react-router-dom` 6.x a 7.x (Resolución Vulnerabilidades npm)
+- **Objetivo**: Resolver las 2 vulnerabilidades moderadas reportadas por `npm audit` en `react-router` / `react-router-dom` (open redirect con backslashes y riesgos de SSR).
+- **Prerrequisitos**: Frontend compilando limpiamente (`npm run build`).
+- **Archivos Afectados**:
+  - `f:\Sitio XignuX\package.json`
+  - `src/App.tsx`
+  - `src/main.tsx`
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* En una rama Git temporal o con stash de seguridad, actualizar las dependencias:
+     `npm install react-router-dom@latest`
+  2. *[Acción IA]* Revisar `package.json` para verificar que `react-router-dom` y `@types/react-router-dom` pasaron a la versión 7+.
+  3. *[Acción IA]* Verificar compatibilidad de `HashRouter`, `Routes`, `Route`, `useNavigate`, `useLocation` y `useParams` en `src/App.tsx` y layouts.
+  4. *[Acción IA]* Ejecutar `npm run build` y resolver incompatibilidades de TypeScript o imports deprecados si los hubiere.
+  5. *[Acción IA]* Probar en navegador (vía dev server o test local): navegación entre Entrada, Taller, Stock, XpressViewer y modales.
+  6. *[Acción IA]* Ejecutar `npm audit` y confirmar que las vulnerabilidades quedaron resueltas (0 vulnerabilidades o severidad baja no explotable).
+  7. *[Acción IA]* Commitear y desplegar a `master` y `gh-pages`.
+- **Criterio de Verificación**: `npm audit` reporta 0 vulnerabilidades en el árbol de dependencias de react-router; `npm run build` genera los chunks correctamente y la navegación funciona sin recargas completas.
+- **Riesgo y Rollback**: Romper la navegación en modo SPA hash (`/#/entrada`). Rollback: `git reset --hard HEAD~1` y `npm install`.
+
+##### [ ] Tarea P1.3: Almacenamiento Distribuido para Rate-Limiting, Throttle y Jobs Asíncronos
+- **Objetivo**: Evitar que el rate limiting (`LoginThrottle`, `Flask-Limiter`) y el seguimiento de tareas (`_SMART_JOBS`, `_ACTIVE_RECONCILE_JOBS`) se ejecuten en la memoria volátil del proceso de Gunicorn, lo cual duplica los límites ante múltiples workers y pierde el estado al reiniciar el dyno en Render.
+- **Prerrequisitos**: Base de datos Redis o servicio serverless compatible (ej. Upstash Redis o Redis addon en Render).
+- **Archivos Afectados**:
+  - `f:\luXius-Backend\requirements.txt`
+  - `f:\luXius-Backend\services\security_utils.py`
+  - `f:\luXius-Backend\services\xana_smart_order.py`
+  - `f:\luXius-Backend\services\drive_reconciliation.py`
+  - `f:\luXius-Backend\app.py`
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* Agregar `redis>=5.0.0` a `requirements.txt`.
+  2. *[Acción IA]* Si la variable `REDIS_URL` está configurada en el entorno:
+     - Configurar `Flask-Limiter(..., storage_uri=os.environ.get('REDIS_URL'))`.
+     - Adaptar `LoginThrottle` en `security_utils.py` para usar claves `throttle:ip:<ip>` y `throttle:user:<user>` con TTL nativo de Redis (`SET key val EX 900`).
+     - Almacenar los estados de `_SMART_JOBS` en Redis con serialización JSON y expiración automática de 24 horas.
+  3. *[Acción IA]* Si `REDIS_URL` no está presente, mantener el fallback en memoria actual para desarrollo local sin dependencias obligatorias.
+- **Criterio de Verificación**: Al correr Gunicorn con 2 workers (`--workers=2`), los intentos de login fallidos se computan globalmente entre ambos procesos.
+
+---
+
+#### 🔒 Nivel P2: Endurecimiento de Seguridad, Privacidad y Mantenibilidad
+
+##### [ ] Tarea P2.1: URLs Firmadas Temporales (Presigned URLs) para `/uploads` y Multimedia
+- **Objetivo**: Evitar que cualquier usuario o scraper pueda descargar artes gráficos de clientes en `/uploads/<filename>` con solo conocer o enumerar el nombre del archivo.
+- **Prerrequisitos**: Cloudflare R2 con permisos para generar presigned URLs en S3 (`boto3.generate_presigned_url`).
+- **Archivos Afectados**:
+  - `f:\luXius-Backend\services\storage.py`
+  - `f:\luXius-Backend\routes\files.py`
+  - `f:\luXius-Backend\app.py`
+  - `src/utils/fileUrl.ts` (o resolvedor de URLs de frontend)
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* En `services/storage.py`, implementar `generate_download_url(filename, expires_in=3600)`:
+     - Genera una URL firmada de Cloudflare R2 válida por 1 hora (`s3_client.generate_presigned_url('get_object', Params={'Bucket': BUCKET, 'Key': f'uploads/{filename}'}, ExpiresIn=expires_in)`).
+  2. *[Acción IA]* En los serializadores de órdenes (`Presupuesto.to_dict()`) y endpoints de consulta, devolver URLs firmadas dinámicas o crear el endpoint autenticado `GET /api/files/signed-url?file=<filename>` (`@login_required`).
+  3. *[Acción IA]* Mantener `/uploads/<filename>` público solo para miniaturas y logos públicos si fuera necesario, restringiendo los artes de alta resolución originales.
+- **Criterio de Verificación**: Peticiones directas anónimas a archivos de clientes en R2 o backend devuelven 401/403 sin la firma temporal criptográfica válida.
+
+##### [ ] Tarea P2.2: Limpieza y Eliminación de Código Muerto en Frontend y Backend
+- **Objetivo**: Reducir la superficie de ataque, eliminar advertencias de linting y mejorar los tiempos de build retirando módulos huérfanos.
+- **Archivos Afectados**:
+  - Frontend: `src/pages/Dashboard/Profile.tsx` (código muerto que apunta a `/api/users/<id>` inexistente; el perfil real es `PerfilModal.tsx` con `saveUsuario`).
+  - Backend: Directorio obsoleto `f:\luXius-Backend\server\` (espejo residual no consumido por Gunicorn, que corre `f:\luXius-Backend\app.py`).
+  - Frontend: Métodos sin uso en `src/services/apiService.ts` (`updateUser`, `getUsers`).
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* Verificar que `Profile.tsx` no esté importado en ninguna parte del proyecto mediante grep search. Borrar `src/pages/Dashboard/Profile.tsx`.
+  2. *[Acción IA]* En `f:\luXius-Backend\`, eliminar la carpeta `server/` que contiene archivos legacy no utilizados por la aplicación principal.
+  3. *[Acción IA]* En `src/services/apiService.ts`, limpiar métodos deprecados.
+  4. *[Acción IA]* Ejecutar `npm run build` y correr suite de tests en backend para confirmar que no se rompieron dependencias.
+- **Criterio de Verificación**: `npm run build` pasa limpiamente; árbol de archivos más liviano y sin código huérfano.
+
+##### [ ] Tarea P2.3: Unificación de Servicios de Voz y Bóveda Drive entre Ambos Repositorios
+- **Objetivo**: Resolver la divergencia donde `xana_voice.py` y `xana_vault.py` existen en `f:\Sitio XignuX\server\` pero no en `f:\luXius-Backend\`.
+- **Archivos Afectados**:
+  - `f:\luXius-Backend\routes\xana_voice.py`
+  - `f:\luXius-Backend\routes\xana_vault.py`
+  - `f:\luXius-Backend\app.py`
+  - `scratch/sync_server.py`
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* Copiar `xana_voice.py` y `xana_vault.py` desde `Sitio XignuX/server/routes/` hacia `luXius-Backend/routes/`.
+  2. *[Acción IA]* Agregar los registros de blueprints correspondientes en `f:\luXius-Backend\app.py` con decoradores de autenticación correspondientes (`@login_required` o `@operator_required`).
+  3. *[Acción IA]* Ajustar `scratch/sync_server.py` para eliminar la regla de divergencia y permitir sincronización 100% simétrica de blueprints.
+- **Criterio de Verificación**: Ambos repositorios contienen los mismos servicios; endpoints de voz y bóveda responden correctamente con token JWT.
+
+##### [ ] Tarea P2.4: Endurecimiento de Seguridad en App Móvil (`XignuX Workfield Manager`)
+- **Objetivo**: Asegurar que la aplicación Capacitor para operarios de campo no almacene tokens en texto plano y fuerce comunicaciones cifradas.
+- **Documento de Referencia**: `docs/xana/XANA_MEMORIA_APP_MOVIL.md`.
+- **Archivos Afectados**:
+  - `capacitor.config.json` de la App Móvil.
+  - Almacenamiento de sesión móvil (`auth.js` / `storage.js`).
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* En `capacitor.config.json`, configurar `server.androidScheme = "https"` y `server.cleartext = false`.
+  2. *[Acción IA]* Reemplazar `localStorage.setItem('luxius_token', ...)` por `@capacitor-community/secure-storage` para evitar extracción de tokens en dispositivos rooteados o volcados de memoria.
+  3. *[Acción IA]* Asegurar que todas las llamadas de la app móvil apunten a `https://luxius-backend.onrender.com` con `Authorization: Bearer <token>`.
+- **Criterio de Verificación**: Build de Android (APK/AAB) generado sin advertencias de tráfico en texto claro; token protegido por Keystore de Android.
+
+---
+
+#### 📊 Nivel P3: Observabilidad, Automatización de Pruebas y Calidad de Código
+
+##### [ ] Tarea P3.1: Incorporación de Suite Automatizada de Pruebas de Seguridad en Repositorio
+- **Objetivo**: Que cada pipeline o desarrollador pueda verificar de forma instantánea la seguridad de rutas antes de desplegar, evitando regresiones donde endpoints protegidos vuelvan a quedar públicos.
+- **Archivos Afectados**:
+  - `f:\luXius-Backend\scripts\tests\test_security_suite.py`
+  - `f:\luXius-Backend\scripts\tests\map_routes.py`
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* Trasladar `scratch/test_security.py` a `scripts/tests/test_security_suite.py`.
+  2. *[Acción IA]* Parametrizar la URL base (`LUXIUS_API_URL` por defecto `http://127.0.0.1:5000`) y permitir ejecutar pruebas contra servidor local o producción.
+  3. *[Acción IA]* Incorporar `map_routes.py` que inspecciona la app Flask (`app.url_map`) y falla automáticamente si encuentra algún endpoint no documentado en la lista blanca de endpoints públicos.
+  4. *[Acción IA]* Documentar el comando de ejecución en la Sección 7 de la memoria:
+     `python scripts/tests/test_security_suite.py`
+- **Criterio de Verificación**: Ejecución de la suite con salida `33/33 tests PASSED` en consola.
+
+##### [ ] Tarea P3.2: Entornos Virtuales y Auditoría Continua de Dependencias Python (`pip-audit`)
+- **Objetivo**: Garantizar que el entorno de desarrollo y las dependencias de Render estén libres de vulnerabilidades conocidas (CVEs) sin instalar paquetes globales.
+- **Prerrequisitos**: Cumplimiento de la regla de la skill `managing-python-dependencies`.
+- **Archivos Afectados**:
+  - `f:\luXius-Backend\requirements.txt`
+- **Paso a Paso de Implementación**:
+  1. *[Acción IA]* Activar el entorno virtual dedicado del backend (`.venv`).
+  2. *[Acción IA]* Ejecutar `pip-audit -r requirements.txt` dentro del virtualenv.
+  3. *[Acción IA]* Si se detectan paquetes vulnerables, actualizar versiones en `requirements.txt` preservando la compatibilidad con SQLAlchemy 2.0 y Flask 3.x.
+- **Criterio de Verificación**: `pip-audit` finaliza con 0 vulnerabilidades conocidas en las dependencias declaradas.
+
+---
+
+#### 🏭 Nivel P4: Integraciones Físicas de Taller (Pausada hasta Operar in Situ)
+
+##### [~] Tarea P4.1: Despliegue del Daemon Hot Folder para Roland VersaWorks en PC de Taller
+- **Estado**: **Pausada temporalmente** (Sesión 03/10/2026). Se retomará cuando el desarrollador o agente trabaje frente a la PC física conectada al RIP.
+- **Objetivo**: Descarga autónoma de archivos listos para imprimir en la carpeta vigilada (Hot Folder) de Roland VersaWorks en la PC del taller, reportando estado al backend (`En cola de RIP`).
+- **Documento de Referencia**: `docs/roadmaps/ROADMAP_PRODUCCION_XANA_HOTFOLDER_DRIVE.md`.
+- **Archivos Afectados**:
+  - `scripts/luxius_rip_daemon.py`
+  - `daemon_config.json`
+- **Paso a Paso para cuando se reactive**:
+  1. En la PC del taller, clonar o copiar el script ligero `luxius_rip_daemon.py`.
+  2. Configurar en `daemon_config.json` la ruta local del Hot Folder de VersaWorks (ej. `C:\Roland VersaWorks\HotFolder_ColaA\`) y el token de autenticación del backend.
+  3. Ejecutar como servicio de fondo en Windows o script de inicio.
+- **Criterio de Verificación**: Al cambiar una orden a estado `orden`, el archivo se descarga en el Hot Folder y la orden muestra badge verde `En cola de RIP`.
+
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 
