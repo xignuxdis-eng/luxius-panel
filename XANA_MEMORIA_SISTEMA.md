@@ -165,6 +165,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **R2→Drive podía borrar de R2 archivos de órdenes que todavía no se habían impreso** | `test_single_file.py` pedía la confirmación (`input()`) ANTES de buscar el presupuesto y evaluar `presupuesto.estado`, así que la protección 🔒 quedaba después del prompt y nunca surtía efecto. Además `buscar_presupuesto_por_archivo()` no traía `estado` ni `deleted_at` en el SELECT, y el script autenticaba contra Drive y ejecutaba `CREATE TABLE` antes de preguntar nada. | Se agregó `requiere_proteccion_por_no_impreso()` con `ESTADOS_IMPRESOS`, se amplió el SELECT con `p.estado, p.deleted_at`, y se reordenó `main()` para que la búsqueda de solo lectura y el chequeo 🔒 ocurran antes del `input()`. `get_drive_service()` y el DDL quedaron después del prompt; ambos `input()` asumen `n` ante `EOFError`. Verificado: `1790309456184_avelino_atrasyzocalo1_135x267cm.jpg` frena con `🔒 PROTEGIDO` sin preguntar. | `scripts/sync_r2_to_drive.py`<br>`scripts/test_single_file.py` |
 | **Scripts con emoji crasheaban al correrlos en consola Windows** | `cmd.exe`/`powershell.exe` usan cp1252 y los `print()` con `✔`, `🔒`, `⚠️` lanzaban `UnicodeEncodeError`. | Se corre con `$env:PYTHONIOENCODING="utf-8"`. El log a archivo nunca se vio afectado porque `logging.FileHandler` ya usa `encoding='utf-8'`. | `scripts/*.py` |
 | **Panel web inutilizable en dispositivos móviles** (**RESUELTO 02/10/2026**) | 1) `MainLayout.css` fuerza `grid-template-columns: 260px 1fr` sin colapso de sidebar. 2) Solo 9 media queries en 68+ archivos CSS; `Stock.css` (691 líneas) tiene 0 breakpoints. 3) Cinco widgets flotantes se superponen en viewport <768px. 4) Touch targets bajo mínimo WCAG 44×44px. 5) `padding: 32px 40px` en `.main-content` desperdicia ~80px en móvil. | **Plan Mobile-First 4 fases COMPLETADO** (02/10/2026, commits `fa43e79`→`e529912`): Fase 1 (fundación tokens/sidebar/topbar), Fase 2 (9 CSS responsive + bottom-sheet 21 modales + FAB unificado), Fase 3 (React.lazy -87% JS + fonts condicionales), Fase 4 (PWA manifest + service worker + iOS safe-area). Bundle de 2.5MB→327KB. App instalable y usable en mobile. | `src/components/layout/MainLayout.*`<br>`src/styles/index.css`<br>`src/pages/*/Stock.css,Entrada.css,ABM.css,Dashboard.css`<br>`src/components/ui/Modal.css,FABMenu.*`<br>`src/App.tsx,index.html,public/manifest.json,public/sw.js` |
+| **Faltaban etiquetas de producción para rollos (impresión física)** (**RESUELTO 02/10/2026**) | En el taller no existía una forma ágil de imprimir etiquetas alargadas autocompletadas para pegar a lo largo del rollo de material con los datos del destinatario, proyecto y detalle visual de archivos. | Se desarrolló el generador de etiquetas `generateLabelPdf.ts` (105mm ancho alargado adaptativo, logo XignuX, fecha de emisión, campos vacíos omitidos para evitar sensación de vacío, proyecto desde `nombreTarea`, teléfono WhatsApp 3517897667, grilla 2-col de miniaturas con nombres sin extensión y medidas en cm sin precios). Integrado en `Entrada.tsx` (botón masivo en barra de selección + botón individual en tabla y tarjetas mobile) y en `SharedFileViewerModal.tsx`. | `src/utils/generateLabelPdf.ts`<br>`src/pages/Entrada/Entrada.tsx`<br>`src/components/shared/SharedFileViewerModal.tsx` |
 
 
 ---
@@ -386,6 +387,15 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Endpoints: `POST /api/xana/vault/sync` (202 + job_id), `GET /api/xana/vault/sync/status/<job_id>`, `GET /api/xana/vault/structure`, `GET /api/xana/vault/config`
   - Límite 500 archivos por corrida, dry-run mode, cancelación
   - Permisos públicos auto-asignados en Drive para acceso directo
+
+### Sesión 02/10/2026: Etiquetas de Producción para Rollos (completado)
+- [x] Generador de Etiquetas de Producción (`generateLabelPdf.ts`) — PDF alargado (105mm ancho) adaptativo para pegar a lo largo del rollo de material impreso.
+- [x] Mapeo de Proyecto / Etiqueta / Nombre Trabajo desde `nombreTarea` (en reemplazo del código de OT).
+- [x] Omisión limpia de campos vacíos (sin títulos huérfanos de Dirección, Proyecto o Detalle cuando no hay datos).
+- [x] Grilla de archivos de 2 columnas con nombres limpios (sin extensiones de archivo), medidas en centímetros (con multiplicador de copias) y miniaturas optimizadas.
+- [x] Teléfono WhatsApp configurable (3517897667) y pie de marca oficial XignuX.
+- [x] Integración en `Entrada.tsx` (botón masivo en barra de selección "🏷️ Etiqueta Rollo", botón individual en tabla y botón en tarjetas mobile).
+- [x] Integración en `SharedFileViewerModal.tsx` ("🏷️ Imprimir Etiqueta").
 
 ---
 

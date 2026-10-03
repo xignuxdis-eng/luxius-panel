@@ -5,6 +5,7 @@ import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { API_URL, getServicios, getMateriales, getCalidades, resolveMediaUrl, getAuthHeaders } from '@data/db'
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
+import { generateProductionLabel } from '@/utils/generateLabelPdf'
 import './FileViewerModal.css'
 
 interface FileViewerModalProps {
@@ -127,6 +128,10 @@ export default function SharedFileViewerModal({
 
     const handlePrintPdf = () => {
         generatePdfBudget(order)
+    }
+
+    const handlePrintLabel = () => {
+        if (order) generateProductionLabel([order])
     }
 
     const downloadImageViaCanvas = (imageUrl: string, filename: string): Promise<boolean> => {
@@ -293,25 +298,46 @@ export default function SharedFileViewerModal({
                             <span className="value">{order.clienteNombre || 'S/D'}</span>
                         </div>
                     </div>
-                    <button
-                        onClick={handlePrintPdf}
-                        style={{
-                            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '0.6rem 1.2rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
-                            whiteSpace: 'nowrap'
-                        }}
-                    >
-                        📄 Ver / Imprimir PDF Presupuesto
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                            onClick={handlePrintPdf}
+                            style={{
+                                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '0.6rem 1.2rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            📄 Ver / Imprimir PDF Presupuesto
+                        </button>
+                        <button
+                            onClick={handlePrintLabel}
+                            style={{
+                                background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '0.6rem 1.2rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 4px 12px rgba(13,148,136,0.3)',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            🏷️ Imprimir Etiqueta
+                        </button>
+                    </div>
                 </div>
 
                 <div className="files-grid">

@@ -10,6 +10,7 @@ import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
 import OrderChatModal from '@components/shared/OrderChatModal'
 import type { Order, Cliente, Material } from '@/types'
 import { generatePdfBudget, generatePdfBatch, type BudgetPdfMode } from '@/utils/generatePdfBudget'
+import { generateProductionLabel } from '@/utils/generateLabelPdf'
 import { computeStockForecast, canViewStockAlerts } from '@/utils/stockForecast'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
@@ -603,6 +604,15 @@ export default function Entrada() {
         openPdfModeModal(selectedList, `Consolidado de ${selectedList.length} órdenes`)
     }
 
+    const handleBatchLabel = () => {
+        const selectedList = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)))
+        if (selectedList.length === 0) {
+            alert('Seleccioná al menos una orden para generar la etiqueta.')
+            return
+        }
+        generateProductionLabel(selectedList)
+    }
+
     const handleBatchDelete = async () => {
         const isTrash = viewTab === 'trash';
         const count = selectedIds.size;
@@ -775,6 +785,14 @@ export default function Entrada() {
                             style={{ backgroundColor: '#059669', color: '#fff', border: 'none' }}
                         >
                             📚 PDF Masivo
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleBatchLabel}
+                            style={{ backgroundColor: '#0d9488', color: '#fff', border: 'none' }}
+                        >
+                            🏷️ Etiqueta Rollo
                         </Button>
                         {viewTab !== 'trash' ? (
                             <>
@@ -1285,6 +1303,13 @@ export default function Entrada() {
                                                                 </button>
                                                                 <button
                                                                     className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); generateProductionLabel([order]); }}
+                                                                    title="Etiqueta Rollo / Producción"
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>🏷️</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action"
                                                                     onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
                                                                     title="Ver Detalle"
                                                                 >
@@ -1554,6 +1579,17 @@ export default function Entrada() {
                                                             style={{ background: 'rgba(249, 115, 22, 0.25)', border: '1px solid rgba(249, 115, 22, 0.6)' }}
                                                         >
                                                             <span style={{ pointerEvents: 'none' }}>📄</span>
+                                                        </button>
+                                                        <button
+                                                            className="btn-icon-action"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                generateProductionLabel([order]);
+                                                            }}
+                                                            title="Etiqueta Rollo / Producción"
+                                                            style={{ background: 'rgba(13, 148, 136, 0.25)', border: '1px solid rgba(13, 148, 136, 0.6)' }}
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>🏷️</span>
                                                         </button>
                                                         <button
                                                             className="btn-icon-action"
