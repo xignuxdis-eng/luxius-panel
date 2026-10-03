@@ -176,36 +176,42 @@ const LABEL_CSS = `
         src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_BOLD_BASE64}) format('opentype');
         font-weight: 700;
         font-style: normal;
+        unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
     }
     @font-face {
         font-family: 'Artegra Sans';
         src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_BOLD_BASE64}) format('opentype');
         font-weight: 800;
         font-style: normal;
+        unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
     }
     @font-face {
         font-family: 'Artegra Sans';
         src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_BOLD_BASE64}) format('opentype');
         font-weight: 900;
         font-style: normal;
+        unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
     }
     @font-face {
         font-family: 'Artegra Sans';
         src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_SEMIBOLD_BASE64}) format('opentype');
         font-weight: 600;
         font-style: normal;
+        unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
     }
     @font-face {
         font-family: 'Artegra Sans';
         src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_SEMIBOLD_BASE64}) format('opentype');
         font-weight: 400;
         font-style: normal;
+        unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
     }
     @font-face {
         font-family: 'Artegra Sans';
         src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_SEMIBOLD_BASE64}) format('opentype');
         font-weight: 500;
         font-style: normal;
+        unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
     }
 
     @page {

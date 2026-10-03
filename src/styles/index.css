@@ -105,6 +105,7 @@ html {
     font-weight: 700;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
 }
 @font-face {
     font-family: 'Artegra Sans';
@@ -112,6 +113,7 @@ html {
     font-weight: 800;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
 }
 @font-face {
     font-family: 'Artegra Sans';
@@ -119,6 +121,7 @@ html {
     font-weight: 900;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
 }
 @font-face {
     font-family: 'Artegra Sans';
@@ -126,6 +129,7 @@ html {
     font-weight: 600;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
 }
 @font-face {
     font-family: 'Artegra Sans';
@@ -133,6 +137,7 @@ html {
     font-weight: 400;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
 }
 @font-face {
     font-family: 'Artegra Sans';
@@ -140,6 +145,7 @@ html {
     font-weight: 500;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0020, U+002C, U+002E, U+0030-0033, U+0035-0039, U+003A-003B, U+003F, U+0041-005A, U+0061-007A;
 }
 
 body {
