@@ -6,28 +6,61 @@ import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
 /**
  * Generador de Etiquetas de Producción para Rollos — Luxius System
  * 
- * Genera un PDF de etiqueta alargada (ancho configurable ~105mm, altura adaptativa)
- * para pegar a lo largo del rollo de material impreso.
- * 
- * Requisitos:
- * - Omitir títulos/secciones vacías para no dejar sensación de vacío (ej: si no hay dirección, no va "Dirección")
- * - Sin OT: en su lugar se coloca el Proyecto / Etiqueta / Nombre Trabajo (desde nombreTarea)
- * - Fecha de emisión de la etiqueta (hoy)
- * - Teléfono de WhatsApp configurable (default: 3517897667)
- * - Grilla de archivos con medidas, sin extensiones, con miniaturas
- * - Sin precios ni importes monetarios
+ * Formato alargado de alto impacto visual (105mm ancho).
+ * Diseñado para adherirse a lo largo del rollo de material gráfico.
  */
 
 // ============================================================
-// CONFIGURACIÓN (editable a futuro)
+// CONFIGURACIÓN (editable)
 // ============================================================
 export const LABEL_CONFIG = {
     whatsapp: '3517897667',
     website: 'XIGNUX.COM.AR',
-    labelWidthMM: 105,   // Ancho alargado estándar para etiquetas de rollo
-    thumbSize: 130,      // Altura máxima de cada miniatura
-    thumbQuality: 0.75,
+    labelWidthMM: 105,   // Ancho estándar de etiqueta alargada para rollo
+    thumbSize: 150,      // Altura máxima de miniatura
+    thumbQuality: 0.80,
 }
+
+// ============================================================
+// PANTALLA DE CARGA RÁPIDA (evita que el navegador diga "no responde")
+// ============================================================
+const LOADING_HTML = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Generando Etiqueta...</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.15);
+            border-top-color: #0d9488;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 18px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h2 { font-size: 18px; font-weight: 700; margin: 0 0 6px 0; }
+        p { font-size: 13px; color: #94a3b8; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="spinner"></div>
+    <h2>🏷️ Armando Etiqueta de Producción</h2>
+    <p>Optimizando miniaturas y preparando documento...</p>
+</body>
+</html>`
 
 // ============================================================
 // HELPERS
@@ -63,7 +96,7 @@ function formatDimensions(ancho?: number, alto?: number, copias?: number): strin
     return text
 }
 
-/** Fecha de hoy formateada para Argentina */
+/** Fecha de hoy formateada */
 function todayFormatted(): string {
     const d = new Date()
     return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -87,9 +120,11 @@ interface LabelFileItem {
 }
 
 // ============================================================
-// CSS ESTILIZADO DE LA ETIQUETA
+// CSS ESTILIZADO DE ALTO IMPACTO
 // ============================================================
 const LABEL_CSS = `
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@400;600;700;800;900&display=swap');
+
     @page {
         size: ${LABEL_CONFIG.labelWidthMM}mm auto;
         margin: 0;
@@ -97,16 +132,18 @@ const LABEL_CSS = `
 
     * {
         box-sizing: border-box;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
     html, body {
         margin: 0;
         padding: 0;
-        background: #f1f5f9;
+        background: #e2e8f0;
         color: #0f172a;
-        font-size: 12px;
+        font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
         line-height: 1.35;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 
     .no-print-bar {
@@ -115,32 +152,36 @@ const LABEL_CSS = `
         align-items: center;
         background: #0f172a;
         color: #fff;
-        padding: 10px 16px;
+        padding: 10px 18px;
         width: 100%;
         max-width: ${LABEL_CONFIG.labelWidthMM}mm;
         margin: 12px auto 8px auto;
         border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.25);
     }
     .no-print-bar .title {
-        font-weight: 700;
-        font-size: 13px;
+        font-weight: 800;
+        font-size: 14px;
+        letter-spacing: 0.5px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
     }
     .btn-print {
         background: #0d9488;
         color: #fff;
         border: none;
-        padding: 7px 16px;
+        padding: 8px 20px;
         border-radius: 6px;
         cursor: pointer;
-        font-weight: 700;
+        font-weight: 800;
         font-size: 13px;
-        transition: background 0.15s;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 6px rgba(13,148,136,0.4);
+        transition: background 0.15s, transform 0.1s;
     }
     .btn-print:hover { background: #0f766e; }
+    .btn-print:active { transform: scale(0.97); }
 
     @media print {
         .no-print-bar { display: none !important; }
@@ -157,182 +198,210 @@ const LABEL_CSS = `
 
     .label-page {
         width: ${LABEL_CONFIG.labelWidthMM}mm;
-        margin: 10px auto 30px auto;
+        margin: 10px auto 40px auto;
         background: #fff;
-        border: 1px solid #cbd5e1;
-        border-radius: 4px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        padding: 16px 14px;
+        border: 2px solid #0f172a;
+        border-radius: 6px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+        padding: 18px 16px;
     }
 
-    /* Logo & Header */
+    /* Logo prominente */
     .label-logo {
         text-align: center;
-        padding-bottom: 10px;
+        padding: 4px 0 10px 0;
     }
     .label-logo img {
-        height: 44px;
-        width: auto;
+        width: 220px;
+        max-width: 90%;
+        height: auto;
         object-fit: contain;
-        margin-bottom: 2px;
+        display: block;
+        margin: 0 auto;
     }
-    .label-logo .brand-name {
-        font-size: 20px;
+
+    /* Separadores punteados de estilo técnico */
+    .dotted-divider {
+        border-top: 2.5px dotted #0f172a;
+        margin: 12px 0;
+    }
+
+    /* Bloque Destacado de Proyecto / Fecha */
+    .label-project-block {
+        background: #f8fafc;
+        border: 1.5px solid #0f172a;
+        border-radius: 6px;
+        padding: 10px 12px;
+        text-align: center;
+        margin-bottom: 4px;
+    }
+    .label-project-block .project-title {
+        font-size: 17px;
+        font-weight: 900;
+        color: #0f172a;
+        margin: 0 0 6px 0;
+        line-height: 1.25;
+        letter-spacing: 0.3px;
+        word-break: break-word;
+        text-transform: uppercase;
+    }
+    .label-project-block .project-meta {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        font-size: 11.5px;
+        color: #475569;
+        font-weight: 700;
+    }
+    .label-project-block .label-material {
+        background: #0f172a;
+        color: #fff;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
         font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-top: 6px;
+        display: inline-block;
+    }
+
+    /* Secciones (Destinatario, Dirección) */
+    .label-section {
+        margin: 10px 0;
+    }
+    .label-section-header {
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #64748b;
+        margin: 0 0 3px 0;
+    }
+    .label-section-value {
+        font-size: 18px;
+        font-weight: 900;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.2;
+        letter-spacing: 0.5px;
+        word-break: break-word;
+    }
+    .label-section-address {
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+        margin: 0;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    /* Detalle de Archivos */
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 12px 0 8px 0;
+    }
+    .detail-title {
+        font-size: 11.5px;
+        font-weight: 900;
+        text-transform: uppercase;
         letter-spacing: 1.5px;
         color: #0f172a;
         margin: 0;
-        line-height: 1.1;
     }
-    .label-logo .brand-tagline {
-        font-size: 10.5px;
-        color: #64748b;
-        letter-spacing: 0.5px;
-        margin: 2px 0 0 0;
-        font-style: italic;
-    }
-
-    /* Dotted line dividers */
-    .dotted-divider {
-        border-top: 2px dotted #94a3b8;
-        margin: 10px 0;
-    }
-
-    /* Project & Date Block */
-    .label-info {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        padding: 8px 10px;
-        text-align: center;
-    }
-    .label-info .project-name {
-        font-size: 15px;
-        font-weight: 800;
-        color: #0f172a;
-        margin: 0 0 4px 0;
-        line-height: 1.25;
-        word-break: break-word;
-    }
-    .label-info .label-date {
+    .detail-count {
         font-size: 11px;
-        color: #64748b;
-        margin: 0;
-        font-weight: 500;
-    }
-    .label-info .label-material {
-        font-size: 12px;
-        color: #334155;
-        margin: 4px 0 0 0;
-        font-weight: 600;
-    }
-
-    /* Form Fields (Destinatario, Dirección) */
-    .label-section {
-        margin-bottom: 8px;
-    }
-    .label-section-title {
-        font-size: 10px;
         font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        color: #64748b;
-        margin: 0 0 2px 0;
-        border-bottom: 1.5px dotted #cbd5e1;
-        padding-bottom: 2px;
-    }
-    .label-section-value {
-        font-size: 13.5px;
-        font-weight: 700;
+        background: #e2e8f0;
         color: #0f172a;
-        margin: 0;
-        padding: 2px 0;
-        word-break: break-word;
+        padding: 2px 7px;
+        border-radius: 12px;
     }
 
-    /* Detail / Files Grid */
-    .thumbs-title {
-        font-size: 10px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        color: #64748b;
-        margin: 10px 0 6px 0;
-        border-bottom: 1.5px dotted #cbd5e1;
-        padding-bottom: 2px;
-    }
+    /* Grilla de Miniaturas */
     .thumbs-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 6px;
+        gap: 8px;
     }
     .thumb-card {
-        text-align: center;
-        border: 1px solid #e2e8f0;
+        border: 1.5px solid #cbd5e1;
         border-radius: 6px;
-        padding: 5px;
-        background: #fafbfc;
+        padding: 6px;
+        background: #fff;
         break-inside: avoid;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     }
-    .thumb-card img {
+    .thumb-card .img-container {
         width: 100%;
-        max-height: ${LABEL_CONFIG.thumbSize}px;
-        object-fit: contain;
-        border-radius: 4px;
+        height: 105px;
         background: #f8fafc;
-        display: block;
-        margin: 0 auto;
-    }
-    .thumb-no-img {
-        width: 100%;
-        height: 60px;
+        border-radius: 4px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #f1f5f9;
-        border-radius: 4px;
-        font-size: 20px;
+        overflow: hidden;
+        margin-bottom: 5px;
+    }
+    .thumb-card img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        display: block;
+    }
+    .thumb-no-img {
+        font-size: 24px;
+        color: #94a3b8;
     }
     .thumb-card .thumb-name {
-        font-size: 9.5px;
-        font-weight: 700;
-        color: #1e293b;
-        margin: 4px 0 1px 0;
+        font-size: 10.5px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0 0 3px 0;
         word-break: break-word;
-        line-height: 1.2;
+        line-height: 1.25;
+        letter-spacing: -0.2px;
     }
-    .thumb-card .thumb-dims {
-        font-size: 9px;
-        font-weight: 600;
+    .thumb-card .thumb-dims-badge {
+        font-size: 10px;
+        font-weight: 800;
+        background: #f1f5f9;
         color: #0d9488;
-        margin: 0;
+        border: 1px solid #ccfbf1;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
     }
 
-    /* Footer */
+    /* Footer de Alto Impacto */
     .label-footer {
-        margin-top: 12px;
-        padding-top: 8px;
-        border-top: 2px solid #0f172a;
+        margin-top: 14px;
+        padding: 10px 0 4px 0;
+        border-top: 2.5px solid #0f172a;
         text-align: center;
     }
     .label-footer .footer-whatsapp {
-        font-size: 14px;
-        font-weight: 800;
+        font-size: 15px;
+        font-weight: 900;
         color: #15803d;
-        margin: 0 0 2px 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
+        margin: 0 0 3px 0;
+        letter-spacing: 0.5px;
     }
     .label-footer .footer-web {
-        font-size: 12px;
-        font-weight: 800;
+        font-size: 13px;
+        font-weight: 900;
         color: #0f172a;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
         margin: 0;
     }
 `
@@ -343,136 +412,150 @@ const LABEL_CSS = `
 
 /**
  * Genera e imprime la Etiqueta de Producción para una o varias órdenes.
- * Consolida archivos, medidas y miniaturas en un formato alargado para rollos.
+ * Optimizado para velocidad inmediata y máxima fidelidad visual.
  */
 export async function generateProductionLabel(orders: Order[]): Promise<void> {
     if (!orders || orders.length === 0) return
 
-    const firstOrder = orders[0]
-
-    // 1. Proyecto / Etiqueta / Nombre Trabajo
-    // Se toma desde nombreTarea o loteNombre. Si está vacío, queda vacío (sin título).
-    const projectName = orders
-        .map(o => (o.nombreTarea || o.loteNombre || '').trim())
-        .find(n => n.length > 0) || ''
-
-    // 2. Destinatario (Cliente)
-    const clientName = (firstOrder.clienteNombre || firstOrder.clientName || '').trim()
-
-    // 3. Dirección: buscar primero en ficha de clientes y luego en observaciones
-    let address = ''
-    try {
-        const clients = getClientes()
-        const client = clients.find(c =>
-            (firstOrder.clientId && c.id === firstOrder.clientId) ||
-            (clientName && c.nombre.trim().toLowerCase() === clientName.toLowerCase())
-        )
-        if (client?.direccion?.trim()) {
-            address = client.direccion.trim()
-        }
-    } catch (e) {
-        console.warn('[Label] Could not lookup client address in local DB:', e)
-    }
-
-    if (!address) {
-        const orderWithObs = orders.find(o => o.observaciones2?.trim() || o.observaciones?.trim())
-        if (orderWithObs) {
-            const obs2 = (orderWithObs.observaciones2 || '').trim()
-            const obs1 = (orderWithObs.observaciones || '').trim()
-            if (obs2) {
-                address = obs2
-            } else if (/calle|av\.|avenida|barrio|piso|depto|altura|entre|b°|direcci/i.test(obs1)) {
-                address = obs1
-            }
-        }
-    }
-
-    // 4. Material
-    const materials = Array.from(new Set(orders.map(o => o.material).filter(Boolean)))
-    const material = materials.join(' / ')
-
-    // 5. Recopilar archivos de todas las órdenes seleccionadas
-    const allFiles: { name: string; url: string; ancho?: number; alto?: number; copias?: number }[] = []
-    for (const order of orders) {
-        const archivos = order.archivosOriginales?.length ? order.archivosOriginales : (order.archivos || [])
-        for (const archivo of archivos) {
-            const url = resolveMediaUrl(archivo)
-            allFiles.push({
-                name: sanitizeFileName(archivo),
-                url,
-                ancho: order.ancho,
-                alto: order.alto,
-                copias: order.copias,
-            })
-        }
-        // Si no tiene archivos adjuntos en el array pero tiene medidas o descripción
-        if (archivos.length === 0 && (order.ancho || order.alto || order.conceptoPersonalizado || order.descripcionItem)) {
-            allFiles.push({
-                name: order.descripcionItem || order.conceptoPersonalizado || order.nombreTarea || order.material || 'Trabajo sin archivo',
-                url: '',
-                ancho: order.ancho,
-                alto: order.alto,
-                copias: order.copias,
-            })
-        }
-    }
-
-    // 6. Optimizar miniaturas para carga instantánea
-    let thumbMap: Record<string, string> = {}
-    const filesWithUrls = allFiles.filter(f => f.url)
-    if (filesWithUrls.length > 0) {
-        try {
-            const urls = filesWithUrls.map(f => f.url)
-            thumbMap = await batchOptimizePdfThumbnails(urls, {
-                maxWidth: 240,
-                maxHeight: 240,
-                quality: LABEL_CONFIG.thumbQuality,
-                timeoutMs: 5000,
-            })
-        } catch (e) {
-            console.warn('[Label] Thumbnail optimization failed, using direct URLs:', e)
-        }
-    }
-
-    // Preparar lista de items
-    const items: LabelFileItem[] = allFiles.map(f => ({
-        name: f.name,
-        dimensions: formatDimensions(f.ancho, f.alto, f.copias),
-        thumbUrl: f.url ? (thumbMap[f.url] || f.url) : '',
-    }))
-
-    // 7. Generar HTML
-    const html = buildLabelHtml({
-        projectName,
-        clientName,
-        material,
-        address,
-        items,
-    })
-
-    // 8. Abrir ventana de impresión
-    const printWindow = window.open('', '_blank', 'width=550,height=850')
+    // 1. Abrir ventana de impresión INMEDIATAMENTE para respuesta visual instantánea
+    const printWindow = window.open('', '_blank', 'width=580,height=880')
     if (!printWindow) {
-        alert('No se pudo abrir la ventana de impresión. Por favor verificá que el navegador no bloquee pop-ups.')
+        alert('Por favor permite las ventanas emergentes (popups) para abrir la etiqueta de impresión.')
         return
     }
 
     printWindow.document.open()
-    printWindow.document.write(html)
-    printWindow.document.close()
+    printWindow.document.write(LOADING_HTML)
 
-    // Autodisparo de impresión cuando las imágenes carguen
-    printWindow.onload = () => {
-        const images = printWindow.document.querySelectorAll('img')
-        if (images.length === 0) {
-            return
+    try {
+        const firstOrder = orders[0]
+
+        // 2. Proyecto / Etiqueta / Nombre Trabajo
+        const projectName = orders
+            .map(o => (o.nombreTarea || o.loteNombre || '').trim())
+            .find(n => n.length > 0) || ''
+
+        // 3. Destinatario (Cliente)
+        const clientName = (firstOrder.clienteNombre || firstOrder.clientName || '').trim()
+
+        // 4. Dirección del cliente
+        let address = ''
+        try {
+            const clients = getClientes()
+            const client = clients.find(c =>
+                (firstOrder.clientId && c.id === firstOrder.clientId) ||
+                (clientName && c.nombre.trim().toLowerCase() === clientName.toLowerCase())
+            )
+            if (client?.direccion?.trim()) {
+                address = client.direccion.trim()
+            }
+        } catch (e) {
+            console.warn('[Label] Could not lookup client address in local DB:', e)
         }
-        const decodePromises = Array.from(images).map(img =>
-            img.decode().catch(() => { /* ignorar fallos de decode */ })
-        )
-        Promise.all(decodePromises).then(() => {
-            // Imágenes cargadas y listas
+
+        if (!address) {
+            const orderWithObs = orders.find(o => o.observaciones2?.trim() || o.observaciones?.trim())
+            if (orderWithObs) {
+                const obs2 = (orderWithObs.observaciones2 || '').trim()
+                const obs1 = (orderWithObs.observaciones || '').trim()
+                if (obs2) {
+                    address = obs2
+                } else if (/calle|av\.|avenida|barrio|piso|depto|altura|entre|b°|direcci/i.test(obs1)) {
+                    address = obs1
+                }
+            }
+        }
+
+        // 5. Material
+        const materials = Array.from(new Set(orders.map(o => o.material).filter(Boolean)))
+        const material = materials.join(' / ')
+
+        // 6. Recopilar archivos reales (usando order.archivos como clave y order.archivosOriginales como nombre)
+        const allFiles: { name: string; url: string; ancho?: number; alto?: number; copias?: number }[] = []
+        for (const order of orders) {
+            const filesList = order.archivos && order.archivos.length > 0 ? order.archivos : []
+            if (filesList.length > 0) {
+                filesList.forEach((fileKey, idx) => {
+                    const displayName = order.archivosOriginales?.[idx] || fileKey.split('/').pop() || `Archivo ${idx + 1}`
+                    const url = resolveMediaUrl(fileKey)
+                    allFiles.push({
+                        name: sanitizeFileName(displayName),
+                        url,
+                        ancho: order.ancho,
+                        alto: order.alto,
+                        copias: order.copias,
+                    })
+                })
+            } else if (order.imgMetadata?.thumbnailUrl) {
+                const displayName = order.archivosOriginales?.[0] || order.nombreTarea || 'Archivo'
+                allFiles.push({
+                    name: sanitizeFileName(displayName),
+                    url: resolveMediaUrl(order.imgMetadata.thumbnailUrl),
+                    ancho: order.ancho,
+                    alto: order.alto,
+                    copias: order.copias,
+                })
+            } else if (order.ancho || order.alto || order.conceptoPersonalizado || order.descripcionItem) {
+                allFiles.push({
+                    name: order.descripcionItem || order.conceptoPersonalizado || order.nombreTarea || order.material || 'Trabajo sin archivo',
+                    url: '',
+                    ancho: order.ancho,
+                    alto: order.alto,
+                    copias: order.copias,
+                })
+            }
+        }
+
+        // 7. Optimizar miniaturas de forma asíncrona y rápida (timeout 3.5s)
+        const uniqueUrls = Array.from(new Set(allFiles.map(f => f.url).filter(Boolean)))
+        let urlMap = new Map<string, string>()
+
+        if (uniqueUrls.length > 0) {
+            try {
+                const optimizedUrls = await batchOptimizePdfThumbnails(uniqueUrls, {
+                    maxWidth: 320,
+                    maxHeight: 320,
+                    quality: LABEL_CONFIG.thumbQuality,
+                    timeoutMs: 3500,
+                })
+                urlMap = new Map(uniqueUrls.map((u, i) => [u, optimizedUrls[i] || u]))
+            } catch (e) {
+                console.warn('[Label] Thumbnail optimization fallback:', e)
+            }
+        }
+
+        // Preparar items con URLs optimizadas
+        const items: LabelFileItem[] = allFiles.map(f => ({
+            name: f.name,
+            dimensions: formatDimensions(f.ancho, f.alto, f.copias),
+            thumbUrl: f.url ? (urlMap.get(f.url) || f.url) : '',
+        }))
+
+        // 8. Generar HTML completo
+        const html = buildLabelHtml({
+            projectName,
+            clientName,
+            material,
+            address,
+            items,
         })
+
+        // 9. Reemplazar contenido del loader con el HTML final
+        printWindow.document.open()
+        printWindow.document.write(html)
+        printWindow.document.close()
+
+    } catch (err) {
+        console.error('[Label] Error generating production label:', err)
+        printWindow.document.open()
+        printWindow.document.write(`
+            <div style="font-family:sans-serif;padding:30px;color:#ef4444;text-align:center;">
+                <h3>Error al generar la etiqueta</h3>
+                <p>${String(err)}</p>
+                <button onclick="window.close()" style="padding:8px 16px;cursor:pointer;">Cerrar</button>
+            </div>
+        `)
+        printWindow.document.close()
     }
 }
 
@@ -494,45 +577,59 @@ function buildLabelHtml(data: LabelData): string {
     // Secciones condicionales: se omiten por completo si no hay datos
     const clientSection = clientName ? `
         <div class="label-section">
-            <p class="label-section-title">Destinatario</p>
+            <p class="label-section-header">DESTINATARIO</p>
             <p class="label-section-value">${escHtml(clientName)}</p>
         </div>
     ` : ''
 
     const addressSection = address ? `
         <div class="label-section">
-            <p class="label-section-title">Dirección</p>
-            <p class="label-section-value">${escHtml(address)}</p>
+            <p class="label-section-header">DIRECCIÓN</p>
+            <p class="label-section-address">${escHtml(address)}</p>
         </div>
     ` : ''
 
-    const materialText = material ? `
-        <p class="label-material">${escHtml(material)}</p>
+    const materialBadge = material ? `
+        <div><span class="label-material">${escHtml(material)}</span></div>
     ` : ''
 
     // Bloque de Proyecto & Fecha
-    const infoHeaderHtml = `
-        <div class="label-info">
-            ${projectName ? `<p class="project-name">${escHtml(projectName)}</p>` : ''}
-            <p class="label-date">Fecha: ${todayFormatted()}</p>
-            ${materialText}
+    const hasProjectHeader = Boolean(projectName || material)
+    const projectBlockHtml = hasProjectHeader ? `
+        <div class="label-project-block">
+            ${projectName ? `<h1 class="project-title">${escHtml(projectName)}</h1>` : ''}
+            <div class="project-meta">
+                <span>📅 Fecha: <strong>${todayFormatted()}</strong></span>
+            </div>
+            ${materialBadge}
+        </div>
+    ` : `
+        <div style="text-align:center;font-weight:700;color:#64748b;font-size:12px;margin-bottom:6px;">
+            Fecha: ${todayFormatted()}
         </div>
     `
 
     // Grilla de miniaturas
     const thumbsHtml = items.length > 0 ? `
         <div class="dotted-divider"></div>
-        <p class="thumbs-title">Detalle de Archivos</p>
+        <div class="detail-header">
+            <p class="detail-title">DETALLE DE ARCHIVOS</p>
+            <span class="detail-count">${items.length} ${items.length === 1 ? 'ítem' : 'ítems'}</span>
+        </div>
         <div class="thumbs-grid">
             ${items.map(item => `
                 <div class="thumb-card">
-                    ${item.thumbUrl ? `
-                        <img src="${item.thumbUrl}" alt="${escHtml(item.name)}" loading="eager" />
-                    ` : `
-                        <div class="thumb-no-img"><span>📄</span></div>
-                    `}
-                    <p class="thumb-name">${escHtml(item.name)}</p>
-                    ${item.dimensions ? `<p class="thumb-dims">${escHtml(item.dimensions)}</p>` : ''}
+                    <div class="img-container">
+                        ${item.thumbUrl ? `
+                            <img src="${item.thumbUrl}" alt="" loading="eager" />
+                        ` : `
+                            <div class="thumb-no-img">📄</div>
+                        `}
+                    </div>
+                    <div>
+                        <p class="thumb-name">${escHtml(item.name)}</p>
+                        ${item.dimensions ? `<span class="thumb-dims-badge">${escHtml(item.dimensions)}</span>` : ''}
+                    </div>
                 </div>
             `).join('')}
         </div>
@@ -556,32 +653,29 @@ function buildLabelHtml(data: LabelData): string {
     </div>
 
     <div class="label-page">
-        <!-- Logo XignuX -->
+        <!-- Logo Oficial XignuX Prominente -->
         <div class="label-logo">
-            <img src="${XIGNUX_LOGO_LIGHT}" alt="XignuX" />
-            <p class="brand-name">XignuX</p>
-            <p class="brand-tagline">Graficamos Arte</p>
+            <img src="${XIGNUX_LOGO_LIGHT}" alt="XignuX — Graficamos Arte" />
         </div>
 
         <div class="dotted-divider"></div>
 
-        <!-- Info Header (Proyecto, Fecha, Material) -->
-        ${infoHeaderHtml}
+        <!-- Bloque de Proyecto & Fecha -->
+        ${projectBlockHtml}
 
         <div class="dotted-divider"></div>
 
-        <!-- Destinatario & Dirección (solo si existen) -->
+        <!-- Destinatario & Dirección -->
         ${clientSection}
         ${addressSection}
 
         <!-- Detalle de Archivos -->
         ${thumbsHtml}
 
-        <!-- Footer -->
+        <!-- Footer Oficial -->
         <div class="label-footer">
             <p class="footer-whatsapp">
-                <span>📱 WhatsApp:</span>
-                <span>${escHtml(LABEL_CONFIG.whatsapp)}</span>
+                <span>📱 WhatsApp: ${escHtml(LABEL_CONFIG.whatsapp)}</span>
             </p>
             <p class="footer-web">${escHtml(LABEL_CONFIG.website)}</p>
         </div>
