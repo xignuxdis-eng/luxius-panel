@@ -1060,34 +1060,46 @@ def process_telegram_photo_message(chat_id: int | str, photo_list: list, caption
             "3. Conclusión o recomendación técnica para producción o administración."
         )
 
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={gemini_key}"
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": b64_img
+        models_cascade = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-lite-latest']
+        analysis = ""
+        for model in models_cascade:
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "inline_data": {
+                                    "mime_type": "image/jpeg",
+                                    "data": b64_img
+                                }
+                            },
+                            {
+                                "text": prompt
                             }
-                        },
-                        {
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
-        }
+                        ]
+                    }
+                ]
+            }
 
-        g_resp = requests.post(gemini_url, json=payload, timeout=20)
-        if g_resp.ok:
-            data = g_resp.json()
-            cands = data.get('candidates', [])
-            if cands:
-                analysis = cands[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                reply = f"👁️ *Análisis Visual de Xana:*\n\n{analysis}"
-                send_telegram_message(chat_id, reply)
-                return {"ok": True, "analysis": analysis}
+            try:
+                g_resp = requests.post(gemini_url, json=payload, timeout=22)
+                if g_resp.ok:
+                    data = g_resp.json()
+                    cands = data.get('candidates', [])
+                    if cands:
+                        analysis = cands[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                        if analysis:
+                            break
+                else:
+                    print(f"[telegram photo analysis] Modelo {model} falló con HTTP {g_resp.status_code}", file=sys.stderr)
+            except Exception as e:
+                print(f"[telegram photo analysis] Excepción con modelo {model}: {e}", file=sys.stderr)
+
+        if analysis:
+            reply = f"👁️ *Análisis Visual de Xana:*\n\n{analysis}"
+            send_telegram_message(chat_id, reply)
+            return {"ok": True, "analysis": analysis}
 
         send_telegram_message(chat_id, "⚠️ Recibí la imagen pero no pude completar el análisis visual en este momento.")
         return {"ok": False, "error": "gemini_error"}
@@ -1125,7 +1137,7 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
 
         # 2. Descargar audio binario
         download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
-        audio_resp = requests.get(download_url, timeout=15)
+        audio_resp = requests.get(download_url, timeout=20)
         if not audio_resp.ok:
             send_telegram_message(chat_id, "❌ Falló la descarga del mensaje de voz.")
             return {"ok": False, "error": "audio_download_failed"}
@@ -1133,7 +1145,20 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
         audio_bytes = audio_resp.content
         b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
 
-        # 3. Invocar Gemini Multimodal en cascada
+        # Normalizar MIME type para compatibilidad con Gemini Audio API
+        raw_mime = (mime_type or 'audio/ogg').split(';')[0].strip().lower()
+        if raw_mime in ('audio/oga', 'audio/opus'):
+            eff_mime = 'audio/ogg'
+        elif raw_mime in ('audio/mp3', 'audio/mpeg'):
+            eff_mime = 'audio/mp3'
+        elif raw_mime in ('audio/wav', 'audio/x-wav'):
+            eff_mime = 'audio/wav'
+        elif raw_mime in ('audio/m4a', 'audio/x-m4a', 'audio/aac'):
+            eff_mime = 'audio/aac'
+        else:
+            eff_mime = 'audio/ogg'
+
+        # 3. Invocar Gemini Multimodal en cascada inteligente
         prompt_text = (
             "Sos Xana, el asistente de inteligencia operativa de LuXius System para XignuX Gráfica (imprenta digital y gigantografía).\n"
             "Escuchá con atención este mensaje de voz del operario/dueño y respondé estructuradamente con el siguiente formato exacto:\n\n"
@@ -1148,7 +1173,13 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
             "RESPUESTA: <tu respuesta ejecutiva, cordial y directa al usuario>\n"
         )
 
-        models_cascade = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro']
+        models_cascade = [
+            'gemini-3.5-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.6-flash',
+            'gemini-flash-lite-latest',
+            'gemini-3.1-flash-lite'
+        ]
         ai_text = ""
         success_model = None
 
@@ -1160,7 +1191,7 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
                         "parts": [
                             {
                                 "inline_data": {
-                                    "mime_type": mime_type or "audio/ogg",
+                                    "mime_type": eff_mime,
                                     "data": b64_audio
                                 }
                             },
@@ -1173,19 +1204,24 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
             }
 
             try:
-                g_resp = requests.post(gemini_url, json=payload, timeout=18)
+                g_resp = requests.post(gemini_url, json=payload, timeout=25)
                 if g_resp.ok:
                     data = g_resp.json()
                     cands = data.get('candidates', [])
                     if cands:
-                        ai_text = cands[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                        if ai_text:
-                            success_model = model
-                            break
+                        parts = cands[0].get('content', {}).get('parts', [])
+                        if parts:
+                            ai_text = parts[0].get('text', '')
+                            if ai_text:
+                                success_model = model
+                                break
+                else:
+                    print(f"[telegram audio] Modelo {model} falló con HTTP {g_resp.status_code}: {g_resp.text[:120]}", file=sys.stderr)
             except Exception as e:
-                print(f"[telegram audio] Error con modelo {model}: {e}", file=sys.stderr)
+                print(f"[telegram audio] Excepción con modelo {model}: {e}", file=sys.stderr)
 
         if not ai_text:
+            print(f"[telegram audio] Falla total: ninguno de los {len(models_cascade)} modelos pudo procesar el audio.", file=sys.stderr)
             send_telegram_message(chat_id, "⚠️ No pude transcribir el audio en este momento. Por favor intentá de nuevo o escribí el comando en texto.")
             return {"ok": False, "error": "transcription_failed"}
 
@@ -1198,10 +1234,32 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
         action = action_match.group(1).strip() if action_match else ""
         response_body = response_match.group(1).strip() if response_match else ai_text.strip()
 
-        # Si se detectó acción de CREAR_TAREA
+        # Detección inteligente de intenciones (con fallback sobre transcripción y texto completo)
+        full_text = f"{transcription} {action} {response_body}"
+        full_text_lower = full_text.lower()
+        act_upper = action.upper()
+
+        target_ot = ""
+        # 1. Si action tiene código explícito (ej: FOTO_OT: 104)
+        if ":" in action and any(k in act_upper for k in ("FOTO_OT:", "PDF_OT:")):
+            target_ot = action.split(":", 1)[1].strip()
+
+        # 2. Si no se extrajo de action, buscar en el texto respetando límites de palabra
+        if not target_ot:
+            ot_search = re.search(r'\b(?:ot[\s\-_:#]*|orden[\s\-_:#]+|#\s*)([a-zA-Z0-9]{2,12})\b', full_text_lower)
+            if ot_search:
+                candidate = ot_search.group(1).strip()
+                if candidate not in ('de', 'del', 'la', 'el', 'un', 'una', 'urgente', 'activa'):
+                    target_ot = candidate
+
+        # Tarea
         task_created_msg = ""
-        if "CREAR_TAREA:" in action.upper():
-            task_title = action.split(":", 1)[1].strip()
+        if "CREAR_TAREA:" in act_upper or any(k in full_text_lower for k in ('anotar tarea', 'crear tarea', 'recordame', 'recordatorio')):
+            task_title = ""
+            if "CREAR_TAREA:" in act_upper:
+                task_title = action.split(":", 1)[1].strip()
+            elif transcription:
+                task_title = transcription
             if task_title:
                 res_task = cmd_addtask(task_title, source="telegram_voice")
                 task_created_msg = f"\n\n{res_task}"
@@ -1214,16 +1272,13 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
         send_telegram_message(chat_id, final_msg)
 
         # Ejecución proactiva si pidió Foto, PDF, Taller o Briefing
-        act_upper = action.upper()
-        if "FOTO_OT:" in act_upper:
-            target_ot = action.split(":", 1)[1].strip()
+        if any(k in full_text_lower for k in ('foto', 'imagen', 'arte', 'diseño')) or "FOTO_OT" in act_upper:
             cmd_foto(chat_id, target_ot)
-        elif "PDF_OT:" in act_upper:
-            target_ot = action.split(":", 1)[1].strip()
+        elif any(k in full_text_lower for k in ('pdf', 'remito', 'ficha')) or "PDF_OT" in act_upper:
             cmd_pdf(chat_id, target_ot)
-        elif act_upper == "TALLER":
+        elif "TALLER" in act_upper or any(k in full_text_lower for k in ('taller', 'cola de impresión', 'cola de impresion', 'para imprimir', 'máquinas', 'impresoras')):
             send_telegram_message(chat_id, cmd_taller())
-        elif act_upper == "BRIEFING":
+        elif "BRIEFING" in act_upper or any(k in full_text_lower for k in ('briefing', 'resumen matutino', 'resumen del día', 'cómo arrancamos', 'arranque')):
             send_telegram_message(chat_id, cmd_briefing())
 
         return {"ok": True, "transcription": transcription, "model": success_model}

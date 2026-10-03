@@ -611,6 +611,25 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Frontend verificado (`npm run build` en 6.94s).
   - Backend verificado con pruebas unitarias para descarga de R2, compresión de imágenes y generación de PDF.
 
+### Sesión 03/10/2026 (6ª parte): Resolución de Transcripción de Audio en Telegram Bot y Resiliencia Gemini Multimodal (completado)
+- [x] **Diagnóstico de Falla en Notas de Voz**:
+  - Al enviar audios desde smartwatch o móvil pidiendo fotos, PDFs o instrucciones, el bot respondía `"No pude transcribir el audio en este momento. Por favor intentá de nuevo o escribí el comando en texto."`.
+  - Causa raíz identificada empíricamente:
+    1. `models_cascade = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro']`: `gemini-2.5-pro` arrojaba HTTP 404 (modelo deprecado en 2026); `gemini-flash-latest` arrojaba HTTP 503 por alta demanda; y `gemini-3.5-flash` sufría rate limiting intermitente (HTTP 429 por agotamiento de cuota por minuto).
+    2. Al fallar los 3 modelos silenciosamente, `ai_text` quedaba vacío, activando el mensaje genérico de error.
+    3. Normalización MIME: los audios enviados por Telegram (`voice` en contenedor OGG con codec Opus o nombres `.oga`) requerían normalización canónica a `audio/ogg` y descarte de sufijos como `; codecs=opus`.
+- [x] **Cascada Resiliente de Modelos Gemini Audio & Visión**:
+  - Actualización de la cascada con modelos operativos certificados: `['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite']`.
+  - `gemini-3.5-flash-lite` y `gemini-3.1-flash-lite` comprobados con tiempos de respuesta de 1.7s a 2.6s con pools de cuota separados, respondiendo inmediatamente cuando `3.5-flash` recibe 429 o 503.
+  - Aumento de timeout de red a 25 segundos para procesamiento holgado de audio binario.
+  - Aplicada idéntica protección en cascada para el análisis de fotografías (`process_telegram_photo_message`).
+- [x] **Detección Inteligente de Intenciones por Voz con Fallback**:
+  - Extracción robusta de intenciones ante respuestas conversacionales del LLM: búsqueda de límites de palabra `\b` para códigos de orden (`OT-XXX`, `orden 104`, `#876`) evitando falsos positivos en palabras como "foto".
+  - Despacho automático directo de `/foto`, `/pdf`, `/taller` y `/briefing` ante comandos hablados desde reloj o móvil.
+- [x] **Sincronización Total y Despliegue**:
+  - `services/telegram_service.py` sincronizado al 100% entre `luXius-Backend` y `Sitio XignuX/server`.
+  - Verificado con test de integración simulado (`test_voice_flow.py`) con fallback exitoso y verificado.
+
 ---
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
