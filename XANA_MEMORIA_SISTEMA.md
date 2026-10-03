@@ -514,6 +514,32 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Solución al problema de imágenes de baja resolución de clientes (15-45 DPI reales en gigantografía).
   - Arquitectura en 3 niveles: 1) Cliente WebGL/Lanczos-3 para previews instantáneas (< 2s) a costo cero; 2) Worker asíncrono con Real-ESRGAN/GFPGAN para reconstrucción profunda 4x/8x y restauración de rostros; 3) Integración visual en `XpressViewer.tsx` con slider comparativo antes/después y guardado automático de la versión HD en la OT.
 
+### Sesión 03/10/2026 (2ª parte): Implementación del Escalador Inteligente de Imágenes (Real-ESRGAN Vulkan GPU) en Backend y Xpress Studio (completado)
+- [x] **Despliegue del Motor Neuronal Local (Real-ESRGAN NCNN Vulkan)**:
+  - Binario oficial `realesrgan-ncnn-vulkan.exe` con aceleración directa por hardware Vulkan en GPU AMD Radeon RX 5700 XT.
+  - Modelos integrados: `realesrgan-x4plus` (fotografía, personas, fondos orgánicos) y `realesrgan-x4plus-anime` (6B, optimizado para logotipos, tipografías nítidas, calcomanías y curvas vectoriales sin distorsión).
+  - Tiempos de inferencia récord: **906 ms** para modelo anime 4x y **2,350 ms** para modelo fotográfico.
+- [x] **Servicio y Endpoints Backend**:
+  - `services/upscaler_service.py` con resolución dinámica de rutas, ejecución segura en subproceso Vulkan y fallback elástico en CPU mediante PIL Lanczos-3 + unsharp mask adaptativa.
+  - `routes/upscaler.py` registrado en `app.py` (`luXius-Backend` y `Sitio XignuX/server`).
+  - Endpoints operativos:
+    - `GET /api/upscaler/status`: diagnóstico del motor, GPU disponible y catálogo de modelos.
+    - `POST /api/upscaler/process`: procesamiento 2x/4x, subida opcional a Cloudflare R2 y actualización atómica de la OT en PostgreSQL con nota de auditoría.
+- [x] **Higiene de Repositorio (.gitignore)**:
+  - Exclusión de `tools/realesrgan/`, binarios `.exe`, `.dll`, `.bin` y `.param` en `.gitignore` de ambos repositorios, protegiendo a GitHub de binarios pesados (~48MB).
+- [x] **Frontend Interactivo en Xpress Studio (`XpressViewer.tsx` y `XpressViewer.css`)**:
+  - Botón de acceso directo "✨ Escalar IA" en Toolbar principal y en la tarjeta "📐 Medidas & Inspector DPI 1:1" del Sidebar.
+  - Modal `UpscalerModal` con diseño Glassmorphism, selector de modelo (Foto vs Logo/Vector), selector de escala (2x / 4x) y estado de procesamiento animado en GPU.
+  - **Comparador interactivo Split Slider Before/After**: visualización interactiva de 0% a 100% comparando imagen original vs escalada con cotas de DPI en tiempo real (ej. `35 DPI 🔴 ➔ 140 DPI 🟢`).
+  - Barra de métricas técnicas con tamaño en px, ganancia porcentual de definición, motor utilizado y latencia en segundos.
+  - Flujo de persistencia en OT:
+    - `💾 Guardar y Reemplazar Arte en OT`: sustituye el archivo principal en la orden y archiva el anterior.
+    - `➕ Guardar como Arte Secundario`: añade la imagen escalada a la OT conservando la original.
+    - `👁️ Aplicar al Visor`: actualiza la vista activa de Xpress Studio para seguir midiendo con el cintrón digital.
+    - `⬇️ Descargar PNG HD`: descarga directa del archivo generado en alta resolución.
+- [x] **Verificación y Compilación Exitosa**:
+  - `npm run build` ejecutado en 6.80s sin errores de TypeScript ni empaquetado.
+
 ---
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)

@@ -66,3 +66,11 @@ test*.cdr
 Thumbs.db
 
 CLOUDFLARE_R2_CREDENTIALS.txt
+
+# Modelos IA y binarios pesados (Real-ESRGAN NCNN Vulkan)
+server/tools/realesrgan/
+tools/realesrgan/
+*.bin
+*.param
+*.exe
+*.dll

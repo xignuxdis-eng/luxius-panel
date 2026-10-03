@@ -98,6 +98,28 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const [isUpdatingOrder, setIsUpdatingOrder] = useState<boolean>(false);
     const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
 
+    // Super-Resolución IA (Real-ESRGAN Vulkan)
+    const [showUpscalerModal, setShowUpscalerModal] = useState<boolean>(false);
+    const [upscalerModel, setUpscalerModel] = useState<'realesrgan-x4plus' | 'realesrgan-x4plus-anime'>('realesrgan-x4plus');
+    const [upscalerScale, setUpscalerScale] = useState<2 | 4>(4);
+    const [isUpscaling, setIsUpscaling] = useState<boolean>(false);
+    const [upscaleStatus, setUpscaleStatus] = useState<string>('');
+    const [upscaleError, setUpscaleError] = useState<string | null>(null);
+    const [upscaledResult, setUpscaledResult] = useState<{
+        originalUrl: string;
+        upscaledUrl: string;
+        originalDims: { width: number; height: number };
+        upscaledDims: { width: number; height: number };
+        originalDpi: number;
+        targetDpi: number;
+        engine: string;
+        elapsedMs: number;
+        fileUrl?: string;
+    } | null>(null);
+    const [upscalerSplitPos, setUpscalerSplitPos] = useState<number>(50);
+    const [isSavingUpscale, setIsSavingUpscale] = useState<boolean>(false);
+    const [upscaleSaveFeedback, setUpscaleSaveFeedback] = useState<string | null>(null);
+
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -396,6 +418,174 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             console.error('[XpressViewer] Error rebotando orden:', err);
         } finally {
             setIsUpdatingOrder(false);
+        }
+    };
+
+    // Disparador de Super-Resolución IA (Real-ESRGAN Vulkan)
+    const handleRunUpscale = async () => {
+        if (!previewUrl && !file) return;
+        setIsUpscaling(true);
+        setUpscaleStatus('Conectando con motor neuronal Vulkan...');
+        setUpscaleError(null);
+        setUpscaleSaveFeedback(null);
+
+        const startTime = Date.now();
+        try {
+            let res: Response;
+            if (file) {
+                setUpscaleStatus('Cargando archivo original en GPU...');
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('scale', String(upscalerScale));
+                formData.append('model', upscalerModel);
+                if (order?.id) {
+                    formData.append('orderId', String(order.id));
+                }
+                res = await fetch(`${API_URL}/upscaler/process`, {
+                    method: 'POST',
+                    body: formData,
+                });
+            } else {
+                setUpscaleStatus('Enviando imagen al motor Real-ESRGAN...');
+                res = await fetch(`${API_URL}/upscaler/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageUrl: previewUrl,
+                        scale: upscalerScale,
+                        model: upscalerModel,
+                        orderId: order?.id,
+                    }),
+                });
+            }
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Error ${res.status} en el escalador`);
+            }
+
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Fallo al procesar la imagen con IA');
+            }
+
+            const origW = data.originalDims?.width || metadata?.width || 800;
+            const origH = data.originalDims?.height || metadata?.height || 800;
+            const upW = data.upscaledDims?.width || origW * upscalerScale;
+            const upH = data.upscaledDims?.height || origH * upscalerScale;
+
+            const inchesW = targetWidthMeters * 39.3700787;
+            const origDpi = Math.round(origW / inchesW);
+            const newDpi = Math.round(upW / inchesW);
+
+            setUpscaledResult({
+                originalUrl: previewUrl || '',
+                upscaledUrl: data.dataUrl || data.fileUrl,
+                originalDims: { width: origW, height: origH },
+                upscaledDims: { width: upW, height: upH },
+                originalDpi: origDpi > 0 ? origDpi : calculatedDpi,
+                targetDpi: newDpi > 0 ? newDpi : calculatedDpi * upscalerScale,
+                engine: data.engine || 'Real-ESRGAN Vulkan GPU',
+                elapsedMs: data.elapsedMs || (Date.now() - startTime),
+                fileUrl: data.fileUrl,
+            });
+        } catch (err: any) {
+            console.error('[Upscaler] Error procesando imagen:', err);
+            setUpscaleError(err.message || 'Error desconocido al escalar con IA');
+        } finally {
+            setIsUpscaling(false);
+        }
+    };
+
+    // Aplicar arte escalado al visor principal
+    const handleApplyUpscaleToViewer = () => {
+        if (!upscaledResult) return;
+        setPreviewUrl(upscaledResult.upscaledUrl);
+        setMetadata((prev: any) => ({
+            ...(prev || {}),
+            width: upscaledResult.upscaledDims.width,
+            height: upscaledResult.upscaledDims.height,
+            dpi: upscaledResult.targetDpi,
+            source: 'Real-ESRGAN IA HD',
+            name: `${prev?.name?.replace(/\.[^/.]+$/, '') || 'arte'}_upscaled_${upscalerScale}x.png`
+        }));
+        setActionSuccessMessage(`✨ ¡Arte escalado ${upscalerScale}x aplicado al visor! (${upscaledResult.targetDpi} DPI)`);
+        setTimeout(() => setActionSuccessMessage(null), 4000);
+        setShowUpscalerModal(false);
+    };
+
+    // Descargar imagen HD generada
+    const handleDownloadUpscaled = () => {
+        if (!upscaledResult) return;
+        const link = document.createElement('a');
+        link.href = upscaledResult.upscaledUrl;
+        const base = metadata?.name?.replace(/\.[^/.]+$/, '') || 'arte';
+        link.download = `${base}_upscaled_${upscalerScale}x_${upscalerModel === 'realesrgan-x4plus' ? 'foto' : 'vector'}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // Guardar arte escalado en la orden de trabajo (Reemplazar o Secundario)
+    const handleSaveUpscaleToOrder = async (replaceInOrder: boolean) => {
+        if (!order || !upscaledResult) return;
+        setIsSavingUpscale(true);
+        setUpscaleSaveFeedback(null);
+        try {
+            const newFileUrl = upscaledResult.fileUrl || upscaledResult.upscaledUrl;
+            const base = metadata?.name?.replace(/\.[^/.]+$/, '') || 'arte';
+            const newFileName = `${base}_upscaled_${upscalerScale}x.png`;
+
+            const currentArchivos = Array.isArray(order.archivos) ? [...order.archivos] : [];
+            const currentOriginales = Array.isArray(order.archivosOriginales) ? [...order.archivosOriginales] : [];
+
+            let updatedArchivos: string[];
+            let updatedOriginales: string[];
+
+            if (replaceInOrder) {
+                const restArchivos = currentArchivos.slice(1);
+                const restOriginales = currentOriginales.slice(1);
+                updatedArchivos = [newFileUrl, ...restArchivos];
+                updatedOriginales = [newFileName, ...restOriginales];
+            } else {
+                updatedArchivos = [...currentArchivos, newFileUrl];
+                updatedOriginales = [...currentOriginales, newFileName];
+            }
+
+            const now = new Date();
+            const logNote = `\n[${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ✨ Super-Resolución Real-ESRGAN ${upscalerScale}x aplicada: ${upscaledResult.upscaledDims.width}x${upscaledResult.upscaledDims.height} px (${upscaledResult.targetDpi} DPI).`;
+            const newObs = (order.observaciones || '') + logNote;
+
+            const updatedOrder: Order = {
+                ...order,
+                archivos: updatedArchivos,
+                archivosOriginales: updatedOriginales,
+                observaciones: newObs,
+                imgMetadata: {
+                    ...(order.imgMetadata || {}),
+                    width: upscaledResult.upscaledDims.width,
+                    height: upscaledResult.upscaledDims.height,
+                    dpi: upscaledResult.targetDpi,
+                    format: 'PNG',
+                    colorMode: 'RGB (Real-ESRGAN HD)',
+                    thumbnailUrl: newFileUrl
+                },
+                updatedAt: new Date().toISOString()
+            };
+
+            const saved = await saveOrden(updatedOrder);
+            setOrder(saved);
+            setUpscaleSaveFeedback(replaceInOrder ? `✅ ¡Arte principal reemplazado en OT #${order.ot}!` : `✅ ¡Arte secundario añadido a OT #${order.ot}!`);
+            setActionSuccessMessage(replaceInOrder ? `✅ OT #${order.ot}: Arte actualizado con versión HD` : `✅ OT #${order.ot}: Arte secundario HD agregado`);
+            setTimeout(() => {
+                setUpscaleSaveFeedback(null);
+                setActionSuccessMessage(null);
+            }, 4000);
+        } catch (err) {
+            console.error('[Upscaler] Error guardando en orden:', err);
+            setUpscaleSaveFeedback('❌ Error al guardar en la orden');
+        } finally {
+            setIsSavingUpscale(false);
         }
     };
 
@@ -1179,6 +1369,30 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 <span>✏️</span>
                                 <span>Redrawer</span>
                             </button>
+                            <button 
+                                type="button"
+                                className="xpress-tool-btn" 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setShowUpscalerModal(true);
+                                }} 
+                                title="Super-Resolución IA (Real-ESRGAN Vulkan)"
+                                style={{
+                                    background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+                                    width: 'auto',
+                                    padding: '0 12px',
+                                    borderRadius: '18px',
+                                    fontWeight: 700,
+                                    fontSize: '0.78rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: '0 2px 10px rgba(6, 182, 212, 0.4)'
+                                }}
+                            >
+                                <span>✨</span>
+                                <span>Escalar IA</span>
+                            </button>
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>
                         </div>
@@ -1361,6 +1575,35 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                         <span>Vectorizar en Redrawer Studio</span>
                                     </button>
                                 )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUpscalerModal(true)}
+                                    style={{
+                                        marginTop: '10px',
+                                        width: '100%',
+                                        background: calculatedDpi < 150 
+                                            ? 'linear-gradient(135deg, #06b6d4 0%, #2563eb 100%)' 
+                                            : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                                        color: '#fff',
+                                        border: calculatedDpi < 150 ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        boxShadow: calculatedDpi < 150 ? '0 2px 12px rgba(6, 182, 212, 0.35)' : 'none',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    title="Aumentar resolución con IA Real-ESRGAN"
+                                >
+                                    <span>✨</span>
+                                    <span>Escalar con IA ({calculatedDpi < 150 ? 'Recomendado' : 'Real-ESRGAN'})</span>
+                                </button>
 
                                 {totalPages > 1 ? (
                                     <div className="xpress-meta-row" style={{ alignItems: 'center', marginTop: '8px' }}>
@@ -1705,6 +1948,361 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     >
                         {isUpdatingOrder ? 'Guardando...' : 'Confirmar Rebote Técnico'}
                     </button>
+                </div>
+            </div>
+        </div>
+    )}
+
+    {/* Modal de Super-Resolución IA (Real-ESRGAN Vulkan) */}
+    {showUpscalerModal && (
+        <div className="xpress-modal-overlay" onClick={() => !isUpscaling && setShowUpscalerModal(false)}>
+            <div className="xpress-upscaler-modal" onClick={(e) => e.stopPropagation()}>
+                {/* Cabecera */}
+                <div className="xpress-upscaler-header">
+                    <div>
+                        <h3 className="xpress-upscaler-title">
+                            <span>✨</span>
+                            <span>Super-Resolución IA (Real-ESRGAN)</span>
+                        </h3>
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>
+                            Restaura detalles perdidos y genera píxeles faltantes mediante Redes Neuronales Profundas.
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="xpress-upscaler-badge-gpu">
+                            <span>⚡</span>
+                            <span>Vulkan GPU Engine</span>
+                        </div>
+                        <button
+                            type="button"
+                            disabled={isUpscaling}
+                            onClick={() => setShowUpscalerModal(false)}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: isUpscaling ? 'not-allowed' : 'pointer' }}
+                            title="Cerrar modal"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                {/* Selección de Modelo y Factor de Escala */}
+                <div className="xpress-upscaler-grid-config">
+                    {/* Tarjeta Modelo Fotografía */}
+                    <div 
+                        className={`xpress-model-card ${upscalerModel === 'realesrgan-x4plus' ? 'selected' : ''}`}
+                        onClick={() => !isUpscaling && setUpscalerModel('realesrgan-x4plus')}
+                    >
+                        <div className="xpress-model-title">
+                            <span>📸 Fotografía / Cartelería</span>
+                            {upscalerModel === 'realesrgan-x4plus' && <span style={{ color: '#38bdf8', fontSize: '0.85rem' }}>✓ Seleccionado</span>}
+                        </div>
+                        <div className="xpress-model-desc">
+                            Modelo general <strong>RealESRGAN_x4plus</strong>. Ideal para retratos, banners comerciales, gigantografías y fotos de catálogo.
+                        </div>
+                    </div>
+
+                    {/* Tarjeta Modelo Anime / Vector / Logos */}
+                    <div 
+                        className={`xpress-model-card ${upscalerModel === 'realesrgan-x4plus-anime' ? 'selected' : ''}`}
+                        onClick={() => !isUpscaling && setUpscalerModel('realesrgan-x4plus-anime')}
+                    >
+                        <div className="xpress-model-title">
+                            <span>🎨 Logo / Tipografía / Calco</span>
+                            {upscalerModel === 'realesrgan-x4plus-anime' && <span style={{ color: '#38bdf8', fontSize: '0.85rem' }}>✓ Seleccionado</span>}
+                        </div>
+                        <div className="xpress-model-desc">
+                            Modelo <strong>RealESRGAN_x4plus_anime_6B</strong>. Elimina ruido sin agregar texturas orgánicas en logos, isotipos y textos nítidos.
+                        </div>
+                    </div>
+                </div>
+
+                {/* Selector de Escala y Botón de Ejecución */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600 }}>Factor de Escala:</span>
+                        <div className="xpress-scale-selector" style={{ padding: '4px 6px' }}>
+                            <button
+                                type="button"
+                                disabled={isUpscaling}
+                                className={`xpress-scale-pill ${upscalerScale === 2 ? 'selected' : ''}`}
+                                onClick={() => setUpscalerScale(2)}
+                            >
+                                2x (Doble Px)
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isUpscaling}
+                                className={`xpress-scale-pill ${upscalerScale === 4 ? 'selected' : ''}`}
+                                onClick={() => setUpscalerScale(4)}
+                            >
+                                4x (Ultra HD - Recomendado)
+                            </button>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        disabled={isUpscaling || (!previewUrl && !file)}
+                        onClick={handleRunUpscale}
+                        style={{
+                            background: isUpscaling 
+                                ? '#334155' 
+                                : 'linear-gradient(135deg, #06b6d4 0%, #2563eb 50%, #7c3aed 100%)',
+                            border: 'none',
+                            color: '#fff',
+                            padding: '10px 22px',
+                            borderRadius: '10px',
+                            fontWeight: 800,
+                            fontSize: '0.88rem',
+                            cursor: (isUpscaling || (!previewUrl && !file)) ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: isUpscaling ? 'none' : '0 4px 18px rgba(6, 182, 212, 0.4)',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        {isUpscaling ? (
+                            <>
+                                <div className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                                <span>{upscaleStatus || 'Procesando en GPU...'}</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>🚀</span>
+                                <span>{upscaledResult ? 'Volver a Procesar' : `Ejecutar Super-Resolución ${upscalerScale}x`}</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Mensaje de Error */}
+                {upscaleError && (
+                    <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>⚠️</span>
+                        <span>{upscaleError}</span>
+                    </div>
+                )}
+
+                {/* Área de Comparativa Before / After (Split Slider) */}
+                {upscaledResult && (
+                    <>
+                        <div 
+                            className="xpress-upscaler-comparison-container"
+                            onMouseMove={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                                setUpscalerSplitPos(Math.round((x / rect.width) * 100));
+                            }}
+                            onTouchMove={(e) => {
+                                if (e.touches.length > 0) {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const x = Math.max(0, Math.min(e.touches[0].clientX - rect.left, rect.width));
+                                    setUpscalerSplitPos(Math.round((x / rect.width) * 100));
+                                }
+                            }}
+                        >
+                            {/* Capa Izquierda: Original */}
+                            <img 
+                                src={upscaledResult.originalUrl} 
+                                alt="Original" 
+                                className="xpress-upscaler-layer"
+                            />
+                            <div className="xpress-upscaler-tag before">
+                                <span>🔴 Original: {upscaledResult.originalDpi} DPI ({upscaledResult.originalDims.width}×{upscaledResult.originalDims.height}px)</span>
+                            </div>
+
+                            {/* Capa Derecha: Escalada IA recortada */}
+                            <img 
+                                src={upscaledResult.upscaledUrl} 
+                                alt="Real-ESRGAN Escalada" 
+                                className="xpress-upscaler-layer"
+                                style={{
+                                    clipPath: `polygon(${upscalerSplitPos}% 0, 100% 0, 100% 100%, ${upscalerSplitPos}% 100%)`
+                                }}
+                            />
+                            <div className="xpress-upscaler-tag after">
+                                <span>🟢 Real-ESRGAN {upscalerScale}x: {upscaledResult.targetDpi} DPI ({upscaledResult.upscaledDims.width}×{upscaledResult.upscaledDims.height}px)</span>
+                            </div>
+
+                            {/* Línea Divisoria del Split */}
+                            <div 
+                                className="xpress-upscaler-divider"
+                                style={{ left: `${upscalerSplitPos}%` }}
+                            >
+                                <div className="xpress-upscaler-divider-handle">↔</div>
+                            </div>
+                        </div>
+
+                        {/* Slider Horizontal de Control Preciso */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 4px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#f87171', fontWeight: 700 }}>◀ 100% Original</span>
+                            <input 
+                                type="range"
+                                min={0}
+                                max={100}
+                                value={upscalerSplitPos}
+                                onChange={(e) => setUpscalerSplitPos(Number(e.target.value))}
+                                style={{ flex: 1, accentColor: '#38bdf8', cursor: 'ew-resize' }}
+                            />
+                            <span style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: 700 }}>100% Real-ESRGAN ▶</span>
+                        </div>
+
+                        {/* Barra de Métricas Técnicas */}
+                        <div className="xpress-upscaler-metrics-bar">
+                            <div className="xpress-metric-box">
+                                <span className="xpress-metric-label">Matriz Inicial</span>
+                                <span className="xpress-metric-value" style={{ color: '#cbd5e1' }}>
+                                    {upscaledResult.originalDims.width} × {upscaledResult.originalDims.height} px
+                                </span>
+                            </div>
+                            <div className="xpress-metric-box">
+                                <span className="xpress-metric-label">Nueva Resolución</span>
+                                <span className="xpress-metric-value" style={{ color: '#38bdf8' }}>
+                                    {upscaledResult.upscaledDims.width} × {upscaledResult.upscaledDims.height} px
+                                </span>
+                            </div>
+                            <div className="xpress-metric-box">
+                                <span className="xpress-metric-label">Definición 1:1</span>
+                                <span className="xpress-metric-value" style={{ color: upscaledResult.targetDpi >= 150 ? '#34d399' : '#f59e0b' }}>
+                                    {upscaledResult.originalDpi} DPI ➔ {upscaledResult.targetDpi} DPI
+                                </span>
+                            </div>
+                            <div className="xpress-metric-box">
+                                <span className="xpress-metric-label">Aceleración</span>
+                                <span className="xpress-metric-value" style={{ color: '#a78bfa', fontSize: '0.8rem' }}>
+                                    ⚡ {upscaledResult.engine.includes('Vulkan') ? 'Vulkan GPU' : 'CPU'} ({(upscaledResult.elapsedMs / 1000).toFixed(1)}s)
+                                </span>
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Feedback de Guardado */}
+                {upscaleSaveFeedback && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#34d399', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, textAlign: 'center' }}>
+                        {upscaleSaveFeedback}
+                    </div>
+                )}
+
+                {/* Botones de Acción */}
+                <div className="xpress-upscaler-actions">
+                    <button
+                        type="button"
+                        onClick={() => setShowUpscalerModal(false)}
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            color: '#cbd5e1',
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '0.84rem'
+                        }}
+                    >
+                        Cerrar
+                    </button>
+
+                    {upscaledResult && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleDownloadUpscaled}
+                                style={{
+                                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                                    border: 'none',
+                                    color: '#fff',
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '0.84rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 2px 8px rgba(2, 132, 199, 0.3)'
+                                }}
+                                title="Descargar archivo PNG en alta resolución"
+                            >
+                                <span>⬇️</span>
+                                <span>Descargar PNG HD</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleApplyUpscaleToViewer}
+                                style={{
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    border: 'none',
+                                    color: '#fff',
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '0.84rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)'
+                                }}
+                                title="Usar esta imagen HD en el visor actual"
+                            >
+                                <span>👁️</span>
+                                <span>Aplicar al Visor</span>
+                            </button>
+
+                            {order && (
+                                <>
+                                    <button
+                                        type="button"
+                                        disabled={isSavingUpscale}
+                                        onClick={() => handleSaveUpscaleToOrder(false)}
+                                        style={{
+                                            background: 'rgba(56, 189, 248, 0.15)',
+                                            border: '1px solid rgba(56, 189, 248, 0.4)',
+                                            color: '#38bdf8',
+                                            padding: '8px 16px',
+                                            borderRadius: '8px',
+                                            cursor: isSavingUpscale ? 'not-allowed' : 'pointer',
+                                            fontWeight: 700,
+                                            fontSize: '0.84rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px'
+                                        }}
+                                        title="Guardar versión HD como archivo complementario"
+                                    >
+                                        <span>➕</span>
+                                        <span>{isSavingUpscale ? 'Guardando...' : 'Guardar como Arte Secundario'}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={isSavingUpscale}
+                                        onClick={() => handleSaveUpscaleToOrder(true)}
+                                        style={{
+                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            border: 'none',
+                                            color: '#fff',
+                                            padding: '8px 18px',
+                                            borderRadius: '8px',
+                                            cursor: isSavingUpscale ? 'not-allowed' : 'pointer',
+                                            fontWeight: 800,
+                                            fontSize: '0.84rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            boxShadow: '0 2px 10px rgba(16, 185, 129, 0.4)'
+                                        }}
+                                        title="Reemplazar el arte original de la OT con esta versión escalada"
+                                    >
+                                        <span>💾</span>
+                                        <span>{isSavingUpscale ? 'Guardando...' : `Reemplazar Arte en OT #${order.ot}`}</span>
+                                    </button>
+                                </>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         </div>
