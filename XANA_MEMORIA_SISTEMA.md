@@ -174,12 +174,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Destinatario no estaba centrado en etiqueta de rollo** (**02/10/2026**) | El bloque de destinatario y dirección en la etiqueta física estaba alineado a la izquierda, perdiendo simetría con el logo y el bloque de proyecto centrados. | Se aplicó `text-align: center;` a `.label-section`, `.label-section-header`, `.label-section-value` y `.label-section-address` para lograr una composición estética completamente centrada y armónica. | `src/utils/generateLabelPdf.ts` |
 | **Botones de cabecera (Stock, Sincronizar, Arcade) ilegibles o desalineados** (**02/10/2026**) | `pixel-btn-warning` y `pixel-btn` carecían de CSS definido, renderizando texto negro sobre fondo oscuro en "STOCK" y "ARCADE", mientras "SINCRONIZAR" tenía estilos inline discordantes sin radio de borde. | Se crearon las clases `.header-action-btn` con variantes estilizadas `.header-stock-btn` (ámbar), `.header-sync-btn` (azul ciber) y `.header-arcade-btn` (violeta neón) con altura fija 36px, esquinas redondeadas, contrastes nítidos WCAG y compatibilidad con modo claro y modo pixel. | `src/components/layout/Header.tsx`<br>`src/components/layout/Header.css`<br>`src/styles/pixelart.css`<br>`src/components/layout/Sidebar.tsx`<br>`src/components/layout/Sidebar.css` |
 | **Ayuda visual para paños y órdenes con metros lineales > 2.93m (Laminado Especial)** (**02/10/2026**) | En producción, los paños gráficos que superan 2.93 metros lineales requieren un método de laminado especial. En la tabla de órdenes de Entrada y Reportes, todos los consumos se mostraban uniformemente en cian/azul sin advertencias de longitud. | Se implementó un indicador visual prominente con la paleta lila/morada de `Sistema Web` (`#c084fc`, `rgba(147, 51, 234, ...)`), borde brillante, brillo box-shadow, ícono `⚡`, badge `LAMINADO ESP.` y tooltip explicativo para cualquier orden o paño con metros lineales o dimensión > 2.93m. En la columna Medidas se resalta la cota que supera 2.93m, en los lotes cerrados se muestra el aviso de lote con paños especiales, y en la fila se añade acento lateral morado. | `src/pages/Entrada/Entrada.tsx`<br>`src/pages/Entrada/Entrada.css`<br>`src/pages/Reportes/Reportes.tsx` |
-
-
-
-
-
-
+| **Pipeline R2→Drive y Gestión Segura de Huérfanos** (**02/10/2026**) | Se acumulaban 680 archivos huérfanos (1.79 GB) en Cloudflare R2 sin orden asociada en BD. `sync_r2_to_drive.py` buscaba archivos solo con `(especificaciones -> 'archivos') ? filename` (perdiendo archivos en `archivosOriginales`, paths con prefijo o URLs), volcaba todos los huérfanos en una sola carpeta plana y saturaba el correo con 1 email por cada archivo. La consola Windows crasheaba con `UnicodeEncodeError`. En la web (`GoogleDriveView.tsx`) no había visibilidad ni control de la cola de huérfanos. | 1) Se comprobó que el 100% de los 680 huérfanos (1.79 GB) ya cuentan con backup en Google Drive y 0 colisión con presupuestos activos. 2) Se reescribió `resolve_orphans.py` con purga por lote (`--all`, `--ext`, `--dry-run`, menú interactivo), chunks de 500 y actualización atómica en PostgreSQL. 3) Se mejoró `sync_r2_to_drive.py` con búsqueda resiliente multi-fallback (`archivos`, `archivosOriginales`, `r2_key` y texto `LIKE %filename%`), carpetas mensuales en Drive (`_Huerfanos_SinClasificar/YYYY-MM/`), y notificación por email consolidada al finalizar (`send_orphan_batch_summary`). 4) Se agregaron endpoints `/vault/orphans` y `/vault/orphans/purge` en `luXius-Backend` (junto con fix de importación de `uuid`). 5) En `GoogleDriveView.tsx` se añadió tarjeta y tabla interactiva de "Cola de Huérfanos" con métricas en vivo, enlaces a Drive y botón de purga segura. 6) Se blindaron los scripts de terminal con `sys.stdout.reconfigure(encoding='utf-8')` contra `UnicodeEncodeError` en Windows. | `scripts/sync_r2_to_drive.py`<br>`scripts/resolve_orphans.py`<br>`src/pages/Sistema/GoogleDriveView.tsx`<br>`luXius-Backend/routes/google_drive.py` |
 
 ---
 
@@ -188,9 +183,9 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:
 
 1. **Estado Actual de Producción (02/10/2026)**:
-   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` están en el commit `6cce8e0`.
+   - **Backend Render**: Operativo al 100% (`https://luxius-backend.onrender.com/health` responde 200 OK). Ambas ramas `main` y `master` de `luXius-Backend` sincronizadas en GitHub con endpoints de auditoría y huérfanos.
    - **Frontend Web**: Publicado y funcional en `https://xignuxdis-eng.github.io/luxius-panel/` (rama `gh-pages` actualizada).
-   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Últimos commits de esta sesión (más reciente → más antiguo): `7697184` (alerta laminado especial >2.93m lila/morado), `77fd17c` (estilizar botones cabecera Stock/Sync/Arcade), `74fb912` (centrar destinatario en etiquetas rollo), `db647ff` (fijar ancho 105mm/210mm en PDFs sin estiramiento), `54df833` (Artegra Sans en LuXius branding), `44f60bc` (unicode-range demo fix), `8972ab1` (Artegra Sans global + tag pre-artegra-global), `28e5e42` (fix nombre proyecto etiquetas), `c7b9bc2` (limpieza loader etiquetas), `409b46d` (Artegra Sans en etiquetas), `30f38d5` (carga instantánea y miniaturas etiquetas), `1cfd3f8` (generador etiquetas rollo), `8a51b20`/`e529912` (Fase 4 Mobile First PWA).
+   - **Frontend Repositorio**: Rama `master` de `luxius-panel` en GitHub sincronizada. Últimos commits de esta sesión (más reciente → más antiguo): `feat(drive-pipeline)` (pipeline R2→Drive, resolución 680 huérfanos, UI almacenamiento dual), `7697184` (alerta laminado especial >2.93m lila/morado), `77fd17c` (estilizar botones cabecera Stock/Sync/Arcade), `74fb912` (centrar destinatario en etiquetas rollo), `db647ff` (fijar ancho 105mm/210mm en PDFs sin estiramiento), `54df833` (Artegra Sans en LuXius branding), `44f60bc` (unicode-range demo fix), `8972ab1` (Artegra Sans global + tag pre-artegra-global), `28e5e42` (fix nombre proyecto etiquetas), `c7b9bc2` (limpieza loader etiquetas), `409b46d` (Artegra Sans en etiquetas), `30f38d5` (carga instantánea y miniaturas etiquetas), `1cfd3f8` (generador etiquetas rollo), `8a51b20`/`e529912` (Fase 4 Mobile First PWA).
    - **Remotos**: `origin` apunta exclusivamente a GitHub. GitLab fue desvinculado el 02/10/2026.
 2. **Dependencias**:
    ```bash
@@ -426,6 +421,27 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Indicador en Lotes de Producción (Acordeón)**: Fila principal de lote muestra la píldora `⚡ Paños > 2.93m (Laminado Esp.)` aun con el lote contraído. En cada fila hija desplegada se muestra el badge lila y un borde lateral morado (`.is-special-lamination`).
 - [x] **Integración en Reportes**: Módulo de Reportes adaptado con el mismo indicador visual para trazabilidad integral.
 
+### Sesión 02/10/2026: Pipeline R2 → Google Drive, Resolución de 680 Huérfanos y UI Dual (completado)
+- [x] **Auditoría Exhaustiva de 680 Huérfanos en R2**: Verificación contra PostgreSQL que los 680 archivos encolados (1.79 GB total: 349 PDFs, 314 JPGs, etc.) corresponden al 100% a archivos heredados de prueba de agosto/septiembre 2026 sin órdenes vivas, y que **el 100% (680/680) cuenta con respaldo comprobado en Google Drive** (`drive_file_id` y `drive_url` válidos).
+- [x] **Reescritura y Potenciación de `scripts/resolve_orphans.py`**:
+  - Soporte de purga por lote (`--all`, `--ext`, `--dry-run`, `--limit`, `--before`, `--interactive`) y menú de consola interactivo.
+  - Purga segura mediante API S3 `delete_objects` en chunks de 500 objetos con actualización atómica de estado en PostgreSQL (`orphan_review_queue.status = 'borrado'`).
+  - Blindaje con `sys.stdout.reconfigure(encoding='utf-8')` para terminales Windows cp1252.
+- [x] **Optimización de `scripts/sync_r2_to_drive.py`**:
+  - Búsqueda multinivel en `buscar_presupuesto_por_archivo`: evalúa `archivos`, `archivosOriginales`, `r2_key` y búsqueda de subcadena en el JSON de especificaciones (`especificaciones::text LIKE %filename%`), evitando falsos huérfanos.
+  - Organización mensual de huérfanos en Google Drive: `_Huerfanos_SinClasificar/YYYY-MM/` en lugar de una única carpeta saturada.
+  - Consolidación de notificaciones por email: envío de un único resumen agrupado (`send_orphan_batch_summary`) al finalizar la corrida en lugar de 1 correo por archivo.
+  - Configuración automática de encoding UTF-8 en stdout/stderr.
+- [x] **Endpoints en `luXius-Backend` (`routes/google_drive.py`)**:
+  - Métricas de huérfanos en `GET /api/google-drive/vault/status` (`orphan_stats`: total, bytes, backed_up).
+  - Listado de huérfanos en `GET /api/google-drive/vault/orphans`.
+  - Purga segura en `POST /api/google-drive/vault/orphans/purge` (solo archivos con backup comprobado en Drive).
+  - Corrección de importación faltante de `uuid` en jobs de auditoría. Desplegado y verificado en `origin main`.
+- [x] **Integración Visual en `src/pages/Sistema/GoogleDriveView.tsx`**:
+  - Tarjeta en panel de arquitectura: "Cola de Huérfanos" con total de archivos pendientes, espacio consumido en MB y porcentaje de respaldo en Drive.
+  - Tabla desplegable de archivos huérfanos con nombres, tamaños, fechas y enlaces directos a Google Drive.
+  - Botón de acción rápida "Purgar de R2" con confirmación y retroalimentación inmediata sin requerir terminal.
+
 ---
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
@@ -455,7 +471,7 @@ referencia en PostgreSQL y **solo entonces** borra el original de R2.
 - Año/Mes/Día salen de `presupuestos.created_at` (**no** del `LastModified` de R2).
 - `OT-XXXXXXXX` = `"OT-" + UPPER(SUBSTRING(presupuestos.id, 1, 8))`. Ver sección 9.1.
 - Cliente = `clientes.nombre` (LEFT JOIN), o `Sin-Cliente`.
-- Sin match → una sola carpeta `_Huerfanos_SinClasificar`.
+- Sin match → subcarpeta mensual `_Huerfanos_SinClasificar/{YYYY-MM}/`.
 
 ### 9.1. El número de OT NO es un campo en la base
 Diagnosticado el 30/09/2026. No existe columna `ot`/`numero_ot` en ninguna

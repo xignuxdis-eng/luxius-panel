@@ -23,6 +23,12 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
+# Asegurar codificación utf-8 en terminales Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 load_dotenv()
 
 log_filename = "r2_migration.log"
@@ -255,26 +261,41 @@ def queue_orphan(conn, r2_key, filename, file_size, drive_id, drive_url):
         return new_id
 
 
-def send_orphan_notification(r2_key, filename, file_size, drive_url, queue_id):
+def send_orphan_batch_summary(huerfanos):
+    """
+    Envía un único correo consolidado al finalizar el proceso en lugar de saturar
+    con 1 correo por cada archivo huérfano detectado.
+    """
+    if not huerfanos:
+        return
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD and SMTP_TO):
         logger.warning(
             "SMTP no configurado (faltan SMTP_HOST/SMTP_USER/SMTP_PASSWORD/SMTP_TO). "
-            "No se pudo notificar el archivo huérfano por email."
+            f"No se enviará email de resumen para los {len(huerfanos)} archivo(s) huérfano(s)."
         )
         return
-    mb = file_size / (1024 * 1024)
+
+    total_bytes = sum(h.get('size', 0) for h in huerfanos)
+    total_mb = total_bytes / (1024 * 1024)
+
+    lineas = []
+    for h in huerfanos[:25]:
+        size_mb = h.get('size', 0) / (1024 * 1024)
+        lineas.append(f"- {h['filename']} ({size_mb:.2f} MB) | ID #{h['id']} | Drive: {h['drive_url']}")
+    if len(huerfanos) > 25:
+        lineas.append(f"... y {len(huerfanos) - 25} archivo(s) más.")
+
     cuerpo = (
-        f"Se detectó un archivo en Cloudflare R2 sin registro asociado en la base de datos.\n\n"
-        f"Archivo      : {filename}\n"
-        f"Ruta en R2   : {r2_key}\n"
-        f"Tamaño       : {mb:.2f} MB\n"
-        f"Backup Drive : {drive_url}\n"
-        f"ID en cola   : {queue_id}\n\n"
-        f"El archivo NO fue borrado de R2 (ya tiene backup en Drive). Queda pendiente de revisión.\n"
-        f"Para resolverlo, corré: python scripts/resolve_orphans.py"
+        f"Se detectaron {len(huerfanos)} archivo(s) en Cloudflare R2 sin presupuesto activo asociado en la base de datos.\n"
+        f"Espacio total involucrado: {total_mb:.2f} MB ({total_mb / 1024:.2f} GB).\n\n"
+        f"Todos los archivos fueron respaldados preventivamente en Google Drive y registrados en 'orphan_review_queue'.\n"
+        f"NINGUNO fue borrado de R2 (quedan pendientes de resolución segura).\n\n"
+        f"Muestra de archivos detectados:\n" + "\n".join(lineas) + "\n\n"
+        f"Para gestionar o purgar estos archivos en lote, ejecuta en el servidor o localmente:\n"
+        f"  python scripts/resolve_orphans.py\n"
     )
     msg = MIMEText(cuerpo, _charset="utf-8")
-    msg["Subject"] = f"[LuXius] Archivo huérfano detectado: {filename}"
+    msg["Subject"] = f"[LuXius] Resumen de {len(huerfanos)} archivos huérfanos respaldados en Drive ({total_mb:.1f} MB)"
     msg["From"] = SMTP_FROM
     msg["To"] = SMTP_TO
     destinatarios = [addr.strip() for addr in SMTP_TO.split(",") if addr.strip()]
@@ -283,33 +304,88 @@ def send_orphan_notification(r2_key, filename, file_size, drive_url, queue_id):
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_FROM, destinatarios, msg.as_string())
-        logger.info(f"📧 Notificación de huérfano enviada a: {SMTP_TO}")
+        logger.info(f"📧 Resumen consolidado de huérfanos ({len(huerfanos)} archivos) enviado a: {SMTP_TO}")
     except Exception as mail_err:
-        logger.error(f"❌ No se pudo enviar el email de notificación de huérfano: {mail_err}")
+        logger.error(f"❌ No se pudo enviar el email de resumen de huérfanos: {mail_err}")
 
 
-def buscar_presupuesto_por_archivo(conn, filename):
+def buscar_presupuesto_por_archivo(conn, filename, r2_key=None):
+    """
+    Búsqueda resiliente con múltiples niveles de resolución:
+    1. Coincidencia exacta en 'archivos' o 'archivosOriginales'.
+    2. Coincidencia por r2_key completa en 'archivos'.
+    3. Coincidencia de texto dentro del JSON de especificaciones (para URLs o rutas anidadas).
+    """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Nivel 1: Búsqueda exacta en arrays 'archivos' y 'archivosOriginales'
         cur.execute("""
             SELECT p.id, p.created_at, p.estado, p.deleted_at, c.nombre AS cliente_nombre
             FROM presupuestos p
             LEFT JOIN clientes c ON c.id = p.cliente_id
             WHERE p.especificaciones IS NOT NULL
-              AND (p.especificaciones::jsonb -> 'archivos') ? %s
+              AND (
+                  (p.especificaciones::jsonb -> 'archivos') ? %s
+                  OR (p.especificaciones::jsonb -> 'archivosOriginales') ? %s
+              )
             LIMIT 1;
-        """, (filename,))
+        """, (filename, filename))
         row = cur.fetchone()
-        if not row:
-            return None
-        ot = f"OT-{str(row['id'])[:8].upper()}"
-        return {
-            'presupuesto_id': row['id'],
-            'cliente_nombre': row['cliente_nombre'] or 'Sin-Cliente',
-            'created_at': row['created_at'],
-            'ot': ot,
-            'estado': row['estado'],
-            'deleted_at': row['deleted_at'],
-        }
+        if row:
+            ot = f"OT-{str(row['id'])[:8].upper()}"
+            return {
+                'presupuesto_id': row['id'],
+                'cliente_nombre': row['cliente_nombre'] or 'Sin-Cliente',
+                'created_at': row['created_at'],
+                'ot': ot,
+                'estado': row['estado'],
+                'deleted_at': row['deleted_at'],
+            }
+
+        # Nivel 2: Si r2_key es diferente al nombre de archivo (ej. con prefijo 'uploads/...'), buscar por r2_key
+        if r2_key and r2_key != filename:
+            cur.execute("""
+                SELECT p.id, p.created_at, p.estado, p.deleted_at, c.nombre AS cliente_nombre
+                FROM presupuestos p
+                LEFT JOIN clientes c ON c.id = p.cliente_id
+                WHERE p.especificaciones IS NOT NULL
+                  AND (p.especificaciones::jsonb -> 'archivos') ? %s
+                LIMIT 1;
+            """, (r2_key,))
+            row = cur.fetchone()
+            if row:
+                ot = f"OT-{str(row['id'])[:8].upper()}"
+                return {
+                    'presupuesto_id': row['id'],
+                    'cliente_nombre': row['cliente_nombre'] or 'Sin-Cliente',
+                    'created_at': row['created_at'],
+                    'ot': ot,
+                    'estado': row['estado'],
+                    'deleted_at': row['deleted_at'],
+                }
+
+        # Nivel 3: Búsqueda de subcadena en todo el contenido de especificaciones (longitud mínima 8 caracteres)
+        if len(filename) >= 8:
+            cur.execute("""
+                SELECT p.id, p.created_at, p.estado, p.deleted_at, c.nombre AS cliente_nombre
+                FROM presupuestos p
+                LEFT JOIN clientes c ON c.id = p.cliente_id
+                WHERE p.especificaciones IS NOT NULL
+                  AND p.especificaciones::text LIKE %s
+                LIMIT 1;
+            """, (f"%{filename}%",))
+            row = cur.fetchone()
+            if row:
+                ot = f"OT-{str(row['id'])[:8].upper()}"
+                return {
+                    'presupuesto_id': row['id'],
+                    'cliente_nombre': row['cliente_nombre'] or 'Sin-Cliente',
+                    'created_at': row['created_at'],
+                    'ot': ot,
+                    'estado': row['estado'],
+                    'deleted_at': row['deleted_at'],
+                }
+
+        return None
 
 
 ESTADOS_IMPRESOS = {'impreso', 'post', 'completo', 'entregado', 'finalizado'}
@@ -390,6 +466,7 @@ def run_migration():
     total_excluidos = 0
     total_protegidos = 0
     folder_cache = {}
+    nuevos_huerfanos = []
 
     try:
         paginator = r2_client.get_paginator('list_objects_v2')
@@ -420,7 +497,7 @@ def run_migration():
                         continue
 
                     try:
-                        match = buscar_presupuesto_por_archivo(db_conn, filename)
+                        match = buscar_presupuesto_por_archivo(db_conn, filename, r2_key=r2_key)
 
                         if match and requiere_proteccion_por_no_impreso(match['estado'], match['deleted_at']):
                             total_protegidos += 1
@@ -441,7 +518,10 @@ def run_migration():
                                 match['ot'],
                             ]
                         else:
-                            partes_ruta = [CARPETA_HUERFANOS]
+                            partes_ruta = [
+                                CARPETA_HUERFANOS,
+                                f"{last_modified.year:04d}-{last_modified.month:02d}"
+                            ]
 
                         logger.info(f"1/4. Ruta en Drive: {'/'.join(partes_ruta)}")
                         carpeta_id = construir_ruta_carpetas(
@@ -479,7 +559,13 @@ def run_migration():
                                 drive_id=drive_id,
                                 drive_url=drive_url
                             )
-                            send_orphan_notification(r2_key, filename, file_size, drive_url, queue_id)
+                            nuevos_huerfanos.append({
+                                'id': queue_id,
+                                'r2_key': r2_key,
+                                'filename': filename,
+                                'size': file_size,
+                                'drive_url': drive_url
+                            })
                             total_huerfanos += 1
                             logger.info(
                                 f"📥 '{r2_key}' respaldado en Drive y encolado (ID #{queue_id}) para revisión manual. "
@@ -490,6 +576,10 @@ def run_migration():
                         logger.error(f"❌ Error migrando '{r2_key}': {process_err}")
                         db_conn.rollback()
                         total_errores += 1
+
+        # Enviar resumen consolidado de huérfanos por correo si hubo detecciones nuevas
+        if nuevos_huerfanos and not DRY_RUN:
+            send_orphan_batch_summary(nuevos_huerfanos)
 
     except Exception as list_err:
         logger.error(f"Error al listar objetos de Cloudflare R2: {list_err}")

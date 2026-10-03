@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import Button from '@components/ui/Button';
 import { 
     CheckCircle2, AlertTriangle, RefreshCw, HardDrive, ShieldCheck, 
-    Cloud, Server, FileText, ExternalLink, Database, Activity, Clock 
+    Cloud, Server, FileText, ExternalLink, Database, Activity, Clock,
+    Archive, Trash2, Eye
 } from 'lucide-react';
 import { API_URL, getAuthHeaders } from '@data/db';
 
@@ -26,6 +27,11 @@ interface VaultStatus {
     shared_drive_id?: string;
     vault_folder_id?: string;
     r2_bucket: string;
+    orphan_stats?: {
+        total_pending: number;
+        total_bytes: number;
+        backed_up: number;
+    };
     latest_audit?: {
         id: number;
         job_id: string;
@@ -67,6 +73,20 @@ export default function GoogleDriveView() {
     const [clientSecret, setClientSecret] = useState('');
     const [showConfig, setShowConfig] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+
+    // Huérfanos R2 -> Drive
+    const [isPurgingOrphans, setIsPurgingOrphans] = useState(false);
+    const [orphanList, setOrphanList] = useState<Array<{
+        id: number;
+        r2_key: string;
+        filename: string;
+        file_size_bytes: number;
+        drive_file_id: string;
+        drive_url: string;
+        detected_at: string;
+    }>>([]);
+    const [showOrphans, setShowOrphans] = useState(false);
+    const [loadingOrphans, setLoadingOrphans] = useState(false);
 
     // Load initial status and vault status
     const loadStatus = async () => {
@@ -262,6 +282,70 @@ export default function GoogleDriveView() {
         }
     };
 
+    const handleLoadOrphans = async () => {
+        if (showOrphans) {
+            setShowOrphans(false);
+            return;
+        }
+        setLoadingOrphans(true);
+        try {
+            const res = await fetch(`${API_URL}/google-drive/vault/orphans?limit=100`, {
+                headers: getAuthHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setOrphanList(data.orphans || []);
+                setShowOrphans(true);
+            } else {
+                setMessage({ text: 'Error al consultar lista de huérfanos', type: 'error' });
+            }
+        } catch (e: any) {
+            setMessage({ text: `Error: ${e?.message}`, type: 'error' });
+        } finally {
+            setLoadingOrphans(false);
+        }
+    };
+
+    const handlePurgeOrphans = async () => {
+        const stats = vaultStatus?.orphan_stats;
+        const total = stats?.total_pending || 0;
+        const mb = ((stats?.total_bytes || 0) / (1024 * 1024)).toFixed(1);
+        if (total === 0) {
+            alert("No hay archivos huérfanos pendientes.");
+            return;
+        }
+        const confirmPurge = window.confirm(
+            `⚠️ ATENCIÓN: Se purgarán ${total} archivos huérfanos (${mb} MB) de Cloudflare R2.\n\n` +
+            `Todos estos archivos cuentan con copia de seguridad 100% verificada en Google Drive.\n\n` +
+            `¿Deseas proceder con la liberación de espacio?`
+        );
+        if (!confirmPurge) return;
+
+        setIsPurgingOrphans(true);
+        setMessage({ text: 'Iniciando purga segura en Cloudflare R2...', type: 'info' });
+        try {
+            const res = await fetch(`${API_URL}/google-drive/vault/orphans/purge`, {
+                method: 'POST',
+                headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setMessage({ 
+                    text: `¡Purga completada! Se liberaron ${((data.bytes_freed || 0) / (1024 * 1024)).toFixed(1)} MB en R2 (${data.purged_count} archivos).`, 
+                    type: 'success' 
+                });
+                setShowOrphans(false);
+                loadStatus();
+            } else {
+                setMessage({ text: data.error || 'Error al ejecutar la purga', type: 'error' });
+            }
+        } catch (e: any) {
+            setMessage({ text: `Error de conexión: ${e?.message}`, type: 'error' });
+        } finally {
+            setIsPurgingOrphans(false);
+        }
+    };
+
     const currentRedirectUri = `${window.location.origin}${window.location.pathname}`;
     const latestAudit = vaultStatus?.latest_audit;
 
@@ -406,7 +490,137 @@ export default function GoogleDriveView() {
                         🏢 Cuenta: <strong>{status?.email || 'Sin vincular'}</strong>
                     </div>
                 </div>
+
+                {/* CARD HUÉRFANOS R2 -> DRIVE */}
+                <div style={{
+                    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9))',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '12px',
+                    padding: '1.25rem'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Archive size={20} style={{ color: '#fbbf24' }} />
+                            <h4 style={{ margin: 0, fontSize: '1rem', color: '#fbbf24' }}>Cola de Huérfanos</h4>
+                        </div>
+                        <span style={{ 
+                            fontSize: '0.72rem', 
+                            fontWeight: 700, 
+                            padding: '2px 8px', 
+                            borderRadius: '12px', 
+                            background: (vaultStatus?.orphan_stats?.total_pending || 0) > 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)', 
+                            color: (vaultStatus?.orphan_stats?.total_pending || 0) > 0 ? '#fbbf24' : '#34d399', 
+                            border: `1px solid ${(vaultStatus?.orphan_stats?.total_pending || 0) > 0 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)'}` 
+                        }}>
+                            {(vaultStatus?.orphan_stats?.total_pending || 0) > 0 
+                                ? `${vaultStatus?.orphan_stats?.total_pending} PENDIENTES` 
+                                : '0 PENDIENTES'}
+                        </span>
+                    </div>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.82rem', color: '#94a3b8' }}>
+                        Archivos sin OT activa. Cuentan con respaldo verificado en Drive y esperan liberación segura de R2.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '6px', marginBottom: '10px' }}>
+                        <span>Espacio ocupado: <strong>{((vaultStatus?.orphan_stats?.total_bytes || 0) / (1024 * 1024)).toFixed(1)} MB</strong></span>
+                        <span style={{ color: '#34d399' }}>Drive: {vaultStatus?.orphan_stats?.backed_up || 0} / {vaultStatus?.orphan_stats?.total_pending || 0}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleLoadOrphans}
+                            disabled={loadingOrphans || isPurgingOrphans}
+                            style={{ flex: 1, fontSize: '0.78rem' }}
+                        >
+                            {loadingOrphans ? 'Cargando...' : showOrphans ? 'Ocultar' : 'Ver Archivos'}
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handlePurgeOrphans}
+                            disabled={isPurgingOrphans || (vaultStatus?.orphan_stats?.total_pending || 0) === 0}
+                            style={{ 
+                                flex: 1, 
+                                fontSize: '0.78rem',
+                                background: (vaultStatus?.orphan_stats?.total_pending || 0) > 0 ? 'linear-gradient(135deg, #d97706, #b45309)' : undefined,
+                                border: 'none'
+                            }}
+                        >
+                            {isPurgingOrphans ? 'Purgando...' : 'Purgar de R2'}
+                        </Button>
+                    </div>
+                </div>
             </div>
+
+            {/* SECCIÓN DETALLE DE HUÉRFANOS SI ESTÁ EXPANDIDO */}
+            {showOrphans && (
+                <div style={{
+                    background: 'var(--bg-mid, #1e222d)',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    borderRadius: '12px',
+                    padding: '1.25rem',
+                    marginBottom: '1.5rem'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Archive size={18} style={{ color: '#fbbf24' }} />
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#fbbf24' }}>
+                                Archivos Huérfanos en Cola ({orphanList.length} mostrados)
+                            </h4>
+                        </div>
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                            Todos tienen copia en Google Drive y están listos para purga
+                        </span>
+                    </div>
+
+                    <div style={{ maxHeight: '240px', overflowY: 'auto', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8' }}>
+                                    <th style={{ padding: '8px 12px' }}>Archivo</th>
+                                    <th style={{ padding: '8px 12px' }}>Tamaño</th>
+                                    <th style={{ padding: '8px 12px' }}>Backup Drive</th>
+                                    <th style={{ padding: '8px 12px' }}>Detectado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {orphanList.map(item => (
+                                    <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#f8fafc' }}>{item.filename}</td>
+                                        <td style={{ padding: '8px 12px', color: '#94a3b8' }}>
+                                            {(item.file_size_bytes / (1024 * 1024)).toFixed(2)} MB
+                                        </td>
+                                        <td style={{ padding: '8px 12px' }}>
+                                            {item.drive_url ? (
+                                                <a 
+                                                    href={item.drive_url} 
+                                                    target="_blank" 
+                                                    rel="noreferrer"
+                                                    style={{ color: '#60a5fa', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                >
+                                                    <ExternalLink size={12} /> Ver en Drive
+                                                </a>
+                                            ) : (
+                                                <span style={{ color: '#ef4444' }}>Sin enlace</span>
+                                            )}
+                                        </td>
+                                        <td style={{ padding: '8px 12px', color: '#94a3b8' }}>
+                                            {item.detected_at ? new Date(item.detected_at).toLocaleDateString() : '-'}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {orphanList.length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>
+                                            No se encontraron archivos huérfanos pendientes.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* TABLERO DE INTEGRIDAD & ÚLTIMA AUDITORÍA */}
             <div style={{
