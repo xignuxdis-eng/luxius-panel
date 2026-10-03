@@ -430,9 +430,10 @@ export default function SharedFileViewerModal({
                                             <button
                                                 type="button"
                                                 className="btn-download-premium"
-                                                onClick={() => {
+                                                    onClick={() => {
                                                     onClose()
-                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}`)
+                                                    const orderParam = order?.id ? `&orderId=${order.id}` : ''
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}`)
                                                 }}
                                                 style={{
                                                     background: 'linear-gradient(135deg, #0284c7, #0369a1)',

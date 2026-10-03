@@ -31,6 +31,18 @@ function versionGeneratorPlugin(): Plugin {
                     generatedAt: Date.now()
                 }, null, 2)
             })
+
+            // Inyectar nombre de cache único con timestamp de build en sw.js
+            const swPath = path.resolve(__dirname, 'public', 'sw.js')
+            if (fs.existsSync(swPath)) {
+                let swContent = fs.readFileSync(swPath, 'utf8')
+                swContent = swContent.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = 'luxius-v${Date.now()}';`)
+                this.emitFile({
+                    type: 'asset',
+                    fileName: 'sw.js',
+                    source: swContent
+                })
+            }
         }
     }
 }
@@ -61,7 +73,23 @@ export default defineConfig({
             output: {
                 entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
                 chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-                assetFileNames: `assets/[name]-[hash].[ext]`
+                assetFileNames: `assets/[name]-[hash].[ext]`,
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('pdfjs-dist') || id.includes('pdf-lib')) {
+                            return 'vendor-pdf';
+                        }
+                        if (id.includes('recharts')) {
+                            return 'vendor-charts';
+                        }
+                        if (id.includes('lucide-react')) {
+                            return 'vendor-icons';
+                        }
+                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('zustand')) {
+                            return 'vendor-core';
+                        }
+                    }
+                }
             }
         }
     },

@@ -180,10 +180,7 @@ export async function checkServerVersion(): Promise<boolean> {
  * Inicializador global del motor de versiones.
  */
 export function initVersionEngine(): void {
-    // 1. Limpieza preventiva de ServiceWorkers
-    purgeServiceWorkersAndCaches();
-
-    // 2. Registrar versión local
+    // 1. Registrar versión local
     localStorage.setItem(VERSION_KEY, CURRENT_BUILD);
 
     // 3. Verificar versión remota de inmediato

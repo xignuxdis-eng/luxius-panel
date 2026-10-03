@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, LoginCredentials, UserRole } from '@/types'
-import { getUsuarios, getClientes, API_URL } from '@/data/db'
+import { API_URL } from '@/data/db'
 
 
 interface AuthState {
@@ -164,3 +164,10 @@ export const useAuthStore = create<AuthState>()(
         }
     )
 )
+
+// Escuchar evento de sesión expirada disparado desde la capa de datos
+if (typeof window !== 'undefined') {
+    window.addEventListener('luxius-auth-expired', () => {
+        useAuthStore.getState().logout();
+    });
+}

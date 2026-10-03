@@ -256,7 +256,7 @@ export default function Diseno() {
                                                         const firstFile = order.archivos![0]
                                                         const url = resolveMediaUrl(firstFile)
                                                         const name = order.archivosOriginales?.[0] || firstFile.split('/').pop()?.split('?')[0] || 'arte'
-                                                        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(name)}`)
+                                                        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(name)}&orderId=${order.id}`)
                                                     }}
                                                     title="Inspeccionar directamente en Xpress Studio (DPI, medidas, demasías, vectorizar)"
                                                     style={{

@@ -152,15 +152,14 @@ export const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs
         });
         clearTimeout(id);
 
-        // Si la sesión expiró en el servidor (401 / 403), limpiar token e invocar logout
+        // Si la sesión expiró en el servidor (401 / 403), limpiar token y disparar evento de logout
         if (response.status === 401 || response.status === 403) {
             console.warn(`[Auth] Sesión no autorizada o expirada (${response.status}) en ${url}`);
             if (localStorage.getItem('luxius_auth_token')) {
                 localStorage.removeItem('luxius_auth_token');
-                try {
-                    const { useAuthStore } = await import('@store/authStore');
-                    useAuthStore.getState().logout();
-                } catch { }
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('luxius-auth-expired'));
+                }
             }
         }
 

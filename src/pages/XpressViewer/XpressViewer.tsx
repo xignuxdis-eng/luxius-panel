@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import './XpressViewer.css';
-import { API_URL } from '../../data/db';
+import { API_URL, getOrdenById, saveOrden, resolveMediaUrl } from '../../data/db';
+import { Order } from '../../types/orden';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
@@ -58,13 +59,44 @@ export interface XpressViewerProps {
     initialFileUrl?: string;
     initialFile?: File;
     initialFileName?: string;
+    initialOrderId?: number;
     onClose?: () => void;
 }
 
-export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, onClose }) => {
+export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, initialOrderId, onClose }) => {
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : 'viewer';
     const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer'>(initialTab);
+
+    // Orden Vinculada (Fase 3 & 5)
+    const orderIdParam = searchParams.get('orderId') || (initialOrderId ? String(initialOrderId) : null);
+    const [order, setOrder] = useState<Order | null>(null);
+    const [loadingOrder, setLoadingOrder] = useState<boolean>(false);
+
+    // Medidas Objetivo de Producción (en metros)
+    const [targetWidthMeters, setTargetWidthMeters] = useState<number>(1.0);
+    const [targetHeightMeters, setTargetHeightMeters] = useState<number>(1.0);
+
+    // Calibrador de Demasías y Sangrado
+    const [bleedCm, setBleedCm] = useState<number>(2.0);
+    const [bleedSides, setBleedSides] = useState<{ top: boolean; bottom: boolean; left: boolean; right: boolean }>({
+        top: true,
+        bottom: true,
+        left: true,
+        right: true
+    });
+    const [safetyMarginCm, setSafetyMarginCm] = useState<number>(1.0);
+    const [bleedSavedFeedback, setBleedSavedFeedback] = useState<string | null>(null);
+
+    // Simulación de Virado Solvente (CMYK)
+    const [simulateSolvent, setSimulateSolvent] = useState<boolean>(false);
+
+    // Barra de Aprobación Técnica y Rebote (Fase 5)
+    const [showRejectModal, setShowRejectModal] = useState<boolean>(false);
+    const [rejectReason, setRejectReason] = useState<string>('');
+    const [isUpdatingOrder, setIsUpdatingOrder] = useState<boolean>(false);
+    const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
 
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -83,7 +115,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const [isPanning, setIsPanning] = useState(false);
     
     // Config
-    const [assumedDpi, setAssumedDpi] = useState<number>(300);
+    const assumedDpi = 300;
 
     // Multipage PDF Navigation State
     const [pdfDoc, setPdfDoc] = useState<any>(null);
@@ -107,6 +139,12 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         setMeasureEnd(null);
         setZoom(1);
         setPan({ x: 0, y: 0 });
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('fileUrl');
+        newParams.delete('fileName');
+        newParams.delete('url');
+        newParams.delete('name');
+        setSearchParams(newParams);
     };
 
     const goToPage = async (pageNumber: number) => {
@@ -124,7 +162,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             canvas.height = viewport.height;
             canvas.width = viewport.width;
 
-            await page.render({ canvasContext: context!, viewport }).promise;
+            await page.render({ canvasContext: context!, viewport, canvas } as any).promise;
             const newPreview = canvas.toDataURL('image/webp', 0.9);
 
             setPreviewUrl(newPreview);
@@ -182,6 +220,184 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             fetchFile();
         }
     }, [paramFileUrl, initialFile, paramFileName]);
+
+    // Carga de Contexto de Orden (Fase 3 & 5)
+    useEffect(() => {
+        if (!orderIdParam) return;
+        const numId = Number(orderIdParam);
+        if (isNaN(numId)) return;
+
+        setLoadingOrder(true);
+        getOrdenById(numId)
+            .then((ord) => {
+                if (ord) {
+                    setOrder(ord);
+                    if (ord.ancho && ord.ancho > 0) setTargetWidthMeters(ord.ancho);
+                    if (ord.alto && ord.alto > 0) setTargetHeightMeters(ord.alto);
+                    if (ord.demasias && ord.demasias > 0) setBleedCm(ord.demasias);
+                    if (ord.demasiasConfig) {
+                        setBleedSides({
+                            top: !!ord.demasiasConfig.top,
+                            bottom: !!ord.demasiasConfig.bottom,
+                            left: !!ord.demasiasConfig.left,
+                            right: !!ord.demasiasConfig.right,
+                        });
+                    }
+                    if (ord.archivos && ord.archivos.length > 0 && !paramFileUrl && !initialFile) {
+                        const first = ord.archivos[0];
+                        const fullUrl = resolveMediaUrl(first);
+                        const firstName = ord.archivosOriginales?.[0] || first.split('/').pop()?.split('?')[0] || 'arte';
+                        fetch(fullUrl)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const f = new File([blob], firstName, { type: blob.type });
+                                processFile(f);
+                            })
+                            .catch(err => {
+                                console.warn('[XpressViewer] Error cargando archivo de orden:', err);
+                                setPreviewUrl(fullUrl);
+                                setMetadata({
+                                    name: firstName,
+                                    format: firstName.split('.').pop()?.toUpperCase() || 'IMG',
+                                    size: 'Adjunto OT',
+                                    width: 1200,
+                                    height: 1200,
+                                    dpi: 150,
+                                    colorMode: 'RGB (Web)',
+                                    source: 'OT File Auto-Load'
+                                });
+                            });
+                    }
+                }
+            })
+            .catch((err) => console.warn('[XpressViewer] Error cargando orden:', err))
+            .finally(() => setLoadingOrder(false));
+    }, [orderIdParam]);
+
+    // Cálculo Matemático de DPI a Escala 1:1
+    const calculatedDpi = useMemo(() => {
+        if (!metadata?.width || targetWidthMeters <= 0) {
+            return metadata?.dpi && metadata.dpi > 0 ? metadata.dpi : assumedDpi;
+        }
+        // 1 metro = 39.3700787 pulgadas
+        const inchesW = targetWidthMeters * 39.3700787;
+        const dpi = Math.round(metadata.width / inchesW);
+        return dpi > 0 ? dpi : assumedDpi;
+    }, [metadata?.width, metadata?.dpi, targetWidthMeters, assumedDpi]);
+
+    // Semáforo de Calidad Técnica de Impresión
+    const dpiTier = useMemo(() => {
+        if (calculatedDpi >= 150) {
+            return {
+                tier: 'optimal' as const,
+                label: 'Óptimo (>150 DPI)',
+                badgeClass: 'optimal',
+                color: '#10b981',
+                icon: '🟢',
+                desc: 'Excelente definición. Apto para vinilo de corte, calcomanías y visualización cercana (<1m).'
+            };
+        } else if (calculatedDpi >= 72) {
+            return {
+                tier: 'acceptable' as const,
+                label: 'Aceptable (72-150 DPI)',
+                badgeClass: 'acceptable',
+                color: '#f59e0b',
+                icon: '🟡',
+                desc: 'Apto para gigantografías, lonas front/back y vía pública vista a media/larga distancia (>2m).'
+            };
+        } else {
+            return {
+                tier: 'critical' as const,
+                label: 'Crítico (<72 DPI)',
+                badgeClass: 'critical',
+                color: '#ef4444',
+                icon: '🔴',
+                desc: 'Riesgo severo de pixelado visible. Se recomienda vectorizar en curvas con Redrawer Studio o solicitar arte en alta resolución.'
+            };
+        }
+    }, [calculatedDpi]);
+
+    // Guardar Demasías en la Orden
+    const handleSaveBleedToOrder = async () => {
+        if (!order) return;
+        setIsUpdatingOrder(true);
+        try {
+            const updated: Order = {
+                ...order,
+                demasias: bleedCm,
+                demasiasConfig: {
+                    top: bleedSides.top,
+                    bottom: bleedSides.bottom,
+                    left: bleedSides.left,
+                    right: bleedSides.right,
+                },
+                updatedAt: new Date().toISOString()
+            };
+            await saveOrden(updated);
+            setOrder(updated);
+            setBleedSavedFeedback(`¡Demasía de ${bleedCm} cm guardada en OT #${order.ot}!`);
+            setTimeout(() => setBleedSavedFeedback(null), 3500);
+        } catch (err) {
+            console.error('[XpressViewer] Error guardando demasías:', err);
+        } finally {
+            setIsUpdatingOrder(false);
+        }
+    };
+
+    // Aprobación Técnica y Envío a Impresión (Fase 5)
+    const handleApprovePreflight = async () => {
+        if (!order) return;
+        setIsUpdatingOrder(true);
+        try {
+            const note = `[Preimpresión Aprobada en Xpress Studio el ${new Date().toLocaleDateString()} - DPI: ${calculatedDpi}, Demasía: ${bleedCm}cm]`;
+            const updated: Order = {
+                ...order,
+                status: 'orden',
+                demasias: bleedCm,
+                demasiasConfig: {
+                    top: bleedSides.top,
+                    bottom: bleedSides.bottom,
+                    left: bleedSides.left,
+                    right: bleedSides.right,
+                },
+                observaciones: order.observaciones ? `${order.observaciones}\n${note}` : note,
+                updatedAt: new Date().toISOString()
+            };
+            await saveOrden(updated);
+            setOrder(updated);
+            setActionSuccessMessage(`✅ ¡OT #${order.ot} aprobada técnicamente y enviada a Impresión!`);
+            setTimeout(() => setActionSuccessMessage(null), 4000);
+        } catch (err) {
+            console.error('[XpressViewer] Error aprobando orden:', err);
+        } finally {
+            setIsUpdatingOrder(false);
+        }
+    };
+
+    // Rechazo Técnico / Rebote al Vendedor (Fase 5)
+    const handleConfirmReject = async () => {
+        if (!order || !rejectReason.trim()) return;
+        setIsUpdatingOrder(true);
+        try {
+            const note = `[REBOTE TÉCNICO en Xpress Studio el ${new Date().toLocaleDateString()}]: ${rejectReason.trim()}`;
+            const updated: Order = {
+                ...order,
+                status: 'rebotado',
+                observaciones: order.observaciones ? `${order.observaciones}\n${note}` : note,
+                updatedAt: new Date().toISOString()
+            };
+            await saveOrden(updated);
+            setOrder(updated);
+            setShowRejectModal(false);
+            setRejectReason('');
+            setActionSuccessMessage(`↩️ OT #${order.ot} marcada como REBOTADA con reporte técnico.`);
+            setTimeout(() => setActionSuccessMessage(null), 4000);
+        } catch (err) {
+            console.error('[XpressViewer] Error rebotando orden:', err);
+        } finally {
+            setIsUpdatingOrder(false);
+        }
+    };
 
     const extractColorsFromImage = (img: HTMLImageElement) => {
         const canvas = document.createElement('canvas');
@@ -298,7 +514,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 
-                await page.render({ canvasContext: context!, viewport: viewport }).promise;
+                await page.render({ canvasContext: context!, viewport: viewport, canvas: canvas } as any).promise;
                 extractedPreview = canvas.toDataURL('image/webp', 0.9);
             }
             // 3. CorelDRAW (JSZip)
@@ -446,7 +662,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
         onDrop,
-        noClick: file !== null 
+        noClick: file !== null || previewUrl !== null
     });
 
     // Herramientas Interactivas: Eventos
@@ -540,7 +756,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         className={`xpress-nav-tab ${activeTab === 'viewer' ? 'active' : ''}`}
                         onClick={() => {
                             setActiveTab('viewer');
-                            setSearchParams({});
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.delete('tab');
+                            setSearchParams(newParams);
                         }}
                     >
                         👁️ Visor & Medición
@@ -550,7 +768,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         className={`xpress-nav-tab ${activeTab === 'redrawer' ? 'active' : ''}`}
                         onClick={() => {
                             setActiveTab('redrawer');
-                            setSearchParams({ tab: 'redrawer' });
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.set('tab', 'redrawer');
+                            setSearchParams(newParams);
                         }}
                     >
                         ✏️ Redrawer & Vectorizador
@@ -559,21 +779,27 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {loadingOrder && (
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Cargando OT...</span>
+                    )}
+                    {order && (
+                        <span style={{ fontSize: '0.78rem', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }} title={`Orden #${order.ot} - ${order.clienteNombre}`}>
+                            OT #{order.ot}
+                        </span>
+                    )}
                     {file && (
                         <span style={{ fontSize: '0.8rem', color: '#94a3b8', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
                             📄 {file.name}
                         </span>
                     )}
-                    {onClose && (
-                        <button 
-                            type="button"
-                            onClick={onClose}
-                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer', padding: '0 4px' }}
-                            title="Cerrar modal"
-                        >
-                            ✕
-                        </button>
-                    )}
+                    <button 
+                        type="button"
+                        onClick={onClose ? onClose : () => navigate(-1)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer', padding: '0 4px' }}
+                        title={onClose ? "Cerrar modal" : "Volver"}
+                    >
+                        ✕
+                    </button>
                 </div>
             </div>
 
@@ -583,16 +809,20 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     initialFileName={file?.name ? file.name.replace(/\.[^/.]+$/, '') : (metadata?.name ? metadata.name.replace(/\.[^/.]+$/, '') : 'archivo')}
                     onSendToViewer={(svgUrl, newFileName) => {
                         setPreviewUrl(svgUrl);
-                        if (metadata) {
-                            setMetadata({
-                                ...metadata,
-                                name: newFileName,
-                                format: 'SVG',
-                                colorMode: 'Vector SVG (Redrawer)'
-                            });
-                        }
+                        setMetadata({
+                            name: newFileName || 'vector_redrawer.svg',
+                            format: 'SVG',
+                            size: 'Vectorizado',
+                            width: 1200,
+                            height: 1200,
+                            dpi: 300,
+                            colorMode: 'Vector SVG (Redrawer)',
+                            source: 'Redrawer Studio'
+                        });
                         setActiveTab('viewer');
-                        setSearchParams({});
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('tab');
+                        setSearchParams(newParams);
                     }}
                     onClose={onClose}
                 />
@@ -601,7 +831,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     <div className="xpress-viewport" {...getRootProps()}>
                         <input {...getInputProps()} />
                         
-                        {!file ? (
+                        {(!file && !previewUrl) ? (
                             <div className={`xpress-dropzone ${isDragActive ? 'active' : ''}`}>
                                 <div className="xpress-dropzone-icon">☁️</div>
                                 <p>Arrastra un archivo aquí o haz clic para explorar</p>
@@ -664,7 +894,16 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                     onLoad={handleImageLoad}
                                     crossOrigin="anonymous"
                                     draggable={false}
-                                    style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', userSelect: 'none', WebkitUserSelect: 'none' }}
+                                    style={{ 
+                                        display: 'block', 
+                                        maxWidth: '100%', 
+                                        maxHeight: '100%', 
+                                        objectFit: 'contain', 
+                                        userSelect: 'none', 
+                                        WebkitUserSelect: 'none',
+                                        filter: simulateSolvent ? 'contrast(1.08) saturate(0.82) brightness(0.97) sepia(0.04)' : undefined,
+                                        transition: 'filter 0.3s ease'
+                                    }}
                                 />
                                 
                                 {/* Overlay Interactivo (Regla y Guías) */}
@@ -672,20 +911,80 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                     ref={svgRef}
                                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
                                 >
-                                    {toolMode === 'bleed' && (
-                                        <>
-                                            <rect 
-                                                x="5%" y="5%" width="90%" height="90%" 
-                                                fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="5,5" 
-                                            />
-                                            <text x="5%" y="4%" fill="#ef4444" fontSize="12" fontWeight="bold">Área de Corte (Safe Area)</text>
-                                            <rect 
-                                                x="2%" y="2%" width="96%" height="96%" 
-                                                fill="none" stroke="#3b82f6" strokeWidth="1" 
-                                            />
-                                            <text x="2%" y="1%" fill="#3b82f6" fontSize="12" fontWeight="bold">Demasía (Bleed)</text>
-                                        </>
-                                    )}
+                                    {toolMode === 'bleed' && (() => {
+                                        // Proporciones dinámicas en porcentaje basadas en medidas reales (m y cm)
+                                        const bleedPctX = Math.min(22, Math.max(1.5, (bleedCm / (targetWidthMeters * 100)) * 100));
+                                        const bleedPctY = Math.min(22, Math.max(1.5, (bleedCm / (targetHeightMeters * 100)) * 100));
+                                        const safetyPctX = Math.min(10, Math.max(1, (safetyMarginCm / (targetWidthMeters * 100)) * 100));
+                                        const safetyPctY = Math.min(10, Math.max(1, (safetyMarginCm / (targetHeightMeters * 100)) * 100));
+
+                                        const topBleed = bleedSides.top ? bleedPctY : 0;
+                                        const bottomBleed = bleedSides.bottom ? bleedPctY : 0;
+                                        const leftBleed = bleedSides.left ? bleedPctX : 0;
+                                        const rightBleed = bleedSides.right ? bleedPctX : 0;
+
+                                        const cutX = leftBleed;
+                                        const cutY = topBleed;
+                                        const cutW = Math.max(10, 100 - leftBleed - rightBleed);
+                                        const cutH = Math.max(10, 100 - topBleed - bottomBleed);
+
+                                        const safeX = cutX + safetyPctX;
+                                        const safeY = cutY + safetyPctY;
+                                        const safeW = Math.max(5, cutW - (safetyPctX * 2));
+                                        const safeH = Math.max(5, cutH - (safetyPctY * 2));
+
+                                        const activeSides = [
+                                            bleedSides.top ? 'Sup' : null,
+                                            bleedSides.bottom ? 'Inf' : null,
+                                            bleedSides.left ? 'Izq' : null,
+                                            bleedSides.right ? 'Der' : null,
+                                        ].filter(Boolean).join('+');
+
+                                        return (
+                                            <g className="xpress-bleed-overlay-group">
+                                                {/* Demasía / Sangrado Perimetral Exterior */}
+                                                <rect 
+                                                    x="0%" y="0%" width="100%" height="100%" 
+                                                    fill="none" stroke="#06b6d4" strokeWidth="2" 
+                                                />
+                                                <rect 
+                                                    x="0%" y="0%" width="100%" height="100%" 
+                                                    fill="rgba(6, 182, 212, 0.08)"
+                                                />
+
+                                                {/* Línea de Corte Neto (Guillotina / Refile de Taller) */}
+                                                <rect 
+                                                    x={`${cutX}%`} y={`${cutY}%`} width={`${cutW}%`} height={`${cutH}%`} 
+                                                    fill="none" stroke="#f43f5e" strokeWidth="2.5" strokeDasharray="8,5" 
+                                                />
+
+                                                {/* Zona de Seguridad de Contenido (1cm dentro del corte) */}
+                                                <rect 
+                                                    x={`${safeX}%`} y={`${safeY}%`} width={`${safeW}%`} height={`${safeH}%`} 
+                                                    fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,4" 
+                                                />
+
+                                                {/* Rótulo Flotante con Cotas */}
+                                                <g transform="translate(16, 26)">
+                                                    <rect x="0" y="0" width="370" height="28" rx="6" fill="rgba(15, 23, 42, 0.88)" stroke="rgba(255,255,255,0.18)" />
+                                                    <text x="12" y="18" fill="#f8fafc" fontSize="11" fontWeight="700">
+                                                        ✂️ Corte: {(targetWidthMeters * 100).toFixed(0)}×{(targetHeightMeters * 100).toFixed(0)}cm | +{bleedCm}cm Sangría ({activeSides || 'Ninguno'}) | -{safetyMarginCm}cm Seguro
+                                                    </text>
+                                                </g>
+
+                                                {bleedSides.top && (
+                                                    <text x="50%" y={`${Math.max(3.5, topBleed / 2)}%`} fill="#06b6d4" fontSize="11" fontWeight="bold" textAnchor="middle">
+                                                        ▲ Sangría Superior +{bleedCm} cm
+                                                    </text>
+                                                )}
+                                                {bleedSides.bottom && (
+                                                    <text x="50%" y={`${Math.min(97.5, 100 - bottomBleed / 2)}%`} fill="#06b6d4" fontSize="11" fontWeight="bold" textAnchor="middle">
+                                                        ▼ Sangría Inferior +{bleedCm} cm
+                                                    </text>
+                                                )}
+                                            </g>
+                                        );
+                                    })()}
 
                                     {toolMode === 'measure' && measureStart && measureEnd && (
                                         <>
@@ -707,6 +1006,50 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                         </>
                                     )}
                                 </svg>
+
+                                {simulateSolvent && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '16px',
+                                        right: '16px',
+                                        background: 'rgba(217, 119, 6, 0.9)',
+                                        color: '#fff',
+                                        padding: '5px 12px',
+                                        borderRadius: '20px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        zIndex: 15,
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}>
+                                        <span>🧪</span>
+                                        <span>Simulación Solvente (CMYK) Activa</span>
+                                    </div>
+                                )}
+
+                                {(actionSuccessMessage || bleedSavedFeedback) && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '60px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        background: 'rgba(16, 185, 129, 0.95)',
+                                        color: '#fff',
+                                        padding: '8px 18px',
+                                        borderRadius: '20px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 700,
+                                        zIndex: 30,
+                                        boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <span>{actionSuccessMessage || bleedSavedFeedback}</span>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div style={{ color: '#ef4444' }}>
@@ -798,12 +1141,22 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 ✂️
                             </button>
                             <button 
+                                className={`xpress-tool-btn ${simulateSolvent ? 'active' : ''}`} 
+                                onClick={(e) => { e.stopPropagation(); setSimulateSolvent(s => !s); }} 
+                                title={simulateSolvent ? "Desactivar Simulación Solvente" : "Simular Virado Solvente (CMYK)"}
+                                style={simulateSolvent ? { background: '#d97706', color: '#fff' } : {}}
+                            >
+                                🧪
+                            </button>
+                            <button 
                                 type="button"
                                 className="xpress-tool-btn" 
                                 onClick={(e) => { 
                                     e.stopPropagation(); 
                                     setActiveTab('redrawer'); 
-                                    setSearchParams({ tab: 'redrawer' });
+                                    const p = new URLSearchParams(searchParams);
+                                    p.set('tab', 'redrawer');
+                                    setSearchParams(p);
                                 }} 
                                 title="Abrir en Redrawer (Vectorizar y Redibujar)"
                                 style={{
@@ -825,6 +1178,58 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>
                         </div>
+
+                        {/* Barra de Aprobación Técnica y Pase a Impresión (Fase 5) */}
+                        {order && (
+                            <div className="xpress-order-action-dock" onClick={(e) => e.stopPropagation()}>
+                                <div className="xpress-dock-order-info">
+                                    <span style={{ fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                                        OT-{order.ot}
+                                    </span>
+                                    <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                        {order.clienteNombre}
+                                    </span>
+                                    <span style={{ color: '#94a3b8' }}>•</span>
+                                    <span style={{ color: '#cbd5e1' }}>
+                                        {order.material} ({targetWidthMeters}m × {targetHeightMeters}m)
+                                    </span>
+                                    <span style={{ 
+                                        fontSize: '0.75rem', 
+                                        padding: '2px 8px', 
+                                        borderRadius: '10px',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        background: order.status === 'orden' ? 'rgba(16, 185, 129, 0.2)' : order.status === 'rebotado' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                                        color: order.status === 'orden' ? '#34d399' : order.status === 'rebotado' ? '#f87171' : '#a5b4fc'
+                                    }}>
+                                        {order.status}
+                                    </span>
+                                </div>
+
+                                <div className="xpress-dock-actions">
+                                    <button
+                                        type="button"
+                                        className="xpress-btn-approve"
+                                        onClick={handleApprovePreflight}
+                                        disabled={isUpdatingOrder}
+                                        title="Aprobar técnicamente y pasar a cola de impresión"
+                                    >
+                                        <span>🚀</span>
+                                        <span>Aprobar Preimpresión</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="xpress-btn-reject"
+                                        onClick={() => setShowRejectModal(true)}
+                                        disabled={isUpdatingOrder}
+                                        title="Rebotar al vendedor con reporte técnico"
+                                    >
+                                        <span>↩️</span>
+                                        <span>Rebotar al Vendedor</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -864,39 +1269,97 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 )}
                             </div>
 
+                            {/* 1. Vista de Producción & Inspector DPI 1:1 */}
                             <div className="xpress-card">
-                                <h3>Vista de Producción</h3>
+                                <h3>📐 Medidas & Inspector DPI 1:1</h3>
+                                
+                                <div style={{ marginBottom: '10px' }}>
+                                    <span className="xpress-meta-label" style={{ fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>
+                                        Tamaño Final Deseado (Metros):
+                                    </span>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Ancho (m):</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.05" 
+                                                min="0.1" 
+                                                value={targetWidthMeters} 
+                                                onChange={(e) => setTargetWidthMeters(Math.max(0.01, Number(e.target.value)))}
+                                                style={{ width: '100%', padding: '4px 6px', background: 'rgba(0,0,0,0.25)', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.82rem' }}
+                                                title="Ancho final para calcular DPI real"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Alto (m):</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.05" 
+                                                min="0.1" 
+                                                value={targetHeightMeters} 
+                                                onChange={(e) => setTargetHeightMeters(Math.max(0.01, Number(e.target.value)))}
+                                                style={{ width: '100%', padding: '4px 6px', background: 'rgba(0,0,0,0.25)', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.82rem' }}
+                                                title="Alto final para calcular DPI real"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="xpress-meta-row">
-                                    <span className="xpress-meta-label">Resolución</span>
+                                    <span className="xpress-meta-label">Matriz Píxeles</span>
                                     <span className="xpress-meta-value">
                                         {metadata.width} × {metadata.height} px
                                     </span>
                                 </div>
                                 
-                                <div className="xpress-meta-row">
-                                    <span className="xpress-meta-label">DPI (Resolución de Impresión)</span>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        {(!metadata.dpi || metadata.dpi === 0) ? (
-                                            <input 
-                                                type="number" 
-                                                value={assumedDpi} 
-                                                onChange={(e) => setAssumedDpi(Number(e.target.value))}
-                                                style={{ width: '60px', padding: '2px 4px', background: 'rgba(0,0,0,0.2)', border: '1px solid #334155', color: '#fff', borderRadius: '4px' }}
-                                                title="Calibrar DPI manualmente"
-                                            />
-                                        ) : (
-                                            <span className="xpress-meta-value">{metadata.dpi}</span>
-                                        )}
-                                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>ppp</span>
+                                <div className="xpress-meta-row" style={{ alignItems: 'flex-start', marginTop: '6px' }}>
+                                    <span className="xpress-meta-label">DPI Escala Real</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                        <div className={`xpress-dpi-badge ${dpiTier.badgeClass}`}>
+                                            <span>{dpiTier.icon}</span>
+                                            <span>{calculatedDpi} DPI</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="xpress-meta-row">
-                                    <span className="xpress-meta-label">Color Original</span>
-                                    <span className="xpress-meta-value">{metadata.colorMode}</span>
+                                <div style={{ fontSize: '0.73rem', color: dpiTier.color, marginTop: '4px', lineHeight: 1.35, background: 'rgba(0,0,0,0.2)', padding: '6px 8px', borderRadius: '4px' }}>
+                                    {dpiTier.desc}
                                 </div>
+
+                                {dpiTier.tier === 'critical' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTab('redrawer');
+                                            const p = new URLSearchParams(searchParams);
+                                            p.set('tab', 'redrawer');
+                                            setSearchParams(p);
+                                        }}
+                                        style={{
+                                            marginTop: '8px',
+                                            width: '100%',
+                                            background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                                            color: '#fff',
+                                            border: 'none',
+                                            padding: '7px 10px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
+                                        }}
+                                    >
+                                        <span>✏️</span>
+                                        <span>Vectorizar en Redrawer Studio</span>
+                                    </button>
+                                )}
+
                                 {totalPages > 1 ? (
-                                    <div className="xpress-meta-row" style={{ alignItems: 'center' }}>
+                                    <div className="xpress-meta-row" style={{ alignItems: 'center', marginTop: '8px' }}>
                                         <span className="xpress-meta-label">Página</span>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <button 
@@ -923,20 +1386,189 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                         </div>
                                     </div>
                                 ) : metadata.pages ? (
-                                    <div className="xpress-meta-row">
+                                    <div className="xpress-meta-row" style={{ marginTop: '8px' }}>
                                         <span className="xpress-meta-label">Páginas</span>
                                         <span className="xpress-meta-value">{metadata.pages}</span>
                                     </div>
                                 ) : null}
-                                <div className="xpress-meta-row" style={{ marginTop: '12px' }}>
-                                    <span className="xpress-meta-label" style={{ fontSize: '0.8rem' }}>Motor de Preview:</span>
-                                    <span className="xpress-meta-value" style={{ fontSize: '0.8rem', color: metadata.source.includes('Client') ? '#34d399' : '#fbbf24' }}>
+
+                                <div className="xpress-meta-row" style={{ marginTop: '10px' }}>
+                                    <span className="xpress-meta-label" style={{ fontSize: '0.78rem' }}>Motor Preview:</span>
+                                    <span className="xpress-meta-value" style={{ fontSize: '0.78rem', color: metadata.source.includes('Client') ? '#34d399' : '#fbbf24' }}>
                                         {metadata.source}
                                     </span>
                                 </div>
                             </div>
+
+                            {/* 2. Calibrador de Demasías y Sangrado */}
+                            <div className="xpress-card">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px', marginBottom: '10px' }}>
+                                    <h3 style={{ margin: 0, border: 'none', padding: 0 }}>✂️ Calibrador de Demasías</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setToolMode(toolMode === 'bleed' ? 'none' : 'bleed')}
+                                        style={{
+                                            background: toolMode === 'bleed' ? '#0ea5e9' : 'rgba(255,255,255,0.08)',
+                                            color: '#fff',
+                                            border: 'none',
+                                            padding: '3px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {toolMode === 'bleed' ? '✂️ Guías Visibles' : '👁️ Ver Guías'}
+                                    </button>
+                                </div>
+
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '6px' }}>Presets de Producción:</div>
+                                <div className="xpress-bleed-presets">
+                                    <button
+                                        type="button"
+                                        className={`xpress-bleed-preset-btn ${bleedCm === 0.5 ? 'active' : ''}`}
+                                        onClick={() => { setBleedCm(0.5); setToolMode('bleed'); }}
+                                    >
+                                        <span style={{ fontSize: '0.8rem' }}>✂️ 0.5 cm</span>
+                                        <span style={{ fontSize: '0.64rem', opacity: 0.85 }}>Vinilo / Calcos</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`xpress-bleed-preset-btn ${bleedCm === 2.0 ? 'active' : ''}`}
+                                        onClick={() => { setBleedCm(2.0); setToolMode('bleed'); }}
+                                    >
+                                        <span style={{ fontSize: '0.8rem' }}>🚩 2.0 cm</span>
+                                        <span style={{ fontSize: '0.64rem', opacity: 0.85 }}>Lona Frontal</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`xpress-bleed-preset-btn ${bleedCm === 5.0 ? 'active' : ''}`}
+                                        onClick={() => { setBleedCm(5.0); setToolMode('bleed'); }}
+                                    >
+                                        <span style={{ fontSize: '0.8rem' }}>🎒 5.0 cm</span>
+                                        <span style={{ fontSize: '0.64rem', opacity: 0.85 }}>Bolsillo Lona</span>
+                                    </button>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>Demasía (cm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            min="0"
+                                            max="30"
+                                            value={bleedCm}
+                                            onChange={(e) => setBleedCm(Math.max(0, Number(e.target.value)))}
+                                            style={{ width: '100%', padding: '4px 6px', background: 'rgba(0,0,0,0.25)', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.82rem' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>Zona Segura (cm):</label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            min="0"
+                                            max="10"
+                                            value={safetyMarginCm}
+                                            onChange={(e) => setSafetyMarginCm(Math.max(0, Number(e.target.value)))}
+                                            style={{ width: '100%', padding: '4px 6px', background: 'rgba(0,0,0,0.25)', border: '1px solid #334155', color: '#fff', borderRadius: '4px', fontSize: '0.82rem' }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '10px' }}>Bordes con Sangría:</div>
+                                <div className="xpress-sides-grid">
+                                    <button
+                                        type="button"
+                                        className={`xpress-side-btn ${bleedSides.top ? 'active' : ''}`}
+                                        onClick={() => setBleedSides(s => ({ ...s, top: !s.top }))}
+                                        title="Demasía Superior"
+                                    >
+                                        ⬆️ Sup
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`xpress-side-btn ${bleedSides.bottom ? 'active' : ''}`}
+                                        onClick={() => setBleedSides(s => ({ ...s, bottom: !s.bottom }))}
+                                        title="Demasía Inferior"
+                                    >
+                                        ⬇️ Inf
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`xpress-side-btn ${bleedSides.left ? 'active' : ''}`}
+                                        onClick={() => setBleedSides(s => ({ ...s, left: !s.left }))}
+                                        title="Demasía Izquierda"
+                                    >
+                                        ⬅️ Izq
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`xpress-side-btn ${bleedSides.right ? 'active' : ''}`}
+                                        onClick={() => setBleedSides(s => ({ ...s, right: !s.right }))}
+                                        title="Demasía Derecha"
+                                    >
+                                        ➡️ Der
+                                    </button>
+                                </div>
+
+                                {order && (
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveBleedToOrder}
+                                        disabled={isUpdatingOrder}
+                                        style={{
+                                            marginTop: '12px',
+                                            width: '100%',
+                                            background: 'rgba(14, 165, 233, 0.2)',
+                                            border: '1px solid #0ea5e9',
+                                            color: '#38bdf8',
+                                            padding: '7px 10px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '6px'
+                                        }}
+                                    >
+                                        <span>💾</span>
+                                        <span>Guardar Demasía en OT #{order.ot}</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* 3. Gestión de Color & Tintas Solventes (CMYK vs RGB) */}
+                            <div className="xpress-card">
+                                <h3>🎨 Gestión de Color & Tintas</h3>
+                                <div className="xpress-meta-row">
+                                    <span className="xpress-meta-label">Perfil Detectado</span>
+                                    <span className="xpress-meta-value">{metadata.colorMode}</span>
+                                </div>
+
+                                <div className="xpress-color-alert">
+                                    ⚠️ <strong>Alerta RGB:</strong> En impresión con tintas solventes/UV (espacio CMYK), los verdes fosforescentes y cianes saturados sufrirán recorte de gama (gamut clipping). Los negros (0,0,0) deben enriquecerse a C:40 M:40 Y:40 K:100.
+                                </div>
+
+                                <div 
+                                    className={`xpress-color-toggle ${simulateSolvent ? 'active' : ''}`}
+                                    onClick={() => setSimulateSolvent(s => !s)}
+                                    title="Aplica una matriz de compensación para previsualizar virado a tintas solventes"
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span>🧪</span>
+                                        <span>Simular Virado Solvente</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>
+                                        {simulateSolvent ? 'ACTIVO' : 'OFF'}
+                                    </span>
+                                </div>
+                            </div>
                             
-                            {/* Panel de Paleta de Colores (Sprint 3) */}
+                            {/* 4. Panel de Paleta de Colores (Sprint 3) */}
                             {metadata.colors && metadata.colors.length > 0 && (
                                 <div className="xpress-card">
                                     <h3>Paleta de Color Estimada</h3>
@@ -972,6 +1604,103 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             Abre un archivo para ver su metadata técnica.
                         </div>
                     )}
+                </div>
+            </div>
+        </div>
+    )}
+
+    {/* Modal de Rebote Técnico (Fase 5) */}
+    {showRejectModal && (
+        <div className="xpress-modal-overlay" onClick={() => setShowRejectModal(false)}>
+            <div className="xpress-reject-modal" onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>↩️</span> Rebote Técnico de OT-{order?.ot}
+                    </h3>
+                    <button
+                        type="button"
+                        onClick={() => setShowRejectModal(false)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer' }}
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '14px' }}>
+                    Selecciona un motivo común o escribe la causa técnica por la cual este archivo no puede ser enviado a taller:
+                </p>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+                    {[
+                        `Baja resolución (${calculatedDpi} DPI < 72 DPI, pixelado severo)`,
+                        'Tipografías no convertidas a curvas',
+                        'Medidas no proporcionales a las solicitadas',
+                        'Falta sangrado/demasía para confección de bolsillos',
+                        'Requiere vectorización en curvas (Logo ilegible)'
+                    ].map((presetText) => (
+                        <button
+                            key={presetText}
+                            type="button"
+                            className="xpress-reject-preset-chip"
+                            onClick={() => setRejectReason(presetText)}
+                        >
+                            {presetText}
+                        </button>
+                    ))}
+                </div>
+
+                <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="Escribe las especificaciones que el vendedor o cliente deben corregir..."
+                    rows={4}
+                    style={{
+                        width: '100%',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        padding: '10px',
+                        fontSize: '0.88rem',
+                        marginBottom: '18px',
+                        resize: 'vertical'
+                    }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button
+                        type="button"
+                        onClick={() => setShowRejectModal(false)}
+                        style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            color: '#cbd5e1',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
+                        }}
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirmReject}
+                        disabled={!rejectReason.trim() || isUpdatingOrder}
+                        style={{
+                            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                            border: 'none',
+                            color: '#fff',
+                            padding: '8px 18px',
+                            borderRadius: '6px',
+                            cursor: (!rejectReason.trim() || isUpdatingOrder) ? 'not-allowed' : 'pointer',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            opacity: (!rejectReason.trim() || isUpdatingOrder) ? 0.6 : 1
+                        }}
+                    >
+                        {isUpdatingOrder ? 'Guardando...' : 'Confirmar Rebote Técnico'}
+                    </button>
                 </div>
             </div>
         </div>
