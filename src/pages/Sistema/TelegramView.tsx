@@ -181,6 +181,27 @@ export default function TelegramView() {
         }
     };
 
+    const handleRegisterCommands = async () => {
+        setActionLoading('commands');
+        setFeedback(null);
+        try {
+            const resp = await fetch(`${API_URL}/api/telegram/register-commands`, {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                setFeedback({ type: 'success', text: '✅ Menú táctil y comandos nativos (/briefing, /taller, /foto, /pdf) registrados en Telegram.' });
+            } else {
+                setFeedback({ type: 'error', text: `❌ Error: ${data.message || 'No se pudieron registrar'}` });
+            }
+        } catch (err: any) {
+            setFeedback({ type: 'error', text: `❌ Fallo de red: ${err.message}` });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const canActivateWebhook = Boolean(status?.configured || botToken.trim());
 
     return (
@@ -381,6 +402,19 @@ export default function TelegramView() {
                             disabled={actionLoading === 'briefing' || (!status?.configured && !botToken.trim())}
                         >
                             {actionLoading === 'briefing' ? 'Generando...' : '☀️ Despachar Briefing'}
+                        </Button>
+                    </div>
+
+                    <div className="action-item">
+                        <h5>4. Menú Táctil & Comandos</h5>
+                        <p>Sincroniza los comandos oficiales (/briefing, /taller, /foto, /pdf) y activa los botones para tu reloj y móvil.</p>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleRegisterCommands}
+                            disabled={actionLoading === 'commands' || (!status?.configured && !botToken.trim())}
+                        >
+                            {actionLoading === 'commands' ? 'Sincronizando...' : '📱 Sincronizar Menú y Comandos'}
                         </Button>
                     </div>
                 </div>

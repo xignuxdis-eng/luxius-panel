@@ -586,6 +586,31 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Etiquetas Operativas en Carga de Pedido**:
   - Selector visual interactivo de `PRESET_ORDER_TAGS` (`🚨 URGENTE`, `⭐ VIP`, `🔄 REIMPRESIÓN`, `🧪 MUESTRA`, `⏳ ESPERA PAGO`, `📦 STOCK`) integrado en `NuevoPedidoModal.tsx` tanto para carga unitaria como por lotes.
 
+### Sesión 03/10/2026 (5ª parte): Menú Táctil Smartwatch / Móvil, Visualización de Fotos y Emisión de Documentos PDF en Telegram (completado)
+- [x] **Teclado Táctil Persistente (ReplyKeyboardMarkup)**:
+  - Interfaz de botones táctiles directos en pantalla (`get_main_reply_keyboard()`): `☀️ Briefing`, `🖨️ Cola Taller`, `🚨 Alertas Stock`, `📋 Tareas`, `🖼️ Ver Arte OT`, `📄 Pedir PDF OT`, `⚡ Estado`, `ℹ️ Ayuda`.
+  - Optimizado especialmente para Samsung Galaxy Watch Ultra (Wear OS) y apps móviles de Telegram (Android/iOS) para operar el taller sin tipear en teclado miniatura.
+  - Comando `/menu` para activar o refrescar el teclado en cualquier momento.
+- [x] **Registro Oficial de Comandos Nativos (`setMyCommands`)**:
+  - Función `register_telegram_bot_commands()` registra los comandos y descripciones en la API de Telegram para autocompletado en el menú nativo `/`.
+  - Integrado automáticamente en `/setup-webhook` y en el endpoint `POST /api/telegram/register-commands`.
+  - Nuevo botón en frontend `src/pages/Sistema/TelegramView.tsx`: `📱 Sincronizar Menú y Comandos`.
+- [x] **Visualización de Arte y Fotos de Producción (`/foto [código]` o `/ver`)**:
+  - Motor de búsqueda flexible `find_order_by_query()` (por ID parcial ej. `ee97`, cliente ej. `axis`, o la orden más urgente activa si se pulsa el botón sin parámetros).
+  - Descarga transparente desde Cloudflare R2 (`uploads/<archivo>`, `thumbnails/<archivo>`) o disco local.
+  - Preprocesamiento inteligente `prepare_telegram_image()`: conversión de CMYK a RGB JPEG y reescalado adaptativo (máx 1600px, compresión de 11.2MB a ~290KB en milisegundos) para visualización instantánea sin lag en la muñeca o smartphone.
+  - Entrega con `sendPhoto` y botones inline táctiles (`[📄 Descargar PDF]` y `[🖨️ Cola Taller]`).
+- [x] **Emisión y Descarga de Documentos PDF (`/pdf [código]`)**:
+  - Si la orden cuenta con archivo PDF vectorial adjunto en R2: descarga y envío directo vía `sendDocument`.
+  - Si la orden no tiene PDF adjunto (subida en JPG/PNG): generación dinámica en tiempo real de Ficha Técnica / Remito A4 en PDF (`generate_order_ficha_pdf()` con Pillow), incluyendo cabecera LuXius, cliente, fecha, medidas, material, consumo ml, total y previsualización del arte de producción embebido (~140KB).
+- [x] **Recepción y Análisis de Fotografías de Usuario con Gemini Vision**:
+  - Soporte de mensajes tipo `photo` en el webhook. Descarga de imagen y análisis visual automático con `gemini-3.5-flash` para identificar comprobantes de pago, inspección de trabajos impresos en taller, fotos de marquesinas y etiquetas.
+- [x] **Integración con Voz Multimodal**:
+  - Extracción de intenciones de audio para disparar fotos (`FOTO_OT: <código>`) y PDFs (`PDF_OT: <código>`) ante órdenes habladas directas.
+- [x] **Compilación y Verificación**:
+  - Frontend verificado (`npm run build` en 6.94s).
+  - Backend verificado con pruebas unitarias para descarga de R2, compresión de imágenes y generación de PDF.
+
 ---
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)

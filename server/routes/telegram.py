@@ -12,7 +12,8 @@ from services.telegram_service import (
     get_admin_chat_ids,
     save_telegram_config,
     send_telegram_broadcast,
-    cmd_briefing
+    cmd_briefing,
+    register_telegram_bot_commands
 )
 from middleware.auth import login_required
 
@@ -133,6 +134,8 @@ def telegram_setup_webhook():
     webhook_url = data.get('url') or data.get('webhook_url') or 'https://luxius-backend.onrender.com/api/telegram/webhook'
 
     if webhook_url and webhook_url != 'delete':
+        # Registrar también los comandos nativos en Telegram
+        register_telegram_bot_commands()
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/setWebhook",
             json={'url': webhook_url},
@@ -147,6 +150,17 @@ def telegram_setup_webhook():
         result = {'raw': resp.text}
 
     return jsonify(result), resp.status_code
+
+
+@telegram_bp.post('/register-commands')
+@login_required
+def telegram_register_commands():
+    """Registra los comandos de menú en Telegram API."""
+    ok = register_telegram_bot_commands()
+    return jsonify({
+        'ok': ok,
+        'message': 'Comandos registrados en Telegram' if ok else 'Error registrando comandos'
+    }), (200 if ok else 500)
 
 
 @telegram_bp.post('/notify')

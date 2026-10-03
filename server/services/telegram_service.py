@@ -2,7 +2,8 @@
 Servicio de Integración Telegram Bot para LuXius y Xana
 Fase 1: Monitoreo y Taller (Modo Observador)
 Fase 2: Modo Gestor & Notificaciones Push Activas (/addtask, /completar, /clear, /briefing, alertas)
-Fase 3: Modo Comandante con Audio de Voz (Voice-to-Task / Audio Transcription con Gemini Multimodal)
+Fase 3: Modo Comandante con Audio de Voz Multimodal (Voice-to-Task / Audio Transcription con Gemini)
+Fase 4: Teclado Táctil Wear OS & Móvil, Visualización de Arte (Fotos) y Emisión de Documentos / PDFs
 """
 
 import os
@@ -10,9 +11,12 @@ import sys
 import json
 import base64
 import re
+import io
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import requests
+from PIL import Image, ImageDraw
+
 from models import db, Presupuesto, Cliente, Maquina, Vendedor, ConfigGlobal
 from services.briefing_service import generate_daily_briefing, resolve_material_name, resolve_bobina_ancho
 
@@ -78,7 +82,59 @@ def is_admin_chat(chat_id: int | str) -> bool:
     return str(chat_id).strip() in allowed
 
 
-def send_telegram_message(chat_id: int | str, text: str, parse_mode: str = 'Markdown') -> bool:
+# ================================================================
+# TECLADO TÁCTIL (WEAR OS & MÓVIL) Y COMANDOS NATIVOS
+# ================================================================
+
+def get_main_reply_keyboard() -> dict:
+    """
+    Retorna el teclado táctil persistente optimizado para smartwatches (Galaxy Watch) y móviles.
+    Al tocar cada botón, Telegram envía el texto de manera instantánea sin tipear.
+    """
+    return {
+        'keyboard': [
+            [{'text': '☀️ Briefing'}, {'text': '🖨️ Cola Taller'}],
+            [{'text': '🚨 Alertas Stock'}, {'text': '📋 Tareas'}],
+            [{'text': '🖼️ Ver Arte OT'}, {'text': '📄 Pedir PDF OT'}],
+            [{'text': '⚡ Estado'}, {'text': 'ℹ️ Ayuda'}]
+        ],
+        'resize_keyboard': True,
+        'is_persistent': True
+    }
+
+
+def register_telegram_bot_commands() -> bool:
+    """Registra los comandos oficiales en Telegram API para el menú emergente nativo."""
+    token = get_telegram_token()
+    if not token:
+        return False
+    url = f"https://api.telegram.org/bot{token}/setMyCommands"
+    commands = [
+        {"command": "briefing", "description": "☀️ Resumen matutino y tandas de bobina"},
+        {"command": "taller", "description": "🖨️ Cola activa de impresión y metros"},
+        {"command": "foto", "description": "🖼️ Ver arte o foto de una OT (ej: /foto ee97)"},
+        {"command": "pdf", "description": "📄 Descargar archivo PDF o remito de una OT"},
+        {"command": "alertas", "description": "🚨 Insumos bajo stock mínimo"},
+        {"command": "tareas", "description": "📋 Tareas activas de Xana"},
+        {"command": "addtask", "description": "➕ Crear nueva tarea en la memoria"},
+        {"command": "done", "description": "✅ Marcar tarea como completada"},
+        {"command": "status", "description": "⚡ Salud del servidor y base de datos"},
+        {"command": "menu", "description": "📱 Activar botones táctiles en pantalla"}
+    ]
+    try:
+        resp = requests.post(url, json={"commands": commands}, timeout=10)
+        return resp.ok
+    except Exception as e:
+        print(f"[telegram commands] Error registrando comandos: {e}", file=sys.stderr)
+        return False
+
+
+# ================================================================
+# ENVÍO DE MENSAJES Y ARCHIVOS MULTIMEDIA
+# ================================================================
+
+def send_telegram_message(chat_id: int | str, text: str, parse_mode: str = 'Markdown', reply_markup: Optional[dict] = None) -> bool:
+    """Envía un mensaje de texto con soporte automático para el teclado táctil."""
     token = get_telegram_token()
     if not token:
         print("[telegram] Error: TELEGRAM_BOT_TOKEN no configurado.", file=sys.stderr)
@@ -91,15 +147,87 @@ def send_telegram_message(chat_id: int | str, text: str, parse_mode: str = 'Mark
         'parse_mode': parse_mode,
         'disable_web_page_preview': True
     }
+    markup = reply_markup if reply_markup is not None else get_main_reply_keyboard()
+    if markup:
+        payload['reply_markup'] = markup
+
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=12)
         if not resp.ok:
-            # Fallback sin parse_mode si falla por markdown malformado
             payload.pop('parse_mode', None)
-            resp = requests.post(url, json=payload, timeout=10)
+            resp = requests.post(url, json=payload, timeout=12)
         return resp.ok
     except Exception as e:
         print(f"[telegram] Error enviando mensaje a Telegram: {e}", file=sys.stderr)
+        return False
+
+
+def send_telegram_photo(chat_id: int | str, photo: Any, caption: Optional[str] = None, parse_mode: str = 'Markdown', filename: str = 'arte.jpg', reply_markup: Optional[dict] = None) -> bool:
+    """
+    Envía una fotografía a Telegram (URL o bytes binarios).
+    Acepta inline_keyboard o reply_markup.
+    """
+    token = get_telegram_token()
+    if not token:
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    data = {'chat_id': chat_id}
+    if caption:
+        data['caption'] = caption
+        data['parse_mode'] = parse_mode
+
+    if reply_markup is not None:
+        data['reply_markup'] = json.dumps(reply_markup)
+
+    try:
+        if isinstance(photo, (bytes, bytearray)):
+            files = {'photo': (filename, photo, 'image/jpeg')}
+            resp = requests.post(url, data=data, files=files, timeout=25)
+        elif isinstance(photo, str) and (photo.startswith('http://') or photo.startswith('https://')):
+            data['photo'] = photo
+            resp = requests.post(url, data=data, timeout=25)
+        else:
+            with open(photo, 'rb') as f:
+                files = {'photo': (os.path.basename(photo), f, 'image/jpeg')}
+                resp = requests.post(url, data=data, files=files, timeout=25)
+        return resp.ok
+    except Exception as e:
+        print(f"[telegram photo] Error enviando foto: {e}", file=sys.stderr)
+        return False
+
+
+def send_telegram_document(chat_id: int | str, document: Any, filename: str = 'documento.pdf', caption: Optional[str] = None, parse_mode: str = 'Markdown', reply_markup: Optional[dict] = None) -> bool:
+    """
+    Envía un archivo PDF o documento a Telegram (URL o bytes binarios).
+    """
+    token = get_telegram_token()
+    if not token:
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendDocument"
+    data = {'chat_id': chat_id}
+    if caption:
+        data['caption'] = caption
+        data['parse_mode'] = parse_mode
+
+    if reply_markup is not None:
+        data['reply_markup'] = json.dumps(reply_markup)
+
+    try:
+        if isinstance(document, (bytes, bytearray)):
+            files = {'document': (filename, document, 'application/pdf')}
+            resp = requests.post(url, data=data, files=files, timeout=30)
+        elif isinstance(document, str) and (document.startswith('http://') or document.startswith('https://')):
+            data['document'] = document
+            resp = requests.post(url, data=data, timeout=30)
+        else:
+            with open(document, 'rb') as f:
+                files = {'document': (filename or os.path.basename(document), f, 'application/pdf')}
+                resp = requests.post(url, data=data, files=files, timeout=30)
+        return resp.ok
+    except Exception as e:
+        print(f"[telegram document] Error enviando documento: {e}", file=sys.stderr)
         return False
 
 
@@ -122,12 +250,12 @@ def notify_urgent_order(ot_code: str, client_name: str, material: str, ml: float
     """Dispara alerta push a los administradores cuando una orden se vuelve urgente o VIP."""
     msg = (
         f"🚨 *¡ALERTA DE PRIORIDAD EN TALLER!*\n\n"
-        f"• *Orden:* `{ot_code}`\n"
+        f"• *Orden:* `OT-{ot_code}`\n"
         f"• *Cliente:* {client_name}\n"
         f"• *Material:* {material} ({ml:.2f} ml)\n"
         f"• *Estado:* `{status}`\n"
         f"• *Motivo:* {reason}\n\n"
-        f"⚡ _Priorizar en cola de impresión del taller._"
+        f"⚡ _Priorizar en cola de impresión del taller. Podés pedir su arte con: `/foto {ot_code}`_"
     )
     return send_telegram_broadcast(msg) > 0
 
@@ -140,18 +268,19 @@ def notify_stock_alert(codigo: str, desc: str, stock: float, minimo: float, unid
         f"• *Material:* {desc}\n"
         f"• *Stock Actual:* {stock} {unidad}\n"
         f"• *Mínimo Requerido:* {minimo} {unidad}\n\n"
-        f"🛒 _Se recomienda gestionar reposición inmediata._"
+        f"📦 _Reponer insumo antes de iniciar tandas de producción._"
     )
     return send_telegram_broadcast(msg) > 0
 
 
-def notify_xana_decision(decision_id: str, topic: str, choice: str) -> bool:
-    """Notifica una nueva decisión arquitectónica asentada en la memoria de Xana."""
+def notify_xana_decision(decision_id: str, context: str, decision: str) -> bool:
+    """Notifica una decisión autónoma relevante tomada por Xana."""
     msg = (
-        f"🧠 *XANA AI — DECISIÓN ARQUITECTÓNICA ASENTADA*\n\n"
+        f"🧠 *DECISIÓN AUTÓNOMA DE XANA*\n\n"
         f"• *ID:* `{decision_id}`\n"
-        f"• *Tema:* {topic}\n"
-        f"• *Elección:* {choice}\n"
+        f"• *Contexto:* {context}\n"
+        f"• *Resolución:* {decision}\n\n"
+        f"⚙️ _Asentado en memoria operativa del sistema._"
     )
     return send_telegram_broadcast(msg) > 0
 
@@ -160,130 +289,115 @@ def notify_xana_decision(decision_id: str, topic: str, choice: str) -> bool:
 # GESTIÓN DE TAREAS Y MEMORIA DE XANA (Fase 2)
 # ================================================================
 
-def _get_xana_memory() -> Dict[str, Any]:
-    cfg = ConfigGlobal.query.filter_by(clave='xana_memory').first()
-    if cfg and cfg.valor and isinstance(cfg.valor, dict):
-        return cfg.valor
-    return {'tasks': [], 'decisions': [], 'sessions': [], 'commits': []}
+def _get_xana_memory() -> dict:
+    row = ConfigGlobal.query.filter_by(clave='xana_data').first()
+    if row and isinstance(row.valor, dict):
+        return row.valor
+    return {'tasks': [], 'sessions': [], 'commits': []}
 
 
-def _save_xana_memory(store: Dict[str, Any]) -> bool:
+def _save_xana_memory(data: dict) -> bool:
     try:
-        cfg = ConfigGlobal.query.filter_by(clave='xana_memory').first()
-        if not cfg:
-            cfg = ConfigGlobal(clave='xana_memory', valor=store)
-            db.session.add(cfg)
-        else:
-            cfg.valor = store
+        row = ConfigGlobal.query.filter_by(clave='xana_data').first()
+        if not row:
+            row = ConfigGlobal(clave='xana_data', valor={})
+            db.session.add(row)
+        row.valor = data
         db.session.commit()
         return True
     except Exception as e:
         db.session.rollback()
-        print(f"[telegram] Error guardando memoria Xana: {e}", file=sys.stderr)
+        print(f"[telegram] Error guardando xana_data: {e}", file=sys.stderr)
         return False
 
 
-def cmd_addtask(text_content: str, source: str = 'telegram') -> str:
-    """Agrega una nueva tarea a la memoria de Xana."""
-    content = text_content.strip()
-    if not content:
-        return "⚠️ Debes ingresar una descripción para la tarea. Ej: `/addtask Revisar cuchilla plotter Roland`"
+def cmd_addtask(task_text: str, source: str = 'telegram') -> str:
+    clean = task_text.strip()
+    if not clean:
+        return "⚠️ Debes ingresar una descripción para la tarea. Ej: `/addtask Revisar stock de vinilo vehicular`"
 
-    store = _get_xana_memory()
-    tasks = store.get('tasks', [])
+    try:
+        store = _get_xana_memory()
+        tasks = store.get('tasks', [])
 
-    # Calcular próximo número de tarea
-    max_num = 0
-    for t in tasks:
-        tid = t.get('task_id', '')
-        match = re.search(r'(\d+)', tid)
-        if match:
-            max_num = max(max_num, int(match.group(1)))
+        next_idx = len(tasks) + 1
+        task_id = f"TASK-{next_idx:03d}"
+        now_str = _now_ar_iso()
 
-    next_num = max(max_num + 1, len(tasks) + 1)
-    task_code = f"TASK-{next_num:03d}"
+        prio = 'normal'
+        if any(w in clean.lower() for w in ('urgente', 'urgencia', 'ya', 'inmediato', 'crítico')):
+            prio = 'alta'
 
-    new_task = {
-        "id": next_num,
-        "task_id": task_code,
-        "project": "LuXius Taller / Operativo",
-        "objective": content,
-        "status": "in_progress",
-        "source": source,
-        "priority": "alta" if ("urgente" in content.lower() or "hoy" in content.lower()) else "normal",
-        "created_at": _now_ar_iso(),
-        "updated_at": _now_ar_iso()
-    }
+        new_t = {
+            'task_id': task_id,
+            'description': clean,
+            'objective': clean,
+            'status': 'in_progress',
+            'created_at': now_str,
+            'updated_at': now_str,
+            'priority': prio,
+            'source': source
+        }
 
-    tasks.insert(0, new_task)
-    store['tasks'] = tasks
-    if _save_xana_memory(store):
+        tasks.append(new_t)
+        store['tasks'] = tasks
+        _save_xana_memory(store)
+
+        prio_badge = " 🚨 (Prioridad Alta)" if prio == 'alta' else ""
         return (
-            f"✅ *Tarea Registrada en Xana*\n\n"
-            f"• *ID:* `{task_code}`\n"
-            f"• *Objetivo:* {content}\n"
-            f"• *Prioridad:* {new_task['priority'].upper()}\n"
-            f"• *Estado:* `in_progress` 🔄\n"
-            f"• *Origen:* `{source}`"
+            f"✅ *Tarea Registrada en Memoria de Xana*\n\n"
+            f"• *ID:* `{task_id}`{prio_badge}\n"
+            f"• *Detalle:* {clean}\n"
+            f"• *Estado:* `in_progress`\n\n"
+            f"💡 _Para completarla: `/done {task_id}`_"
         )
-    return "❌ Error persistiendo la tarea en la base de datos."
+    except Exception as e:
+        return f"⚠️ Error registrando tarea en la base de datos: {e}"
 
 
 def cmd_completar(task_arg: str) -> str:
-    """Marca una tarea como completada en la memoria de Xana."""
-    arg = task_arg.strip().upper()
-    if not arg:
-        return "⚠️ Indique el ID de la tarea a completar. Ej: `/completar TASK-016` o `/completar 16`"
+    clean = task_arg.strip().upper()
+    if not clean:
+        return "⚠️ Debes ingresar el ID de la tarea. Ej: `/done TASK-012`"
 
-    store = _get_xana_memory()
-    tasks = store.get('tasks', [])
+    try:
+        store = _get_xana_memory()
+        tasks = store.get('tasks', [])
 
-    found = None
-    for t in tasks:
-        tid = str(t.get('task_id', '')).upper()
-        sid = str(t.get('id', ''))
-        if arg in (tid, sid, f"TASK-{arg}", f"TASK-0{arg}", f"TASK-00{arg}"):
-            found = t
-            break
+        found = None
+        for t in tasks:
+            if t.get('task_id', '').upper() == clean or clean in t.get('task_id', '').upper():
+                found = t
+                break
 
-    if not found:
-        return f"❓ No se encontró ninguna tarea con identificador `{arg}`."
+        if not found:
+            return f"❌ No se encontró ninguna tarea con el ID `{clean}`."
 
-    found['status'] = 'completed'
-    found['updated_at'] = _now_ar_iso()
-    store['tasks'] = tasks
+        found['status'] = 'completed'
+        found['completed_at'] = _now_ar_iso()
+        store['tasks'] = tasks
+        _save_xana_memory(store)
 
-    if _save_xana_memory(store):
-        return (
-            f"🎉 *Tarea Marcada como Completada*\n\n"
-            f"• *ID:* `{found.get('task_id')}`\n"
-            f"• *Objetivo:* {found.get('objective')}\n"
-            f"• *Estado:* `completed` ✅"
-        )
-    return "❌ Error actualizando la tarea en la base de datos."
+        desc = found.get('objective') or found.get('description') or ''
+        return f"🎉 *Tarea Completada:* `{found.get('task_id')}`\n_{desc}_\n\nQuedó registrada como finalizada en la memoria."
+    except Exception as e:
+        return f"⚠️ Error actualizando tarea: {e}"
 
 
 def cmd_clear() -> str:
-    """Limpia o archiva tareas completadas antiguas de la vista activa."""
-    store = _get_xana_memory()
-    tasks = store.get('tasks', [])
+    try:
+        store = _get_xana_memory()
+        tasks = store.get('tasks', [])
 
-    in_progress = [t for t in tasks if t.get('status') == 'in_progress']
-    completed = [t for t in tasks if t.get('status') == 'completed']
+        in_progress = [t for t in tasks if t.get('status') == 'in_progress']
+        purged_count = len(tasks) - len(in_progress)
 
-    # Conservar solo las 3 completadas más recientes
-    keep_completed = completed[:3]
-    cleaned_count = len(completed) - len(keep_completed)
+        store['tasks'] = in_progress
+        _save_xana_memory(store)
 
-    store['tasks'] = in_progress + keep_completed
-    if _save_xana_memory(store):
-        return (
-            f"🧹 *Historial de Tareas Depurado*\n\n"
-            f"• *Tareas archivadas:* {max(0, cleaned_count)}\n"
-            f"• *Tareas activas en curso:* {len(in_progress)}\n"
-            f"• *Completadas visibles:* {len(keep_completed)}"
-        )
-    return "❌ Error al limpiar historial."
+        return f"🧹 *Memoria de Xana Depurada:*\nSe archivaron {purged_count} tareas completadas. Quedan {len(in_progress)} tareas activas en progreso."
+    except Exception as e:
+        return f"⚠️ Error limpiando tareas: {e}"
 
 
 # ================================================================
@@ -291,25 +405,49 @@ def cmd_clear() -> str:
 # ================================================================
 
 def cmd_start() -> str:
+    register_telegram_bot_commands()
     return (
-        "🤖 *Xana System — Bot de Control y Taller LuXius (v2.0)*\n"
+        "🤖 *Xana System — Bot de Control y Taller LuXius (v2.1)*\n"
         "Sistema de control agéntico, taller y monitoreo para *XignuX Gráfica*.\n\n"
+        "📱 *Botones Táctiles Activos (Galaxy Watch & Móvil):*\n"
+        "Podés usar los botones fijos en pantalla para consultar todo de 1 solo toque.\n\n"
         "📊 *Monitoreo y Taller:*\n"
-        "• `/status` — Salud del servidor, PostgreSQL y latencia\n"
         "• `/taller` — Cola de impresión, metros lineales y OTs urgentes\n"
         "• `/briefing` — ☀️ Resumen matutino de producción del día\n"
-        "• `/alertas` — Materiales críticos con stock bajo el mínimo\n\n"
+        "• `/alertas` — Insumos críticos con stock bajo el mínimo\n"
+        "• `/status` — Salud del servidor, PostgreSQL y latencia\n\n"
+        "🖼️ *Visualización y Archivos (Fase 4):*\n"
+        "• `/foto [código]` — Ver el arte o foto de producción de una OT (ej: `/foto ee97`)\n"
+        "• `/pdf [código]` — Descargar el PDF original o ficha técnica de una OT\n"
+        "• `/menu` — Mostrar los botones táctiles de acceso rápido\n\n"
         "🧠 *Gestión de Tareas de Xana (Fase 2):*\n"
         "• `/tareas` — Ver tareas en curso y completadas\n"
         "• `/addtask [texto]` — Dictar una nueva tarea para Xana\n"
-        "• `/completar [ID]` — Marcar tarea como completada\n"
-        "• `/clear` — Depurar tareas completadas antiguas\n"
-        "• `/sesiones` — Últimos agentes, modelos y commits registrados\n\n"
+        "• `/done [ID]` — Marcar tarea como completada\n"
+        "• `/clear` — Depurar tareas completadas antiguas\n\n"
         "🎤 *Modo Comandante (Fase 3):*\n"
-        "• ¡Enviame una **nota de voz**! Xana la transcribirá y creará la tarea o responderá tu consulta al instante.\n"
-        "• `/execute [orden]` — Ejecutar consulta agéntica directa a Xana.\n\n"
+        "• ¡Enviame una **nota de voz**! Xana la transcribirá y creará la tarea o responderá al instante.\n"
+        "• Podés pedir por voz: _'mandame la foto de la orden sacilotto'_ o _'pasame el pdf de la orden 123'_.\n\n"
         "🔒 *Seguridad:* Acceso verificado y restringido por Chat ID."
     )
+
+
+def cmd_menu(chat_id: int | str) -> bool:
+    """Fuerza la activación del teclado de botones táctiles en el reloj o móvil."""
+    register_telegram_bot_commands()
+    msg = (
+        "📱 *Teclado Táctil Activado*\n\n"
+        "Tenés los botones de acceso rápido fijados en la parte inferior de la pantalla:\n"
+        "• ☀️ *Briefing:* Resumen matutino de taller\n"
+        "• 🖨️ *Cola Taller:* Órdenes vivas y metros lineales\n"
+        "• 🚨 *Alertas Stock:* Insumos bajo mínimo\n"
+        "• 📋 *Tareas:* Tareas activas de Xana\n"
+        "• 🖼️ *Ver Arte OT:* Solicitar foto de una orden\n"
+        "• 📄 *Pedir PDF OT:* Descargar PDF o remito de una orden\n"
+        "• ⚡ *Estado:* Latencia y salud de servidores\n\n"
+        "⌚ _En tu Galaxy Watch Ultra podés pulsar directamente cada botón con el dedo._"
+    )
+    return send_telegram_message(chat_id, msg, reply_markup=get_main_reply_keyboard())
 
 
 def cmd_status() -> str:
@@ -340,13 +478,12 @@ def cmd_status() -> str:
         f"• *Máquinas Registradas:* {total_maquinas}\n"
         "• *Xana AI:* Operativa (LangGraph + Gate A4 Certificado)\n"
         "• *Cloudflare R2:* Conectado y Activo\n"
-        "• *Telegram Gateway:* Modo Gestor & Comandante Activo"
+        "• *Telegram Gateway:* Modo Gestor, Comandante y Visor Activos"
     )
 
 
 def cmd_taller() -> str:
     try:
-        # Filtrar estrictamente órdenes pendientes de impresión (excluye ya impresas)
         ordenes = Presupuesto.query.filter(
             Presupuesto.deleted_at.is_(None),
             Presupuesto.estado.in_(['orden', 'ORDEN_DE_TRABAJO'])
@@ -362,41 +499,46 @@ def cmd_taller() -> str:
         urgentes = []
         regular_queue = []
 
-        for p in ordenes:
-            esp = p.especificaciones or {}
-            tags = [str(t).lower() for t in (esp.get('tags') or [])]
-            is_urgente = any('urgente' in t or 'vip' in t for t in tags)
+        for o in ordenes:
+            esp = o.especificaciones or {}
+            ancho = esp.get('ancho') or esp.get('anchoReal') or 0
+            alto = esp.get('alto') or esp.get('altoReal') or 0
+            copias = esp.get('copias') or 1
+            tags = esp.get('tags') or []
 
-            ml = float(esp.get('consumoEstimado') or 0.0)
-            if ml <= 0:
-                alto = float(esp.get('alto') or 0.0)
-                copias = int(esp.get('copias') or 1)
-                ml = alto * copias
+            try:
+                c = int(copias)
+                a = float(alto)
+                ml = a * c
+            except Exception:
+                ml = 1.0
+
             total_ml += ml
+            mat_raw = esp.get('material') or 'Material Estándar'
+            mat_name = resolve_material_name(mat_raw)
+            bobina_ancho = resolve_bobina_ancho(esp, float(ancho) if str(ancho).replace('.','',1).isdigit() else 1.0)
+            mat_display = f"{mat_name} ({bobina_ancho})"
 
-            cname = p.cliente.nombre if p.cliente else 'Cliente'
-            raw_mat = esp.get('material')
-            mat_name = resolve_material_name(raw_mat)
-            bob_ancho = resolve_bobina_ancho(esp, raw_mat)
-            ot_code = f"OT-{str(p.id)[:8].upper()}"
+            is_urg = any('URGENTE' in str(t).upper() or 'VIP' in str(t).upper() for t in tags)
+            cl_name = o.cliente.nombre if o.cliente else 'Sin Cliente'
+            ot_code = f"OT-{str(o.id)[:8]}"
 
-            entry = {
+            item_data = {
                 'ot': ot_code,
-                'cliente': cname,
-                'material': f"{mat_name} ({bob_ancho})",
+                'cliente': cl_name,
+                'material': mat_display,
                 'ml': round(ml, 2),
-                'urgente': is_urgente,
-                'estado': p.estado
+                'urgente': is_urg
             }
 
-            if is_urgente:
-                urgentes.append(entry)
+            if is_urg:
+                urgentes.append(item_data)
             else:
-                regular_queue.append(entry)
+                regular_queue.append(item_data)
 
         lines = [
-            "🏭 *Estado del Taller y Cola de Impresión*",
-            f"• *Pendientes para Imprimir:* {total_taller} OTs",
+            "🖨️ *Estado Actual de la Cola de Impresión*\n",
+            f"• *Trabajos Pendientes de Impresión:* {total_taller} OTs",
             f"• *Metros Lineales en Cola:* {total_ml:.2f} ml",
             f"• *🚨 OTs Urgentes / VIP:* {len(urgentes)}",
             f"• *✅ Ya Impresas en Taller:* {total_impresas} OTs\n"
@@ -416,6 +558,8 @@ def cmd_taller() -> str:
 
         if not all_sorted:
             lines.append("✨ *Taller al día: No hay trabajos pendientes de impresión.*")
+        else:
+            lines.append("\n💡 _Para ver el arte o foto: `/foto [código]`_")
 
         return "\n".join(lines)
     except Exception as e:
@@ -542,13 +686,419 @@ def cmd_execute(instruction: str) -> str:
 
 
 # ================================================================
-# MODO COMANDANTE CON AUDIO DE VOZ (Fase 3)
+# FASE 4: VISUALIZACIÓN DE FOTOS Y GENERACIÓN / ENVÍO DE PDFS
 # ================================================================
 
+def find_order_by_query(query: str = "") -> Optional[Presupuesto]:
+    """Busca una orden de trabajo por código parcial, cliente o devuelve la más prioritaria."""
+    clean = (query or '').strip().lower()
+    for prefix in ('ot-', '#', 'ot_', 'orden '):
+        if clean.startswith(prefix):
+            clean = clean[len(prefix):].strip()
+
+    # Si no se pasó código o coincide con el texto del botón
+    if not clean or clean in ('ver foto ot', 'pedir pdf ot', 'foto', 'pdf', 'arte'):
+        # 1. Buscar orden urgente activa
+        urg = Presupuesto.query.filter(
+            Presupuesto.deleted_at.is_(None),
+            Presupuesto.estado.in_(['orden', 'ORDEN_DE_TRABAJO'])
+        ).order_by(Presupuesto.created_at.asc()).all()
+        for o in urg:
+            tags = (o.especificaciones or {}).get('tags', [])
+            if any('URGENTE' in str(t).upper() or 'VIP' in str(t).upper() for t in tags):
+                return o
+        if urg:
+            return urg[0]
+        return Presupuesto.query.filter(Presupuesto.deleted_at.is_(None)).order_by(Presupuesto.id.desc()).first()
+
+    # 1. Búsqueda por ID (parcial al inicio o contenido)
+    by_id = Presupuesto.query.filter(
+        Presupuesto.deleted_at.is_(None),
+        Presupuesto.id.ilike(f"{clean}%")
+    ).first()
+    if by_id:
+        return by_id
+
+    by_id_sub = Presupuesto.query.filter(
+        Presupuesto.deleted_at.is_(None),
+        Presupuesto.id.ilike(f"%{clean}%")
+    ).first()
+    if by_id_sub:
+        return by_id_sub
+
+    # 2. Búsqueda por nombre de cliente
+    cliente_match = Cliente.query.filter(
+        Cliente.nombre.ilike(f"%{clean}%")
+    ).all()
+    if cliente_match:
+        c_ids = [c.id for c in cliente_match]
+        by_client = Presupuesto.query.filter(
+            Presupuesto.deleted_at.is_(None),
+            Presupuesto.cliente_id.in_(c_ids)
+        ).order_by(Presupuesto.id.desc()).first()
+        if by_client:
+            return by_client
+
+    # 3. Búsqueda en descripción
+    by_desc = Presupuesto.query.filter(
+        Presupuesto.deleted_at.is_(None),
+        Presupuesto.descripcion.ilike(f"%{clean}%")
+    ).first()
+    if by_desc:
+        return by_desc
+
+    return None
+
+
+def get_order_image_bytes(order: Presupuesto) -> Tuple[Optional[bytes], Optional[str]]:
+    """Obtiene los bytes del archivo de imagen de la orden desde disco local o Cloudflare R2."""
+    esp = order.especificaciones or {}
+    archivos = esp.get('archivos') or esp.get('archivosOriginales') or []
+    if not archivos:
+        return None, None
+
+    image_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
+    target_filename = None
+    for a in archivos:
+        ext = os.path.splitext(a)[1].lower()
+        if ext in image_exts:
+            target_filename = a
+            break
+
+    if not target_filename:
+        target_filename = archivos[0]
+
+    # 1. Intentar disco local
+    try:
+        from app import UPLOADS_DIR
+        local_p = os.path.join(UPLOADS_DIR, target_filename)
+        if os.path.isfile(local_p):
+            with open(local_p, 'rb') as f:
+                return f.read(), target_filename
+    except Exception:
+        pass
+
+    # 2. Intentar Cloudflare R2
+    try:
+        from services.r2_storage import r2_storage
+        for prefix in ('uploads/', 'thumbnails/', ''):
+            try:
+                k = f"{prefix}{target_filename}"
+                obj = r2_storage.client.get_object(Bucket=r2_storage.bucket_name, Key=k)
+                data = obj['Body'].read()
+                if data:
+                    return data, target_filename
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"[telegram r2] Error conectando con R2: {e}", file=sys.stderr)
+
+    return None, target_filename
+
+
+def prepare_telegram_image(image_bytes: bytes, max_dim: int = 1600) -> bytes:
+    """Optimiza y convierte la imagen a RGB JPEG para entrega instantánea a Smartwatch y Móvil."""
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.mode not in ('RGB', 'L'):
+            img = img.convert('RGB')
+        w, h = img.size
+        if max(w, h) > max_dim:
+            scale = max_dim / max(w, h)
+            new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format='JPEG', quality=85, optimize=True)
+        return out.getvalue()
+    except Exception as e:
+        print(f"[telegram prepare image] Error optimizando: {e}", file=sys.stderr)
+        return image_bytes
+
+
+def generate_order_ficha_pdf(order_code: str, cliente: str, medidas: str, material: str, ml: float, fecha: str, total: float = 0.0, preview_img_bytes: Optional[bytes] = None) -> bytes:
+    """Genera dinámicamente una Ficha Técnica / Remito A4 en PDF para una orden."""
+    w, h = 1240, 1754  # A4 a 150 DPI
+    img = Image.new('RGB', (w, h), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    # Cabecera corporativa Azul Oscuro
+    draw.rectangle([0, 0, w, 160], fill=(15, 23, 42))
+    draw.text((60, 40), "LUXIUS SYSTEM", fill=(56, 189, 248))
+    draw.text((60, 80), "XignuX Gráfica · Ficha Técnica de Taller", fill=(255, 255, 255))
+    draw.text((w - 380, 60), f"OT #{order_code}", fill=(251, 191, 36))
+
+    # Borde exterior
+    draw.rectangle([40, 190, w - 40, h - 80], outline=(226, 232, 240), width=3)
+
+    # Tabla de especificaciones
+    y = 230
+    draw.text((70, y), "DATOS DE LA ORDEN DE TRABAJO", fill=(30, 41, 59))
+    y += 50
+    draw.line([70, y, w - 70, y], fill=(226, 232, 240), width=2)
+    y += 30
+
+    fields = [
+        ("Cliente:", cliente),
+        ("Fecha de Emisión:", fecha),
+        ("Medidas Objetivo:", medidas),
+        ("Material / Bobina:", material),
+        ("Metros Lineales:", f"{ml:.2f} ml"),
+        ("Monto Estimado:", f"${total:,.2f}" if total else "A convenir")
+    ]
+
+    for label, val in fields:
+        draw.text((80, y), label, fill=(100, 116, 139))
+        draw.text((280, y), str(val), fill=(15, 23, 42))
+        y += 42
+
+    y += 40
+    draw.line([70, y, w - 70, y], fill=(226, 232, 240), width=2)
+    y += 30
+
+    draw.text((70, y), "ARTE DE PRODUCCIÓN (PREVIEW)", fill=(30, 41, 59))
+    y += 50
+
+    if preview_img_bytes:
+        try:
+            art = Image.open(io.BytesIO(preview_img_bytes))
+            if art.mode not in ('RGB', 'L'):
+                art = art.convert('RGB')
+            max_art_w = w - 160
+            max_art_h = (h - 120) - y
+            art.thumbnail((max_art_w, max_art_h), Image.Resampling.LANCZOS)
+            offset_x = (w - art.width) // 2
+            img.paste(art, (offset_x, y))
+        except Exception as e:
+            draw.text((80, y), f"[Error previsualizando arte: {e}]", fill=(239, 68, 68))
+    else:
+        draw.text((80, y), "[Sin previsualización de arte disponible]", fill=(148, 163, 184))
+
+    # Pie de página
+    draw.text((60, h - 50), "Documento generado por Xana Operativa · LuXius System", fill=(148, 163, 184))
+
+    pdf_io = io.BytesIO()
+    img.save(pdf_io, format='PDF', resolution=150.0)
+    return pdf_io.getvalue()
+
+
+def cmd_foto(chat_id: int | str, arg: str = "") -> bool:
+    """Envía la imagen o arte de producción de una orden al chat de Telegram."""
+    order = find_order_by_query(arg)
+    if not order:
+        clean_arg = arg.strip()
+        msg = f"❌ No se encontró ninguna orden que coincida con `{clean_arg}`." if clean_arg else "❌ No hay órdenes pendientes con arte disponible en este momento."
+        msg += "\n\n💡 *Ejemplo:* `/foto ee97` o decime por voz _'mostrame la foto de sacilotto'_."
+        return send_telegram_message(chat_id, msg)
+
+    ot_code = str(order.id)[:8]
+    cl_name = order.cliente.nombre if order.cliente else 'Sin Cliente'
+    esp = order.especificaciones or {}
+
+    ancho = esp.get('ancho') or esp.get('anchoReal') or '0'
+    alto = esp.get('alto') or esp.get('altoReal') or '0'
+    material = resolve_material_name(esp.get('material') or 'Vinilo')
+    bobina = resolve_bobina_ancho(esp, float(ancho) if str(ancho).replace('.','',1).isdigit() else 1.0)
+
+    try:
+        copias = int(esp.get('copias') or 1)
+        ml = (float(alto) * copias) if str(alto).replace('.','',1).isdigit() else 1.0
+    except Exception:
+        ml = 1.0
+
+    send_telegram_message(chat_id, f"🔍 _Buscando arte para OT #{ot_code} ({cl_name})..._")
+
+    img_bytes, filename = get_order_image_bytes(order)
+    if not img_bytes:
+        archivos = esp.get('archivos') or esp.get('archivosOriginales') or []
+        pdf_file = next((a for a in archivos if a.lower().endswith('.pdf')), None)
+        if pdf_file:
+            msg = (
+                f"ℹ️ *Orden #{ot_code} ({cl_name})*\n"
+                f"Esta orden cuenta con un archivo vectorial PDF: `{pdf_file}`.\n\n"
+                f"📥 Podés descargarlo con `/pdf {ot_code}`."
+            )
+            return send_telegram_message(chat_id, msg)
+        else:
+            return send_telegram_message(chat_id, f"⚠️ La orden `#{ot_code}` no tiene archivos de imagen disponibles.")
+
+    optimized_bytes = prepare_telegram_image(img_bytes)
+
+    caption = (
+        f"🖼️ *Orden #{ot_code}*\n"
+        f"👤 *Cliente:* {cl_name}\n"
+        f"📐 *Medidas:* {ancho} x {alto} m · ({ml:.2f} ml)\n"
+        f"🧵 *Material:* {material} ({bobina})\n"
+        f"🚦 *Estado:* `{order.estado}`\n"
+        f"📄 *Archivo:* `{filename}`"
+    )
+
+    inline_keyboard = {
+        'inline_keyboard': [
+            [
+                {'text': '📄 Descargar PDF', 'callback_data': f'pdf_{ot_code}'},
+                {'text': '🖨️ Cola Taller', 'callback_data': 'cmd_taller'}
+            ]
+        ]
+    }
+
+    return send_telegram_photo(chat_id, optimized_bytes, caption=caption, filename=filename or f"OT_{ot_code}.jpg", reply_markup=inline_keyboard)
+
+
+def cmd_pdf(chat_id: int | str, arg: str = "") -> bool:
+    """Envía el PDF original o genera una Ficha Técnica en PDF para la orden."""
+    order = find_order_by_query(arg)
+    if not order:
+        clean_arg = arg.strip()
+        msg = f"❌ No se encontró ninguna orden que coincida con `{clean_arg}`." if clean_arg else "❌ No hay órdenes pendientes para emitir PDF."
+        msg += "\n\n💡 *Ejemplo:* `/pdf ee97` o decime por voz _'mandame el pdf de sacilotto'_."
+        return send_telegram_message(chat_id, msg)
+
+    ot_code = str(order.id)[:8]
+    cl_name = order.cliente.nombre if order.cliente else 'Sin Cliente'
+    esp = order.especificaciones or {}
+
+    send_telegram_message(chat_id, f"📄 _Preparando documento PDF para OT #{ot_code}..._")
+
+    archivos = esp.get('archivos') or esp.get('archivosOriginales') or []
+    pdf_filename = next((a for a in archivos if a.lower().endswith('.pdf')), None)
+
+    pdf_bytes = None
+    target_name = f"OT_{ot_code}_FichaTecnica.pdf"
+
+    # 1. Si la orden tiene un PDF original adjunto en R2, enviarlo
+    if pdf_filename:
+        try:
+            from services.r2_storage import r2_storage
+            for prefix in ('uploads/', ''):
+                try:
+                    k = f"{prefix}{pdf_filename}"
+                    obj = r2_storage.client.get_object(Bucket=r2_storage.bucket_name, Key=k)
+                    data = obj['Body'].read()
+                    if data:
+                        pdf_bytes = data
+                        target_name = pdf_filename
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+    # 2. Si no hay PDF original en R2 (ej. arte subido en JPG), generar Ficha Técnica PDF en vivo
+    if not pdf_bytes:
+        img_bytes, _ = get_order_image_bytes(order)
+        ancho = esp.get('ancho') or esp.get('anchoReal') or '0'
+        alto = esp.get('alto') or esp.get('altoReal') or '0'
+        material = resolve_material_name(esp.get('material') or 'Vinilo')
+        bobina = resolve_bobina_ancho(esp, float(ancho) if str(ancho).replace('.','',1).isdigit() else 1.0)
+        try:
+            copias = int(esp.get('copias') or 1)
+            ml = (float(alto) * copias) if str(alto).replace('.','',1).isdigit() else 1.0
+        except Exception:
+            ml = 1.0
+        fecha = order.created_at.strftime("%d/%m/%Y") if order.created_at else datetime.now().strftime("%d/%m/%Y")
+        total = float(order.total or 0)
+
+        pdf_bytes = generate_order_ficha_pdf(
+            order_code=ot_code,
+            cliente=cl_name,
+            medidas=f"{ancho} x {alto} m",
+            material=f"{material} ({bobina})",
+            ml=ml,
+            fecha=fecha,
+            total=total,
+            preview_img_bytes=img_bytes
+        )
+
+    caption = (
+        f"📄 *Ficha Técnica / Documento OT #{ot_code}*\n"
+        f"👤 *Cliente:* {cl_name}\n"
+        f"🚦 *Estado:* `{order.estado}`"
+    )
+
+    return send_telegram_document(chat_id, pdf_bytes, filename=target_name, caption=caption)
+
+
+# ================================================================
+# MODO COMANDANTE CON AUDIO Y FOTOS (Fase 3 & Fase 4)
+# ================================================================
+
+def process_telegram_photo_message(chat_id: int | str, photo_list: list, caption: str = "") -> dict:
+    """Procesa una foto enviada por el usuario (desde smartwatch o móvil) mediante Gemini Vision."""
+    token = get_telegram_token()
+    gemini_key = os.environ.get('GEMINI_API_KEY', '').strip()
+    if not token or not photo_list:
+        return {"ok": False, "error": "missing_data"}
+
+    send_telegram_message(chat_id, "👁️ _Analizando fotografía con Xana Vision..._")
+
+    try:
+        photo = photo_list[-1]
+        file_id = photo.get('file_id')
+
+        file_info_url = f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}"
+        resp_info = requests.get(file_info_url, timeout=10)
+        if not resp_info.ok:
+            return {"ok": False, "error": "get_file_failed"}
+        file_path = resp_info.json().get('result', {}).get('file_path')
+        if not file_path:
+            return {"ok": False, "error": "no_file_path"}
+
+        download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+        r_down = requests.get(download_url, timeout=15)
+        if not r_down.ok:
+            return {"ok": False, "error": "download_failed"}
+
+        b64_img = base64.b64encode(r_down.content).decode('utf-8')
+
+        prompt = (
+            "Sos Xana, el asistente de inteligencia de LuXius System para XignuX Gráfica (imprenta digital y gigantografía).\n"
+            "El usuario te acaba de enviar esta fotografía desde su celular o smartwatch Samsung Galaxy Watch.\n"
+            f"Texto/Comentario adjunto: '{caption or 'Sin texto'}'\n\n"
+            "Analizá la imagen y respondé de manera concisa y ejecutiva en español argentino:\n"
+            "1. ¿Qué tipo de contenido es? (Comprobante de pago, trabajo impreso en taller, foto de marquesina, muestra de color, etiqueta, etc.)\n"
+            "2. Datos clave detectados (números de OT, importes en pesos, clientes, medidas o fechas si son legibles).\n"
+            "3. Conclusión o recomendación técnica para producción o administración."
+        )
+
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={gemini_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": b64_img
+                            }
+                        },
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        }
+
+        g_resp = requests.post(gemini_url, json=payload, timeout=20)
+        if g_resp.ok:
+            data = g_resp.json()
+            cands = data.get('candidates', [])
+            if cands:
+                analysis = cands[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                reply = f"👁️ *Análisis Visual de Xana:*\n\n{analysis}"
+                send_telegram_message(chat_id, reply)
+                return {"ok": True, "analysis": analysis}
+
+        send_telegram_message(chat_id, "⚠️ Recibí la imagen pero no pude completar el análisis visual en este momento.")
+        return {"ok": False, "error": "gemini_error"}
+    except Exception as e:
+        print(f"[telegram photo analysis] Error: {e}", file=sys.stderr)
+        send_telegram_message(chat_id, f"⚠️ Error analizando fotografía: {str(e)[:80]}")
+        return {"ok": False, "error": str(e)}
+
+
 def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: str = 'audio/ogg') -> dict:
-    """
-    Descarga una nota de voz de Telegram, la transcribe con Gemini Multimodal y ejecuta la acción adecuada.
-    """
+    """Descarga una nota de voz de Telegram, la transcribe con Gemini Multimodal y ejecuta la acción adecuada."""
     token = get_telegram_token()
     gemini_key = os.environ.get('GEMINI_API_KEY', '').strip()
 
@@ -588,7 +1138,13 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
             "Sos Xana, el asistente de inteligencia operativa de LuXius System para XignuX Gráfica (imprenta digital y gigantografía).\n"
             "Escuchá con atención este mensaje de voz del operario/dueño y respondé estructuradamente con el siguiente formato exacto:\n\n"
             "TRANSCRIPCION: \"<texto transcripto fielmente en español argentino>\"\n"
-            "ACCION: <si el audio pide anotar una tarea o recordatorio, escribí: CREAR_TAREA: <título conciso>; de lo contrario escribí NINGUNA>\n"
+            "ACCION: <elegí UNA de las siguientes opciones:\n"
+            "- CREAR_TAREA: <título conciso> (si pide anotar una tarea o recordatorio)\n"
+            "- FOTO_OT: <código o cliente> (si pide ver la foto, imagen o arte de una orden)\n"
+            "- PDF_OT: <código o cliente> (si pide el pdf, remito o ficha técnica de una orden)\n"
+            "- TALLER (si pregunta cómo está el taller, qué hay para imprimir o la cola)\n"
+            "- BRIEFING (si pide el resumen matutino del día)\n"
+            "- NINGUNA (para consultas generales o dudas)>\n"
             "RESPUESTA: <tu respuesta ejecutiva, cordial y directa al usuario>\n"
         )
 
@@ -655,8 +1211,21 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
             f"🗣️ _{transcription or 'Audio analizado'}_{task_created_msg}\n\n"
             f"🤖 *Respuesta:*\n{response_body}"
         )
-
         send_telegram_message(chat_id, final_msg)
+
+        # Ejecución proactiva si pidió Foto, PDF, Taller o Briefing
+        act_upper = action.upper()
+        if "FOTO_OT:" in act_upper:
+            target_ot = action.split(":", 1)[1].strip()
+            cmd_foto(chat_id, target_ot)
+        elif "PDF_OT:" in act_upper:
+            target_ot = action.split(":", 1)[1].strip()
+            cmd_pdf(chat_id, target_ot)
+        elif act_upper == "TALLER":
+            send_telegram_message(chat_id, cmd_taller())
+        elif act_upper == "BRIEFING":
+            send_telegram_message(chat_id, cmd_briefing())
+
         return {"ok": True, "transcription": transcription, "model": success_model}
 
     except Exception as e:
@@ -670,7 +1239,39 @@ def process_telegram_voice_message(chat_id: int | str, file_id: str, mime_type: 
 # ================================================================
 
 def process_telegram_update(update: dict) -> dict:
-    """Procesa un webhook update de Telegram y despacha comandos de texto y voz."""
+    """Procesa un webhook update de Telegram y despacha comandos de texto, botones, fotos y voz."""
+    # 0. Manejo de botones Inline (Callback Queries)
+    callback_query = update.get('callback_query')
+    if callback_query:
+        cb_id = callback_query.get('id')
+        cb_data = callback_query.get('data') or ''
+        cb_chat = callback_query.get('message', {}).get('chat', {})
+        cb_chat_id = cb_chat.get('id')
+
+        token = get_telegram_token()
+        if token and cb_id:
+            try:
+                requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", json={'callback_query_id': cb_id}, timeout=5)
+            except Exception:
+                pass
+
+        if not is_admin_chat(cb_chat_id):
+            return {"ok": False, "error": "unauthorized"}
+
+        if cb_data.startswith('pdf_'):
+            ot_sub = cb_data.split('_', 1)[1]
+            cmd_pdf(cb_chat_id, ot_sub)
+        elif cb_data.startswith('foto_'):
+            ot_sub = cb_data.split('_', 1)[1]
+            cmd_foto(cb_chat_id, ot_sub)
+        elif cb_data == 'cmd_taller':
+            send_telegram_message(cb_chat_id, cmd_taller())
+        elif cb_data == 'cmd_briefing':
+            send_telegram_message(cb_chat_id, cmd_briefing())
+
+        return {"ok": True, "action": "callback_processed", "data": cb_data}
+
+    # Mensaje normal
     message = update.get('message') or update.get('edited_message')
     if not message:
         return {"ok": True, "action": "ignored_no_message"}
@@ -697,7 +1298,13 @@ def process_telegram_update(update: dict) -> dict:
         mime_type = voice.get('mime_type') or 'audio/ogg'
         return process_telegram_voice_message(chat_id, file_id, mime_type)
 
-    # 2. Comprobar texto
+    # 2. Comprobar si es una fotografía enviada por el usuario (Fase 4)
+    photo = message.get('photo')
+    if photo:
+        caption = message.get('caption') or ''
+        return process_telegram_photo_message(chat_id, photo, caption)
+
+    # 3. Comprobar texto / comandos / botones táctiles
     text = (message.get('text') or '').strip()
     if not text:
         return {"ok": True, "action": "ignored_empty_text"}
@@ -706,35 +1313,40 @@ def process_telegram_update(update: dict) -> dict:
     raw_cmd = parts[0].lower()
     arg = parts[1].strip() if len(parts) > 1 else ""
 
-    # Limpiar arroba de username del bot (ej. /status@luxius_bot -> /status)
     cmd = raw_cmd.split('@')[0] if '@' in raw_cmd else raw_cmd
+    norm = text.lower().strip()
 
-    response_text = ""
-    if cmd in ('/start', '/ayuda', '/help'):
-        response_text = cmd_start()
-    elif cmd in ('/status', '/salud', '/estado'):
-        response_text = cmd_status()
-    elif cmd in ('/taller', '/cola', '/impresion'):
-        response_text = cmd_taller()
-    elif cmd in ('/briefing', '/manana', '/mañana', '/resumen'):
-        response_text = cmd_briefing()
-    elif cmd in ('/alertas', '/stock'):
-        response_text = cmd_alertas()
-    elif cmd in ('/tareas', '/tasks'):
-        response_text = cmd_tareas()
+    # Despachador enriquecido para comandos y botones táctiles del reloj
+    if norm.startswith('☀️') or norm == 'briefing' or cmd in ('/briefing', '/manana', '/mañana', '/resumen'):
+        send_telegram_message(chat_id, cmd_briefing())
+    elif norm.startswith('🖨️') or norm in ('cola taller', 'taller', 'cola') or cmd in ('/taller', '/cola', '/impresion'):
+        send_telegram_message(chat_id, cmd_taller())
+    elif norm.startswith('🚨') or norm in ('alertas stock', 'alertas', 'stock') or cmd in ('/alertas', '/stock'):
+        send_telegram_message(chat_id, cmd_alertas())
+    elif norm.startswith('📋') or norm in ('tareas', 'tasks') or cmd in ('/tareas', '/tasks'):
+        send_telegram_message(chat_id, cmd_tareas())
+    elif norm.startswith('⚡') or norm in ('estado', 'salud', 'status') or cmd in ('/status', '/salud', '/estado'):
+        send_telegram_message(chat_id, cmd_status())
+    elif norm.startswith('ℹ️') or norm in ('ayuda', 'help') or cmd in ('/start', '/ayuda', '/help'):
+        send_telegram_message(chat_id, cmd_start())
+    elif norm.startswith('📱') or norm in ('menu', 'menú', 'botones') or cmd in ('/menu', '/botones'):
+        cmd_menu(chat_id)
+    elif norm.startswith('🖼️') or norm in ('ver arte ot', 'ver foto ot', 'arte', 'foto') or cmd in ('/foto', '/imagen', '/ver', '/arte'):
+        cmd_foto(chat_id, arg)
+    elif norm.startswith('📄') or norm in ('pedir pdf ot', 'pdf', 'remito', 'doc') or cmd in ('/pdf', '/remito', '/doc'):
+        cmd_pdf(chat_id, arg)
     elif cmd in ('/addtask', '/agregartarea', '/nueva'):
-        response_text = cmd_addtask(arg, source='telegram')
+        send_telegram_message(chat_id, cmd_addtask(arg, source='telegram'))
     elif cmd in ('/completar', '/done', '/terminar'):
-        response_text = cmd_completar(arg)
+        send_telegram_message(chat_id, cmd_completar(arg))
     elif cmd in ('/clear', '/limpiar'):
-        response_text = cmd_clear()
+        send_telegram_message(chat_id, cmd_clear())
     elif cmd in ('/sesiones', '/agentes', '/commits'):
-        response_text = cmd_sesiones()
+        send_telegram_message(chat_id, cmd_sesiones())
     elif cmd in ('/execute', '/ejecutar', '/xana'):
-        response_text = cmd_execute(arg)
+        send_telegram_message(chat_id, cmd_execute(arg))
     else:
         # Si escribe texto libre sin comando, lo tratamos como consulta interactiva a Xana
-        response_text = cmd_execute(text)
+        send_telegram_message(chat_id, cmd_execute(text))
 
-    send_telegram_message(chat_id, response_text)
     return {"ok": True, "command": cmd, "chat_id": chat_id}
