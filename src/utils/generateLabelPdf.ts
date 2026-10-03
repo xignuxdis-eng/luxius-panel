@@ -1,13 +1,14 @@
 import type { Order } from '@/types'
 import { XIGNUX_LOGO_LIGHT } from './logoBase64Light'
+import { ARTEGRA_BOLD_BASE64, ARTEGRA_SEMIBOLD_BASE64 } from './artegraFontsBase64'
 import { resolveMediaUrl, getClientes } from '@/data/db'
 import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
 
 /**
  * Generador de Etiquetas de Producción para Rollos — Luxius System
  * 
+ * Tipografía oficial de marca: Artegra Sans Bold y Artegra Sans Semibold (embebidas en Base64).
  * Formato alargado de alto impacto visual (105mm ancho).
- * Diseñado para adherirse a lo largo del rollo de material gráfico.
  */
 
 // ============================================================
@@ -17,8 +18,8 @@ export const LABEL_CONFIG = {
     whatsapp: '3517897667',
     website: 'XIGNUX.COM.AR',
     labelWidthMM: 105,   // Ancho estándar de etiqueta alargada para rollo
-    thumbSize: 150,      // Altura máxima de miniatura
-    thumbQuality: 0.80,
+    thumbSize: 180,      // Altura máxima de miniatura
+    thumbQuality: 0.85,
 }
 
 // ============================================================
@@ -51,14 +52,14 @@ const LOADING_HTML = `<!DOCTYPE html>
             margin-bottom: 18px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        h2 { font-size: 18px; font-weight: 700; margin: 0 0 6px 0; }
+        h2 { font-size: 19px; font-weight: 700; margin: 0 0 6px 0; }
         p { font-size: 13px; color: #94a3b8; margin: 0; }
     </style>
 </head>
 <body>
     <div class="spinner"></div>
     <h2>🏷️ Armando Etiqueta de Producción</h2>
-    <p>Optimizando miniaturas y preparando documento...</p>
+    <p>Cargando miniaturas y tipografías Artegra Sans...</p>
 </body>
 </html>`
 
@@ -120,10 +121,45 @@ interface LabelFileItem {
 }
 
 // ============================================================
-// CSS ESTILIZADO DE ALTO IMPACTO
+// CSS ESTILIZADO DE ALTO IMPACTO CON ARTEGRA SANS EMBEBIDA
 // ============================================================
 const LABEL_CSS = `
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@400;600;700;800;900&display=swap');
+    @font-face {
+        font-family: 'Artegra Sans';
+        src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_BOLD_BASE64}) format('opentype');
+        font-weight: 700;
+        font-style: normal;
+    }
+    @font-face {
+        font-family: 'Artegra Sans';
+        src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_BOLD_BASE64}) format('opentype');
+        font-weight: 800;
+        font-style: normal;
+    }
+    @font-face {
+        font-family: 'Artegra Sans';
+        src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_BOLD_BASE64}) format('opentype');
+        font-weight: 900;
+        font-style: normal;
+    }
+    @font-face {
+        font-family: 'Artegra Sans';
+        src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_SEMIBOLD_BASE64}) format('opentype');
+        font-weight: 600;
+        font-style: normal;
+    }
+    @font-face {
+        font-family: 'Artegra Sans';
+        src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_SEMIBOLD_BASE64}) format('opentype');
+        font-weight: 400;
+        font-style: normal;
+    }
+    @font-face {
+        font-family: 'Artegra Sans';
+        src: url(data:font/opentype;charset=utf-8;base64,${ARTEGRA_SEMIBOLD_BASE64}) format('opentype');
+        font-weight: 500;
+        font-style: normal;
+    }
 
     @page {
         size: ${LABEL_CONFIG.labelWidthMM}mm auto;
@@ -132,18 +168,19 @@ const LABEL_CSS = `
 
     * {
         box-sizing: border-box;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 
     html, body {
         margin: 0;
         padding: 0;
-        background: #e2e8f0;
+        background: #cbd5e1;
         color: #0f172a;
-        font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Artegra Sans', sans-serif;
+        font-weight: 600;
         font-size: 13px;
         line-height: 1.35;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
     }
 
     .no-print-bar {
@@ -152,15 +189,16 @@ const LABEL_CSS = `
         align-items: center;
         background: #0f172a;
         color: #fff;
-        padding: 10px 18px;
+        padding: 12px 20px;
         width: 100%;
         max-width: ${LABEL_CONFIG.labelWidthMM}mm;
-        margin: 12px auto 8px auto;
+        margin: 14px auto 8px auto;
         border-radius: 8px;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
     .no-print-bar .title {
-        font-weight: 800;
+        font-family: 'Artegra Sans', sans-serif;
+        font-weight: 700;
         font-size: 14px;
         letter-spacing: 0.5px;
         display: flex;
@@ -171,13 +209,14 @@ const LABEL_CSS = `
         background: #0d9488;
         color: #fff;
         border: none;
-        padding: 8px 20px;
+        padding: 9px 22px;
         border-radius: 6px;
         cursor: pointer;
-        font-weight: 800;
-        font-size: 13px;
+        font-family: 'Artegra Sans', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
         letter-spacing: 0.5px;
-        box-shadow: 0 2px 6px rgba(13,148,136,0.4);
+        box-shadow: 0 2px 8px rgba(13,148,136,0.5);
         transition: background 0.15s, transform 0.1s;
     }
     .btn-print:hover { background: #0f766e; }
@@ -198,22 +237,22 @@ const LABEL_CSS = `
 
     .label-page {
         width: ${LABEL_CONFIG.labelWidthMM}mm;
-        margin: 10px auto 40px auto;
+        margin: 12px auto 40px auto;
         background: #fff;
-        border: 2px solid #0f172a;
-        border-radius: 6px;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.12);
-        padding: 18px 16px;
+        border: 2.5px solid #0f172a;
+        border-radius: 8px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        padding: 20px 18px;
     }
 
-    /* Logo prominente */
+    /* Logo prominente y de impacto */
     .label-logo {
         text-align: center;
-        padding: 4px 0 10px 0;
+        padding: 6px 0 12px 0;
     }
     .label-logo img {
-        width: 220px;
-        max-width: 90%;
+        width: 240px;
+        max-width: 95%;
         height: auto;
         object-fit: contain;
         display: block;
@@ -223,21 +262,21 @@ const LABEL_CSS = `
     /* Separadores punteados de estilo técnico */
     .dotted-divider {
         border-top: 2.5px dotted #0f172a;
-        margin: 12px 0;
+        margin: 14px 0;
     }
 
     /* Bloque Destacado de Proyecto / Fecha */
     .label-project-block {
         background: #f8fafc;
-        border: 1.5px solid #0f172a;
-        border-radius: 6px;
-        padding: 10px 12px;
+        border: 2px solid #0f172a;
+        border-radius: 8px;
+        padding: 12px 14px;
         text-align: center;
-        margin-bottom: 4px;
     }
     .label-project-block .project-title {
-        font-size: 17px;
-        font-weight: 900;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 19px;
+        font-weight: 700;
         color: #0f172a;
         margin: 0 0 6px 0;
         line-height: 1.25;
@@ -246,54 +285,56 @@ const LABEL_CSS = `
         text-transform: uppercase;
     }
     .label-project-block .project-meta {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 12px;
-        font-size: 11.5px;
+        font-family: 'Artegra Sans', sans-serif;
+        font-weight: 600;
+        font-size: 12.5px;
         color: #475569;
-        font-weight: 700;
     }
     .label-project-block .label-material {
         background: #0f172a;
         color: #fff;
-        padding: 3px 8px;
+        padding: 4px 10px;
         border-radius: 4px;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.5px;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
         text-transform: uppercase;
-        margin-top: 6px;
+        margin-top: 8px;
         display: inline-block;
     }
 
     /* Secciones (Destinatario, Dirección) */
     .label-section {
-        margin: 10px 0;
+        margin: 12px 0;
     }
     .label-section-header {
+        font-family: 'Artegra Sans', sans-serif;
         font-size: 11px;
-        font-weight: 900;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 1.5px;
+        letter-spacing: 2px;
         color: #64748b;
-        margin: 0 0 3px 0;
+        margin: 0 0 4px 0;
     }
     .label-section-value {
-        font-size: 18px;
-        font-weight: 900;
-        color: #0f172a;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 24px;
+        font-weight: 700;
+        color: #000000;
         margin: 0;
         line-height: 1.2;
         letter-spacing: 0.5px;
         word-break: break-word;
+        text-transform: uppercase;
     }
     .label-section-address {
-        font-size: 14px;
-        font-weight: 700;
-        color: #334155;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: #1e293b;
         margin: 0;
-        line-height: 1.3;
+        line-height: 1.35;
         word-break: break-word;
     }
 
@@ -302,22 +343,24 @@ const LABEL_CSS = `
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin: 12px 0 8px 0;
+        margin: 14px 0 10px 0;
     }
     .detail-title {
-        font-size: 11.5px;
-        font-weight: 900;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 1.5px;
+        letter-spacing: 2px;
         color: #0f172a;
         margin: 0;
     }
     .detail-count {
-        font-size: 11px;
-        font-weight: 800;
-        background: #e2e8f0;
-        color: #0f172a;
-        padding: 2px 7px;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 11.5px;
+        font-weight: 700;
+        background: #0f172a;
+        color: #fff;
+        padding: 2px 8px;
         border-radius: 12px;
     }
 
@@ -325,29 +368,30 @@ const LABEL_CSS = `
     .thumbs-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
+        gap: 10px;
     }
     .thumb-card {
-        border: 1.5px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 6px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
         background: #fff;
         break-inside: avoid;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
     .thumb-card .img-container {
         width: 100%;
-        height: 105px;
+        height: 115px;
         background: #f8fafc;
-        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        margin-bottom: 5px;
+        margin-bottom: 6px;
     }
     .thumb-card img {
         max-width: 100%;
@@ -358,50 +402,53 @@ const LABEL_CSS = `
         display: block;
     }
     .thumb-no-img {
-        font-size: 24px;
+        font-size: 26px;
         color: #94a3b8;
     }
     .thumb-card .thumb-name {
-        font-size: 10.5px;
-        font-weight: 800;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 11.5px;
+        font-weight: 700;
         color: #0f172a;
-        margin: 0 0 3px 0;
+        margin: 0 0 4px 0;
         word-break: break-word;
         line-height: 1.25;
         letter-spacing: -0.2px;
     }
     .thumb-card .thumb-dims-badge {
-        font-size: 10px;
-        font-weight: 800;
-        background: #f1f5f9;
-        color: #0d9488;
-        border: 1px solid #ccfbf1;
-        padding: 2px 6px;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 3px 8px;
         border-radius: 4px;
         display: inline-block;
-        letter-spacing: 0.2px;
+        letter-spacing: 0.3px;
         white-space: nowrap;
     }
 
     /* Footer de Alto Impacto */
     .label-footer {
-        margin-top: 14px;
-        padding: 10px 0 4px 0;
-        border-top: 2.5px solid #0f172a;
+        margin-top: 18px;
+        padding: 12px 0 4px 0;
+        border-top: 3px solid #0f172a;
         text-align: center;
     }
     .label-footer .footer-whatsapp {
-        font-size: 15px;
-        font-weight: 900;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 17px;
+        font-weight: 700;
         color: #15803d;
         margin: 0 0 3px 0;
         letter-spacing: 0.5px;
     }
     .label-footer .footer-web {
-        font-size: 13px;
-        font-weight: 900;
+        font-family: 'Artegra Sans', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
         color: #0f172a;
-        letter-spacing: 1.5px;
+        letter-spacing: 2px;
         margin: 0;
     }
 `
@@ -412,7 +459,7 @@ const LABEL_CSS = `
 
 /**
  * Genera e imprime la Etiqueta de Producción para una o varias órdenes.
- * Optimizado para velocidad inmediata y máxima fidelidad visual.
+ * Optimizado para velocidad inmediata, tipografía oficial y máxima fidelidad visual.
  */
 export async function generateProductionLabel(orders: Order[]): Promise<void> {
     if (!orders || orders.length === 0) return
@@ -470,7 +517,7 @@ export async function generateProductionLabel(orders: Order[]): Promise<void> {
         const materials = Array.from(new Set(orders.map(o => o.material).filter(Boolean)))
         const material = materials.join(' / ')
 
-        // 6. Recopilar archivos reales (usando order.archivos como clave y order.archivosOriginales como nombre)
+        // 6. Recopilar archivos REALES (usando order.archivos como URL y order.archivosOriginales como nombre)
         const allFiles: { name: string; url: string; ancho?: number; alto?: number; copias?: number }[] = []
         for (const order of orders) {
             const filesList = order.archivos && order.archivos.length > 0 ? order.archivos : []
@@ -506,7 +553,7 @@ export async function generateProductionLabel(orders: Order[]): Promise<void> {
             }
         }
 
-        // 7. Optimizar miniaturas de forma asíncrona y rápida (timeout 3.5s)
+        // 7. Optimizar miniaturas de forma asíncrona y rápida (timeout 3s)
         const uniqueUrls = Array.from(new Set(allFiles.map(f => f.url).filter(Boolean)))
         let urlMap = new Map<string, string>()
 
@@ -516,7 +563,7 @@ export async function generateProductionLabel(orders: Order[]): Promise<void> {
                     maxWidth: 320,
                     maxHeight: 320,
                     quality: LABEL_CONFIG.thumbQuality,
-                    timeoutMs: 3500,
+                    timeoutMs: 3000,
                 })
                 urlMap = new Map(uniqueUrls.map((u, i) => [u, optimizedUrls[i] || u]))
             } catch (e) {
