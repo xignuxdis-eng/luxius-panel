@@ -752,6 +752,24 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Instalado el paquete oficial `mcp-server-sqlite` y el SDK oficial `mcp` en el entorno global (Python 3.12).
   - Declarado el servidor MCP `luxius-sqlite` tanto a nivel global (`C:\Users\Admin\.gemini\config\mcp_config.json`) como en el workspace (`.agents/mcp_config.json`), conectando con `F:\luXius-Backend\luxius.db`.
   - Habilita al agente IA a interactuar con tablas, esquemas, claves foráneas e índices de la base de datos de manera estandarizada y segura.
+- [x] **Construcción y Despliegue del Servidor MCP Propio (`luxius-core`)**:
+  - Implementado `mcp_server.py` utilizando el SDK oficial `mcp` (v2.x con `MCPServer`).
+  - Expone 13 herramientas operativas de negocio con tipado y descripciones para LLMs:
+    1. `obtener_estado_orden`: estado, cliente, total y saldo de OT por código.
+    2. `buscar_ordenes`: búsqueda multicriterio (cliente, OT, material, urgentes).
+    3. `consultar_resumen_taller`: órdenes en cola, metros lineales, bobinas y urgencias.
+    4. `consultar_briefing_matutino`: reporte ejecutivo diario con recomendación táctica de Xana.
+    5. `estado_maquinas`: listado y telemetría de impresoras y plotters activos (Roland, Graphtec, etc.).
+    6. `crear_borrador_orden`: creación de borradores de OT.
+    7. `consultar_stock`: bobinas y stock físico por sustrato/tinta/código.
+    8. `consultar_alertas_stock`: materiales por debajo del umbral de seguridad.
+    9. `cotizar_impresion`: motor de cotización con cálculo de m², desperdicio y acabados.
+    10. `consultar_tarifario_oficial`: precios unitarios vigentes por m² y ml.
+    11. `metricas_cliente`: facturación y órdenes por período.
+    12. `ranking_clientes`: top de clientes por volumen.
+    13. `asesoramiento_tecnico_grafico`: recomendaciones de DPI, CMYK/RGB, Rich Black y sustratos.
+  - Expone 2 recursos MCP URI (`luxius://briefing`, `luxius://tarifario`) y 1 prompt especializado (`planificar_taller`).
+  - Registrado en `mcp_config.json` global y de workspace para ejecución local vía transporte `stdio`.
 - [x] **Depuración Estructural y Organización de `luXius-Backend`**:
   - **Diagnóstico**: La raíz de `luXius-Backend` contenía más de 300 archivos mezclados (67 snapshots `.tsx` de React huérfanos, más de 130 scripts de parche/diagnóstico `debug_*.py`, `fix_*.py`, `verify_*.py`, y logs de texto).
   - **Acción Segura**: Se estructuró el directorio `_archive/` (`frontend_snapshots/`, `one_off_scripts/`, `debug_logs_and_samples/`).
@@ -760,7 +778,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Verificación de Integridad y Pruebas**:
   - Verificación de rutas oficiales (`python scripts/tests/check_public_routes.py`): 84 rutas analizadas, 9 públicas, 0 fuera de lista blanca.
   - Verificación de importación de Flask (`python -c "import app; ..."`): Exitoso con conexión activa a PostgreSQL Neon.
-  - Verificación de compilación frontend (`npm run build` en `luxius-panel`): 6.35s sin errores.
+  - Verificación de compilación frontend (`npm run build` en `luxius-panel`): 6.47s sin errores.
 
 ---
 

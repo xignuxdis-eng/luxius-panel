@@ -6,6 +6,12 @@
         "--db-path",
         "f:/luXius-Backend/luxius.db"
       ]
+    },
+    "luxius-core": {
+      "command": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "args": [
+        "f:/luXius-Backend/mcp_server.py"
+      ]
     }
   }
 }
