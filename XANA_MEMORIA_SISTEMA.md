@@ -754,7 +754,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Habilita al agente IA a interactuar con tablas, esquemas, claves foráneas e índices de la base de datos de manera estandarizada y segura.
 - [x] **Construcción y Despliegue del Servidor MCP Propio (`luxius-core`)**:
   - Implementado `mcp_server.py` utilizando el SDK oficial `mcp` (v2.x con `MCPServer`).
-  - Expone 13 herramientas operativas de negocio con tipado y descripciones para LLMs:
+  - Expone 16 herramientas operativas y administrativas de negocio con tipado y descripciones para LLMs:
     1. `obtener_estado_orden`: estado, cliente, total y saldo de OT por código.
     2. `buscar_ordenes`: búsqueda multicriterio (cliente, OT, material, urgentes).
     3. `consultar_resumen_taller`: órdenes en cola, metros lineales, bobinas y urgencias.
@@ -768,6 +768,9 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
     11. `metricas_cliente`: facturación y órdenes por período.
     12. `ranking_clientes`: top de clientes por volumen.
     13. `asesoramiento_tecnico_grafico`: recomendaciones de DPI, CMYK/RGB, Rich Black y sustratos.
+    14. `crear_cliente`: creación atómica de clientes con validación anti-duplicados por nombre/CUIT.
+    15. `editar_cliente`: actualización granular de campos de clientes (dirección, teléfono, CUIT, email, categoría, etc.).
+    16. `editar_orden`: modificación granular de órdenes de trabajo por OT o nombre de proyecto (ej. actualizar logística/envío del proyecto 'Mosto', estados, notas, etiquetas).
   - Expone 2 recursos MCP URI (`luxius://briefing`, `luxius://tarifario`) y 1 prompt especializado (`planificar_taller`).
   - Registrado en `mcp_config.json` global y de workspace para ejecución local vía transporte `stdio`.
 - [x] **Depuración Estructural y Organización de `luXius-Backend`**:
