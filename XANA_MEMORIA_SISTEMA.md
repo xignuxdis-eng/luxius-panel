@@ -904,12 +904,11 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - **Objetivo**: Evitar que cualquier usuario o scraper pueda descargar artes gráficos de clientes en `/uploads/<filename>` con solo conocer o enumerar el nombre del archivo.
 - **Prerrequisitos**: Cloudflare R2 con permisos para generar presigned URLs en S3 (`boto3.generate_presigned_url`).
 - **Archivos Afectados**:
-  - `f:\luXius-Backend\services\storage.py`
-  - `f:\luXius-Backend\routes\files.py`
-  - `f:\luXius-Backend\app.py`
-  - `src/utils/fileUrl.ts` (o resolvedor de URLs de frontend)
+  - `f:\luXius-Backend\services\r2_storage.py` (cliente boto3 de R2)
+  - `f:\luXius-Backend\app.py` (`serve_upload`, ruta `/uploads/<path:filename>`, ~línea 220)
+  - Frontend: localizar con grep las construcciones de URL `/uploads/` (no existe un resolvedor único; verificar antes de editar)
 - **Paso a Paso de Implementación**:
-  1. *[Acción IA]* En `services/storage.py`, implementar `generate_download_url(filename, expires_in=3600)`:
+  1. *[Acción IA]* En `services/r2_storage.py`, implementar `generate_download_url(filename, expires_in=3600)`:
      - Genera una URL firmada de Cloudflare R2 válida por 1 hora (`s3_client.generate_presigned_url('get_object', Params={'Bucket': BUCKET, 'Key': f'uploads/{filename}'}, ExpiresIn=expires_in)`).
   2. *[Acción IA]* En los serializadores de órdenes (`Presupuesto.to_dict()`) y endpoints de consulta, devolver URLs firmadas dinámicas o crear el endpoint autenticado `GET /api/files/signed-url?file=<filename>` (`@login_required`).
   3. *[Acción IA]* Mantener `/uploads/<filename>` público solo para miniaturas y logos públicos si fuera necesario, restringiendo los artes de alta resolución originales.
@@ -920,11 +919,11 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - **Archivos Afectados**:
   - Frontend: `src/pages/Dashboard/Profile.tsx` (código muerto que apunta a `/api/users/<id>` inexistente; el perfil real es `PerfilModal.tsx` con `saveUsuario`).
   - Backend: Directorio obsoleto `f:\luXius-Backend\server\` (espejo residual no consumido por Gunicorn, que corre `f:\luXius-Backend\app.py`).
-  - Frontend: Métodos sin uso en `src/services/apiService.ts` (`updateUser`, `getUsers`).
+  - Frontend: `updateUser`/`getUsers` en `src/services/api.ts` (líneas ~294 y ~351). **Ojo**: NO están sin uso; los consumen páginas legacy (`src/components/AdminTest.tsx`, `DashboardAdminSimple.tsx`, `DashboardDebug.tsx`, `src/pages/Dashboard/admin/usuarios.tsx`, `admin/upload.tsx`, `Profile.tsx`). Primero confirmar con grep en `App.tsx` que esas páginas no están ruteadas; recién entonces borrar páginas + métodos juntos.
 - **Paso a Paso de Implementación**:
   1. *[Acción IA]* Verificar que `Profile.tsx` no esté importado en ninguna parte del proyecto mediante grep search. Borrar `src/pages/Dashboard/Profile.tsx`.
   2. *[Acción IA]* En `f:\luXius-Backend\`, eliminar la carpeta `server/` que contiene archivos legacy no utilizados por la aplicación principal.
-  3. *[Acción IA]* En `src/services/apiService.ts`, limpiar métodos deprecados.
+  3. *[Acción IA]* Si las páginas legacy del punto anterior no están ruteadas, borrarlas junto con `updateUser`/`getUsers` de `src/services/api.ts`.
   4. *[Acción IA]* Ejecutar `npm run build` y correr suite de tests en backend para confirmar que no se rompieron dependencias.
 - **Criterio de Verificación**: `npm run build` pasa limpiamente; árbol de archivos más liviano y sin código huérfano.
 
@@ -936,7 +935,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - `f:\luXius-Backend\app.py`
   - `scratch/sync_server.py`
 - **Paso a Paso de Implementación**:
-  1. *[Acción IA]* Copiar `xana_voice.py` y `xana_vault.py` desde `Sitio XignuX/server/routes/` hacia `luXius-Backend/routes/`.
+  1. *[Acción IA]* Copiar `xana_voice.py` y `xana_vault.py` desde `Sitio XignuX/server/routes/` (verificado que existen ahí) hacia `luXius-Backend/routes/`, revisando antes sus imports y dependencias (STT/Drive) contra `requirements.txt`.
   2. *[Acción IA]* Agregar los registros de blueprints correspondientes en `f:\luXius-Backend\app.py` con decoradores de autenticación correspondientes (`@login_required` o `@operator_required`).
   3. *[Acción IA]* Ajustar `scratch/sync_server.py` para eliminar la regla de divergencia y permitir sincronización 100% simétrica de blueprints.
 - **Criterio de Verificación**: Ambos repositorios contienen los mismos servicios; endpoints de voz y bóveda responden correctamente con token JWT.
