@@ -79,3 +79,6 @@ tools/realesrgan/
 *CREDENCIALES*
 *CREDENTIALS*
 private_legacy_r2.py
+
+# Backend: vive solo en el repo privado luXius-Backend (copia local sin versionar, 03/10/2026)
+server/

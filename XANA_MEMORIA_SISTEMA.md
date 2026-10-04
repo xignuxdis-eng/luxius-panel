@@ -1,5 +1,5 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 03/10/2026 20:30 (Auditoría Integral de Seguridad + Modelo de Roles y Permisos + Roadmap Maestro de Implementación para IAs)  
+> **Última Actualización:** 03/10/2026 23:15 (Ejecutadas tareas P1/P2/P3 del roadmap: server/ fuera del repo público, react-router 7, Redis opcional, limpieza de código muerto, suite de seguridad en repo. Pendientes del usuario en sección 8 → "📝 Tareas del Usuario")  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -40,7 +40,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 7. **Cero Secretos en Código o Repositorios**: Jamás commitear tokens, contraseñas, URLs de conexión o claves API (`.env`, `*.db`, archivos de credenciales). Todo secreto debe inyectarse por variables de entorno del hosting (`Render`) o `.env` local (estrictamente git-ignorado). En logs, enmascarar siempre contraseñas y connection strings.
 8. **Principio de Mínimo Privilegio en Endpoints (Flask)**: Todo nuevo endpoint en backend DEBE llevar decorador explícito (`@login_required`, `@operator_required` o `@admin_required`). Quedan terminantemente prohibidos los endpoints abiertos/públicos salvo justificación explícita de autenticación o assets estáticos con sanitización (ver lista blanca en Sección 4).
 9. **Prevención de SSRF y Path Traversal**: En toda descarga o procesamiento de URLs externas (ej. escalador, importador cloud) usar `services/security_utils.py:is_safe_url` en cada redirección para bloquear IPs privadas (127.0.0.1, 10.x, 169.254.x, etc.) y esquemas no HTTP(S). En `/uploads`, validar siempre con `_safe_upload_relpath` y servir SVGs con CSP `sandbox`.
-10. **Sincronización Dual de Servidor (`server/` y `luXius-Backend`)**: Al modificar código del backend en `luXius-Backend/`, mantener sincronizada la carpeta `f:\Sitio XignuX\server\` usando `scratch/sync_server.py`, respetando las divergencias conocidas (líneas de `voice_bp` y `vault_bp` en `app.py`).
+10. **Backend = solo `luXius-Backend` (privado)**: desde el 03/10/2026 la carpeta `server/` de `luxius-panel` **ya no se versiona** (está en `.gitignore`; queda solo como copia local en disco y en el historial viejo). Todo cambio de backend se hace y commitea en `f:\luXius-Backend\`. La carpeta legacy `luXius-Backend/server/` también fue eliminada (Render ejecuta `gunicorn app:app` desde la raíz). Antes de commitear cambios de rutas, correr `python scripts/tests/check_public_routes.py` (falla si aparece un endpoint público fuera de la lista blanca) y, con el backend local levantado, `python scripts/tests/test_security_suite.py` (33 pruebas).
 11. **Despliegue gh-pages sin Redirección de Errores**: Al invocar `.\scripts\deploy_gh_pages.ps1` en PowerShell, **NO** usar `2>&1` porque el script define `$ErrorActionPreference = 'Stop'` y cualquier warning no fatal en stderr aborta la ejecución. Ejecutarlo de forma directa: `.\scripts\deploy_gh_pages.ps1`.
 
 ---
@@ -232,6 +232,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 | **Auditoría de Seguridad Integral: Secretos expuestos, claves por defecto y falta de autenticación en endpoints** (**03/10/2026**) | 6 cuentas operativas tenían claves por defecto ('admin', 'adrian', 'sistema', 'impresion', 'diseño', 'vendedor') heredadas de seeds antiguos. Varios endpoints carecían de decoradores de auth. Endpoint `/api/usuarios` permitía auto-ascenso a administrador. Secretos hardcodeados en código. | Rotación de contraseñas de las 6 cuentas con hashes aleatorios seguros (`CREDENCIALES_NUEVAS.txt`), restricción estricta de ABM usuarios solo a administradores, invalidación de tokens (`token_version`), protección con decoradores `@login_required`/`@operator_required`, webhook Telegram con `secret_token`, anti-SSRF con `is_safe_url`, throttle anti fuerza bruta en login, e interceptor `authFetch.ts` en frontend. | `middleware/auth.py`<br>`services/security_utils.py`<br>`routes/auth.py`<br>`app.py`<br>`routes/orders.py`<br>`routes/telegram.py`<br>`routes/upscaler.py`<br>`src/utils/authFetch.ts`<br>`src/data/db.ts` |
 | **Falta de variables R2_* en Render causaba fallback a almacenamiento local** (**03/10/2026**) | En el dashboard de Render no estaban configuradas las variables de entorno `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, etc., provocando que el backend intentara guardar en disco efímero de Render o fallara en el streaming. | Implementado módulo transitorio `private_legacy_r2.py` en el repo privado para no interrumpir el servicio multimedia (`storage: r2-legacy` en `/health`), con plan de migración inmediata a claves rotadas cargadas en Render. | `config.py`<br>`luXius-Backend/private_legacy_r2.py` |
 | **Contraseñas cambiadas por el usuario no impactaban en la base de datos** (**03/10/2026**) | Hasta el commit `dbccec1` (03/09/2026), la función `saveUsuario` en el frontend solo persistía datos en el `localStorage` del navegador y no enviaba peticiones PUT/POST al backend, haciendo que la base de datos conservara los valores de fábrica. | Depuración completa de `saveUsuario` para sincronizar con `/api/usuarios`, invalidación de caché local en `getUsuarios()` y rotación definitiva en PostgreSQL. | `src/data/db.ts`<br>`app.py` |
+| **Rate limit global compartido por todos los usuarios** (**03/10/2026**) | Flask-Limiter usaba `get_remote_address` y en Render todas las peticiones llegan desde la IP del proxy, por lo que el límite de 200 req/min por IP era en la práctica global; además el estado vivía en memoria de cada worker. | `key_func` pasa a `client_ip(request)` (X-Forwarded-For) y `storage_uri` usa `REDIS_URL` si existe; `RedisLoginThrottle` opcional. | `app.py`<br>`services/security_utils.py`<br>`requirements.txt` |
 
 ---
 
@@ -838,7 +839,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 #### 🛠️ Nivel P1: Mejoras Críticas de Arquitectura y Dependencias
 
-##### [ ] Tarea P1.1: Desacople de `server/` del Repositorio Público `luxius-panel`
+##### [x] Tarea P1.1: Desacople de `server/` del Repositorio Público `luxius-panel`
+> **Estado 03/10/2026 23:15**: HECHO. `git rm -r --cached server` + `server/` en `.gitignore` del panel. Los archivos siguen en disco. **Sigue pendiente (requiere OK explícito del usuario)**: reescribir el historial público con `git-filter-repo` para borrar commits viejos con secretos; mientras tanto la mitigación es rotar R2/Neon (P0.1/P0.2).
 - **Objetivo**: Evitar la exposición innecesaria del código fuente y endpoints del backend en el repositorio público de frontend de GitHub Pages.
 - **Contexto**: El repositorio `luxius-panel` es público para permitir el hosting gratuito de GitHub Pages. La carpeta `server/` es un espejo del backend `luXius-Backend` (que sí es privado). Si bien los secretos ya fueron eliminados del código, exponer la lógica de endpoints y esquemas facilita el reconocimiento a atacantes.
 - **Archivos Afectados**:
@@ -859,7 +861,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - En GitHub (`https://github.com/xignuxdis-eng/luxius-panel`), la carpeta `server/` ya no figura en la rama `master`.
   - El frontend compila y despliega en `gh-pages` con total normalidad.
 
-##### [ ] Tarea P1.2: Migración de `react-router-dom` 6.x a 7.x (Resolución Vulnerabilidades npm)
+##### [x] Tarea P1.2: Migración de `react-router-dom` 6.x a 7.x (Resolución Vulnerabilidades npm)
+> **Estado 03/10/2026 23:15**: HECHO. `react-router-dom@^7.18.4`; sin cambios de código (API usada: HashRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation, useSearchParams). Build OK y smoke test en navegador (login, redirección de rutas protegidas y catch-all) sin errores de consola. **No probado aún con sesión iniciada**: el usuario debe navegar las pantallas principales tras el deploy. `npm audit` ahora solo reporta esbuild/vite (ver P1.4).
 - **Objetivo**: Resolver las 2 vulnerabilidades moderadas reportadas por `npm audit` en `react-router` / `react-router-dom` (open redirect con backslashes y riesgos de SSR).
 - **Prerrequisitos**: Frontend compilando limpiamente (`npm run build`).
 - **Archivos Afectados**:
@@ -878,7 +881,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - **Criterio de Verificación**: `npm audit` reporta 0 vulnerabilidades en el árbol de dependencias de react-router; `npm run build` genera los chunks correctamente y la navegación funciona sin recargas completas.
 - **Riesgo y Rollback**: Romper la navegación en modo SPA hash (`/#/entrada`). Rollback: `git reset --hard HEAD~1` y `npm install`.
 
-##### [ ] Tarea P1.3: Almacenamiento Distribuido para Rate-Limiting, Throttle y Jobs Asíncronos
+##### [~] Tarea P1.3: Almacenamiento Distribuido para Rate-Limiting, Throttle y Jobs Asíncronos
+> **Estado 03/10/2026 23:15**: CÓDIGO LISTO, falta que el usuario cree un Redis (ej. Upstash free) y cargue `REDIS_URL` en Render. `services/security_utils.py` → `RedisLoginThrottle` (se activa solo si `REDIS_URL` responde a `ping`, si no cae a memoria); `app.py` → Flask-Limiter usa `REDIS_URL` como `storage_uri`; `redis>=4.2` en `requirements.txt`. Además el limitador global ahora usa la IP real del cliente (`client_ip`, X-Forwarded-For) en vez de la IP del proxy de Render (antes los 200 req/min eran compartidos por TODOS los usuarios). Pendiente IA: mover `_SMART_JOBS` / `_ACTIVE_RECONCILE_JOBS` a Redis cuando exista `REDIS_URL`.
 - **Objetivo**: Evitar que el rate limiting (`LoginThrottle`, `Flask-Limiter`) y el seguimiento de tareas (`_SMART_JOBS`, `_ACTIVE_RECONCILE_JOBS`) se ejecuten en la memoria volátil del proceso de Gunicorn, lo cual duplica los límites ante múltiples workers y pierde el estado al reiniciar el dyno en Render.
 - **Prerrequisitos**: Base de datos Redis o servicio serverless compatible (ej. Upstash Redis o Redis addon en Render).
 - **Archivos Afectados**:
@@ -895,6 +899,12 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
      - Almacenar los estados de `_SMART_JOBS` en Redis con serialización JSON y expiración automática de 24 horas.
   3. *[Acción IA]* Si `REDIS_URL` no está presente, mantener el fallback en memoria actual para desarrollo local sin dependencias obligatorias.
 - **Criterio de Verificación**: Al correr Gunicorn con 2 workers (`--workers=2`), los intentos de login fallidos se computan globalmente entre ambos procesos.
+
+##### [ ] Tarea P1.4: Actualizar Vite 5 → 6.4.3+ (o 8) para cerrar la alerta de esbuild
+- **Contexto**: `npm audit` (03/10/2026) reporta `esbuild <=0.24.2` (GHSA-67mh-4wv8-2f99, moderada) vía `vite@5.4.21`. Solo afecta al **servidor de desarrollo** (`npm run dev`): una web maliciosa abierta en el mismo navegador podría leer respuestas del dev server. El build publicado en gh-pages NO está afectado.
+- **Archivos**: `package.json`, `vite.config.ts` (plugin propio que inyecta `CACHE_NAME` en `sw.js`, `manualChunks`, alias), `@vitejs/plugin-react`.
+- **Pasos**: 1) Rama/stash de seguridad. 2) `npm install -D vite@^6 @vitejs/plugin-react@latest` (probar 6 antes que 8). 3) `npm run build`; revisar que existan los chunks `vendor-pdf`, `vendor-charts`, `vendor-icons`, `vendor-core` y que `dist/sw.js` tenga `CACHE_NAME = 'luxius-v<timestamp>'`. 4) `npx vite preview` + smoke test con sesión. 5) `npm audit` sin esbuild. 6) Deploy gh-pages.
+- **Mitigación mientras tanto**: no navegar sitios desconocidos con `npm run dev` corriendo.
 
 ---
 
@@ -914,7 +924,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   3. *[Acción IA]* Mantener `/uploads/<filename>` público solo para miniaturas y logos públicos si fuera necesario, restringiendo los artes de alta resolución originales.
 - **Criterio de Verificación**: Peticiones directas anónimas a archivos de clientes en R2 o backend devuelven 401/403 sin la firma temporal criptográfica válida.
 
-##### [ ] Tarea P2.2: Limpieza y Eliminación de Código Muerto en Frontend y Backend
+##### [x] Tarea P2.2: Limpieza y Eliminación de Código Muerto en Frontend y Backend
+> **Estado 03/10/2026 23:15**: HECHO. Se eliminaron 50 archivos TS/TSX inalcanzables desde `src/main.tsx` (detectados con un recorrido de imports que resuelve los alias de Vite): `src/services/api.ts`, `src/pages/Dashboard/{admin,artista,cliente,impresor}/`, `Profile.tsx`, `pages/{Dashboard,Landing,Login,Uploads}.tsx`, componentes legacy (`Sidebar.tsx`, `Header.tsx`, `AppSidebar.tsx`, `StockCharts.tsx`, tests de admin, etc.), `src/data/{clients,materials,tasks,initialClientes,id_utils}.ts`, `utils/{csv,format,clearData,materialHelpers}.ts`. Errores de `tsc --noEmit` bajaron de 202 a 65 (los restantes son previos y no bloquean el build, que es `vite build`). Se conservaron a propósito `ProveedoresView.tsx`/`NuevoProveedorModal.tsx` (no ruteados, posible feature futura) y `logoBase64.ts`. Backend: eliminada la copia legacy `luXius-Backend/server/` (196 archivos).
 - **Objetivo**: Reducir la superficie de ataque, eliminar advertencias de linting y mejorar los tiempos de build retirando módulos huérfanos.
 - **Archivos Afectados**:
   - Frontend: `src/pages/Dashboard/Profile.tsx` (código muerto que apunta a `/api/users/<id>` inexistente; el perfil real es `PerfilModal.tsx` con `saveUsuario`).
@@ -927,7 +938,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   4. *[Acción IA]* Ejecutar `npm run build` y correr suite de tests en backend para confirmar que no se rompieron dependencias.
 - **Criterio de Verificación**: `npm run build` pasa limpiamente; árbol de archivos más liviano y sin código huérfano.
 
-##### [ ] Tarea P2.3: Unificación de Servicios de Voz y Bóveda Drive entre Ambos Repositorios
+##### [x] Tarea P2.3: Unificación de Servicios de Voz y Bóveda Drive entre Ambos Repositorios
+> **Estado 03/10/2026 23:15**: CERRADA SIN PORTAR (decisión). Ningún archivo del frontend llama a `/api/xana/voice/*` ni `/api/xana/vault/*`; la voz real funciona por Web Speech API (web) y Gemini (Telegram), y la bóveda Drive vive en `routes/google_drive.py`. `xana_voice.py` usa STT `mock` por defecto. Si algún día se necesitan, recuperarlos del historial de `luxius-panel` (`server/routes/xana_voice.py`, `xana_vault.py`) y registrarlos en `luXius-Backend/app.py`.
 - **Objetivo**: Resolver la divergencia donde `xana_voice.py` y `xana_vault.py` existen en `f:\Sitio XignuX\server\` pero no en `f:\luXius-Backend\`.
 - **Archivos Afectados**:
   - `f:\luXius-Backend\routes\xana_voice.py`
@@ -952,11 +964,16 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   3. *[Acción IA]* Asegurar que todas las llamadas de la app móvil apunten a `https://luxius-backend.onrender.com` con `Authorization: Bearer <token>`.
 - **Criterio de Verificación**: Build de Android (APK/AAB) generado sin advertencias de tráfico en texto claro; token protegido por Keystore de Android.
 
+##### [ ] Tarea P2.5: Verificar confianza en `X-Forwarded-For` detrás de Render
+- **Contexto**: `client_ip()` toma la PRIMERA IP de `X-Forwarded-For`. Si Render no sobrescribe ese header, un atacante podría falsear su IP y esquivar `LoginThrottle` / Flask-Limiter (no permite acceder a nada, solo evadir el bloqueo por intentos).
+- **Pasos**: 1) Agregar temporalmente un log (o endpoint admin) que registre `X-Forwarded-For` y `remote_addr` en Render. 2) Hacer una petición con `X-Forwarded-For: 1.2.3.4` falso y ver qué llega. 3) Si Render agrega la IP real al FINAL, cambiar `client_ip()` para tomar la última IP (o usar `werkzeug.middleware.proxy_fix.ProxyFix(x_for=1)`). 4) Re-correr `test_security_suite.py`.
+
 ---
 
 #### 📊 Nivel P3: Observabilidad, Automatización de Pruebas y Calidad de Código
 
-##### [ ] Tarea P3.1: Incorporación de Suite Automatizada de Pruebas de Seguridad en Repositorio
+##### [x] Tarea P3.1: Incorporación de Suite Automatizada de Pruebas de Seguridad en Repositorio
+> **Estado 03/10/2026 23:15**: HECHO. `scripts/tests/check_public_routes.py` (estático, 84 rutas, 9 públicas en lista blanca, exit 1 si aparece otra) y `scripts/tests/test_security_suite.py` (33/33 PASS contra backend local; parametrizable con `LUXIUS_API_URL`, `LUXIUS_TEST_CLIENT_UID/CID`, `LUXIUS_TEST_ADMIN_UID`).
 - **Objetivo**: Que cada pipeline o desarrollador pueda verificar de forma instantánea la seguridad de rutas antes de desplegar, evitando regresiones donde endpoints protegidos vuelvan a quedar públicos.
 - **Archivos Afectados**:
   - `f:\luXius-Backend\scripts\tests\test_security_suite.py`
@@ -969,7 +986,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
      `python scripts/tests/test_security_suite.py`
 - **Criterio de Verificación**: Ejecución de la suite con salida `33/33 tests PASSED` en consola.
 
-##### [ ] Tarea P3.2: Entornos Virtuales y Auditoría Continua de Dependencias Python (`pip-audit`)
+##### [x] Tarea P3.2: Entornos Virtuales y Auditoría Continua de Dependencias Python (`pip-audit`)
+> **Estado 03/10/2026 23:15**: HECHO. `pip-audit -r requirements.txt` (desde un venv aislado, sin instalar nada global): **No known vulnerabilities found**. Repetir periódicamente.
 - **Objetivo**: Garantizar que el entorno de desarrollo y las dependencias de Render estén libres de vulnerabilidades conocidas (CVEs) sin instalar paquetes globales.
 - **Prerrequisitos**: Cumplimiento de la regla de la skill `managing-python-dependencies`.
 - **Archivos Afectados**:
@@ -997,6 +1015,22 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   3. Ejecutar como servicio de fondo en Windows o script de inicio.
 - **Criterio de Verificación**: Al cambiar una orden a estado `orden`, el archivo se descarga en el Hot Folder y la orden muestra badge verde `En cola de RIP`.
 
+
+---
+
+### 📝 Tareas del Usuario (no automatizables — actualizado 03/10/2026 23:15)
+
+> Cuando completes una, avisá a la IA para que la marque `[x]` y haga la limpieza asociada.
+
+1. [ ] **Rotar token de Cloudflare R2** (P0.1) y cargar `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` en Render → la IA verifica `/health` = `"storage":"r2"` y borra `private_legacy_r2.py`.
+2. [ ] **Rotar contraseña de Neon** (P0.2) y actualizar `DATABASE_URL` en Render y en `.env` locales (hacerlo en horario sin actividad del taller).
+3. [ ] **Repartir contraseñas nuevas** de `f:\luXius-Backend\CREDENCIALES_NUEVAS.txt` y borrar el archivo (P0.3).
+4. [ ] **Probar el bot de Telegram**: mandar `/start` a `@LuXius_Taller_Bot` y confirmar que responde (verifica el webhook con secreto).
+5. [ ] **Probar el panel con sesión iniciada** tras el deploy de react-router 7: Entrada, Diseño, Impresión, Stock, ABM, Sistema, Xpress Studio, Presupuestador. Avisar si alguna pantalla queda en blanco.
+6. [ ] **(Opcional) Crear Redis** (Upstash free o Redis de Render) y cargar `REDIS_URL` en Render (P1.3) → límites de login compartidos entre workers.
+7. [ ] **(Opcional) Portal de clientes**: decidir si los clientes van a entrar al panel; si sí, asignarles `clientId` y contraseña desde Sistema → Usuarios (P0.4).
+8. [ ] **(Decisión) Reescribir historial público** de `luxius-panel` para borrar commits viejos con secretos (destructivo; solo con tu OK explícito). Si rotás R2 y Neon, deja de ser urgente.
+9. [ ] **(Opcional) Rotar claves Gemini/OpenAI** si alguna vez estuvieron en el repo.
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 
