@@ -862,7 +862,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - El frontend compila y despliega en `gh-pages` con total normalidad.
 
 ##### [x] Tarea P1.2: Migración de `react-router-dom` 6.x a 7.x (Resolución Vulnerabilidades npm)
-> **Estado 03/10/2026 23:15**: HECHO. `react-router-dom@^7.18.4`; sin cambios de código (API usada: HashRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation, useSearchParams). Build OK y smoke test en navegador (login, redirección de rutas protegidas y catch-all) sin errores de consola. **No probado aún con sesión iniciada**: el usuario debe navegar las pantallas principales tras el deploy. `npm audit` ahora solo reporta esbuild/vite (ver P1.4).
+> **Estado 03/10/2026 23:15**: HECHO. `react-router-dom@^7.18.4`; sin cambios de código (API usada: HashRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation, useSearchParams). Build OK; en navegador se verificó que el build carga y muestra la ruta #/login (no se llegó a revisar la consola ni la navegación con sesión). **No probado aún con sesión iniciada**: el usuario debe navegar las pantallas principales tras el deploy. `npm audit` ahora solo reporta esbuild/vite (ver P1.4).
 - **Objetivo**: Resolver las 2 vulnerabilidades moderadas reportadas por `npm audit` en `react-router` / `react-router-dom` (open redirect con backslashes y riesgos de SSR).
 - **Prerrequisitos**: Frontend compilando limpiamente (`npm run build`).
 - **Archivos Afectados**:
