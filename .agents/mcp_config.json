@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "luxius-sqlite": {
+      "command": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\mcp-server-sqlite.exe",
+      "args": [
+        "--db-path",
+        "f:/luXius-Backend/luxius.db"
+      ]
+    }
+  }
+}

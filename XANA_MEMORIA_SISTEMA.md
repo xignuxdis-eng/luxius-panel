@@ -747,6 +747,20 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   5. **Transitorio R2**: como Render no tenia variables R2_*, el backend PRIVADO usa private_legacy_r2.py (solo en luXius-Backend, ignorado en luxius-panel) como respaldo para no cortar las imagenes. /health muestra storage: r2-legacy hasta que se carguen las claves rotadas en Render; despues borrar ese archivo.
   6. **Seguimiento (03/10 noche)**: `getUsuarios()` purga contraseñas viejas cacheadas en localStorage de cada navegador. Causa de que las contraseñas 'ya cambiadas' siguieran siendo las de fábrica: antes del commit `dbccec1` (03/09/2026) `saveUsuario` solo guardaba en localStorage. `npm audit`: 2 moderadas en react-router 6.x (open redirect con backslash / SSR) — riesgo bajo (no se navega a URLs del usuario ni hay SSR); el fix exige migrar a react-router 7 (breaking), planificar. `src/pages/Dashboard/Profile.tsx` es código muerto (no se importa; usa `/api/users` inexistente).
 
+### Sesión 04/10/2026: Configuración del Servidor MCP SQLite y Depuración Estructural del Repositorio Backend (completado)
+- [x] **Configuración del Servidor MCP SQLite (`luxius-sqlite`)**:
+  - Instalado el paquete oficial `mcp-server-sqlite` y el SDK oficial `mcp` en el entorno global (Python 3.12).
+  - Declarado el servidor MCP `luxius-sqlite` tanto a nivel global (`C:\Users\Admin\.gemini\config\mcp_config.json`) como en el workspace (`.agents/mcp_config.json`), conectando con `F:\luXius-Backend\luxius.db`.
+  - Habilita al agente IA a interactuar con tablas, esquemas, claves foráneas e índices de la base de datos de manera estandarizada y segura.
+- [x] **Depuración Estructural y Organización de `luXius-Backend`**:
+  - **Diagnóstico**: La raíz de `luXius-Backend` contenía más de 300 archivos mezclados (67 snapshots `.tsx` de React huérfanos, más de 130 scripts de parche/diagnóstico `debug_*.py`, `fix_*.py`, `verify_*.py`, y logs de texto).
+  - **Acción Segura**: Se estructuró el directorio `_archive/` (`frontend_snapshots/`, `one_off_scripts/`, `debug_logs_and_samples/`).
+  - Se movieron 77 archivos frontend obsoletos, 130 scripts de prueba/parche y 16 volcados de log preservando el historial git mediante `git mv`.
+  - **Resultado**: La raíz del backend quedó reducida a sus componentes vitales (de 301 a 78 archivos: entrypoints `app.py`/`production.py`, configuraciones de despliegue, modelos, documentación activa y rutas).
+- [x] **Verificación de Integridad y Pruebas**:
+  - Verificación de rutas oficiales (`python scripts/tests/check_public_routes.py`): 84 rutas analizadas, 9 públicas, 0 fuera de lista blanca.
+  - Verificación de importación de Flask (`python -c "import app; ..."`): Exitoso con conexión activa a PostgreSQL Neon.
+  - Verificación de compilación frontend (`npm run build` en `luxius-panel`): 6.35s sin errores.
 
 ---
 
