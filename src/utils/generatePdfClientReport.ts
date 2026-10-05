@@ -1,7 +1,21 @@
 import type { Order } from '@/types'
 import { XIGNUX_LOGO_LIGHT, XIGNUX_LOGO_BASE64 } from './logoBase64Light'
-import { resolveMediaUrl } from '@/data/db'
+import { resolveMediaUrl, getMateriales } from '@/data/db'
 import { batchOptimizePdfThumbnails } from './pdfImageOptimizer'
+
+const KNOWN_MATERIALS: Record<string, string> = {
+    'VV': 'Vinilo Vehicular (VV)',
+    'VVP': 'Vinilo Vehicular Promocional (VVP)',
+    'FL': 'Lona Frontlight 13oz (FL)',
+    'BL': 'Lona Backlight 15oz (BL)',
+    'BO': 'Lona Blackout Doble Faz (BO)',
+    'MESH': 'Lona Mesh Microperforada (MESH)',
+    'MIC': 'Vinilo Microperforado (MIC)',
+    'ESM': 'Vinilo Esmerilado (ESM)',
+    'TRANS': 'Vinilo Transparente (TRANS)',
+    'POLY': 'Lienzo Polycanvas (POLY)',
+    'PAPEL': 'Papel Fotográfico (PAPEL)'
+}
 
 export interface ClientReportOptions {
     clienteNombre: string;
@@ -60,6 +74,57 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
         return `$${val.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     }
 
+    const allMaterials = getMateriales() || []
+
+    const getMaterialDetails = (matRaw?: string) => {
+        const raw = (matRaw || '').trim()
+        if (!raw || raw === '-') {
+            return { code: 'VAR', name: 'Material Varios / Sin especificar' }
+        }
+        const found = allMaterials.find(m => 
+            m.codigo.toLowerCase() === raw.toLowerCase() || 
+            (m.descripcion && m.descripcion.toLowerCase() === raw.toLowerCase())
+        )
+        if (found) {
+            return { code: found.codigo, name: `${found.descripcion} (${found.codigo})` }
+        }
+        const upper = raw.toUpperCase()
+        if (KNOWN_MATERIALS[upper]) {
+            return { code: upper, name: KNOWN_MATERIALS[upper] }
+        }
+        return { code: upper, name: raw }
+    }
+
+    const calculateOrderMl = (order: Order): number => {
+        if (order.precioDetalle?.consumoML !== undefined && Number(order.precioDetalle.consumoML) > 0) {
+            return Number(order.precioDetalle.consumoML)
+        }
+        if (order.consumoEstimado !== undefined && Number(order.consumoEstimado) > 0) {
+            return Number(order.consumoEstimado)
+        }
+        const w = Number(order.ancho) || 0
+        const h = Number(order.alto) || 0
+        const c = Math.max(1, Number(order.copias) || 1)
+        if (w <= 0 || h <= 0) return 0
+
+        if (order.precioDetalle?.rotated === true) {
+            return Math.round(w * c * 100) / 100
+        }
+        if (order.precioDetalle?.rotated === false) {
+            return Math.round(h * c * 100) / 100
+        }
+        // Heurística de avance en rollo (útil estándar 1.515m)
+        if (w <= 1.515 && h <= 1.515) {
+            return Math.round(Math.min(w, h) * c * 100) / 100
+        } else if (w <= 1.515) {
+            return Math.round(h * c * 100) / 100
+        } else if (h <= 1.515) {
+            return Math.round(w * c * 100) / 100
+        } else {
+            return Math.round(Math.max(w, h) * c * 100) / 100
+        }
+    }
+
     // Financial calculations
     let totalGeneral = 0
     let totalSena = 0
@@ -115,12 +180,23 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
             files.push({ url: thumbUrl, fileName: order.archivosOriginales?.[0] || 'Archivo cargado' })
         }
 
+        const matInfo = getMaterialDetails(order.material)
+        const w = Number(order.ancho) || 0
+        const h = Number(order.alto) || 0
+        const copias = Math.max(1, Number(order.copias) || 1)
+        const linearMeters = calculateOrderMl(order)
+        const m2 = Math.round(w * h * copias * 100) / 100
+
         return {
             ot: otDisplay,
             fecha,
             desc,
             material: order.material || '-',
-            copias: order.copias || 1,
+            materialCode: matInfo.code,
+            materialName: matInfo.name,
+            copias,
+            linearMeters,
+            m2,
             status: statusLabel,
             rawStatus: order.status,
             thumbUrl,
@@ -131,6 +207,44 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
             saldo
         }
     })
+
+    // Sumatoria de metros lineales y metros cuadrados por material
+    interface MaterialSummary {
+        code: string;
+        name: string;
+        ordenesCount: number;
+        copiasCount: number;
+        totalLinearMeters: number;
+        totalM2: number;
+    }
+    const materialSummaryMap: Record<string, MaterialSummary> = {}
+    let totalMlSum = 0
+    let totalM2Sum = 0
+    let totalCopiasSum = 0
+
+    mappedRows.forEach(row => {
+        const key = row.materialCode || 'VAR'
+        if (!materialSummaryMap[key]) {
+            materialSummaryMap[key] = {
+                code: key,
+                name: row.materialName,
+                ordenesCount: 0,
+                copiasCount: 0,
+                totalLinearMeters: 0,
+                totalM2: 0
+            }
+        }
+        materialSummaryMap[key].ordenesCount += 1
+        materialSummaryMap[key].copiasCount += row.copias
+        materialSummaryMap[key].totalLinearMeters += row.linearMeters
+        materialSummaryMap[key].totalM2 += row.m2
+
+        totalMlSum += row.linearMeters
+        totalM2Sum += row.m2
+        totalCopiasSum += row.copias
+    })
+
+    const materialSummaries = Object.values(materialSummaryMap).sort((a, b) => b.totalLinearMeters - a.totalLinearMeters)
 
     // Flatten all artwork pieces across all orders for the visual gallery
     interface GalleryPiece {
@@ -485,7 +599,9 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                         </div>
                         <div style="text-align: right;">
                             <div class="box-field-label">Total Trabajos</div>
-                            <div class="box-field-val" style="color: #2563eb;">${orders.length} OTs</div>
+                            <div class="box-field-val" style="color: #2563eb;">
+                                ${orders.length} OTs ${isSimplified && totalMlSum > 0 ? `· <span style="color: #0284c7;">${totalMlSum.toFixed(2)} ml</span>` : ''}
+                            </div>
                         </div>
                     </div>
 
@@ -494,14 +610,17 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                         <thead>
                             <tr>
                                 <th style="width: 10%;">N° OT</th>
-                                <th style="width: 12%;">Vista Previa</th>
-                                <th style="width: 12%;">Fecha</th>
-                                <th style="width: ${isSimplified ? '48%' : '36%'};">Descripción del Trabajo</th>
-                                <th style="width: 14%;">Estado</th>
-                                ${!isSimplified ? `
+                                <th style="width: 11%;">Vista Previa</th>
+                                <th style="width: 11%;">Fecha</th>
+                                <th style="width: ${isSimplified ? '36%' : '36%'};">Descripción del Trabajo</th>
+                                <th style="width: 12%;">Estado</th>
+                                ${isSimplified ? `
+                                <th style="width: 8%; text-align: center;">Copias</th>
+                                <th class="text-right" style="width: 14%; background: #0f172a; color: #38bdf8;">Consumo (ml)</th>
+                                ` : `
                                 <th class="text-right" style="width: 14%;">Importe</th>
                                 <th class="text-right" style="width: 14%;">Saldo</th>
-                                ` : ''}
+                                `}
                             </tr>
                         </thead>
                         <tbody>
@@ -520,21 +639,86 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                                     <td>${row.fecha}</td>
                                     <td>
                                         <strong>${row.desc}</strong>
-                                        ${row.fileName ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">${row.fileName}</div>` : ''}
+                                        <div style="font-size: 10px; color: #475569; margin-top: 1px;">
+                                            <span style="background: #e2e8f0; padding: 1px 4px; border-radius: 3px; font-weight: 600; color: #334155;">${row.materialName}</span>
+                                            ${row.fileName ? ` · <span>${row.fileName}</span>` : ''}
+                                        </div>
                                     </td>
                                     <td><span class="badge-status">${row.status}</span></td>
-                                    ${!isSimplified ? `
+                                    ${isSimplified ? `
+                                    <td style="text-align: center; font-weight: 700; color: #334155;">
+                                        ${row.copias} un.
+                                    </td>
+                                    <td class="text-right" style="font-weight: 800; color: #0284c7; font-family: monospace;">
+                                        ${row.linearMeters > 0 ? `${row.linearMeters.toFixed(2)} ml` : '-'}
+                                    </td>
+                                    ` : `
                                     <td class="text-right" style="font-weight: 600;">${formatCurrency(row.total)}</td>
                                     <td class="text-right" style="font-weight: 700; color: ${row.saldo > 0 ? '#dc2626' : '#166534'};">
                                         ${formatCurrency(row.saldo)}
                                     </td>
-                                    ` : ''}
+                                    `}
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
 
-                    ${!isSimplified ? `
+                    ${isSimplified ? `
+                    <!-- Resumen de Taller: Sumatoria de Metros Lineales por Material -->
+                    <div style="margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid;">
+                        <div style="background: #1e2433; color: #ffffff; padding: 10px 14px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 800; font-size: 11.5px; letter-spacing: 0.5px; text-transform: uppercase;">
+                                📦 Resumen de Taller — Metros Lineales por Material
+                            </span>
+                            <span style="font-size: 11px; color: #38bdf8; font-weight: 700;">
+                                ${materialSummaries.length} material(es) en este lote
+                            </span>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-top: none; font-size: 11.5px;">
+                            <thead>
+                                <tr style="background: #f1f5f9; color: #475569; font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+                                    <th style="padding: 7px 12px; text-align: left; border-bottom: 1px solid #cbd5e1;">Material / Sustrato</th>
+                                    <th style="padding: 7px 10px; text-align: center; border-bottom: 1px solid #cbd5e1; width: 14%;">Órdenes</th>
+                                    <th style="padding: 7px 10px; text-align: center; border-bottom: 1px solid #cbd5e1; width: 14%;">Copias</th>
+                                    <th style="padding: 7px 12px; text-align: right; border-bottom: 1px solid #cbd5e1; width: 18%;">Superficie (m²)</th>
+                                    <th style="padding: 7px 14px; text-align: right; border-bottom: 1px solid #cbd5e1; width: 22%; background: #e0f2fe; color: #0369a1;">Metros Lineales (ml)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${materialSummaries.map(mat => `
+                                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                                        <td style="padding: 7px 12px; font-weight: 700; color: #1e2433;">
+                                            ${mat.name}
+                                        </td>
+                                        <td style="padding: 7px 10px; text-align: center; color: #64748b;">
+                                            ${mat.ordenesCount} OT(s)
+                                        </td>
+                                        <td style="padding: 7px 10px; text-align: center; font-weight: 600; color: #334155;">
+                                            ${mat.copiasCount} un.
+                                        </td>
+                                        <td style="padding: 7px 12px; text-align: right; color: #64748b; font-family: monospace;">
+                                            ${mat.totalM2.toFixed(2)} m²
+                                        </td>
+                                        <td style="padding: 7px 14px; text-align: right; font-weight: 800; font-size: 12.5px; color: #0284c7; background: #f0f9ff; font-family: monospace;">
+                                            ${mat.totalLinearMeters.toFixed(2)} ml
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background: #1e2433; color: #ffffff; font-weight: 800;">
+                                    <td style="padding: 9px 12px; text-transform: uppercase;">TOTAL GENERAL DEL LOTE</td>
+                                    <td style="padding: 9px 10px; text-align: center;">${orders.length} OTs</td>
+                                    <td style="padding: 9px 10px; text-align: center;">${totalCopiasSum} un.</td>
+                                    <td style="padding: 9px 12px; text-align: right; font-family: monospace;">${totalM2Sum.toFixed(2)} m²</td>
+                                    <td style="padding: 9px 14px; text-align: right; color: #38bdf8; font-size: 13.5px; font-family: monospace; background: #0f172a;">
+                                        ${totalMlSum.toFixed(2)} ml
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    ` : `
                     <!-- Summary & Commercial Notes -->
                     <div class="summary-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 20px;">
                         <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; font-size: 11.5px; color: #1e40af; line-height: 1.45;">
@@ -562,7 +746,7 @@ export async function generatePdfClientReport(orders: Order[], options: ClientRe
                             </table>
                         </div>
                     </div>
-                    ` : ''}
+                    `}
 
                     <!-- Visual Artwork Gallery Section -->
                     ${galleryPieces.length > 0 ? `
