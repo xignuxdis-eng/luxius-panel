@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag } from '../../types/orden'
-import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders } from '@data/db'
+import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
 import StatusChangeModal from './StatusChangeModal'
@@ -14,6 +14,8 @@ import { generateProductionLabel } from '@/utils/generateLabelPdf'
 import { computeStockForecast, canViewStockAlerts } from '@/utils/stockForecast'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
+import NestingStudioModal from '@components/workshop/NestingStudioModal'
+import { runNesting, getBobinaUsefulWidth, type NestingItem } from '@/utils/nestingEngine'
 import './Entrada.css'
 
 interface OrderTagBadgesProps {
@@ -109,6 +111,11 @@ export default function Entrada() {
     const [statusBatchOrders, setStatusBatchOrders] = useState<Order[] | undefined>(undefined)
     const [previewOrder, setPreviewOrder] = useState<Order | null>(null)
     const [chatOrder, setChatOrder] = useState<Order | null>(null)
+
+    // NESTING STUDIO MODAL STATE
+    const [isNestingModalOpen, setIsNestingModalOpen] = useState(false)
+    const [nestingModalOrders, setNestingModalOrders] = useState<Order[]>([])
+    const [nestingModalBatchName, setNestingModalBatchName] = useState<string>('')
 
     const [defaultStatus, setDefaultStatus] = useState<string>('orden')
 
@@ -366,9 +373,13 @@ export default function Entrada() {
 
             if (val === undefined || !assignedBobina) {
                 if (matData?.bobinas && matData.bobinas.length > 0) {
-                    const safetyMargin = 0.01;
                     const availableWidths = matData.bobinas
-                        .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
+                        .map((b: any) => {
+                            const nominal = Number(b.ancho) || 0;
+                            const realAncho = (Math.abs(nominal - 1.50) < 0.03) ? 1.52 : nominal;
+                            const usefulWidth = getBobinaUsefulWidth(realAncho);
+                            return { ...b, ancho: realAncho, usefulWidth };
+                        })
                         .filter((b: any) => b.usefulWidth > 0)
                         .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
@@ -397,15 +408,16 @@ export default function Entrada() {
                     }
                 } else {
                     // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
-                    if (w <= 1.36) {
+                    // Regla de taller: Bobina 1.50m mide en realidad 1.52m con tolerancia útil hasta 1.515m; 1.37m útil 1.365m
+                    if (w <= 1.365) {
                         assignedBobina = 1.37;
                         val = round2(h * c);
-                    } else if (h <= 1.36 && round2(w * c) <= round2(h * c)) {
+                    } else if (h <= 1.365 && round2(w * c) <= round2(h * c)) {
                         assignedBobina = 1.37;
                         val = round2(w * c);
-                    } else if (w <= 1.51 || h <= 1.51) {
+                    } else if (w <= 1.515 || h <= 1.515) {
                         assignedBobina = 1.52;
-                        val = (h <= 1.51 && round2(w * c) < round2(h * c)) ? round2(w * c) : round2(h * c);
+                        val = (h <= 1.515 && round2(w * c) < round2(h * c)) ? round2(w * c) : round2(h * c);
                     } else {
                         assignedBobina = 1.52;
                         val = round2(h * c);
@@ -521,6 +533,9 @@ export default function Entrada() {
             m2: number;
             ml: number;
             mlByBobina: Record<string, number>;
+            rawMl?: number;
+            savingsPercent?: number;
+            savingsMeters?: number;
         };
         totalCopies: number;
         allSelected: boolean;
@@ -618,23 +633,65 @@ export default function Entrada() {
                 let totalPrice = 0;
                 let totalM2 = 0;
                 let totalMl = 0;
+                let rawTotalMl = 0;
                 let totalCopies = 0;
                 let selectedCount = 0;
                 const mlByBobina: Record<string, number> = {};
 
+                // Separar órdenes según su tipo de consumo (ml o m2)
+                const mlOrders: Order[] = [];
                 batchList.forEach(o => {
                     totalPrice += calculateOrderPrice(o);
+                    totalCopies += (o.copias || 1);
+                    if (selectedIds.has(String(o.id || o.ot))) selectedCount++;
+
                     const cons = getConsumption(o);
                     if (cons.unit === 'ml') {
-                        totalMl += cons.value;
-                        const bKey = cons.bobina ? `${cons.bobina}m` : 'Estándar';
-                        mlByBobina[bKey] = (mlByBobina[bKey] || 0) + cons.value;
+                        mlOrders.push(o);
                     } else {
                         totalM2 += cons.value;
                     }
-                    totalCopies += (o.copias || 1);
-                    if (selectedIds.has(String(o.id || o.ot))) selectedCount++;
                 });
+
+                // Si hay órdenes con consumo de bobina (ml), aplicar el Motor de Nesting 2D
+                if (mlOrders.length > 0) {
+                    const ordersByBobina = new Map<number, Order[]>();
+                    mlOrders.forEach(o => {
+                        const cons = getConsumption(o);
+                        const bNum = Number(cons.bobina) || 1.52;
+                        if (!ordersByBobina.has(bNum)) {
+                            ordersByBobina.set(bNum, []);
+                        }
+                        ordersByBobina.get(bNum)!.push(o);
+                    });
+
+                    ordersByBobina.forEach((bOrders, bobinaNum) => {
+                        if (bOrders.length > 1) {
+                            const nestingItems: NestingItem[] = bOrders.map(o => ({
+                                id: o.id || o.ot,
+                                ot: o.ot,
+                                label: o.descripcionItem || o.nombreTarea || `OT-${o.id}`,
+                                width: Number(o.ancho) || 0,
+                                height: Number(o.alto) || 0,
+                                copies: Number(o.copias) || 1,
+                                orderId: o.id
+                            }));
+
+                            const nResult = runNesting(nestingItems, { rollWidth: bobinaNum });
+                            totalMl += nResult.linearMeters;
+                            rawTotalMl += nResult.rawLinearMeters;
+                            mlByBobina[`${bobinaNum}m`] = (mlByBobina[`${bobinaNum}m`] || 0) + nResult.linearMeters;
+                        } else {
+                            const singleCons = getConsumption(bOrders[0]);
+                            totalMl += singleCons.value;
+                            rawTotalMl += singleCons.value;
+                            mlByBobina[`${bobinaNum}m`] = (mlByBobina[`${bobinaNum}m`] || 0) + singleCons.value;
+                        }
+                    });
+                }
+
+                const savingsMeters = Math.max(0, rawTotalMl - totalMl);
+                const savingsPercent = rawTotalMl > 0 ? Math.round((savingsMeters / rawTotalMl) * 100) : 0;
 
                 result.push({
                     isBatch: true,
@@ -643,7 +700,14 @@ export default function Entrada() {
                     orders: batchList,
                     primaryOrder: batchList[0],
                     totalPrice,
-                    totalConsumption: { m2: totalM2, ml: totalMl, mlByBobina },
+                    totalConsumption: {
+                        m2: totalM2,
+                        ml: totalMl,
+                        mlByBobina,
+                        rawMl: rawTotalMl,
+                        savingsPercent,
+                        savingsMeters
+                    },
                     totalCopies,
                     allSelected: selectedCount === batchList.length && batchList.length > 0,
                     someSelected: selectedCount > 0 && selectedCount < batchList.length
@@ -737,6 +801,53 @@ export default function Entrada() {
         setPreviewOrder(order)
         setIsPreviewModalOpen(true)
     }
+
+    // NESTING & MERGE HANDLERS
+    const handleOpenNestingModal = (batchOrders: Order[], batchName?: string) => {
+        setNestingModalOrders(batchOrders);
+        setNestingModalBatchName(batchName || 'Lote Unificado');
+        setIsNestingModalOpen(true);
+    };
+
+    const handleOpenNestingForSelected = () => {
+        const selectedOrders = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)));
+        if (selectedOrders.length === 0) return;
+        const firstClient = selectedOrders[0].clienteNombre || '';
+        handleOpenNestingModal(selectedOrders, `Lote ${firstClient || 'Unificado'}`);
+    };
+
+    const handleMergeSelectedIntoBatch = async () => {
+        const selectedOrders = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)));
+        if (selectedOrders.length < 2) {
+            alert('Seleccione al menos 2 órdenes para unificar en un lote.');
+            return;
+        }
+        const defaultName = selectedOrders[0].loteNombre || selectedOrders[0].clienteNombre || 'Lote Producción';
+        const batchName = prompt('Ingrese el nombre para el lote unificado:', defaultName);
+        if (!batchName || !batchName.trim()) return;
+
+        try {
+            setLoading(true);
+            await mergeOrdersIntoBatch(selectedOrders.map(o => o.id || o.ot || ''), batchName.trim());
+            await loadOrders();
+        } catch (e: any) {
+            console.error('Error al unificar lote:', e);
+            alert(e.message || 'Error al unificar lote');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveNestingBatch = async (batchName: string, updatedConsumptionMl: number) => {
+        if (nestingModalOrders.length === 0) return;
+        const ids = nestingModalOrders.map(o => o.id || o.ot || '');
+        const perOrderMl = updatedConsumptionMl / nestingModalOrders.length;
+        await saveBatchOrders('update', ids, {
+            loteNombre: batchName,
+            consumoEstimado: perOrderMl
+        });
+        await loadOrders();
+    };
 
     const handleClearFilters = () => {
         setSearchTerm('')
@@ -1034,7 +1145,29 @@ export default function Entrada() {
                             ))}
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {selectedIds.size >= 2 && (
+                            <>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={handleOpenNestingForSelected}
+                                    style={{ background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#fff', border: 'none', fontWeight: 700 }}
+                                    title="Optimizar acomodo e imposición 2D en bobina para las órdenes seleccionadas"
+                                >
+                                    📐 Nesting Studio ({selectedIds.size})
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleMergeSelectedIntoBatch}
+                                    style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', fontWeight: 600 }}
+                                    title="Unificar órdenes seleccionadas en un mismo Lote para calcular consumo conjunto"
+                                >
+                                    🔗 Unificar en Lote
+                                </Button>
+                            </>
+                        )}
                         <Button
                             variant="primary"
                             size="sm"
@@ -1272,6 +1405,20 @@ export default function Entrada() {
                                                             <span className="m2-text font-mono" style={{ fontWeight: 800, color: '#00daf3', fontSize: '0.92rem' }}>
                                                                 {item.totalConsumption.ml.toFixed(2)} <small>ml</small>
                                                             </span>
+                                                            {item.totalConsumption.savingsPercent !== undefined && item.totalConsumption.savingsPercent > 0 && (
+                                                                <span style={{
+                                                                    fontSize: '0.68rem',
+                                                                    fontWeight: 700,
+                                                                    color: '#34d399',
+                                                                    background: 'rgba(16, 185, 129, 0.15)',
+                                                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                                    padding: '1px 6px',
+                                                                    borderRadius: '4px',
+                                                                    whiteSpace: 'nowrap'
+                                                                }} title={`Consumo teórico sin nesting: ${item.totalConsumption.rawMl?.toFixed(2)} ml`}>
+                                                                    ⚡ Nesting: {item.totalConsumption.savingsPercent}% ahorro
+                                                                </span>
+                                                            )}
                                                             {item.totalConsumption.mlByBobina && Object.keys(item.totalConsumption.mlByBobina).length > 0 && (
                                                                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', marginTop: '2px' }}>
                                                                     {Object.entries(item.totalConsumption.mlByBobina).map(([bLabel, bVal]) => (
@@ -1357,6 +1504,18 @@ export default function Entrada() {
                                                 </td>
                                                 <td>
                                                     <div className="order-actions-row">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon-action"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenNestingModal(item.orders, item.batchName);
+                                                            }}
+                                                            title="Abrir Nesting Studio 2D para este Lote"
+                                                            style={{ background: 'rgba(56, 189, 248, 0.25)', border: '1px solid rgba(56, 189, 248, 0.6)' }}
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>📐</span>
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             className="btn-icon-action"
@@ -1967,6 +2126,18 @@ export default function Entrada() {
                 onClose={() => setPdfModeTarget(null)}
                 onSelect={handlePdfModeSelect}
             />
+            {isNestingModalOpen && (
+                <NestingStudioModal
+                    isOpen={isNestingModalOpen}
+                    orders={nestingModalOrders}
+                    initialBatchName={nestingModalBatchName}
+                    onClose={() => {
+                        setIsNestingModalOpen(false);
+                        setNestingModalOrders([]);
+                    }}
+                    onSaveBatch={handleSaveNestingBatch}
+                />
+            )}
         </div>
     )
 }

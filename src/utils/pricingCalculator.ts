@@ -1,5 +1,6 @@
 import { getMateriales, getClientes, getServicios } from '@/data/db';
 import type { DemasiasConfig } from '@/types';
+import { getBobinaUsefulWidth } from './nestingEngine';
 
 export const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
 
@@ -89,9 +90,13 @@ export function calculateItemPriceDetailed(
             };
         }
 
-        const safetyMargin = 0.01;
         const availableWidths = bobinas
-            .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
+            .map((b: any) => {
+                const nominal = Number(b.ancho) || 0;
+                const realAncho = (Math.abs(nominal - 1.50) < 0.03) ? 1.52 : nominal;
+                const usefulWidth = getBobinaUsefulWidth(realAncho);
+                return { ...b, ancho: realAncho, usefulWidth };
+            })
             .filter((b: any) => b.usefulWidth > 0)
             .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 

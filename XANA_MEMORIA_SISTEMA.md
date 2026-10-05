@@ -501,6 +501,26 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Tabla desplegable de archivos huérfanos con nombres, tamaños, fechas y enlaces directos a Google Drive.
   - Botón de acción rápida "Purgar de R2" con confirmación y retroalimentación inmediata sin requerir terminal.
 
+### Sesión 05/10/2026: Motor de Nesting 2D en Bobina Continua y Unificación de Lotes (completado)
+- [x] **Regla Oficial de Bobinas y Tolerancias de Taller**:
+  - Incorporada la regla de taller: La bobina comercialmente conocida como "1.50m" mide físicamente 1.52m con un ancho útil imprimible / nesting permitido de hasta exactamente **1.515m** (151.5 cm).
+  - Bobina 1.37m con ancho útil de **1.365m**.
+  - Actualizado `pricingCalculator.ts`, `nestingEngine.ts`, `Entrada.tsx` y el backend para respetar estas cotas sin falsos desbordes.
+- [x] **Motor Algorítmico de Nesting 2D (Strip Packing)**:
+  - Implementado `src/utils/nestingEngine.ts` con algoritmo Skyline Multi-Shelf Best-Fit continuo (ancho fijo, avance dinámico).
+  - Cálculo automático de ahorro de metros lineales (`savingsMeters`, `savingsPercent`), piezas colocadas y eficiencia de área.
+  - Implementado su equivalente en Python `luXius-Backend/services/nesting_service.py` y blueprint `/api/nesting`.
+- [x] **Nesting Studio UI (Modal Interactivo de Imposición)**:
+  - Componente `src/components/workshop/NestingStudioModal.tsx` y `.css` con renderizado a escala milimétrica del rollo.
+  - Regla métrica superior (0.00m a 1.52m con límite visual en 1.515m) y avance lateral en metros lineales.
+  - Controles de zoom, separación de corte (gap: 0, 5, 10, 15 mm), rotación 90° permitida y marcas de corte perimetrales.
+  - Exportación directa de plano de taller en PNG de alta resolución.
+- [x] **Unificación de Lotes y Recálculo en Entrada**:
+  - Función `mergeOrdersIntoBatch()` en `src/data/db.ts` para fusionar órdenes asíncronas de un mismo cliente o material en un lote consolidado.
+  - Botones en barra de selección masiva: `📐 Nesting Studio` y `🔗 Unificar en Lote`.
+  - Recálculo automático de consumo por Nesting en las filas maestras de lotes en `Entrada.tsx`, mostrando el consumo real optimizado y la insignia `⚡ Nesting: XX% ahorro`.
+  - Botón de acceso directo `📐` en la fila maestra del lote para abrir el estudio de imposición.
+
 ### Sesión 03/10/2026: Preimpresión en Tiempo Real (Xpress Studio) y Optimización de Rendimiento Frontend (completado)
 - [x] **Inspector DPI 1:1 Físico e Interactivo**:
   - Detección reactiva de resolución real basada en dimensiones de píxeles y ancho/alto ingresado en metros $\left(\frac{\text{px}}{\text{metros} \times 39.3701}\right)$.

@@ -524,6 +524,41 @@ export async function saveBatchOrders(
     return { success: true, count: ids.length };
 }
 
+/**
+ * Unifica 2 o más órdenes en un lote único (Batch)
+ * Permite que órdenes cargadas en momentos distintos compartan lote y optimicen nesting.
+ */
+export async function mergeOrdersIntoBatch(
+    orderIds: (number | string)[],
+    batchName: string
+): Promise<{ success: boolean; batchId: string; count: number }> {
+    if (!orderIds || orderIds.length < 2) {
+        throw new Error('Se requieren al menos 2 órdenes para unificar un lote');
+    }
+
+    const cleanBatchName = batchName.trim() || `Lote Unificado ${new Date().toLocaleDateString('es-AR')}`;
+    const slug = cleanBatchName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+
+    // Obtener órdenes actuales para validar cliente
+    const orders = await getOrdenes();
+    const targetOrders = orders.filter(o => orderIds.some(id => matchesOrderId(o, id)));
+
+    const clientId = targetOrders[0]?.clientId || '0';
+    const batchId = `lote_${clientId}_${slug}_${Date.now().toString(36)}`;
+
+    // Actualizar todas las órdenes con el nuevo batchId y loteNombre
+    const result = await saveBatchOrders('update', orderIds, {
+        batchId,
+        loteNombre: cleanBatchName
+    });
+
+    return {
+        success: result.success,
+        batchId,
+        count: targetOrders.length
+    };
+}
+
 export async function uploadFile(
     file: File,
     onProgress?: (percent: number, loaded: number, total: number) => void
