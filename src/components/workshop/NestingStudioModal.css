@@ -393,50 +393,85 @@
 
 .nesting-piece-card {
     position: absolute;
-    background: rgba(37, 99, 235, 0.35);
+    background: rgba(30, 58, 138, 0.45);
     border: 1.5px solid #60a5fa;
-    border-radius: 4px;
+    border-radius: 6px;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 4px;
+    padding: 4px 6px;
     box-sizing: border-box;
     cursor: pointer;
     transition: all 0.15s ease-in-out;
     overflow: hidden;
+    user-select: none;
 }
 
 .nesting-piece-card:hover {
-    background: rgba(37, 99, 235, 0.6);
+    background: rgba(37, 99, 235, 0.7);
     border-color: #93c5fd;
-    box-shadow: 0 0 12px rgba(96, 165, 250, 0.6);
+    box-shadow: 0 0 16px rgba(96, 165, 250, 0.65);
     z-index: 5;
-    transform: scale(1.01);
+    transform: scale(1.008);
 }
 
-.nesting-piece-ot {
+.nesting-piece-center-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    text-align: center;
+}
+
+.nesting-piece-filename-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    max-width: 96%;
+}
+
+.nesting-piece-filename {
     font-weight: 800;
+    font-size: 13.5px;
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
+}
+
+.nesting-piece-copy-badge {
+    background: #0284c7;
+    color: #f0f9ff;
+    padding: 1px 6px;
+    border-radius: 4px;
     font-size: 11px;
-    color: #ffedd5;
-    white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-}
-
-.nesting-piece-dims {
-    font-size: 10px;
-    color: #cbd5e1;
-    white-space: nowrap;
+    font-weight: 800;
     font-family: monospace;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
-.nesting-piece-tag {
-    font-size: 9px;
-    background: rgba(0,0,0,0.5);
-    padding: 1px 4px;
-    border-radius: 3px;
-    color: #f8fafc;
-    margin-top: 2px;
+.nesting-piece-dims-centered {
+    font-size: 12px;
+    font-weight: 700;
+    color: #38bdf8;
+    background: rgba(15, 23, 42, 0.82);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    font-family: monospace;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    display: inline-block;
 }
 
 /* Footer */

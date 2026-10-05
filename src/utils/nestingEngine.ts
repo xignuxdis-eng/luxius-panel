@@ -35,6 +35,8 @@ export interface PlacedPiece {
     originalWidth: number;
     originalHeight: number;
     orderId?: string | number;
+    copyIndex?: number;  // 1-based index (ej: 1)
+    totalCopies?: number;// Total copias de este ítem (ej: 3)
 }
 
 export interface NestingConfig {
@@ -117,6 +119,8 @@ export function runNesting(items: NestingItem[], userConfig?: Partial<NestingCon
         h: number;
         allowRotation: boolean;
         orderId?: string | number;
+        copyIndex: number;
+        totalCopies: number;
     }
 
     const flatPieces: FlatPiece[] = [];
@@ -150,7 +154,9 @@ export function runNesting(items: NestingItem[], userConfig?: Partial<NestingCon
                 w,
                 h,
                 allowRotation: item.allowRotation !== undefined ? item.allowRotation : globalAllowRotation,
-                orderId: item.orderId || item.id
+                orderId: item.orderId || item.id,
+                copyIndex: i + 1,
+                totalCopies: copies
             });
         }
     });
@@ -305,7 +311,9 @@ export function runNesting(items: NestingItem[], userConfig?: Partial<NestingCon
             rotated: best.rotated,
             originalWidth: piece.w,
             originalHeight: piece.h,
-            orderId: piece.orderId
+            orderId: piece.orderId,
+            copyIndex: piece.copyIndex,
+            totalCopies: piece.totalCopies
         });
 
         updateSkyline(best.x, best.w, best.y, best.h);

@@ -106,15 +106,37 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     const rollContainerRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
 
+    // Extrae un nombre de archivo limpio y amigable para humanos (priorizando archivo original sobre código OT)
+    const getPieceDisplayName = (o: Order): string => {
+        if (o.archivosOriginales && o.archivosOriginales.length > 0 && o.archivosOriginales[0]) {
+            const raw = o.archivosOriginales[0].split(/[/\\]/).pop() || '';
+            const cleaned = raw.replace(/\.[^/.]+$/, "");
+            if (cleaned.trim()) return cleaned.trim();
+        }
+        if (o.archivos && o.archivos.length > 0 && o.archivos[0]) {
+            const raw = o.archivos[0].split(/[/\\]/).pop() || '';
+            const cleaned = raw.replace(/^\d+[-_]/, '').replace(/\.[^/.]+$/, "");
+            if (cleaned.trim()) return cleaned.trim();
+        }
+        if (o.descripcionItem && o.descripcionItem.trim()) {
+            return o.descripcionItem.trim();
+        }
+        if (o.nombreTarea && o.nombreTarea.trim()) {
+            return o.nombreTarea.trim();
+        }
+        return o.ot || `Pieza ${o.id}`;
+    };
+
     // Preparar ítems para el motor de Nesting reactivo a las copias
     const nestingItems = useMemo<NestingItem[]>(() => {
         return orders.map(o => {
             const key = o.id || o.ot || '';
             const c = copiesMap[key] !== undefined ? copiesMap[key] : (Math.max(1, Number(o.copias) || 1));
+            const friendlyName = getPieceDisplayName(o);
             return {
                 id: key,
                 ot: o.ot || `OT-${o.id}`,
-                label: o.descripcionItem || o.nombreTarea || `OT-${o.id}`,
+                label: friendlyName,
                 width: Number(o.ancho) || 0,
                 height: Number(o.alto) || 0,
                 copies: c,
@@ -234,13 +256,24 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                 ctx.beginPath(); ctx.moveTo(px + pw - mLen, py); ctx.lineTo(px + pw + mLen, py); ctx.stroke();
             }
 
-            // Texto descriptivo
+            // Texto centrado en la pieza (Nombre de archivo + Copia + Medida)
+            const copyBadge = p.totalCopies && p.totalCopies > 0 ? ` (${p.copyIndex || 1}/${p.totalCopies})` : '';
+            const dimsText = `${p.originalWidth.toFixed(2)} × ${p.originalHeight.toFixed(2)}m${p.rotated ? ' ↺90°' : ''}`;
+            const cx = px + (pw / 2);
+            const cy = py + (ph / 2);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Nombre de archivo + copia (Grande y legible)
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 22px Arial, sans-serif';
-            ctx.fillText(`${p.ot} (${p.originalWidth.toFixed(2)}x${p.originalHeight.toFixed(2)}m)${p.rotated ? ' ↺90°' : ''}`, px + 12, py + 30);
-            ctx.font = '18px Arial, sans-serif';
-            ctx.fillStyle = '#cbd5e1';
-            ctx.fillText(p.label, px + 12, py + 56);
+            ctx.font = 'bold 26px Arial, sans-serif';
+            ctx.fillText(`${p.label}${copyBadge}`, cx, cy - 14, Math.max(50, pw - 20));
+
+            // Medidas métricas destacadas
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 20px Arial, sans-serif';
+            ctx.fillText(dimsText, cx, cy + 18, Math.max(50, pw - 20));
         });
 
         // Pie informativo del pliego
@@ -334,6 +367,8 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                     const h = Number(o.alto) || 0;
                                     const isSelected = selectedPieceId === key || String(selectedPieceId).startsWith(String(key));
 
+                                    const friendlyName = getPieceDisplayName(o);
+
                                     return (
                                         <div
                                             key={key}
@@ -342,13 +377,15 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                         >
                                             <div className="nesting-piece-item-info">
                                                 <div className="nesting-piece-item-ot">
-                                                    <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{o.ot || `OT-${o.id}`}</span>
+                                                    <span style={{ fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={friendlyName}>
+                                                        {friendlyName}
+                                                    </span>
                                                     <span className="nesting-piece-item-dims">
                                                         {w.toFixed(2)} × {h.toFixed(2)}m
                                                     </span>
                                                 </div>
-                                                <div className="nesting-piece-item-label" title={o.descripcionItem || o.nombreTarea || ''}>
-                                                    {o.descripcionItem || o.nombreTarea || `Pieza ${o.id}`}
+                                                <div className="nesting-piece-item-label" title={`${o.ot || `OT-${o.id}`} · ${o.material || ''}`}>
+                                                    {o.ot || `OT-${o.id}`} · {o.material || 'VV'}
                                                 </div>
                                             </div>
                                             <div className="nesting-stepper" onClick={(e) => e.stopPropagation()}>
@@ -554,19 +591,25 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                                 background: isSelected ? 'rgba(56, 189, 248, 0.5)' : undefined
                                             }}
                                             onClick={() => setSelectedPieceId(p.id)}
-                                            title={`${p.ot} - ${p.label}\nMedidas: ${p.originalWidth.toFixed(2)} x ${p.originalHeight.toFixed(2)}m ${p.rotated ? '(Rotado 90°)' : ''}\nPosición: X: ${p.x.toFixed(2)}m, Y: ${p.y.toFixed(2)}m`}
+                                            title={`${p.label} (Copia ${p.copyIndex || 1}/${p.totalCopies || 1})\nMedidas: ${p.originalWidth.toFixed(2)} × ${p.originalHeight.toFixed(2)}m ${p.rotated ? '(Rotado 90°)' : ''}\nOT: ${p.ot}\nPosición: X: ${p.x.toFixed(2)}m, Y: ${p.y.toFixed(2)}m`}
                                         >
-                                            <span className="nesting-piece-ot">{p.ot}</span>
-                                            {showLabels && (
-                                                <span className="nesting-piece-dims">
-                                                    {p.width.toFixed(2)} x {p.height.toFixed(2)}m {p.rotated && '↺'}
-                                                </span>
-                                            )}
-                                            {p.label && (
-                                                <span className="nesting-piece-tag" style={{ maxWidth: '90%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {p.label}
-                                                </span>
-                                            )}
+                                            <div className="nesting-piece-center-content">
+                                                <div className="nesting-piece-filename-row">
+                                                    <span className="nesting-piece-filename" title={p.label}>
+                                                        {p.label}
+                                                    </span>
+                                                    {p.totalCopies && p.totalCopies > 0 && (
+                                                        <span className="nesting-piece-copy-badge">
+                                                            ({p.copyIndex || 1}/{p.totalCopies})
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {showLabels && (
+                                                    <span className="nesting-piece-dims-centered">
+                                                        {p.originalWidth.toFixed(2)} × {p.originalHeight.toFixed(2)}m {p.rotated && '↺'}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
