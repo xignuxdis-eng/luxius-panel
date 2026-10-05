@@ -98,14 +98,33 @@ Para facilitar la consulta rápida de cada perfil sin sobrecargar con informaci�
 * 7.2 Tarifario oficial de materiales, tintas y mano de obra.
 * 7.3 Reportes de facturación, métricas de taller y auditoría del sistema.
 
-### Módulo 8: Asistente Xana IA y Canal Telegram
-* 8.1 Uso del bot oficial `@LuXius_Taller_Bot` (comandos `/status`, `/taller`, `/briefing`, `/alertas`).
-* 8.2 Creación de tareas y recordatorios mediante notas de voz multimodales.
-* 8.3 Consultas técnicas al router determinista y base de conocimiento.
+### Módulo 8: Asistente Xana IA — Tutora Operativa Interactiva (Interactive SOP)
+* 8.1 Xana como tutora omnicanal 24/7 (Web y Telegram `@LuXius_Taller_Bot`): respuestas procedimentales con imágenes, GIFs y flujos paso a paso.
+* 8.2 Tool canónica de backend `consultar_manual_operativo(procedimiento, modulo)` para evitar alucinaciones.
+* 8.3 Tarjetas guiadas interactivas de 'Paso a Paso' (Stepper UI) en el chat.
+* 8.4 Deep Links de navegación directa: botones en la respuesta de Xana para abrir modales o páginas específicas.
+* 8.5 Creación de tareas, órdenes y recordatorios mediante notas de voz multimodales.
 
 ---
 
-## 📸 4. Estándar Visual para Capturas de Pantalla
+## 🖨️ 4. Hoja de Ruta: Automatización RIP y Roland VersaWorks
+
+Como evolución del motor de Nesting Studio hacia la automatización total de taller:
+
+1. **Pliego Compuesto Maestro 1:1 (Master Nested PDF / TIFF):**
+   * Generación en backend (Python / `PyMuPDF` / `Pillow CMYK`) del pliego completo compuesto con todas las piezas en sus coordenadas exactas $(x, y)$ a 150 DPI reales.
+   * **Cero degradación de color:** Mantiene intactos los perfiles de color incrustados (Fogra39, US Web Coated) y las curvas vectoriales sin conversión RGB destructiva.
+
+2. **Inyección Directa en Hot Folders de VersaWorks:**
+   * El Daemon de Taller de LuXius descarga y deposita el archivo maestro directamente en la carpeta caliente de VersaWorks (`C:\VersaWorks\Input\Queue_A`).
+   * VersaWorks procesa el pliego como un único trabajo continuo y lo envía directo a los cabezales del plotter Roland sin intervención manual de imposición en el RIP.
+
+3. **Compatibilidad con Auto-Nesting de VersaWorks:**
+   * Alternativa complementaria: descarga de archivos individuales a carpetas de cola con el flag nativo de VersaWorks *"Job Action: Nesting"* habilitado en las propiedades de cola.
+
+---
+
+## 📸 5. Estándar Visual para Capturas de Pantalla
 
 La claridad visual es prioritaria para que el manual sea efectivo:
 
@@ -130,18 +149,20 @@ La claridad visual es prioritaria para que el manual sea efectivo:
 
 ---
 
-## 💻 5. Integración In-App ("Ayuda Contextual")
+## 💻 6. Integración In-App y Asistente Xana (Tutoría Contextual)
 
 Para evitar que el manual quede archivado en una carpeta externa sin uso:
 
-1. **Botón `❓ Ayuda` en Toolbars:**
-   * En la barra de herramientas de `Entrada.tsx`, `XpressViewer.tsx` y `NestingStudioModal.tsx`, se habilitará un botón discreto de ayuda contextual.
-2. **Drawer Lateral Renderizado en Markdown:**
-   * Al hacer clic, se abre un panel lateral deslizable que renderiza directamente la sección correspondiente del manual con sus capturas y pasos, sin necesidad de salir del flujo de trabajo actual ni abrir otra pestaña.
+1. **Respuestas Multimedia en Xana Chat:**
+   * Soporte en [XanaAssistant.tsx](file:///f:/Sitio%20XignuX/src/components/XanaAssistant.tsx) para renderizar imágenes markdown `![alt](url)` con visor ampliable (lightbox) y diagramas SVG.
+2. **Deep Links Interactivos:**
+   * Enlaces ejecutables en el chat: `[Abrir Nesting Studio](/taller)` o `[Ir a Entrada](/entrada)` para que el operario navegue con un clic.
+3. **Botón `❓ Ayuda` en Toolbars:**
+   * En la barra de herramientas de `Entrada.tsx`, `XpressViewer.tsx` y `NestingStudioModal.tsx`, se habilitará un botón discreto de ayuda contextual que abre el drawer o consulta directamente a Xana.
 
 ---
 
-## 🗓️ 6. Plan de Ejecución y Cronograma Sugerido
+## 🗓️ 7. Plan de Ejecución y Cronograma Sugerido
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -155,8 +176,8 @@ Para evitar que el manual quede archivado en una carpeta externa sin uso:
 │ ETAPA 3: Módulos de Ventas y Administración (Entrada, Cotizaciones, ABM y Reportes)         │
 │ • Redactar flujo de carga de pedidos, señas y facturación.                                 │
 ├─────────────────────────────────────────────────────────────────────────────────────────────┤
-│ ETAPA 4: Integración RAG en Xana + Botón In-App en LuXius Web                              │
-│ • Cargar archivos en el servicio de conocimiento de Xana.                                   │
-│ • Habilitar botón de ayuda contextual `❓` en el frontend.                                  │
+│ ETAPA 4: Integración RAG en Xana + Frontend Multimedia                                      │
+│ • Habilitar imágenes markdown y tarjetas interactivas en XanaAssistant.tsx.                │
+│ • Crear tool de consulta canónica en xana_graph.py y backend.                               │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

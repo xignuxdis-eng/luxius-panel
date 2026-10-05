@@ -75,6 +75,8 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
 
     // Estado de copias interactivas por ítem
     const [copiesMap, setCopiesMap] = useState<Record<string | number, number>>({});
+    const [isCustomRoll, setIsCustomRoll] = useState<boolean>(false);
+    const [customRollInput, setCustomRollInput] = useState<string>('');
 
     // Sincronizar copias iniciales desde las órdenes
     useEffect(() => {
@@ -92,6 +94,8 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     useEffect(() => {
         if (isOpen) {
             setRollWidth(defaultRollWidth);
+            setIsCustomRoll(false);
+            setCustomRollInput('');
         }
     }, [isOpen, defaultRollWidth]);
 
@@ -359,6 +363,37 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                     {nestingResult.totalPiecesPlaced} en pliego
                                 </span>
                             </div>
+                            {/* Preset rápido de copias globales */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px', fontSize: '0.72rem', color: '#94a3b8' }}>
+                                <span>Todas a:</span>
+                                {[1, 2, 3, 5, 10].map(cnt => (
+                                    <button
+                                        key={cnt}
+                                        type="button"
+                                        style={{
+                                            padding: '2px 7px',
+                                            fontSize: '0.72rem',
+                                            cursor: 'pointer',
+                                            background: 'rgba(255,255,255,0.06)',
+                                            border: '1px solid rgba(255,255,255,0.12)',
+                                            color: '#cbd5e1',
+                                            borderRadius: '4px',
+                                            fontWeight: 600
+                                        }}
+                                        onClick={() => {
+                                            const next: Record<string | number, number> = {};
+                                            orders.forEach(o => {
+                                                const key = o.id || o.ot || '';
+                                                next[key] = cnt;
+                                            });
+                                            setCopiesMap(next);
+                                        }}
+                                        title={`Establecer ${cnt} copia(s) para todas las piezas`}
+                                    >
+                                        {cnt}
+                                    </button>
+                                ))}
+                            </div>
                             <div className="nesting-pieces-list">
                                 {orders.map((o) => {
                                     const key = o.id || o.ot || '';
@@ -429,17 +464,55 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                 <label className="nesting-label">Ancho de Bobina:</label>
                                 <select
                                     className="nesting-select"
-                                    value={rollWidth}
-                                    onChange={(e) => setRollWidth(parseFloat(e.target.value))}
+                                    value={isCustomRoll ? 'custom' : rollWidth}
+                                    onChange={(e) => {
+                                        if (e.target.value === 'custom') {
+                                            setIsCustomRoll(true);
+                                            setCustomRollInput(String(rollWidth));
+                                        } else {
+                                            setIsCustomRoll(false);
+                                            setRollWidth(parseFloat(e.target.value));
+                                        }
+                                    }}
                                 >
                                     <option value={1.52}>Bobina 1.50m (Real: 1.52m · Útil máx: 1.515m)</option>
                                     <option value={1.37}>Bobina 1.37m (Real: 1.37m · Útil máx: 1.365m)</option>
                                     <option value={1.60}>Bobina 1.60m (Real: 1.60m · Útil máx: 1.590m)</option>
                                     <option value={1.07}>Bobina 1.07m (Real: 1.07m · Útil máx: 1.050m)</option>
                                     <option value={0.91}>Bobina 0.91m (Real: 0.91m · Útil máx: 0.895m)</option>
+                                    <option value={1.27}>Bobina 1.27m (Real: 1.27m · Útil máx: 1.255m)</option>
+                                    <option value={1.80}>Bobina 1.80m (Real: 1.80m · Útil máx: 1.785m)</option>
+                                    <option value={2.20}>Bobina 2.20m (Real: 2.20m · Útil máx: 2.185m)</option>
+                                    <option value={3.20}>Bobina 3.20m (Real: 3.20m · Útil máx: 3.185m)</option>
+                                    <option value="custom">⚙️ Ancho Personalizado / Retazo...</option>
                                 </select>
-                                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                                    Regla de taller: Bobina 1.50m mide 1.52m con tolerancia útil hasta 1.515m.
+                                {isCustomRoll && (
+                                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0.20"
+                                            max="5.00"
+                                            className="nesting-input"
+                                            value={customRollInput}
+                                            onChange={(e) => {
+                                                setCustomRollInput(e.target.value);
+                                                const parsed = parseFloat(e.target.value);
+                                                if (!isNaN(parsed) && parsed >= 0.20 && parsed <= 5.0) {
+                                                    setRollWidth(parsed);
+                                                }
+                                            }}
+                                            placeholder="Ej: 1.45"
+                                            style={{ flex: 1, padding: '6px 10px' }}
+                                        />
+                                        <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 700 }}>metros</span>
+                                    </div>
+                                )}
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                                    {isCustomRoll
+                                        ? `Bobina personalizada de ${rollWidth.toFixed(2)}m (Útil estimado: ${nestingResult.usefulWidth.toFixed(3)}m).`
+                                        : 'Regla de taller: Bobina 1.50m mide 1.52m con tolerancia útil hasta 1.515m.'
+                                    }
                                 </span>
                             </div>
 
@@ -637,6 +710,15 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                         Cerrar
                     </button>
                     <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            type="button"
+                            className="nesting-btn-secondary"
+                            onClick={handleExportCanvasImage}
+                            title="Descargar diagrama de imposición en alta resolución PNG"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            <span>📥</span> Descargar Plano PNG
+                        </button>
                         {onSaveBatch && (
                             <button
                                 className="nesting-btn-primary"
