@@ -190,17 +190,27 @@
 }
 
 .nesting-canvas-toolbar {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    z-index: 10;
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: #0d1527;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.nesting-canvas-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nesting-canvas-toolbar-right {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 6px 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(4px);
 }
 
 .nesting-tool-btn {

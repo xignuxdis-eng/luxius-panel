@@ -513,8 +513,9 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Nesting Studio UI (Modal Interactivo de Imposición)**:
   - Componente `src/components/workshop/NestingStudioModal.tsx` y `.css` con renderizado a escala milimétrica del rollo.
   - Regla métrica superior (0.00m a 1.52m con límite visual en 1.515m) y avance lateral en metros lineales.
+  - Barra superior desacoplada (no flotante ni obstructiva) fuera del viewport del canvas con título, cotas útiles, zoom, botón de auto-ajuste a pantalla (`📐 Ajustar`) y reseteo al 100%.
   - Controles de zoom, separación de corte (gap: 0, 5, 10, 15 mm), rotación 90° permitida y marcas de corte perimetrales.
-  - Exportación directa de plano de taller en PNG de alta resolución.
+  - Exportación directa de plano de taller en PNG de alta resolución sin superposición de elementos UI.
 - [x] **Unificación de Lotes y Recálculo en Entrada**:
   - Función `mergeOrdersIntoBatch()` en `src/data/db.ts` para fusionar órdenes asíncronas de un mismo cliente o material en un lote consolidado.
   - Botones en barra de selección masiva: `📐 Nesting Studio` y `🔗 Unificar en Lote`.

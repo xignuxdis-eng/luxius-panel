@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Order } from '@/types';
 import { runNesting, getBobinaUsefulWidth, BOBINA_SPECS, type NestingItem, type NestingResult } from '@/utils/nestingEngine';
 import './NestingStudioModal.css';
@@ -45,6 +45,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     const [selectedPieceId, setSelectedPieceId] = useState<string | number | null>(null);
 
     const rollContainerRef = useRef<HTMLDivElement>(null);
+    const viewportRef = useRef<HTMLDivElement>(null);
 
     // Preparar ítems para el motor de Nesting
     const nestingItems = useMemo<NestingItem[]>(() => {
@@ -71,6 +72,27 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
             allowRotation
         });
     }, [nestingItems, rollWidth, gap, allowRotation]);
+
+    const handleFitToScreen = () => {
+        if (!viewportRef.current) return;
+        const vpWidth = viewportRef.current.clientWidth - 80;
+        const vpHeight = viewportRef.current.clientHeight - 80;
+        if (vpWidth <= 0 || vpHeight <= 0) return;
+        const scaleX = vpWidth / (rollWidth * 550);
+        const scaleY = vpHeight / (Math.max(0.5, nestingResult.linearMeters) * 550);
+        const fitZoom = Math.min(scaleX, scaleY, 1.15);
+        setZoom(Math.max(0.25, Math.round(fitZoom * 100) / 100));
+    };
+
+    // Auto-ajustar plano al tamaño de pantalla cuando se abre el modal o cambia la bobina
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => {
+                handleFitToScreen();
+            }, 60);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, rollWidth, nestingResult.linearMeters]);
 
     if (!isOpen) return null;
 
@@ -306,25 +328,43 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                     <div className="nesting-canvas-area">
                         {/* Toolbar de visualización */}
                         <div className="nesting-canvas-toolbar">
-                            <button className="nesting-tool-btn" onClick={() => setZoom(z => Math.max(0.4, z - 0.15))}>
-                                🔍- Alejar
-                            </button>
-                            <span style={{ fontSize: '0.8rem', color: '#cbd5e1', alignSelf: 'center', padding: '0 4px' }}>
-                                {Math.round(zoom * 100)}%
-                            </span>
-                            <button className="nesting-tool-btn" onClick={() => setZoom(z => Math.min(2.5, z + 0.15))}>
-                                🔍+ Acercar
-                            </button>
-                            <button className="nesting-tool-btn" onClick={() => setZoom(1)}>
-                                ↺ Reset
-                            </button>
-                            <button className="nesting-tool-btn" onClick={handleExportCanvasImage} style={{ color: '#38bdf8' }}>
-                                📥 Exportar Plano PNG
-                            </button>
+                            <div className="nesting-canvas-toolbar-left">
+                                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>📐</span> Plano de Imposición en Rollo
+                                </span>
+                                <span style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '4px' }}>
+                                    Bobina {rollWidth.toFixed(2)}m · Útil máx {nestingResult.usefulWidth.toFixed(3)}m
+                                </span>
+                            </div>
+                            <div className="nesting-canvas-toolbar-right">
+                                <button className="nesting-tool-btn" onClick={() => setZoom(z => Math.max(0.2, Math.round((z - 0.15) * 100) / 100))} title="Alejar plano">
+                                    🔍- Alejar
+                                </button>
+                                <span style={{ fontSize: '0.82rem', color: '#cbd5e1', alignSelf: 'center', padding: '0 6px', fontFamily: 'monospace', fontWeight: 700 }}>
+                                    {Math.round(zoom * 100)}%
+                                </span>
+                                <button className="nesting-tool-btn" onClick={() => setZoom(z => Math.min(2.5, Math.round((z + 0.15) * 100) / 100))} title="Acercar plano">
+                                    🔍+ Acercar
+                                </button>
+                                <button className="nesting-tool-btn" onClick={handleFitToScreen} title="Ajustar plano completo a la pantalla">
+                                    📐 Ajustar
+                                </button>
+                                <button className="nesting-tool-btn" onClick={() => setZoom(1)} title="Zoom al 100%">
+                                    ↺ 100%
+                                </button>
+                                <button
+                                    className="nesting-tool-btn"
+                                    onClick={handleExportCanvasImage}
+                                    style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)', background: 'rgba(56, 189, 248, 0.1)' }}
+                                    title="Exportar plano en alta resolución PNG"
+                                >
+                                    📥 Exportar Plano PNG
+                                </button>
+                            </div>
                         </div>
 
                         {/* Viewport scrolleable */}
-                        <div className="nesting-canvas-viewport">
+                        <div ref={viewportRef} className="nesting-canvas-viewport">
                             <div
                                 ref={rollContainerRef}
                                 className="nesting-roll-visual"
