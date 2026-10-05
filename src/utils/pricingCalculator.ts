@@ -121,8 +121,45 @@ export function calculateItemPriceDetailed(
             }
         }
 
-        // Sort by: 1) smallest bobina (minimize waste), 2) fewest ML (tiebreaker)
-        candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
+        // Sort candidates according to workshop rules and material efficiency:
+        // 1. If piece dimension is ~1.50m (> 1.365m up to 1.515m), it is designed for the 1.50m/1.52m roll.
+        //    Forcing it onto 1.37m wastes 60% of roll width and nearly triples linear meters.
+        // 2. Minimize total roll material area consumed (bobina * ml).
+        // 3. Lowest total cost.
+        // 4. Fewest linear meters.
+        // 5. Natural orientation (unrotated) preferred over rotated.
+        // 6. Narrower bobina tie-breaker.
+        const maxDim = Math.max(w, h);
+        const is150Piece = maxDim > 1.365 && maxDim <= 1.515;
+
+        candidates.sort((a, b) => {
+            if (is150Piece) {
+                const aIs152 = a.bobina >= 1.48 && a.bobina <= 1.53;
+                const bIs152 = b.bobina >= 1.48 && b.bobina <= 1.53;
+                if (aIs152 && !bIs152) return -1;
+                if (!aIs152 && bIs152) return 1;
+            }
+
+            const areaA = a.bobina * a.ml;
+            const areaB = b.bobina * b.ml;
+            if (Math.abs(areaA - areaB) > 0.05) {
+                return areaA - areaB;
+            }
+
+            if (Math.abs(a.cost - b.cost) > 1) {
+                return a.cost - b.cost;
+            }
+
+            if (Math.abs(a.ml - b.ml) > 0.01) {
+                return a.ml - b.ml;
+            }
+
+            if (a.rotated !== b.rotated) {
+                return a.rotated ? 1 : -1;
+            }
+
+            return a.bobina - b.bobina;
+        });
 
         if (candidates.length > 0) {
             const best = candidates[0];

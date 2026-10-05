@@ -317,6 +317,7 @@ export default function Entrada() {
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
 
                 type Candidate = { bobina: number; ml: number; cost: number };
+                type Candidate = { bobina: number; ml: number; cost: number; rotated: boolean };
                 const candidates: Candidate[] = [];
 
                 for (const b of availableWidths) {
@@ -325,15 +326,32 @@ export default function Entrada() {
 
                     if (w <= b.usefulWidth) {
                         const ml = round2(h * c);
-                        candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml) });
+                        candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml), rotated: false });
                     }
                     if (h <= b.usefulWidth) {
                         const ml = round2(w * c);
-                        candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml) });
+                        candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml), rotated: true });
                     }
                 }
 
-                candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
+                const maxDim = Math.max(w, h);
+                const is150Piece = maxDim > 1.365 && maxDim <= 1.515;
+
+                candidates.sort((a, b) => {
+                    if (is150Piece) {
+                        const aIs152 = a.bobina >= 1.48 && a.bobina <= 1.53;
+                        const bIs152 = b.bobina >= 1.48 && b.bobina <= 1.53;
+                        if (aIs152 && !bIs152) return -1;
+                        if (!aIs152 && bIs152) return 1;
+                    }
+                    const areaA = a.bobina * a.ml;
+                    const areaB = b.bobina * b.ml;
+                    if (Math.abs(areaA - areaB) > 0.05) return areaA - areaB;
+                    if (Math.abs(a.cost - b.cost) > 1) return a.cost - b.cost;
+                    if (Math.abs(a.ml - b.ml) > 0.01) return a.ml - b.ml;
+                    if (a.rotated !== b.rotated) return a.rotated ? 1 : -1;
+                    return a.bobina - b.bobina;
+                });
 
                 if (candidates.length > 0) return candidates[0].cost;
 
@@ -371,7 +389,12 @@ export default function Entrada() {
             let val = order.consumoEstimado !== undefined ? round2(order.consumoEstimado) : undefined;
             let assignedBobina = order.bobinaAsignada || order.precioDetalle?.bobinaAncho || order.precioDetalle?.bobinaUsada;
 
-            if (val === undefined || !assignedBobina) {
+            const maxDim = Math.max(w, h);
+            const is150Piece = maxDim > 1.365 && maxDim <= 1.515;
+            // Corrección reactiva si una pieza de 1.50m tenía erróneamente guardada bobina 1.37m o consumo de 1.50ml
+            const isAnomaly137 = is150Piece && (Number(assignedBobina) === 1.37 || String(assignedBobina).includes('1.37'));
+
+            if (val === undefined || !assignedBobina || isAnomaly137) {
                 if (matData?.bobinas && matData.bobinas.length > 0) {
                     const availableWidths = matData.bobinas
                         .map((b: any) => {
@@ -383,21 +406,32 @@ export default function Entrada() {
                         .filter((b: any) => b.usefulWidth > 0)
                         .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
-                    // Collect ALL valid bobina+orientation combos
-                    type Candidate = { bobina: number; ml: number };
+                    type Candidate = { bobina: number; ml: number; rotated: boolean };
                     const candidates: Candidate[] = [];
 
                     for (const b of availableWidths) {
                         if (w <= b.usefulWidth) {
-                            candidates.push({ bobina: b.ancho, ml: round2(h * c) });
+                            candidates.push({ bobina: b.ancho, ml: round2(h * c), rotated: false });
                         }
                         if (h <= b.usefulWidth) {
-                            candidates.push({ bobina: b.ancho, ml: round2(w * c) });
+                            candidates.push({ bobina: b.ancho, ml: round2(w * c), rotated: true });
                         }
                     }
 
-                    // Minimize waste: smallest bobina first, then fewest ML
-                    candidates.sort((a, b) => a.bobina - b.bobina || a.ml - b.ml);
+                    candidates.sort((a, b) => {
+                        if (is150Piece) {
+                            const aIs152 = a.bobina >= 1.48 && a.bobina <= 1.53;
+                            const bIs152 = b.bobina >= 1.48 && b.bobina <= 1.53;
+                            if (aIs152 && !bIs152) return -1;
+                            if (!aIs152 && bIs152) return 1;
+                        }
+                        const areaA = a.bobina * a.ml;
+                        const areaB = b.bobina * b.ml;
+                        if (Math.abs(areaA - areaB) > 0.05) return areaA - areaB;
+                        if (Math.abs(a.ml - b.ml) > 0.01) return a.ml - b.ml;
+                        if (a.rotated !== b.rotated) return a.rotated ? 1 : -1;
+                        return a.bobina - b.bobina;
+                    });
 
                     if (candidates.length > 0) {
                         val = candidates[0].ml;
@@ -408,8 +442,10 @@ export default function Entrada() {
                     }
                 } else {
                     // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
-                    // Regla de taller: Bobina 1.50m mide en realidad 1.52m con tolerancia útil hasta 1.515m; 1.37m útil 1.365m
-                    if (w <= 1.365) {
+                    if (is150Piece) {
+                        assignedBobina = 1.52;
+                        val = (w <= 1.515) ? round2(h * c) : round2(w * c);
+                    } else if (w <= 1.365) {
                         assignedBobina = 1.37;
                         val = round2(h * c);
                     } else if (h <= 1.365 && round2(w * c) <= round2(h * c)) {
@@ -838,10 +874,26 @@ export default function Entrada() {
         }
     };
 
-    const handleSaveNestingBatch = async (batchName: string, updatedConsumptionMl: number) => {
+    const handleSaveNestingBatch = async (batchName: string, updatedConsumptionMl: number, updatedCopies?: Record<string | number, number>) => {
         if (nestingModalOrders.length === 0) return;
         const ids = nestingModalOrders.map(o => o.id || o.ot || '');
         const perOrderMl = updatedConsumptionMl / nestingModalOrders.length;
+
+        // Si se modificaron copias dentro de Nesting Studio, actualizar cada orden
+        if (updatedCopies) {
+            for (const o of nestingModalOrders) {
+                const key = o.id || o.ot || '';
+                const newCopies = updatedCopies[key];
+                if (newCopies !== undefined && newCopies !== o.copias) {
+                    try {
+                        await saveOrden({ ...o, copias: newCopies });
+                    } catch (err) {
+                        console.error(`Error actualizando copias de OT ${o.ot || o.id}:`, err);
+                    }
+                }
+            }
+        }
+
         await saveBatchOrders('update', ids, {
             loteNombre: batchName,
             consumoEstimado: perOrderMl

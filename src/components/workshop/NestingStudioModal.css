@@ -145,6 +145,137 @@
     gap: 6px;
 }
 
+/* Lista de Piezas y Asignación de Copias */
+.nesting-pieces-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.nesting-pieces-list::-webkit-scrollbar {
+    width: 5px;
+}
+
+.nesting-pieces-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+.nesting-piece-item {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nesting-piece-item:hover {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.nesting-piece-item.selected {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+}
+
+.nesting-piece-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+    flex: 1;
+}
+
+.nesting-piece-item-ot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+}
+
+.nesting-piece-item-dims {
+    font-size: 0.72rem;
+    color: #38bdf8;
+    font-family: monospace;
+    background: rgba(56, 189, 248, 0.1);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.nesting-piece-item-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Stepper de Copias */
+.nesting-stepper {
+    display: inline-flex;
+    align-items: center;
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.nesting-stepper-btn {
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1rem;
+    transition: all 0.15s;
+    user-select: none;
+}
+
+.nesting-stepper-btn:hover:not(:disabled) {
+    background: #38bdf8;
+    color: #0f172a;
+}
+
+.nesting-stepper-btn:disabled {
+    color: #475569;
+    cursor: not-allowed;
+}
+
+.nesting-stepper-val {
+    width: 32px;
+    height: 26px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: #38bdf8;
+    font-weight: 800;
+    font-size: 0.85rem;
+    font-family: monospace;
+    outline: none;
+    -moz-appearance: textfield;
+}
+
+.nesting-stepper-val::-webkit-inner-spin-button,
+.nesting-stepper-val::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 .nesting-control-group {
     display: flex;
     flex-direction: column;

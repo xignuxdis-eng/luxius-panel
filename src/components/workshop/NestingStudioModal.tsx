@@ -8,7 +8,7 @@ interface NestingStudioModalProps {
     onClose: () => void;
     orders: Order[];
     initialBatchName?: string;
-    onSaveBatch?: (batchName: string, updatedConsumptionMl: number) => Promise<void>;
+    onSaveBatch?: (batchName: string, updatedConsumptionMl: number, updatedCopies?: Record<string | number, number>) => Promise<void>;
 }
 
 export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
@@ -21,16 +21,45 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     // Detectar bobina por defecto según material o asignación de órdenes
     const defaultRollWidth = useMemo(() => {
         if (!orders || orders.length === 0) return 1.52;
+
+        // 1. Si alguna pieza mide ~1.50m (entre 1.365m y 1.515m), debe ir a bobina 1.52m (1.50m comercial)
+        const has150Piece = orders.some(o => {
+            const w = Number(o.ancho) || 0;
+            const h = Number(o.alto) || 0;
+            const maxD = Math.max(w, h);
+            return maxD > 1.365 && maxD <= 1.515;
+        });
+        if (has150Piece) return 1.52;
+
+        // 2. Si alguna pieza supera 1.365m en ambas dimensiones, no cabe en 1.37m ni rotándola
+        const cannotFit137 = orders.some(o => {
+            const w = Number(o.ancho) || 0;
+            const h = Number(o.alto) || 0;
+            return Math.min(w, h) > 1.365;
+        });
+        if (cannotFit137) return 1.52;
+
+        // 3. Comprobar bobina asignada en las órdenes (descartando anomalías de 1.37 en piezas de 1.50m)
         const b = orders[0].bobinaAsignada || orders[0].precioDetalle?.bobinaAncho || orders[0].precioDetalle?.bobinaUsada;
         if (b) {
             const bNum = Number(b);
             if (bNum >= 1.48 && bNum <= 1.53) return 1.52;
-            if (bNum >= 1.35 && bNum <= 1.38) return 1.37;
+            if (bNum >= 1.35 && bNum <= 1.38) {
+                const firstMaxD = Math.max(Number(orders[0].ancho) || 0, Number(orders[0].alto) || 0);
+                if (firstMaxD > 1.365) return 1.52;
+                return 1.37;
+            }
             return bNum;
         }
-        // Si el ancho máximo de las piezas es <= 1.36m, sugerir 1.37m
-        const maxDim = Math.max(...orders.map(o => Math.min(Number(o.ancho) || 0, Number(o.alto) || 0)));
-        if (maxDim <= 1.365) return 1.37;
+
+        // 4. Si todas las piezas caben holgadamente en 1.37m
+        const allFitIn137 = orders.every(o => {
+            const w = Number(o.ancho) || 0;
+            const h = Number(o.alto) || 0;
+            return (w <= 1.365 || h <= 1.365);
+        });
+        if (allFitIn137) return 1.37;
+
         return 1.52;
     }, [orders]);
 
@@ -44,23 +73,57 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [selectedPieceId, setSelectedPieceId] = useState<string | number | null>(null);
 
+    // Estado de copias interactivas por ítem
+    const [copiesMap, setCopiesMap] = useState<Record<string | number, number>>({});
+
+    // Sincronizar copias iniciales desde las órdenes
+    useEffect(() => {
+        if (isOpen && orders && orders.length > 0) {
+            const initial: Record<string | number, number> = {};
+            orders.forEach(o => {
+                const key = o.id || o.ot || Math.random().toString();
+                initial[key] = Math.max(1, Number(o.copias) || 1);
+            });
+            setCopiesMap(initial);
+        }
+    }, [isOpen, orders]);
+
+    // Sincronizar bobina por defecto al abrir el modal
+    useEffect(() => {
+        if (isOpen) {
+            setRollWidth(defaultRollWidth);
+        }
+    }, [isOpen, defaultRollWidth]);
+
+    const handleUpdateCopies = (key: string | number, nextCount: number) => {
+        const val = Math.max(1, Math.min(999, Math.round(nextCount) || 1));
+        setCopiesMap(prev => ({
+            ...prev,
+            [key]: val
+        }));
+    };
+
     const rollContainerRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
 
-    // Preparar ítems para el motor de Nesting
+    // Preparar ítems para el motor de Nesting reactivo a las copias
     const nestingItems = useMemo<NestingItem[]>(() => {
-        return orders.map(o => ({
-            id: o.id || o.ot || Math.random().toString(),
-            ot: o.ot || `OT-${o.id}`,
-            label: o.descripcionItem || o.nombreTarea || `OT-${o.id}`,
-            width: Number(o.ancho) || 0,
-            height: Number(o.alto) || 0,
-            copies: Number(o.copias) || 1,
-            cliente: o.clienteNombre,
-            material: o.material,
-            orderId: o.id
-        }));
-    }, [orders]);
+        return orders.map(o => {
+            const key = o.id || o.ot || '';
+            const c = copiesMap[key] !== undefined ? copiesMap[key] : (Math.max(1, Number(o.copias) || 1));
+            return {
+                id: key,
+                ot: o.ot || `OT-${o.id}`,
+                label: o.descripcionItem || o.nombreTarea || `OT-${o.id}`,
+                width: Number(o.ancho) || 0,
+                height: Number(o.alto) || 0,
+                copies: c,
+                cliente: o.clienteNombre,
+                material: o.material,
+                orderId: o.id
+            };
+        });
+    }, [orders, copiesMap]);
 
     // Ejecutar motor de Nesting reactivamente
     const nestingResult = useMemo<NestingResult>(() => {
@@ -106,7 +169,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
         if (!onSaveBatch) return;
         try {
             setIsSaving(true);
-            await onSaveBatch(batchName, nestingResult.linearMeters);
+            await onSaveBatch(batchName, nestingResult.linearMeters, copiesMap);
             onClose();
         } catch (e) {
             console.error('Error al guardar lote con nesting:', e);
@@ -252,6 +315,73 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                         {nestingResult.totalPiecesPlaced} / {nestingResult.totalPiecesRequested}
                                     </span>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Piezas y Asignación de Copias */}
+                        <div>
+                            <div className="nesting-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Piezas y Copias ({orders.length})</span>
+                                <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 600 }}>
+                                    {nestingResult.totalPiecesPlaced} en pliego
+                                </span>
+                            </div>
+                            <div className="nesting-pieces-list">
+                                {orders.map((o) => {
+                                    const key = o.id || o.ot || '';
+                                    const currentCopies = copiesMap[key] ?? (Number(o.copias) || 1);
+                                    const w = Number(o.ancho) || 0;
+                                    const h = Number(o.alto) || 0;
+                                    const isSelected = selectedPieceId === key || String(selectedPieceId).startsWith(String(key));
+
+                                    return (
+                                        <div
+                                            key={key}
+                                            className={`nesting-piece-item ${isSelected ? 'selected' : ''}`}
+                                            onClick={() => setSelectedPieceId(key)}
+                                        >
+                                            <div className="nesting-piece-item-info">
+                                                <div className="nesting-piece-item-ot">
+                                                    <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{o.ot || `OT-${o.id}`}</span>
+                                                    <span className="nesting-piece-item-dims">
+                                                        {w.toFixed(2)} × {h.toFixed(2)}m
+                                                    </span>
+                                                </div>
+                                                <div className="nesting-piece-item-label" title={o.descripcionItem || o.nombreTarea || ''}>
+                                                    {o.descripcionItem || o.nombreTarea || `Pieza ${o.id}`}
+                                                </div>
+                                            </div>
+                                            <div className="nesting-stepper" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    className="nesting-stepper-btn"
+                                                    onClick={() => handleUpdateCopies(key, currentCopies - 1)}
+                                                    disabled={currentCopies <= 1}
+                                                    title="Disminuir copias de esta pieza"
+                                                >
+                                                    -
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    className="nesting-stepper-val"
+                                                    value={currentCopies}
+                                                    min={1}
+                                                    max={999}
+                                                    onChange={(e) => handleUpdateCopies(key, parseInt(e.target.value) || 1)}
+                                                    title="Cantidad de copias"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="nesting-stepper-btn"
+                                                    onClick={() => handleUpdateCopies(key, currentCopies + 1)}
+                                                    title="Aumentar copias de esta pieza"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
