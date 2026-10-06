@@ -142,33 +142,103 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isCloudImporting, saving]);
 
-    // --- Searchable Client Dropdown State ---
+    // --- Searchable Client State & Quick Add ---
+    const [clientes, setClientes] = useState<any[]>(() => getClientes());
     const [clientSearch, setClientSearch] = useState('');
     const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const [highlightedClientIndex, setHighlightedClientIndex] = useState(0);
     const clientDropdownRef = useRef<HTMLDivElement>(null);
+    const clientInputRef = useRef<HTMLInputElement>(null);
+
+    // Drag and Drop States for File Upload
+    const [isDraggingUnitario, setIsDraggingUnitario] = useState(false);
+    const [isDraggingBatch, setIsDraggingBatch] = useState(false);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
                 setShowClientDropdown(false);
+                // Si hay un cliente seleccionado, asegurar que el input muestre su nombre legible
+                const currentCid = getValues('clienteId');
+                if (currentCid) {
+                    const found = clientes.find(c => String(c.id) === String(currentCid));
+                    if (found) {
+                        setClientSearch(`${found.nombre} (${found.empresa || 'Particular'})`);
+                    }
+                }
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [clientes, getValues]);
+
+    const handleSelectClient = (c: any) => {
+        setValue('clienteId', String(c.id), { shouldValidate: true, shouldDirty: true });
+        setClientSearch(`${c.nombre} (${c.empresa || 'Particular'})`);
+        setShowClientDropdown(false);
+    };
+
+    const handleClearClient = () => {
+        setValue('clienteId', '', { shouldValidate: true, shouldDirty: true });
+        setClientSearch('');
+        setShowClientDropdown(false);
+        clientInputRef.current?.focus();
+    };
+
+    const handleQuickCreateClient = async (rawName: string) => {
+        const cleanName = rawName.trim();
+        if (!cleanName) return;
+        try {
+            const newC = await saveCliente({
+                nombre: cleanName,
+                empresa: 'Particular',
+                habilitado: true,
+                fechaInicio: new Date().toISOString().split('T')[0]
+            });
+            setClientes(prev => [newC, ...prev]);
+            handleSelectClient(newC);
+        } catch (e) {
+            console.error("[Luxius-UI] Error creando cliente rápido:", e);
+            alert("No se pudo registrar el cliente.");
+        }
+    };
+
+    const filteredClients = useMemo(() => {
+        const q = clientSearch.trim().toLowerCase();
+        if (!q) return clientes;
+        return clientes.filter(c =>
+            (c.nombre || '').toLowerCase().includes(q) ||
+            (c.empresa || '').toLowerCase().includes(q) ||
+            String(c.id).includes(q)
+        );
+    }, [clientes, clientSearch]);
     // ----------------------------------------
 
     // REF for async access to latest batch state
     const batchItemsRef = useRef(batchItems);
     useEffect(() => { batchItemsRef.current = batchItems; }, [batchItems]);
 
-    // Load services and vendors dynamically when modal opens
+    // Load clients, services and vendors dynamically when modal opens
     useEffect(() => {
-        const loadServicesAndVendors = async () => {
+        const loadInitialModalData = async () => {
             if (isOpen) {
-                console.log("[Luxius-UI] Sincronizando servicios y vendedores...");
+                console.log("[Luxius-UI] Sincronizando clientes, servicios y vendedores...");
 
-                // 1. Inmediato: LocalStorage
+                // 1. Clientes: inmediato LocalStorage + db.ts
+                const storedClientes = localStorage.getItem('luxius_session_clientes');
+                if (storedClientes) {
+                    try {
+                        const parsed = JSON.parse(storedClientes);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setClientes(parsed);
+                        }
+                    } catch (e) { console.error("Error localStorage clientes", e); }
+                } else {
+                    const fromDb = getClientes();
+                    if (fromDb.length > 0) setClientes(fromDb);
+                }
+
+                // 2. Servicios: Inmediato LocalStorage + fallback
                 const stored = localStorage.getItem('luxius_session_servicios');
                 if (stored) {
                     try {
@@ -176,26 +246,41 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         const active = parsed.filter((s: any) => s.habilitado);
                         if (active.length > 0) setAvailableServices(active);
                     } catch (e) { console.error("Error localStorage servicios", e); }
-                }
-
-                // 1b. Fallback: cargar desde db.ts (getServiciosActivos)
-                if (!stored) {
+                } else {
                     const fromDb = getServiciosActivos();
                     if (fromDb.length > 0) setAvailableServices(fromDb);
                 }
 
+                // 3. Vendedores
                 const storedVendedores = localStorage.getItem('luxius_session_vendedores');
                 if (storedVendedores) {
                     try {
-                        setVendedores(JSON.parse(storedVendedores));
+                        const parsed = JSON.parse(storedVendedores);
+                        setVendedores(parsed);
+                        if (!getValues('vendedorId') && parsed.length > 0) {
+                            setValue('vendedorId', String(parsed[0].id), { shouldValidate: true });
+                        }
                     } catch (e) { console.error("Error localStorage vendedores", e); }
                 }
 
-                // 2. Fondo: API para asegurar frescura
+                // 4. Fondo: API para asegurar frescura de Clientes, Servicios y Vendedores
                 const token = localStorage.getItem('luxius_auth_token') || localStorage.getItem('token');
                 const authHeaders: Record<string, string> = { 'Cache-Control': 'no-cache' };
                 if (token) {
                     authHeaders['Authorization'] = `Bearer ${token}`;
+                }
+
+                try {
+                    const res = await fetch(`${API_URL}/clientes`, { headers: authHeaders, cache: 'no-store' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data) && data.length > 0) {
+                            setClientes(data);
+                            localStorage.setItem('luxius_session_clientes', JSON.stringify(data));
+                        }
+                    }
+                } catch (e) {
+                    console.warn("[Luxius-UI] API Offline para clientes.");
                 }
 
                 try {
@@ -216,9 +301,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     const res = await fetch(`${API_URL}/vendedores`, { headers: authHeaders, cache: 'no-store' });
                     if (res.ok) {
                         const data = await res.json();
-                        if (Array.isArray(data)) {
+                        if (Array.isArray(data) && data.length > 0) {
                             setVendedores(data);
                             localStorage.setItem('luxius_session_vendedores', JSON.stringify(data));
+                            if (!getValues('vendedorId')) {
+                                setValue('vendedorId', String(data[0].id), { shouldValidate: true });
+                            }
                         }
                     }
                 } catch (e) {
@@ -226,8 +314,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 }
             }
         };
-        loadServicesAndVendors();
-    }, [isOpen]);
+        loadInitialModalData();
+    }, [isOpen, getValues, setValue]);
 
     const isLonaOrNotVinilo = (matCode: string) => {
         if (!matCode) return false;
@@ -452,9 +540,25 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const defaultCalidad = activeQuals.length > 0 ? activeQuals[0].nombre : '';
 
         if (order) {
-            setActiveTab('unitario')
-            reset(order)
-            setSelectedTags(order.tags || [])
+            const orderClientId = order.clientId || (order as any).clienteId;
+            setActiveTab('unitario');
+            reset({
+                ...order,
+                clienteId: orderClientId ? String(orderClientId) : '',
+                vendedorId: order.vendedorId ? String(order.vendedorId) : '1',
+                status: order.status || currentDefaultStatus,
+            });
+            if (orderClientId) {
+                const foundClient = clientes.find(c => String(c.id) === String(orderClientId)) || getClientes().find(c => String(c.id) === String(orderClientId));
+                if (foundClient) {
+                    setClientSearch(`${foundClient.nombre} (${foundClient.empresa || 'Particular'})`);
+                } else if (order.clienteNombre) {
+                    setClientSearch(order.clienteNombre);
+                }
+            } else if (order.clienteNombre) {
+                setClientSearch(order.clienteNombre);
+            }
+            setSelectedTags(order.tags || []);
             const initSena = Number(order.sena ?? order.senaMonto ?? (order as any).sena_monto ?? 0);
             setSenaAmount(initSena);
             setSenaMetodo(order.senaMetodo || 'efectivo');
@@ -482,17 +586,19 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setValue('calidad', defaultCalidad);
             }
             if (order.archivos?.[0]) {
-                const name = order.archivos[0]
-                setFileName(name)
+                const name = order.archivos[0];
+                setFileName(name);
                 // Recover from blobStore, imgMetadata thumbnailUrl or resolveMediaUrl
-                const savedUrl = blobStore.get(name)
-                const targetUrl = savedUrl || order.imgMetadata?.thumbnailUrl || resolveMediaUrl(name)
-                if (targetUrl) setPreviewUrl(targetUrl)
-                if (order.imgMetadata) setMetadata(order.imgMetadata)
+                const savedUrl = blobStore.get(name);
+                const targetUrl = savedUrl || order.imgMetadata?.thumbnailUrl || resolveMediaUrl(name);
+                if (targetUrl) setPreviewUrl(targetUrl);
+                if (order.imgMetadata) setMetadata(order.imgMetadata);
             }
         } else {
             reset({
                 clienteId: '',
+                vendedorId: (vendedores.length > 0 ? String(vendedores[0].id) : '1'),
+                status: currentDefaultStatus,
                 material: '',
                 calidad: defaultCalidad,
                 ancho: '',
@@ -501,19 +607,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 notas: '',
                 subtotal: 0,
                 demasiasConfig: { top: false, bottom: false, left: false, right: false }
-            })
-            setPriceOverride(null)
-            setIsPriceOverridden(false)
-            setSenaAmount(0)
-            setSelectedTags([])
-            setSenaMetodo('efectivo')
-            setSenaPorcentajeOption('0')
-            setFileName('')
-            setPreviewUrl(null)
-            setMetadata(null)
-            setSelectedFile(null)
+            });
+            setClientSearch('');
+            setPriceOverride(null);
+            setIsPriceOverridden(false);
+            setSenaAmount(0);
+            setSelectedTags([]);
+            setSenaMetodo('efectivo');
+            setSenaPorcentajeOption('0');
+            setFileName('');
+            setPreviewUrl(null);
+            setMetadata(null);
+            setSelectedFile(null);
         }
-    }, [order, reset, setValue])
+    }, [order, reset, setValue, currentDefaultStatus, clientes, vendedores]);
 
     const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string> => {
         const timeoutMs = 3500;
@@ -1221,80 +1328,144 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        console.log(`[Luxius-UI] Evento handleFileChange disparado`);
-        const file = e.target.files?.[0]
-        if (file) {
-            setExtracting(true)
-            const ext = (file.name.split('.').pop()?.toUpperCase() || '');
+    const processSingleFile = async (file: File) => {
+        setExtracting(true);
+        const ext = (file.name.split('.').pop()?.toUpperCase() || '');
 
-            // Pre-check multi-page PDF to explode and redirect to Batch Upload
-            if (ext === 'PDF') {
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    let pageCount = 1;
-                    try {
-                        const pdfDoc = await PDFDocument.load(arrayBuffer.slice(0), { ignoreEncryption: true });
-                        pageCount = pdfDoc.getPageCount();
-                    } catch {
-                        try {
-                            const pjDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
-                            pageCount = pjDoc.numPages;
-                        } catch {}
-                    }
-
-                    if (pageCount > 1) {
-                        console.log(`[Luxius-UI] PDF multipágina detectado (${pageCount} páginas). Redirigiendo automáticamente a Carga por Lote...`);
-                        setSelectedFile(null);
-                        setFileName('');
-                        setPreviewUrl(null);
-                        setMetadata(null);
-                        if (e.target) e.target.value = '';
-                        setActiveTab('lote');
-                        await processBatchFiles([file]);
-                        return;
-                    }
-                } catch (e) {
-                    console.warn('[Luxius-UI] Error pre-verificando páginas PDF:', e);
-                }
-            }
-
-            setSelectedFile(file)
-            setFileName(file.name)
-            const url = URL.createObjectURL(file)
-            blobStore.set(file.name, url)
-            setPreviewUrl(url)
-
+        // Pre-check multi-page PDF to explode and redirect to Batch Upload
+        if (ext === 'PDF') {
             try {
-                const meta = await extractMetadata(file, url)
-                if (meta.pageCount > 1) {
-                    console.log(`[Luxius-UI] PDF multipágina detectado en extractMetadata (${meta.pageCount} páginas). Redirigiendo a Carga por Lote...`);
+                const arrayBuffer = await file.arrayBuffer();
+                let pageCount = 1;
+                try {
+                    const pdfDoc = await PDFDocument.load(arrayBuffer.slice(0), { ignoreEncryption: true });
+                    pageCount = pdfDoc.getPageCount();
+                } catch {
+                    try {
+                        const pjDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                        pageCount = pjDoc.numPages;
+                    } catch {}
+                }
+
+                if (pageCount > 1) {
+                    console.log(`[Luxius-UI] PDF multipágina detectado (${pageCount} páginas). Redirigiendo automáticamente a Carga por Lote...`);
                     setSelectedFile(null);
                     setFileName('');
                     setPreviewUrl(null);
                     setMetadata(null);
-                    if (e.target) e.target.value = '';
+                    if (fileInputRef.current) fileInputRef.current.value = '';
                     setActiveTab('lote');
                     await processBatchFiles([file]);
                     return;
                 }
-
-                setMetadata(meta)
-                if (meta.width > 0) {
-                    setValue('ancho', (meta.width / 100).toFixed(2))
-                    setValue('alto', (meta.height / 100).toFixed(2))
-                }
-                if (meta.thumbnailUrl) {
-                    console.log(`[Luxius-Meta] Aplicando miniatura a previsualización: ${meta.thumbnailUrl.substring(0, 50)}...`)
-                    setPreviewUrl(meta.thumbnailUrl)
-                }
-            } catch (err) {
-                console.error('[Luxius-Meta] Error fatal:', err)
-            } finally {
-                setExtracting(false)
+            } catch (e) {
+                console.warn('[Luxius-UI] Error pre-verificando páginas PDF:', e);
             }
         }
-    }
+
+        setSelectedFile(file);
+        setFileName(file.name);
+        const url = URL.createObjectURL(file);
+        blobStore.set(file.name, url);
+        setPreviewUrl(url);
+
+        try {
+            const meta = await extractMetadata(file, url);
+            if (meta.pageCount > 1) {
+                console.log(`[Luxius-UI] PDF multipágina detectado en extractMetadata (${meta.pageCount} páginas). Redirigiendo a Carga por Lote...`);
+                setSelectedFile(null);
+                setFileName('');
+                setPreviewUrl(null);
+                setMetadata(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                setActiveTab('lote');
+                await processBatchFiles([file]);
+                return;
+            }
+
+            setMetadata(meta);
+            if (meta.width > 0) {
+                setValue('ancho', (meta.width / 100).toFixed(2));
+                setValue('alto', (meta.height / 100).toFixed(2));
+            }
+            if (meta.thumbnailUrl) {
+                console.log(`[Luxius-Meta] Aplicando miniatura a previsualización: ${meta.thumbnailUrl.substring(0, 50)}...`);
+                setPreviewUrl(meta.thumbnailUrl);
+            }
+        } catch (err) {
+            console.error('[Luxius-Meta] Error fatal:', err);
+        } finally {
+            setExtracting(false);
+        }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        console.log(`[Luxius-UI] Evento handleFileChange disparado`);
+        const file = e.target.files?.[0];
+        if (file) {
+            await processSingleFile(file);
+        }
+    };
+
+    const handleFileClear = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setSelectedFile(null);
+        setFileName('');
+        setPreviewUrl(null);
+        setMetadata(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleUnitarioDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDraggingUnitario) setIsDraggingUnitario(true);
+    };
+
+    const handleUnitarioDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingUnitario(false);
+    };
+
+    const handleUnitarioDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingUnitario(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) return;
+        if (files.length > 1) {
+            setActiveTab('lote');
+            await processBatchFiles(files);
+        } else {
+            await processSingleFile(files[0]);
+        }
+    };
+
+    const handleBatchDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDraggingBatch) setIsDraggingBatch(true);
+    };
+
+    const handleBatchDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingBatch(false);
+    };
+
+    const handleBatchDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingBatch(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) {
+            await processBatchFiles(files);
+        }
+    };
 
     // FIX: Reset demasias if material changes to incompatible type
     useEffect(() => {
@@ -1792,7 +1963,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmit, (errors) => {
-                    console.error("Form errors:", errors)
+                    console.error("[Luxius-Form] Errores de validación:", errors)
                     const isRelevamiento = watch('status') === 'relevamiento' || watch('status') === 'diseno'
                     let msg = "Por favor revise los siguientes campos:\n"
                     let hasErrors = false
@@ -1802,6 +1973,15 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     if (!isRelevamiento && errors.calidad) { msg += "- Calidad es requerida\n"; hasErrors = true; }
                     if (!isRelevamiento && errors.ancho) { msg += "- Ancho es requerido\n"; hasErrors = true; }
                     if (!isRelevamiento && errors.alto) { msg += "- Alto es requerido\n"; hasErrors = true; }
+                    if (errors.vendedorId) { msg += "- Vendedor asignado es requerido\n"; hasErrors = true; }
+                    if (errors.status) { msg += "- Tipo de pedido es requerido\n"; hasErrors = true; }
+
+                    Object.keys(errors).forEach(key => {
+                        if (!['clienteId', 'material', 'calidad', 'ancho', 'alto', 'vendedorId', 'status'].includes(key)) {
+                            msg += `- ${key}: ${(errors as any)[key]?.message || 'Inválido'}\n`;
+                            hasErrors = true;
+                        }
+                    });
                     
                     if (hasErrors) alert(msg)
                 })} className="pedido-form">
@@ -1809,18 +1989,26 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         <div className="compact-grid">
                             {/* Línea 1: Cliente y Fecha Entrega */}
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                <label>Cliente</label>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <label>Cliente</label>
+                                    {watch('clienteId') && user?.role !== 'cliente' && (
+                                        <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 600 }}>✓ Seleccionado</span>
+                                    )}
+                                </div>
                                 {user?.role === 'cliente' ? (
                                     <>
                                         <input
                                             type="text"
                                             className="input-field"
                                             value={(() => {
-                                                const c = getClientes().find(c =>
+                                                const c = clientes.find(c =>
+                                                    c.nombre.toLowerCase().includes(user.name.toLowerCase()) ||
+                                                    user.name.toLowerCase().includes(c.nombre.toLowerCase())
+                                                ) || getClientes().find(c =>
                                                     c.nombre.toLowerCase().includes(user.name.toLowerCase()) ||
                                                     user.name.toLowerCase().includes(c.nombre.toLowerCase())
                                                 )
-                                                return c ? `${c.nombre} (${c.empresa})` : user.name
+                                                return c ? `${c.nombre} (${c.empresa || 'Particular'})` : user.name
                                             })()}
                                             readOnly
                                             disabled
@@ -1829,49 +2017,93 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                         <input type="hidden" {...register('clienteId', { required: false })} />
                                     </>
                                 ) : (
-                                    <div className="relative" ref={clientDropdownRef}>
+                                    <div className="client-search-wrapper" ref={clientDropdownRef}>
                                         <input type="hidden" {...register('clienteId', { required: false })} />
-                                        <input
-                                            type="text"
-                                            className="input-field"
-                                            placeholder="Buscar cliente por nombre o empresa..."
-                                            value={showClientDropdown ? clientSearch : (() => {
-                                                const selectedId = watch('clienteId');
-                                                if (!selectedId) return '';
-                                                const c = getClientes().find(cl => String(cl.id) === String(selectedId));
-                                                return c ? `${c.nombre} (${c.empresa || 'Particular'})` : '';
-                                            })()}
-                                            onChange={(e) => {
-                                                setClientSearch(e.target.value);
-                                                if (!showClientDropdown) setShowClientDropdown(true);
-                                            }}
-                                            onFocus={() => {
-                                                setClientSearch('');
-                                                setShowClientDropdown(true);
-                                            }}
-                                        />
+                                        <div className="client-search-input-box">
+                                            <input
+                                                ref={clientInputRef}
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="Buscar cliente por nombre o empresa..."
+                                                value={clientSearch}
+                                                onChange={(e) => {
+                                                    setClientSearch(e.target.value);
+                                                    setShowClientDropdown(true);
+                                                    setHighlightedClientIndex(0);
+                                                }}
+                                                onFocus={() => {
+                                                    setShowClientDropdown(true);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'ArrowDown') {
+                                                        e.preventDefault();
+                                                        if (!showClientDropdown) {
+                                                            setShowClientDropdown(true);
+                                                        } else {
+                                                            setHighlightedClientIndex(prev => Math.min(prev + 1, Math.max(0, filteredClients.length - 1)));
+                                                        }
+                                                    } else if (e.key === 'ArrowUp') {
+                                                        e.preventDefault();
+                                                        setHighlightedClientIndex(prev => Math.max(prev - 1, 0));
+                                                    } else if (e.key === 'Enter') {
+                                                        if (showClientDropdown) {
+                                                            e.preventDefault();
+                                                            if (filteredClients.length > 0 && highlightedClientIndex < filteredClients.length) {
+                                                                handleSelectClient(filteredClients[highlightedClientIndex]);
+                                                            } else if (clientSearch.trim()) {
+                                                                handleQuickCreateClient(clientSearch);
+                                                            }
+                                                        }
+                                                    } else if (e.key === 'Escape') {
+                                                        setShowClientDropdown(false);
+                                                    }
+                                                }}
+                                                style={{
+                                                    borderColor: watch('clienteId') ? 'var(--accent)' : undefined
+                                                }}
+                                            />
+                                            {watch('clienteId') && (
+                                                <button
+                                                    type="button"
+                                                    className="client-clear-btn"
+                                                    onClick={handleClearClient}
+                                                    title="Limpiar cliente"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
                                         {showClientDropdown && (
-                                            <div className="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md shadow-lg max-h-60 overflow-y-auto" style={{ zIndex: 9999 }}>
-                                                {getClientes()
-                                                    .filter(c => 
-                                                        c.nombre.toLowerCase().includes(clientSearch.toLowerCase()) || 
-                                                        (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase())
-                                                    )
-                                                    .map(c => (
-                                                        <div 
-                                                            key={c.id} 
-                                                            className="px-3 py-2 cursor-pointer hover:bg-[var(--primary-color)] hover:text-white border-b border-[var(--border-color)] last:border-0"
-                                                            onClick={() => {
-                                                                setValue('clienteId', String(c.id));
-                                                                setShowClientDropdown(false);
-                                                            }}
-                                                        >
-                                                            <div style={{ fontWeight: 'bold' }}>{c.nombre}</div>
-                                                            <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{c.empresa || 'Particular'}</div>
-                                                        </div>
-                                                    ))}
-                                                {getClientes().filter(c => c.nombre.toLowerCase().includes(clientSearch.toLowerCase()) || (c.empresa || '').toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
-                                                    <div className="px-3 py-2 text-sm opacity-50">No se encontraron clientes</div>
+                                            <div className="client-dropdown-menu">
+                                                {filteredClients.map((c, idx) => (
+                                                    <div 
+                                                        key={c.id} 
+                                                        className={`client-dropdown-item ${idx === highlightedClientIndex ? 'active' : ''}`}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            handleSelectClient(c);
+                                                        }}
+                                                    >
+                                                        <div className="client-item-name">{c.nombre}</div>
+                                                        <div className="client-item-empresa">{c.empresa || 'Particular'}</div>
+                                                    </div>
+                                                ))}
+                                                {filteredClients.length === 0 && (
+                                                    <div className="client-dropdown-empty">
+                                                        <div>No se encontraron clientes para "{clientSearch}"</div>
+                                                        {clientSearch.trim() && (
+                                                            <button
+                                                                type="button"
+                                                                className="client-create-quick-btn"
+                                                                onMouseDown={(e) => {
+                                                                    e.preventDefault();
+                                                                    handleQuickCreateClient(clientSearch);
+                                                                }}
+                                                            >
+                                                                ➕ Crear cliente "{clientSearch.trim()}"
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -1957,7 +2189,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     </div>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                         <label>Archivo</label>
-                                        <div className="compact-upload" onClick={() => !saving && fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}>
+                                        <div 
+                                            className={`compact-upload ${isDraggingUnitario ? 'drag-over' : ''}`} 
+                                            onClick={() => !saving && fileInputRef.current?.click()} 
+                                            onDragOver={handleUnitarioDragOver}
+                                            onDragLeave={handleUnitarioDragLeave}
+                                            onDrop={handleUnitarioDrop}
+                                            style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}
+                                        >
                                             <UniversalFilePreview
                                                 file={selectedFile || undefined}
                                                 fileUrl={previewUrl || undefined}
@@ -2018,12 +2257,31 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </button>
                                                     )}
                                                     {fileName ? (
-                                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={fileName}>
-                                                            {fileName}
-                                                        </span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }} title={fileName}>
+                                                                {fileName}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleFileClear}
+                                                                style={{
+                                                                    padding: '2px 6px',
+                                                                    fontSize: '0.75rem',
+                                                                    background: 'rgba(239, 68, 68, 0.15)',
+                                                                    color: '#ef4444',
+                                                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                                                    borderRadius: '4px',
+                                                                    cursor: 'pointer',
+                                                                    fontWeight: 700
+                                                                }}
+                                                                title="Quitar archivo seleccionado"
+                                                            >
+                                                                ✕ Quitar
+                                                            </button>
+                                                        </div>
                                                     ) : (
-                                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                                            Sin archivo
+                                                        <span style={{ fontSize: '0.78rem', color: isDraggingUnitario ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                                            {isDraggingUnitario ? 'Suelta el archivo aquí...' : 'Sin archivo (o arrastra y suelta)'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -2102,7 +2360,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                     </button>
                                                 )}
                                             </div>
-                                            <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+                                            <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png,.webp,.tif,.tiff,.cdr,.ai,.eps,.svg,.psd" />
 
                                             {/* PROGRESS BAR - Extracción de metadata */}
                                             {extracting && (
@@ -2370,12 +2628,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
 
                                     <label>Carga masiva</label>
-                                    <div className="batch-upload-zone"
+                                    <div 
+                                        className={`batch-upload-zone ${isDraggingBatch ? 'drag-over' : ''}`}
                                         onClick={() => batchInputRef.current?.click()}
+                                        onDragOver={handleBatchDragOver}
+                                        onDragLeave={handleBatchDragLeave}
+                                        onDrop={handleBatchDrop}
                                         style={{ border: '2px dashed var(--accent)', background: 'var(--accent-light)', padding: '20px', textAlign: 'center', borderRadius: 'var(--radius-lg)', cursor: 'pointer' }}
                                     >
                                         <div className="batch-upload-text">
-                                            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: '600' }}>Haz clic para seleccionar múltiples archivos</span>
+                                            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: '600' }}>
+                                                {isDraggingBatch ? '¡Suelta los archivos aquí para agregarlos al lote!' : 'Haz clic o arrastra y suelta múltiples archivos aquí'}
+                                            </span>
                                             <span className="batch-upload-hint" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>Los PDFs multipágina se explotarán automáticamente</span>
                                             
                                             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }} onClick={e => e.stopPropagation()}>
@@ -2425,7 +2689,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 )}
                                             </div>
                                         </div>
-                                        <input type="file" ref={batchInputRef} style={{ display: 'none' }} multiple onChange={handleBatchChange} />
+                                        <input type="file" ref={batchInputRef} style={{ display: 'none' }} multiple onChange={handleBatchChange} accept=".pdf,.jpg,.jpeg,.png,.webp,.tif,.tiff,.cdr,.ai,.eps,.svg,.psd" />
                                     </div>
 
                                     {/* BANNER INFORMATIVO MECÁNICA */}
@@ -2865,7 +3129,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     }}>
                                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                             <label>Archivo de Diseño / Gráfica para la Promo</label>
-                                            <div className="compact-upload" onClick={() => !saving && fileInputRef.current?.click()} style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}>
+                                            <div 
+                                                className={`compact-upload ${isDraggingUnitario ? 'drag-over' : ''}`} 
+                                                onClick={() => !saving && fileInputRef.current?.click()} 
+                                                onDragOver={handleUnitarioDragOver}
+                                                onDragLeave={handleUnitarioDragLeave}
+                                                onDrop={handleUnitarioDrop}
+                                                style={{ minHeight: '48px', position: 'relative', cursor: saving ? 'wait' : 'pointer' }}
+                                            >
                                                 <UniversalFilePreview
                                                     file={selectedFile || undefined}
                                                     fileUrl={previewUrl || undefined}
@@ -2926,12 +3197,31 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                             </button>
                                                         )}
                                                         {fileName ? (
-                                                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={fileName}>
-                                                                {fileName}
-                                                            </span>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }} title={fileName}>
+                                                                    {fileName}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleFileClear}
+                                                                    style={{
+                                                                        padding: '2px 6px',
+                                                                        fontSize: '0.75rem',
+                                                                        background: 'rgba(239, 68, 68, 0.15)',
+                                                                        color: '#ef4444',
+                                                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                                                        borderRadius: '4px',
+                                                                        cursor: 'pointer',
+                                                                        fontWeight: 700
+                                                                    }}
+                                                                    title="Quitar archivo seleccionado"
+                                                                >
+                                                                    ✕ Quitar
+                                                                </button>
+                                                            </div>
                                                         ) : (
-                                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                                                Sin archivo
+                                                            <span style={{ fontSize: '0.78rem', color: isDraggingUnitario ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                                                {isDraggingUnitario ? 'Suelta el archivo aquí...' : 'Sin archivo (o arrastra y suelta)'}
                                                             </span>
                                                         )}
                                                     </div>
