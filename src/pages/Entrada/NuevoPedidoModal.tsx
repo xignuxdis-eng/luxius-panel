@@ -51,13 +51,36 @@ interface BatchItem {
 
 export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus }: NuevoPedidoModalProps) {
     const { user } = useAuthStore()
+    const [currentDefaultStatus] = useState(defaultStatus || 'orden')
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const batchInputRef = useRef<HTMLInputElement>(null)
+    const lastInitializedOrderIdRef = useRef<number | string | null | undefined>(undefined)
+
+    const { register, handleSubmit, reset, setValue, watch, getValues } = useForm({
+        defaultValues: (order || {
+            status: defaultStatus || 'orden',
+            copias: 1,
+            calidad: '',
+            prioridad: 0,
+            fechaEntrega: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            demasiasConfig: { top: false, bottom: false, left: false, right: false }
+        }) as any
+    })
+
+    // Watch fields for price calculation
+    const watchedAncho = watch('ancho')
+    const watchedAlto = watch('alto')
+    const watchedCopias = watch('copias')
+    const watchedMaterial = watch('material')
+    const watchedCalidad = watch('calidad')
+    const watchedClientId = watch('clienteId')
+
     const [activeTab, setActiveTab] = useState<TabType>('unitario')
     const [fileName, setFileName] = useState('')
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [metadata, setMetadata] = useState<{ width?: number, height?: number, dpi?: number, format?: string, colorMode?: string, pageCount?: number, thumbnailUrl?: string } | null>(null)
     const [batchItems, setBatchItems] = useState<BatchItem[]>([])
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
-    const [currentDefaultStatus] = useState(defaultStatus || 'orden')
     const [extracting, setExtracting] = useState(false)
     const [availableServices, setAvailableServices] = useState<import('@/types').Servicio[]>([])
     const [saving, setSaving] = useState(false)
@@ -327,28 +350,6 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         return d.includes('lona') || d.includes('front') || d.includes('back') || d.includes('banner') || (!d.includes('vinilo') && !c.includes('vin'));
     }
 
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const batchInputRef = useRef<HTMLInputElement>(null)
-    const { register, handleSubmit, reset, setValue, watch, getValues } = useForm({
-        defaultValues: (order || {
-            status: currentDefaultStatus,
-            copias: 1,
-            calidad: '',
-            prioridad: 0,
-            fechaEntrega: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            demasiasConfig: { top: false, bottom: false, left: false, right: false }
-        }) as any
-    })
-
-
-    // Watch fields for price calculation
-    const watchedAncho = watch('ancho')
-    const watchedAlto = watch('alto')
-    const watchedCopias = watch('copias')
-    const watchedMaterial = watch('material')
-    const watchedCalidad = watch('calidad')
-    const watchedClientId = watch('clienteId')
-
     useEffect(() => {
         const activeQuals = getCalidades().filter(c => c.habilitado !== false);
         if (activeQuals.length === 0) return;
@@ -536,10 +537,21 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
     // ... (rest of code)
     useEffect(() => {
+        if (!isOpen) {
+            lastInitializedOrderIdRef.current = undefined;
+            return;
+        }
+
         const activeQuals = getCalidades().filter(c => c.habilitado !== false);
         const defaultCalidad = activeQuals.length > 0 ? activeQuals[0].nombre : '';
 
         if (order) {
+            const currentOrderId = order.id || (order as any).ot || 'loaded';
+            if (lastInitializedOrderIdRef.current === currentOrderId) {
+                return;
+            }
+            lastInitializedOrderIdRef.current = currentOrderId;
+
             const orderClientId = order.clientId || (order as any).clienteId;
             setActiveTab('unitario');
             reset({
@@ -595,6 +607,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 if (order.imgMetadata) setMetadata(order.imgMetadata);
             }
         } else {
+            if (lastInitializedOrderIdRef.current === 'new') {
+                return;
+            }
+            lastInitializedOrderIdRef.current = 'new';
+
             reset({
                 clienteId: '',
                 vendedorId: (vendedores.length > 0 ? String(vendedores[0].id) : '1'),
@@ -620,7 +637,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setMetadata(null);
             setSelectedFile(null);
         }
-    }, [order, reset, setValue, currentDefaultStatus, clientes, vendedores]);
+    }, [isOpen, order, reset, setValue, currentDefaultStatus]);
 
     const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum: number = 1, widthCm?: number, heightCm?: number): Promise<string> => {
         const timeoutMs = 3500;

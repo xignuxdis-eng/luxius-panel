@@ -316,7 +316,6 @@ export default function Entrada() {
                 const cliente = allClientes.find(cl => String(cl.id) === String(order.clientId));
                 const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
 
-                type Candidate = { bobina: number; ml: number; cost: number };
                 type Candidate = { bobina: number; ml: number; cost: number; rotated: boolean };
                 const candidates: Candidate[] = [];
 

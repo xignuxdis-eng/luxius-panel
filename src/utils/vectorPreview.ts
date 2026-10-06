@@ -158,7 +158,8 @@ export function generateVectorCard(
         // Filename
         ctx.fillStyle = '#cbd5e1';
         ctx.font = '12px Inter, Arial, sans-serif';
-        const cleanName = fileName.length > 28 ? fileName.substring(0, 25) + '...' : fileName;
+        const safeFileName = fileName || 'Archivo';
+        const cleanName = safeFileName.length > 28 ? safeFileName.substring(0, 25) + '...' : safeFileName;
         ctx.fillText(cleanName, 160, 165);
 
         // Dimensions card box
