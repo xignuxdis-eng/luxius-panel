@@ -260,24 +260,63 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                 ctx.beginPath(); ctx.moveTo(px + pw - mLen, py); ctx.lineTo(px + pw + mLen, py); ctx.stroke();
             }
 
-            // Texto centrado en la pieza (Nombre de archivo + Copia + Medida)
-            const copyBadge = p.totalCopies && p.totalCopies > 0 ? ` (${p.copyIndex || 1}/${p.totalCopies})` : '';
-            const dimsText = `${p.originalWidth.toFixed(2)} × ${p.originalHeight.toFixed(2)}m${p.rotated ? ' ↺90°' : ''}`;
+            // Texto centrado en la pieza adaptativo (orientación + escala métrica)
             const cx = px + (pw / 2);
             const cy = py + (ph / 2);
+
+            // Orientación adaptativa en canvas: rotar a lo largo del eje mayor si es vertical
+            const isCanvasVertical = (ph > pw * 1.15 && pw < 500) || (ph > pw * 1.6);
+            const canvasMajor = isCanvasVertical ? ph : pw;
+            const canvasMinor = isCanvasVertical ? pw : ph;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            if (isCanvasVertical) {
+                // Rotar -90° (de abajo hacia arriba)
+                ctx.rotate(-Math.PI / 2);
+            }
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            // Nombre de archivo + copia (Grande y legible)
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 26px Arial, sans-serif';
-            ctx.fillText(`${p.label}${copyBadge}`, cx, cy - 14, Math.max(50, pw - 20));
+            const isCanvasCompact = canvasMajor < 260;
+            const canvasDimsText = isCanvasCompact
+                ? `${p.originalWidth.toFixed(2)}×${p.originalHeight.toFixed(2)}${p.rotated ? '↺' : ''}`
+                : `${p.originalWidth.toFixed(2)} × ${p.originalHeight.toFixed(2)}m${p.rotated ? ' ↺90°' : ''}`;
 
-            // Medidas métricas destacadas
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = 'bold 20px Arial, sans-serif';
-            ctx.fillText(dimsText, cx, cy + 18, Math.max(50, pw - 20));
+            const canvasCopyBadge = p.totalCopies && p.totalCopies > 0
+                ? (isCanvasCompact ? ` ${p.copyIndex || 1}/${p.totalCopies}` : ` (${p.copyIndex || 1}/${p.totalCopies})`)
+                : '';
+
+            let canvasTitleFont = Math.min(28, Math.max(12, Math.round(canvasMinor * 0.16)));
+            if (canvasMajor < 200) canvasTitleFont = Math.min(canvasTitleFont, 14);
+
+            let canvasDimsFont = Math.min(22, Math.max(10, Math.round(canvasTitleFont * 0.82)));
+            const maxCanvasTextWidth = Math.max(50, canvasMajor - 24);
+
+            const isCanvasSingleLine = canvasMinor < 85 && canvasMajor >= 180;
+
+            if (isCanvasSingleLine) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${canvasTitleFont}px Arial, sans-serif`;
+                ctx.fillText(`${p.label}${canvasCopyBadge}  •  ${canvasDimsText}`, 0, 0, maxCanvasTextWidth);
+            } else if (canvasMinor < 55 && canvasMajor < 180) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${canvasTitleFont}px Arial, sans-serif`;
+                ctx.fillText(`${p.label}${canvasCopyBadge}`, 0, 0, maxCanvasTextWidth);
+            } else {
+                const offset = Math.min(18, Math.max(8, Math.round(canvasMinor * 0.15)));
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${canvasTitleFont}px Arial, sans-serif`;
+                ctx.fillText(`${p.label}${canvasCopyBadge}`, 0, -offset, maxCanvasTextWidth);
+
+                ctx.fillStyle = '#38bdf8';
+                ctx.font = `bold ${canvasDimsFont}px Arial, sans-serif`;
+                ctx.fillText(canvasDimsText, 0, offset + 2, maxCanvasTextWidth);
+            }
+
+            ctx.restore();
         });
 
         // Pie informativo del pliego
@@ -651,36 +690,98 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                 {/* Piezas colocadas */}
                                 {nestingResult.pieces.map((p) => {
                                     const isSelected = selectedPieceId === p.id;
+                                    const pieceW = p.width * baseScale;
+                                    const pieceH = p.height * baseScale;
+
+                                    // Orientación adaptativa: vertical si la altura supera al ancho significativamente
+                                    const isVertical = (pieceH > pieceW * 1.15 && pieceW < 150) || (pieceH > pieceW * 1.6);
+                                    const majorAxis = isVertical ? pieceH : pieceW;
+                                    const minorAxis = isVertical ? pieceW : pieceH;
+
+                                    // Tipografía adaptativa calculada dinámicamente según espacio disponible
+                                    let titleFontSize = Math.min(15, Math.max(8.5, Math.round(minorAxis * 0.22)));
+                                    if (majorAxis < 80) {
+                                        titleFontSize = Math.min(titleFontSize, 10);
+                                    }
+                                    const badgeFontSize = Math.min(11, Math.max(7.5, Math.round(titleFontSize * 0.82)));
+                                    const dimsFontSize = Math.min(12, Math.max(7.5, Math.round(titleFontSize * 0.85)));
+
+                                    // Adaptación compacta para evitar truncamiento
+                                    const isCompact = majorAxis < 75;
+                                    const isSingleLine = minorAxis < 38 && majorAxis >= 85;
+                                    const showDims = showLabels && (minorAxis >= 26 || isSingleLine);
+
+                                    const dimsText = isCompact
+                                        ? `${p.originalWidth.toFixed(2)}×${p.originalHeight.toFixed(2)}${p.rotated ? '↺' : ''}`
+                                        : `${p.originalWidth.toFixed(2)} × ${p.originalHeight.toFixed(2)}m${p.rotated ? ' ↺' : ''}`;
+
+                                    const copyBadgeText = p.totalCopies && p.totalCopies > 0
+                                        ? (isCompact ? `${p.copyIndex || 1}/${p.totalCopies}` : `(${p.copyIndex || 1}/${p.totalCopies})`)
+                                        : '';
+
                                     return (
                                         <div
                                             key={p.id}
-                                            className="nesting-piece-card"
+                                            className={`nesting-piece-card ${isVertical ? 'is-vertical-piece' : ''} ${isSelected ? 'selected' : ''}`}
                                             style={{
                                                 left: `${p.x * baseScale}px`,
                                                 top: `${p.y * baseScale}px`,
-                                                width: `${p.width * baseScale}px`,
-                                                height: `${p.height * baseScale}px`,
+                                                width: `${pieceW}px`,
+                                                height: `${pieceH}px`,
                                                 borderColor: isSelected ? '#38bdf8' : undefined,
                                                 background: isSelected ? 'rgba(56, 189, 248, 0.5)' : undefined
                                             }}
                                             onClick={() => setSelectedPieceId(p.id)}
                                             title={`${p.label} (Copia ${p.copyIndex || 1}/${p.totalCopies || 1})\nMedidas: ${p.originalWidth.toFixed(2)} × ${p.originalHeight.toFixed(2)}m ${p.rotated ? '(Rotado 90°)' : ''}\nOT: ${p.ot}\nPosición: X: ${p.x.toFixed(2)}m, Y: ${p.y.toFixed(2)}m`}
                                         >
-                                            <div className="nesting-piece-center-content">
-                                                <div className="nesting-piece-filename-row">
-                                                    <span className="nesting-piece-filename" title={p.label}>
-                                                        {p.label}
-                                                    </span>
-                                                    {p.totalCopies && p.totalCopies > 0 && (
-                                                        <span className="nesting-piece-copy-badge">
-                                                            ({p.copyIndex || 1}/{p.totalCopies})
+                                            <div
+                                                className="nesting-piece-center-content"
+                                                style={isVertical ? {
+                                                    position: 'absolute',
+                                                    left: '50%',
+                                                    top: '50%',
+                                                    transform: 'translate(-50%, -50%) rotate(-90deg)',
+                                                    width: `${Math.max(20, pieceH - 6)}px`,
+                                                    height: `${Math.max(16, pieceW - 4)}px`,
+                                                } : {
+                                                    width: '100%',
+                                                    height: '100%',
+                                                }}
+                                            >
+                                                {isSingleLine ? (
+                                                    <div className="nesting-piece-filename-row is-inline-compact" style={{ fontSize: `${titleFontSize}px` }}>
+                                                        <span className="nesting-piece-filename" style={{ fontSize: `${titleFontSize}px` }} title={p.label}>
+                                                            {p.label}
                                                         </span>
-                                                    )}
-                                                </div>
-                                                {showLabels && (
-                                                    <span className="nesting-piece-dims-centered">
-                                                        {p.originalWidth.toFixed(2)} × {p.originalHeight.toFixed(2)}m {p.rotated && '↺'}
-                                                    </span>
+                                                        {copyBadgeText && (
+                                                            <span className="nesting-piece-copy-badge" style={{ fontSize: `${badgeFontSize}px` }}>
+                                                                {copyBadgeText}
+                                                            </span>
+                                                        )}
+                                                        {showDims && (
+                                                            <span className="nesting-piece-dims-inline" style={{ fontSize: `${dimsFontSize}px` }}>
+                                                                • {dimsText}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="nesting-piece-filename-row" style={{ fontSize: `${titleFontSize}px` }}>
+                                                            <span className="nesting-piece-filename" style={{ fontSize: `${titleFontSize}px` }} title={p.label}>
+                                                                {p.label}
+                                                            </span>
+                                                            {copyBadgeText && (
+                                                                <span className="nesting-piece-copy-badge" style={{ fontSize: `${badgeFontSize}px` }}>
+                                                                    {copyBadgeText}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {showDims && (
+                                                            <span className="nesting-piece-dims-centered" style={{ fontSize: `${dimsFontSize}px` }}>
+                                                                {dimsText}
+                                                            </span>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
