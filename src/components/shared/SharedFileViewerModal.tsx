@@ -6,6 +6,7 @@ import { API_URL, getServicios, getMateriales, getCalidades, resolveMediaUrl, ge
 import type { Order } from '@/types'
 import { generatePdfBudget } from '@/utils/generatePdfBudget'
 import { generateProductionLabel } from '@/utils/generateLabelPdf'
+import { buildProductionFilename } from '@/utils/orderFileDownloader'
 import './FileViewerModal.css'
 
 interface FileViewerModalProps {
@@ -14,73 +15,6 @@ interface FileViewerModalProps {
     order: Order | null
     onUpdate?: () => void
     showStandardize?: boolean
-}
-
-function buildProductionFilename(order: Order, index: number, originalName: string): string {
-    let otRaw = String(order.ot || order.id || '0').trim()
-    if (otRaw.toUpperCase().startsWith('OT-')) {
-        otRaw = otRaw.slice(3).trim()
-    } else if (otRaw.toUpperCase().startsWith('OT')) {
-        otRaw = otRaw.slice(2).trim()
-    }
-    const otNumber = otRaw || '0'
-    const copias = order.copias || 1
-    
-    // 1. Resolve short material CODE
-    let rawMat = (order.material || 'MAT').trim()
-    let materialCode = rawMat
-    try {
-        const allMaterials = getMateriales()
-        const foundMat = allMaterials.find(m => 
-            (m.codigo && m.codigo.toLowerCase() === rawMat.toLowerCase()) ||
-            (m.descripcion && m.descripcion.toLowerCase() === rawMat.toLowerCase())
-        )
-        if (foundMat && foundMat.codigo) {
-            materialCode = foundMat.codigo.trim()
-        }
-    } catch (e) { }
-    materialCode = materialCode.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '')
-
-    // 2. Resolve short service CODES
-    const serviceCodes: string[] = []
-    if (order.servicios && typeof order.servicios === 'object') {
-        try {
-            const allServices = getServicios()
-            Object.entries(order.servicios).forEach(([sId, active]) => {
-                if (active) {
-                    const s = allServices.find((serv) => 
-                        String(serv.id) === String(sId) ||
-                        (serv.codigo && serv.codigo.toLowerCase() === String(sId).toLowerCase()) ||
-                        (serv.nombre && serv.nombre.toLowerCase() === String(sId).toLowerCase())
-                    )
-                    if (s && s.codigo) {
-                        serviceCodes.push(s.codigo.trim().replace(/[^a-zA-Z0-9_-]/g, ''))
-                    } else if (s && s.nombre) {
-                        serviceCodes.push(s.nombre.substring(0, 4).toUpperCase().trim().replace(/[^a-zA-Z0-9_-]/g, ''))
-                    } else if (typeof sId === 'string' && isNaN(Number(sId))) {
-                        serviceCodes.push(sId.substring(0, 4).toUpperCase().trim().replace(/[^a-zA-Z0-9_-]/g, ''))
-                    }
-                }
-            })
-        } catch (e) { }
-    }
-
-    const hasDimensionsRegex = /\d+[.,]?\d*\s*[xX]\s*\d+[.,]?\d*/
-    const alreadyHasDimensions = hasDimensionsRegex.test(originalName)
-
-    let dimString = ''
-    if (!alreadyHasDimensions && order.ancho && order.alto) {
-        dimString = `_${Number(order.ancho).toFixed(2)}x${Number(order.alto).toFixed(2)}`
-    }
-
-    const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
-    const prefix = `OT-${otNumber}_x${copias}_${materialCode}${servicesStr}${dimString}`
-
-    if (originalName.startsWith(`OT-${otNumber}`) || originalName.startsWith('OT-')) {
-        return originalName
-    }
-
-    return `${prefix} --- ${originalName}`
 }
 
 export default function SharedFileViewerModal({

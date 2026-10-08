@@ -818,6 +818,31 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Verificación de importación de Flask (`python -c "import app; ..."`): Exitoso con conexión activa a PostgreSQL Neon.
   - Verificación de compilación frontend (`npm run build` en `luxius-panel`): 6.47s sin errores.
 
+### Sesión 07/10/2026: Sistema Unificado de Descarga Directa y por Lotes (Imágenes/Archivos en ZIP)
+- [x] **Motor Unificado de Descarga (`src/utils/orderFileDownloader.ts`)**:
+  - Creado módulo centralizado con `JSZip`, soporte para URLs `data:`, proxy backend `/api/download` (R2/S3 presigned con CORS), descarga directa con JWT y fallback vía Canvas para imágenes externas.
+  - **Lógica Inteligente de Nomenclatura del ZIP**:
+    - **Por Grupo/Lote**: `Lote_[NombreLote]_[Fecha]_[Cantidad]OTs.zip` (ej. `Lote_Carteleria_Luz_2026-10-07_5OTs.zip`).
+    - **Por Selección (mismo cliente)**: `Imagenes_[Cliente]_[Fecha]_[Cantidad]OTs.zip` (ej. `Imagenes_GraficaSur_2026-10-07_8OTs.zip`).
+    - **Por Selección (mixto/varios clientes)**: `Ordenes_Seleccionadas_[Fecha]_[Cantidad]OTs.zip`.
+    - **Orden individual (múltiples archivos)**: `OT-[N°OT]_[Cliente]_[Fecha]_[N]archivos.zip`.
+  - **Estandarización de Archivos dentro del ZIP (`buildProductionFilename`)**:
+    - Aplica la nomenclatura oficial para taller: `OT-{otNumber}_x{copias}_{materialCode}_{servicios}_{ancho}x{alto} --- {nombreOriginal}`.
+    - Sanitización automática de caracteres inválidos en sistemas de archivos (Windows/Linux/macOS) y desambiguación con sufijos `(2)`, `(3)` para evitar sobreescritura de archivos homónimos en cola RIP.
+- [x] **Tres Niveles de Descarga en el Frontend**:
+  1. **Nivel 1 - Descarga Individual por Orden (`Entrada.tsx` e `Impresion.tsx`)**:
+     - Botón `📥` dedicado en cada fila de orden (filas individuales y filas hijas de lote), permitiendo descargar sin necesidad de ingresar al modal de visualización (`SharedFileViewerModal`).
+     - Si la orden posee 1 archivo: descarga directa del archivo con el nombre de producción oficial.
+     - Si posee 2+ archivos: descarga automáticamente un ZIP consolidado de la OT.
+  2. **Nivel 2 - Descarga por Lote / Grupo (`Entrada.tsx`)**:
+     - Botón `📥` en el encabezado de cada lote agrupado (junto a las herramientas de Nesting Studio y PDF Cliente), empaquetando todos los archivos del lote en un ZIP estructurado.
+  3. **Nivel 3 - Descarga Masiva de Seleccionadas (`Entrada.tsx`)**:
+     - Botón `📥 Descargar Imágenes ({count})` en la barra de herramientas superior de selección flotante (junto a Nesting Studio y PDF Masivo). Permite seleccionar checkboxes arbitrarios de cualquier grupo o cliente y descargarlos en un único paquete ZIP.
+- [x] **Feedback Visual & Toast de Progreso**:
+  - Toast flotante con animación en CSS (`.download-progress-toast`) con telemetría en tiempo real: porcentaje, archivo actual vs total y estado de compresión (`Empaquetando ZIP: 95%`).
+- [x] **Compilación y Verificación**:
+  - `npm run build` ejecutado en 6.60s sin advertencias de tipos ni errores de bundle.
+
 ### Sesión 05/10/2026: Roadmap Nesting Hot Folder RIP y Visualizador Adaptativo en Nesting Studio (completado)
 - [x] **Roadmap Independiente de Nesting Automatizado con Hot Folders y RIP (`ROADMAP_NESTING_HOTFOLDER_RIP.md`)**:
   - Arquitectura desatendida en 3 niveles: LuXius Panel (Frontend con Skyline) -> LuXius Backend (Worker CMYK 150 DPI) -> Daemon Local / VersaWorks Hot Folders (`Queue_A`).

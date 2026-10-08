@@ -16,6 +16,7 @@ import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
 import NestingStudioModal from '@components/workshop/NestingStudioModal'
 import { runNesting, getBobinaUsefulWidth, type NestingItem } from '@/utils/nestingEngine'
+import { downloadSingleOrderFiles, downloadBatchOrdersZip, type DownloadProgressState } from '@/utils/orderFileDownloader'
 import './Entrada.css'
 
 interface OrderTagBadgesProps {
@@ -132,6 +133,9 @@ export default function Entrada() {
 
     // VIEW TAB: 'active' (current OTs), 'history' (completed), or 'trash' (soft-deleted)
     const [viewTab, setViewTab] = useState<'active' | 'history' | 'trash'>('active')
+
+    // DOWNLOAD PROGRESS STATE
+    const [downloadProgress, setDownloadProgress] = useState<DownloadProgressState | null>(null)
 
     const loadOrders = async () => {
         try {
@@ -988,6 +992,40 @@ export default function Entrada() {
         openPdfModeModal(selectedList, `Consolidado de ${selectedList.length} órdenes`)
     }
 
+    const handleDownloadSingle = async (order: Order) => {
+        try {
+            await downloadSingleOrderFiles(order, (p) => {
+                setDownloadProgress(p)
+                if (!p.active) {
+                    setTimeout(() => setDownloadProgress(null), 3000)
+                }
+            })
+        } catch (e) {
+            console.error('Error al descargar orden:', e)
+            setDownloadProgress(null)
+        }
+    }
+
+    const handleDownloadBatch = async (batchOrders: Order[], batchName?: string) => {
+        try {
+            await downloadBatchOrdersZip(batchOrders, batchName, (p) => {
+                setDownloadProgress(p)
+                if (!p.active) {
+                    setTimeout(() => setDownloadProgress(null), 3500)
+                }
+            })
+        } catch (e) {
+            console.error('Error al descargar lote ZIP:', e)
+            setDownloadProgress(null)
+        }
+    }
+
+    const handleDownloadSelectedOrders = async () => {
+        const selectedOrders = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)))
+        if (selectedOrders.length === 0) return
+        await handleDownloadBatch(selectedOrders)
+    }
+
     const handleBatchLabel = () => {
         const selectedList = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)))
         if (selectedList.length === 0) {
@@ -1219,6 +1257,25 @@ export default function Entrada() {
                                 </Button>
                             </>
                         )}
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleDownloadSelectedOrders}
+                            disabled={!!downloadProgress?.active}
+                            style={{
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                            }}
+                            title="Descargar paquete ZIP con todos los archivos de las órdenes seleccionadas"
+                        >
+                            <span>📥</span> Descargar Imágenes ({selectedIds.size})
+                        </Button>
                         <Button
                             variant="primary"
                             size="sm"
@@ -1560,6 +1617,18 @@ export default function Entrada() {
                                                             className="btn-icon-action"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                handleDownloadBatch(item.orders, item.batchName);
+                                                            }}
+                                                            title={`Descargar todas las imágenes de este lote (${item.orders.length} OTs en ZIP)`}
+                                                            style={{ background: 'rgba(16, 185, 129, 0.25)', border: '1px solid rgba(16, 185, 129, 0.6)' }}
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>📥</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-icon-action"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 handleOpenNestingModal(item.orders, item.batchName);
                                                             }}
                                                             title="Abrir Nesting Studio 2D para este Lote"
@@ -1789,6 +1858,20 @@ export default function Entrada() {
                                                                     title="Etiqueta Rollo / Producción"
                                                                 >
                                                                     <span style={{ pointerEvents: 'none' }}>🏷️</span>
+                                                                </button>
+                                                                <button
+                                                                    className="btn-icon-action"
+                                                                    onClick={(e) => { e.stopPropagation(); handleDownloadSingle(order); }}
+                                                                    title={order.archivos?.length ? `Descargar archivo(s) (${order.archivos.length})` : 'Sin archivos adjuntos'}
+                                                                    disabled={!order.archivos?.length}
+                                                                    style={{
+                                                                        background: order.archivos?.length ? 'rgba(16, 185, 129, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                                                                        border: order.archivos?.length ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(100, 116, 139, 0.2)',
+                                                                        opacity: order.archivos?.length ? 1 : 0.4,
+                                                                        cursor: order.archivos?.length ? 'pointer' : 'not-allowed'
+                                                                    }}
+                                                                >
+                                                                    <span style={{ pointerEvents: 'none' }}>📥</span>
                                                                 </button>
                                                                 <button
                                                                     className="btn-icon-action"
@@ -2070,6 +2153,20 @@ export default function Entrada() {
                                                         </button>
                                                         <button
                                                             className="btn-icon-action"
+                                                            onClick={(e) => { e.stopPropagation(); handleDownloadSingle(order); }}
+                                                            title={order.archivos?.length ? `Descargar archivo(s) (${order.archivos.length})` : 'Sin archivos adjuntos'}
+                                                            disabled={!order.archivos?.length}
+                                                            style={{
+                                                                background: order.archivos?.length ? 'rgba(16, 185, 129, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                                                                border: order.archivos?.length ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(100, 116, 139, 0.2)',
+                                                                opacity: order.archivos?.length ? 1 : 0.4,
+                                                                cursor: order.archivos?.length ? 'pointer' : 'not-allowed'
+                                                            }}
+                                                        >
+                                                            <span style={{ pointerEvents: 'none' }}>📥</span>
+                                                        </button>
+                                                        <button
+                                                            className="btn-icon-action"
                                                             onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
                                                             title="Ver Detalle / Previsualizar"
                                                         >
@@ -2188,6 +2285,30 @@ export default function Entrada() {
                     }}
                     onSaveBatch={handleSaveNestingBatch}
                 />
+            )}
+            {downloadProgress && (
+                <div className="download-progress-toast">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {downloadProgress.active ? '⏳ Descargando Archivos' : '✅ Descarga Lista'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
+                            {downloadProgress.percent}%
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginBottom: '8px', wordBreak: 'break-all' }}>
+                        {downloadProgress.message}
+                    </div>
+                    <div style={{ width: '100%', height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                            width: `${downloadProgress.percent}%`,
+                            height: '100%',
+                            background: downloadProgress.active ? 'linear-gradient(90deg, #10b981, #06b6d4)' : '#10b981',
+                            transition: 'width 0.2s ease',
+                            borderRadius: '3px'
+                        }} />
+                    </div>
+                </div>
             )}
         </div>
     )

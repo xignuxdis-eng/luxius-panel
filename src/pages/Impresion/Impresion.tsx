@@ -5,6 +5,7 @@ import { useAuthStore } from '@store/authStore'
 import type { Order } from '@/types'
 import { statusColors, statusLabels } from '@/types'
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
+import { downloadSingleOrderFiles } from '@/utils/orderFileDownloader'
 import './Impresion.css'
 
 export default function Impresion() {
@@ -205,6 +206,19 @@ export default function Impresion() {
                                                         onClick={() => setViewingOrder(order)}
                                                     >
                                                         📄
+                                                    </button>
+                                                    <button
+                                                        className="btn-icon-action"
+                                                        title={order.archivos?.length ? `Descargar archivo(s) (${order.archivos.length})` : 'Sin archivos adjuntos'}
+                                                        disabled={!order.archivos?.length}
+                                                        onClick={() => downloadSingleOrderFiles(order)}
+                                                        style={{
+                                                            color: order.archivos?.length ? '#10b981' : 'var(--text-muted)',
+                                                            opacity: order.archivos?.length ? 1 : 0.4,
+                                                            cursor: order.archivos?.length ? 'pointer' : 'not-allowed'
+                                                        }}
+                                                    >
+                                                        📥
                                                     </button>
                                                     <button
                                                         className="btn-icon-action"

@@ -807,4 +807,33 @@
 .btn-batch-tag:hover {
     filter: brightness(1.2);
     transform: translateY(-1px);
+}
+
+/* Download Progress Floating Toast */
+.download-progress-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    background: #0f172a;
+    border: 1px solid #10b981;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 14px 18px;
+    min-width: 290px;
+    max-width: 390px;
+    color: #f8fafc;
+    font-family: system-ui, -apple-system, sans-serif;
+    animation: toastSlideUp 0.3s ease-out;
+}
+
+@keyframes toastSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
