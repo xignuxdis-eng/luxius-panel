@@ -15,7 +15,24 @@ interface MainLayoutProps {
 
 export default function MainLayout({ children }: MainLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+        try {
+            return localStorage.getItem('luxius_sidebar_collapsed') === 'true'
+        } catch {
+            return false
+        }
+    })
     const location = useLocation()
+
+    const toggleSidebarCollapse = () => {
+        setIsSidebarCollapsed(prev => {
+            const next = !prev
+            try {
+                localStorage.setItem('luxius_sidebar_collapsed', String(next))
+            } catch {}
+            return next
+        })
+    }
 
     // Auto-close sidebar drawer on route change
     useEffect(() => {
@@ -65,7 +82,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     ]
 
     return (
-        <div className="main-layout">
+        <div className={`main-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
             {/* Top mobile navigation bar (visible only <= 1024px) */}
             <header className="mobile-topbar">
                 <button
@@ -96,6 +113,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <Sidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={toggleSidebarCollapse}
             />
 
             <main className="main-content">

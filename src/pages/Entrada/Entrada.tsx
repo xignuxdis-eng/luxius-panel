@@ -160,10 +160,14 @@ export default function Entrada() {
     const [categoryFilter, setCategoryFilter] = useState('')
     const [tagFilter, setTagFilter] = useState<string>('')
     const [tagPopoverOrderId, setTagPopoverOrderId] = useState<number | string | null>(null)
+    const [actionMenuOrderId, setActionMenuOrderId] = useState<number | string | null>(null)
 
-    // Close tag popover on outside click
+    // Close popovers on outside click
     useEffect(() => {
-        const handleDocClick = () => setTagPopoverOrderId(null);
+        const handleDocClick = () => {
+            setTagPopoverOrderId(null);
+            setActionMenuOrderId(null);
+        };
         window.addEventListener('click', handleDocClick);
         return () => window.removeEventListener('click', handleDocClick);
     }, []);
@@ -174,6 +178,7 @@ export default function Entrada() {
     }, [viewTab, searchTerm, statusFilter, materialFilter, categoryFilter, tagFilter])
 
     const { user } = useAuthStore()
+    const isAdmin = (user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema'
     const [allClientes, setAllClientes] = useState<Cliente[]>(getClientes())
     const [allMateriales, setAllMateriales] = useState<Material[]>(getMateriales())
 
@@ -496,7 +501,7 @@ export default function Entrada() {
                         <div className="special-lamination-val font-mono">
                             <span style={{ fontSize: '0.8rem' }}>⚡</span>
                             <span>{cons.value.toFixed(2)}</span>
-                            <small style={{ color: '#c084fc', fontWeight: 800 }}>ml</small>
+                            <small style={{ color: 'var(--badge-purple-text)', fontWeight: 800 }}>ml</small>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                             {cons.bobina && (
@@ -514,7 +519,7 @@ export default function Entrada() {
 
             return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: '#00daf3', fontSize: '0.85rem' }}>
+                    <span className="m2-text font-mono" style={{ fontWeight: 700, color: 'var(--metric-cyan)', fontSize: '0.85rem' }}>
                         {cons.value.toFixed(2)} <small>ml</small>
                     </span>
                     {cons.bobina && (
@@ -544,7 +549,7 @@ export default function Entrada() {
                     <div className="special-lamination-val font-mono">
                         <span style={{ fontSize: '0.8rem' }}>⚡</span>
                         <span>{cons.value.toFixed(2)}</span>
-                        <small style={{ color: '#c084fc', fontWeight: 800 }}>{cons.unit}</small>
+                        <small style={{ color: 'var(--badge-purple-text)', fontWeight: 800 }}>{cons.unit}</small>
                     </div>
                     <span className="special-lamination-pill">
                         LAMINADO ESP.
@@ -1203,57 +1208,56 @@ export default function Entrada() {
                 </button>
             </div>
 
-            {/* BATCH ACTIONS BAR */}
+            {/* FLOATING BATCH ACTIONS DOCK */}
             {selectedIds.size > 0 && (
-                <div className="batch-actions-bar glass-panel animate-slide-down" style={{ marginBottom: '1rem', padding: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--primary-color)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontWeight: 'bold', color: 'var(--primary-color)' }}>{selectedIds.size} seleccionados</span>
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} style={{ fontSize: '0.8rem' }}>Cancelar</Button>
+                <div className="batch-actions-dock glass-panel">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ fontWeight: 800, color: 'var(--primary-color)', whiteSpace: 'nowrap' }}>{selectedIds.size} seleccionados</span>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} style={{ fontSize: '0.8rem', padding: '2px 8px' }}>✕</Button>
                         </div>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-color)', display: 'flex', gap: '1rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '1rem' }}>
-                            {selectedTotals.m2 > 0 && <span>Total m²: <strong>{selectedTotals.m2.toFixed(2)}</strong></span>}
-                            {selectedTotals.ml > 0 && <span>Total ml: <strong>{selectedTotals.ml.toFixed(2)}</strong></span>}
-                            {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
-                                <span>Total $: <strong>{selectedTotals.price.toLocaleString()}</strong></span>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-color)', display: 'flex', gap: '0.75rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem', whiteSpace: 'nowrap' }}>
+                            {selectedTotals.m2 > 0 && <span>m²: <strong>{selectedTotals.m2.toFixed(2)}</strong></span>}
+                            {selectedTotals.ml > 0 && <span>ml: <strong>{selectedTotals.ml.toFixed(2)}</strong></span>}
+                            {isAdmin && (
+                                <span>$: <strong>{selectedTotals.price.toLocaleString()}</strong></span>
                             )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', borderLeft: '1px solid var(--border-color)', paddingLeft: '1rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Etiquetar:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem', flexWrap: 'nowrap' }}>
                             {PRESET_ORDER_TAGS.map(pt => (
                                 <button
                                     key={pt.id}
                                     type="button"
                                     className="btn-batch-tag"
-                                    style={{ borderColor: pt.borderColor, color: pt.color, background: pt.bgColor }}
+                                    style={{ borderColor: pt.borderColor, color: pt.color, background: pt.bgColor, padding: '3px 8px', fontSize: '0.75rem' }}
                                     onClick={() => handleBulkApplyTag(pt.id)}
-                                    title={`Aplicar ${pt.label} a ${selectedIds.size} órdenes seleccionadas`}
+                                    title={`Aplicar ${pt.label} a ${selectedIds.size} órdenes`}
                                 >
                                     {pt.icon} {pt.label}
                                 </button>
                             ))}
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'nowrap', alignItems: 'center' }}>
                         {selectedIds.size >= 2 && (
                             <>
                                 <Button
                                     variant="primary"
                                     size="sm"
                                     onClick={handleOpenNestingForSelected}
-                                    style={{ background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#fff', border: 'none', fontWeight: 700 }}
+                                    style={{ background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.8rem' }}
                                     title="Optimizar acomodo e imposición 2D en bobina para las órdenes seleccionadas"
                                 >
-                                    📐 Nesting Studio ({selectedIds.size})
+                                    📐 Nesting ({selectedIds.size})
                                 </Button>
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={handleMergeSelectedIntoBatch}
-                                    style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', fontWeight: 600 }}
+                                    style={{ backgroundColor: '#4f46e5', color: '#fff', border: 'none', fontWeight: 600, fontSize: '0.8rem' }}
                                     title="Unificar órdenes seleccionadas en un mismo Lote para calcular consumo conjunto"
                                 >
-                                    🔗 Unificar en Lote
+                                    🔗 Unificar
                                 </Button>
                             </>
                         )}
@@ -1267,28 +1271,30 @@ export default function Entrada() {
                                 color: '#fff',
                                 border: 'none',
                                 fontWeight: 700,
+                                fontSize: '0.8rem',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
-                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                                gap: '4px'
                             }}
                             title="Descargar paquete ZIP con todos los archivos de las órdenes seleccionadas"
                         >
-                            <span>📥</span> Descargar Imágenes ({selectedIds.size})
+                            <span>📥</span> Descargar ({selectedIds.size})
                         </Button>
                         <Button
                             variant="primary"
                             size="sm"
                             onClick={handleExportClientReportPdf}
-                            style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none' }}
+                            style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none', fontSize: '0.8rem' }}
+                            title="Exportar Reporte PDF para el Cliente"
                         >
-                            📄 Exportar PDF Cliente
+                            📄 PDF Cliente
                         </Button>
                         <Button
                             variant="primary"
                             size="sm"
                             onClick={handleBatchPdf}
-                            style={{ backgroundColor: '#059669', color: '#fff', border: 'none' }}
+                            style={{ backgroundColor: '#059669', color: '#fff', border: 'none', fontSize: '0.8rem' }}
+                            title="PDF Masivo"
                         >
                             📚 PDF Masivo
                         </Button>
@@ -1296,9 +1302,10 @@ export default function Entrada() {
                             variant="primary"
                             size="sm"
                             onClick={handleBatchLabel}
-                            style={{ backgroundColor: '#0d9488', color: '#fff', border: 'none' }}
+                            style={{ backgroundColor: '#0d9488', color: '#fff', border: 'none', fontSize: '0.8rem' }}
+                            title="Etiqueta Rollo"
                         >
-                            🏷️ Etiqueta Rollo
+                            🏷️ Etiqueta
                         </Button>
                         {viewTab !== 'trash' ? (
                             <>
@@ -1306,17 +1313,17 @@ export default function Entrada() {
                                     variant="secondary"
                                     size="sm"
                                     onClick={() => handleBatchStatus('impreso')}
-                                    style={{ backgroundColor: statusColors['impreso'], color: '#fff', border: 'none' }}
+                                    style={{ backgroundColor: statusColors['impreso'], color: '#fff', border: 'none', fontSize: '0.8rem' }}
                                 >
-                                    Marcar como Impresos
+                                    Impreso
                                 </Button>
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={() => handleBatchStatus('entregado')}
-                                    style={{ backgroundColor: statusColors['entregado'], color: '#fff', border: 'none' }}
+                                    style={{ backgroundColor: statusColors['entregado'], color: '#fff', border: 'none', fontSize: '0.8rem' }}
                                 >
-                                    Marcar como Entregados
+                                    Entregado
                                 </Button>
                             </>
                         ) : (
@@ -1324,18 +1331,18 @@ export default function Entrada() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={handleBatchRestore}
-                                style={{ backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none' }}
+                                style={{ backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none', fontSize: '0.8rem' }}
                             >
-                                Restaurar Seleccionados
+                                Restaurar
                             </Button>
                         )}
                         <Button
                             variant="danger"
                             size="sm"
                             onClick={handleBatchDelete}
-                            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', marginLeft: '0.5rem' }}
+                            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', fontSize: '0.8rem' }}
                         >
-                            {viewTab === 'trash' ? 'Borrar Definitivamente' : 'Eliminar'}
+                            {viewTab === 'trash' ? 'Borrar Definitivo' : 'Eliminar'}
                         </Button>
                     </div>
                 </div>
@@ -1361,7 +1368,7 @@ export default function Entrada() {
                     <table className="orders-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                <th style={{ width: '42px', textAlign: 'center' }}>
                                     <input
                                         type="checkbox"
                                         checked={displayedOrders.length > 0 && selectedIds.size === displayedOrders.length}
@@ -1369,21 +1376,13 @@ export default function Entrada() {
                                         style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
                                     />
                                 </th>
-                                <th>N° OT / Trabajo</th>
-                                <th>Origen</th>
-                                <th>Creación</th>
-                                <th>Estado</th>
-                                <th>Cliente</th>
-                                <th>Material</th>
-                                <th>Medidas</th>
-                                <th>Copias</th>
-                                <th>Demasías</th>
-                                <th>Consumo</th>
-                                {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
-                                    <th>Importe</th>
+                                <th style={{ minWidth: '220px' }}>Trabajo &amp; Cliente</th>
+                                <th style={{ minWidth: '230px' }}>Especificaciones Técnicas</th>
+                                <th style={{ minWidth: '170px' }}>Estado &amp; Entrega</th>
+                                {isAdmin && (
+                                    <th style={{ width: '100px', textAlign: 'right' }}>Importe</th>
                                 )}
-                                <th>Entrega</th>
-                                <th style={{ textAlign: 'center' }}>Acciones</th>
+                                <th style={{ width: '130px', textAlign: 'center' }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1397,8 +1396,8 @@ export default function Entrada() {
                                                 key={item.batchId}
                                                 className={`batch-row-master ${isExpanded ? 'is-expanded' : ''} ${item.allSelected ? 'selected-row' : ''}`}
                                             >
-                                                <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                                         <button
                                                             type="button"
                                                             className="batch-expand-btn"
@@ -1418,10 +1417,15 @@ export default function Entrada() {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <div className="order-id" style={{ cursor: 'pointer' }} onClick={() => toggleExpandBatch(item.batchId)}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                    <div className="composite-cell-primary" style={{ cursor: 'pointer' }} onClick={() => toggleExpandBatch(item.batchId)}>
+                                                        <div className="composite-top-row">
                                                             <span className="batch-badge-pill">🏷️ {item.batchName}</span>
                                                             <span className="batch-count-pill">📦 {item.orders.length} OTs</span>
+                                                            {item.primaryOrder.origen === 'mobile' ? (
+                                                                <span className="origin-badge origin-badge-mobile">📱 Móvil</span>
+                                                            ) : (
+                                                                <span className="origin-badge origin-badge-web">💻 Web</span>
+                                                            )}
                                                             {canViewAlerts && forecastGroupByKey.get(`batch:${item.batchId}`) === 'critical' && (
                                                                 <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.4)' }}>⚠ Faltante stock</span>
                                                             )}
@@ -1429,142 +1433,124 @@ export default function Entrada() {
                                                                 <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.4)' }}>◐ Stock bajo</span>
                                                             )}
                                                         </div>
-                                                        <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                            {isExpanded ? '▼ Clic para contraer' : '▶ Clic para ver los archivos'}
-                                                        </span>
+                                                        <div className="composite-bottom-row">
+                                                            <span className="composite-client">🏢 {item.primaryOrder.clienteNombre}</span>
+                                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                                {isExpanded ? '▼ Clic para contraer' : '▶ Clic para ver órdenes'}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    {item.primaryOrder.origen === 'mobile' ? (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(0, 218, 243, 0.15)', color: '#00daf3', border: '1px solid rgba(0, 218, 243, 0.4)' }}>
-                                                            📱 App Móvil
-                                                        </span>
-                                                    ) : (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: 'rgba(147, 51, 234, 0.15)', color: '#c084fc', border: '1px solid rgba(147, 51, 234, 0.3)' }}>
-                                                            💻 Sistema Web
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                                                        {item.primaryOrder.createdAt ? new Date(item.primaryOrder.createdAt).toLocaleString('es-AR', {
-                                                            timeZone: 'America/Argentina/Buenos_Aires',
-                                                            day: '2-digit',
-                                                            month: '2-digit',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: false
-                                                        }) : (item.primaryOrder.fechaCreacion || '-')}
-                                                    </span>
-                                                </td>
-                                                <td
-                                                    style={{ cursor: 'pointer' }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setStatusOrder(item.primaryOrder);
-                                                        setStatusBatchOrders(item.orders);
-                                                        setIsStatusModalOpen(true);
-                                                    }}
-                                                    title="Click para cambiar el estado de todo el lote"
-                                                >
-                                                    {(() => {
-                                                        const distinct = Array.from(new Set(item.orders.map(o => o.status)));
-                                                        if (distinct.length === 1) {
-                                                            const st = distinct[0];
-                                                            return (
-                                                                <span className="status-badge" style={{ backgroundColor: statusColors[st], boxShadow: `0 0 8px ${statusColors[st]}40`, cursor: 'pointer' }}>
-                                                                    {statusLabels[st]}
+                                                    <div className="composite-cell-tech">
+                                                        <div className="composite-top-row">
+                                                            {(() => {
+                                                                const mats = Array.from(new Set(item.orders.map(o => o.material)));
+                                                                if (mats.length === 1) {
+                                                                    return <span className="material-tag-sm">{mats[0]}</span>;
+                                                                }
+                                                                return <span className="material-tag-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>{mats.length} materiales</span>;
+                                                            })()}
+                                                            <span style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '0.82rem' }}>
+                                                                {item.orders.length} piezas · {item.totalCopies} cop.
+                                                            </span>
+                                                        </div>
+                                                        <div className="composite-bottom-row">
+                                                            {item.totalConsumption.ml > 0 ? (
+                                                                <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.88rem' }}>
+                                                                    {item.totalConsumption.ml.toFixed(2)} ml
                                                                 </span>
-                                                            );
-                                                        }
-                                                        return (
-                                                            <span className="status-badge" style={{ backgroundColor: '#64748b', fontSize: '0.72rem', cursor: 'pointer' }}>
-                                                                Mixto ({distinct.length})
-                                                            </span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                                <td>
-                                                    <div className="client-cell">
-                                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.primaryOrder.clienteNombre}</span>
-                                                    </div>
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    {(() => {
-                                                        const mats = Array.from(new Set(item.orders.map(o => o.material)));
-                                                        if (mats.length === 1) {
-                                                            return <span className="material-tag-sm">{mats[0]}</span>;
-                                                        }
-                                                        return <span className="material-tag-sm" style={{ background: 'rgba(255,255,255,0.1)' }}>{mats.length} mats</span>;
-                                                    })()}
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <span style={{ fontWeight: 700, color: '#60a5fa', fontSize: '0.85rem' }}>{item.orders.length} piezas</span>
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <span className="copies-badge" style={{ background: 'rgba(37, 99, 235, 0.2)', color: '#93c5fd' }}>{item.totalCopies}</span>
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <span style={{ color: 'var(--text-muted)' }}>—</span>
-                                                </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    {item.totalConsumption.ml > 0 ? (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                                                            <span className="m2-text font-mono" style={{ fontWeight: 800, color: '#00daf3', fontSize: '0.92rem' }}>
-                                                                {item.totalConsumption.ml.toFixed(2)} <small>ml</small>
-                                                            </span>
+                                                            ) : (
+                                                                <span className="m2-text font-mono" style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                                                                    {item.totalConsumption.m2.toFixed(2)} m²
+                                                                </span>
+                                                            )}
                                                             {item.totalConsumption.savingsPercent !== undefined && item.totalConsumption.savingsPercent > 0 && (
                                                                 <span style={{
                                                                     fontSize: '0.68rem',
                                                                     fontWeight: 700,
-                                                                    color: '#34d399',
-                                                                    background: 'rgba(16, 185, 129, 0.15)',
-                                                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                                    color: '#10b981',
+                                                                    background: 'rgba(16, 185, 129, 0.12)',
+                                                                    border: '1px solid rgba(16, 185, 129, 0.35)',
                                                                     padding: '1px 6px',
                                                                     borderRadius: '4px',
                                                                     whiteSpace: 'nowrap'
                                                                 }} title={`Consumo teórico sin nesting: ${item.totalConsumption.rawMl?.toFixed(2)} ml`}>
-                                                                    ⚡ Nesting: {item.totalConsumption.savingsPercent}% ahorro
+                                                                    ⚡ {item.totalConsumption.savingsPercent}% ahorro
                                                                 </span>
-                                                            )}
-                                                            {item.totalConsumption.mlByBobina && Object.keys(item.totalConsumption.mlByBobina).length > 0 && (
-                                                                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', marginTop: '2px' }}>
-                                                                    {Object.entries(item.totalConsumption.mlByBobina).map(([bLabel, bVal]) => (
-                                                                        <span key={bLabel} style={{
-                                                                            fontSize: '0.72rem',
-                                                                            fontWeight: 700,
-                                                                            padding: '1px 6px',
-                                                                            borderRadius: '6px',
-                                                                            background: 'rgba(0, 218, 243, 0.12)',
-                                                                            color: '#67e8f9',
-                                                                            border: '1px solid rgba(0, 218, 243, 0.3)',
-                                                                            whiteSpace: 'nowrap'
-                                                                        }}>
-                                                                            {bVal.toFixed(2)} ml <span style={{ opacity: 0.8, fontSize: '0.68rem' }}>({bLabel})</span>
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
                                                             )}
                                                             {item.orders.some(o => isSpecialLaminationOrder(o)) && (
                                                                 <span className="batch-special-lamination-pill" title="Este lote incluye paños > 2.93m con laminado especial">
-                                                                    <span>⚡</span> Paños {'>'} 2.93m (Laminado Esp.)
+                                                                    ⚡ Paños &gt; 2.93m
                                                                 </span>
                                                             )}
                                                         </div>
-                                                    ) : (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                            <span className="m2-text font-mono text-muted" style={{ fontWeight: 700, color: '#e2e8f0' }}>
-                                                                {item.totalConsumption.m2.toFixed(2)} <small>m²</small>
-                                                            </span>
-                                                            {item.orders.some(o => isSpecialLaminationOrder(o)) && (
-                                                                <span className="batch-special-lamination-pill" title="Este lote incluye paños > 2.93m con laminado especial">
-                                                                    <span>⚡</span> Paños {'>'} 2.93m (Laminado Esp.)
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                    </div>
                                                 </td>
-                                                {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
+                                                <td>
+                                                    <div className="composite-cell-status">
+                                                        <div className="composite-top-row">
+                                                            <div
+                                                                style={{ cursor: 'pointer' }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setStatusOrder(item.primaryOrder);
+                                                                    setStatusBatchOrders(item.orders);
+                                                                    setIsStatusModalOpen(true);
+                                                                }}
+                                                                title="Click para cambiar el estado de todo el lote"
+                                                            >
+                                                                {(() => {
+                                                                    const distinct = Array.from(new Set(item.orders.map(o => o.status)));
+                                                                    if (distinct.length === 1) {
+                                                                        const st = distinct[0];
+                                                                        return (
+                                                                            <span className="status-badge" style={{ backgroundColor: statusColors[st], boxShadow: `0 0 8px ${statusColors[st]}40`, cursor: 'pointer' }}>
+                                                                                {statusLabels[st]}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <span className="status-badge" style={{ backgroundColor: '#64748b', fontSize: '0.72rem', cursor: 'pointer' }}>
+                                                                            Mixto ({distinct.length})
+                                                                        </span>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                            {(() => {
+                                                                const envios = Array.from(new Set(item.orders.map(o => o.envio).filter(Boolean)));
+                                                                if (envios.length > 0) {
+                                                                    return (
+                                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                                                            {envios.map(env => (
+                                                                                <span key={env} className="shipping-pill">
+                                                                                    🚚 {env}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
+                                                        </div>
+                                                        <div className="composite-bottom-row">
+                                                            <span style={{ fontWeight: '700', color: 'var(--accent)', fontSize: '0.8rem' }}>
+                                                                📅 {item.primaryOrder.fechaEntrega ? (() => {
+                                                                    const d = new Date(item.primaryOrder.fechaEntrega + 'T12:00:00');
+                                                                    if (!isNaN(d.getTime())) {
+                                                                        const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
+                                                                        return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                                                                    }
+                                                                    return item.primaryOrder.fechaEntrega;
+                                                                })() : '--'}
+                                                            </span>
+                                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                                Ingreso: {item.primaryOrder.createdAt ? new Date(item.primaryOrder.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : (item.primaryOrder.fechaCreacion || '-')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                {isAdmin && (
                                                     <td>
                                                         <div className="price-cell" style={{ fontWeight: 800, color: '#10b981' }}>
                                                             <span className="currency">$</span>
@@ -1572,46 +1558,8 @@ export default function Entrada() {
                                                         </div>
                                                     </td>
                                                 )}
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                                                        <div className="date-cell" style={{ fontWeight: '700', color: 'var(--accent)', fontSize: '0.85rem' }}>
-                                                            {item.primaryOrder.fechaEntrega ? (() => {
-                                                                const d = new Date(item.primaryOrder.fechaEntrega + 'T12:00:00');
-                                                                if (!isNaN(d.getTime())) {
-                                                                    const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
-                                                                    return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-                                                                }
-                                                                return item.primaryOrder.fechaEntrega;
-                                                            })() : <span className="text-muted italic">--</span>}
-                                                        </div>
-                                                        {(() => {
-                                                            const envios = Array.from(new Set(item.orders.map(o => o.envio).filter(Boolean)));
-                                                            if (envios.length > 0) {
-                                                                return (
-                                                                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '2px' }}>
-                                                                        {envios.map(env => (
-                                                                            <span key={env} style={{
-                                                                                fontSize: '0.7rem',
-                                                                                fontWeight: 700,
-                                                                                padding: '1px 6px',
-                                                                                borderRadius: '4px',
-                                                                                background: 'rgba(245, 158, 11, 0.15)',
-                                                                                color: '#fbbf24',
-                                                                                border: '1px solid rgba(245, 158, 11, 0.35)',
-                                                                                whiteSpace: 'nowrap'
-                                                                            }}>
-                                                                                🚚 {env}
-                                                                            </span>
-                                                                        ))}
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            return null;
-                                                        })()}
-                                                    </div>
-                                                </td>
                                                 <td>
-                                                    <div className="order-actions-row">
+                                                    <div className="order-actions-compact">
                                                         <button
                                                             type="button"
                                                             className="btn-icon-action"
@@ -1698,10 +1646,14 @@ export default function Entrada() {
                                                     childLabel = order.archivosOriginales?.[0] || order.archivos?.[0] || order.nombreTarea || '';
                                                 }
 
-
                                                 return (
-                                                    <tr key={order.id || order.ot} className={`batch-child-row fade-in ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''} ${isSpecialLaminationOrder(order, consumption) ? 'is-special-lamination' : ''}`}>
-                                                        <td style={{ verticalAlign: 'middle' }}>
+                                                    <tr
+                                                        key={order.id || order.ot}
+                                                        className={`batch-child-row fade-in ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''} ${isSpecialLaminationOrder(order, consumption) ? 'is-special-lamination' : ''}`}
+                                                        onDoubleClick={() => handlePreview(order)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        <td style={{ verticalAlign: 'middle', textAlign: 'center' }}>
                                                             <div className="batch-child-indent">
                                                                 <span className="batch-child-connector">↳</span>
                                                                 <input
@@ -1713,93 +1665,103 @@ export default function Entrada() {
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div className="order-id" style={{ paddingLeft: '8px' }}>
-                                                                <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.9rem' }}>{otDisplay}</span>
-                                                                {childLabel && (
-                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={childLabel}>
-                                                                        {childLabel}
-                                                                    </span>
-                                                                )}
-                                                                <OrderTagBadges
-                                                                    order={order}
-                                                                    tagPopoverOrderId={tagPopoverOrderId}
-                                                                    setTagPopoverOrderId={setTagPopoverOrderId}
-                                                                    onToggleTag={handleToggleOrderTag}
-                                                                />
+                                                            <div className="composite-cell-primary" style={{ paddingLeft: '8px' }}>
+                                                                <div className="composite-top-row">
+                                                                    <span className="ot-text" style={{ fontWeight: 800, color: 'var(--ot-color)', fontSize: '0.9rem' }}>{otDisplay}</span>
+                                                                    {childLabel && (
+                                                                        <span className="composite-work-title" title={childLabel}>
+                                                                            {childLabel}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="composite-bottom-row">
+                                                                    <span className="composite-client">↳ {order.clienteNombre}</span>
+                                                                    <OrderTagBadges
+                                                                        order={order}
+                                                                        tagPopoverOrderId={tagPopoverOrderId}
+                                                                        setTagPopoverOrderId={setTagPopoverOrderId}
+                                                                        onToggleTag={handleToggleOrderTag}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>—</span>
-                                                        </td>
-                                                        <td>
-                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                                {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                            </span>
-                                                        </td>
-                                                        <td
-                                                            style={{ cursor: 'pointer' }}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setStatusOrder(order);
-                                                                setStatusBatchOrders(undefined);
-                                                                setIsStatusModalOpen(true);
-                                                            }}
-                                                            title="Click para cambiar el estado de este ítem"
-                                                        >
-                                                            <span className="status-badge" style={{
-                                                                backgroundColor: statusColors[order.status],
-                                                                boxShadow: `0 0 6px ${statusColors[order.status]}30`,
-                                                                fontSize: '0.72rem',
-                                                                padding: '2px 6px',
-                                                                cursor: 'pointer'
-                                                             }}>
-                                                                {statusLabels[order.status]}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>↳ {order.clienteNombre}</span>
-                                                        </td>
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            <span className="material-tag-sm">{order.material}</span>
-                                                        </td>
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            {(() => {
-                                                                const w = Number(order.ancho) || 0;
-                                                                const h = Number(order.alto) || 0;
-                                                                const isSpecial = isSpecialLaminationOrder(order, consumption);
-                                                                return (
-                                                                    <span className="dims-text">
-                                                                        <span style={w > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{w.toFixed(2)}</span>
-                                                                        {' x '}
-                                                                        <span style={h > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{h.toFixed(2)}</span>
-                                                                        {' m'}
-                                                                        {isSpecial && <span style={{ marginLeft: '3px', fontSize: '0.72rem', color: '#c084fc' }} title="Paño > 2.93m: Requiere laminado especial">⚡</span>}
-                                                                    </span>
-                                                                );
-                                                            })()}
-                                                        </td>
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            <span className="copies-badge">{order.copias}</span>
-                                                        </td>
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) ? (
-                                                                <div className="demasia-indicator-group" style={{ margin: '0 auto', width: 'fit-content' }}>
-                                                                    <span className="demasia-arrows">
-                                                                        {order.demasiasConfig.top ? '↑' : ''}
-                                                                        {order.demasiasConfig.bottom ? '↓' : ''}
-                                                                        {order.demasiasConfig.left ? '←' : ''}
-                                                                        {order.demasiasConfig.right ? '→' : ''}
-                                                                    </span>
-                                                                    <span className="demasia-target">🎯</span>
+                                                            <div className="composite-cell-tech">
+                                                                <div className="composite-top-row">
+                                                                    <span className="material-tag-sm">{order.material}</span>
+                                                                    {(() => {
+                                                                        const w = Number(order.ancho) || 0;
+                                                                        const h = Number(order.alto) || 0;
+                                                                        const isSpecial = isSpecialLaminationOrder(order, consumption);
+                                                                        return (
+                                                                            <span className="dims-text">
+                                                                                <span style={w > 2.93 ? { color: 'var(--badge-purple-text)', fontWeight: 800 } : undefined}>{w.toFixed(2)}</span>
+                                                                                {' × '}
+                                                                                <span style={h > 2.93 ? { color: 'var(--badge-purple-text)', fontWeight: 800 } : undefined}>{h.toFixed(2)}</span>
+                                                                                {' m'}
+                                                                                {isSpecial && <span style={{ marginLeft: '3px', fontSize: '0.72rem', color: 'var(--badge-purple-text)' }} title="Paño > 2.93m: Requiere laminado especial">⚡</span>}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                    <span className="copies-badge">{order.copias} cop.</span>
+                                                                    {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) && (
+                                                                        <span className="demasia-indicator" title={`Demasías: ${[order.demasiasConfig.top?'Arriba':'', order.demasiasConfig.bottom?'Abajo':'', order.demasiasConfig.left?'Izq':'', order.demasiasConfig.right?'Der':''].filter(Boolean).join(', ')}`}>
+                                                                            🎯 Demasías
+                                                                        </span>
+                                                                    )}
                                                                 </div>
-                                                            ) : (
-                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-                                                            )}
+                                                                <div className="composite-bottom-row">
+                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Consumo:</span>
+                                                                    {renderConsumptionBadge(order, consumption)}
+                                                                </div>
+                                                            </div>
                                                         </td>
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            {renderConsumptionBadge(order, consumption)}
+                                                        <td>
+                                                            <div className="composite-cell-status">
+                                                                <div className="composite-top-row">
+                                                                    <div
+                                                                        style={{ cursor: 'pointer' }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setStatusOrder(order);
+                                                                            setStatusBatchOrders(undefined);
+                                                                            setIsStatusModalOpen(true);
+                                                                        }}
+                                                                        title="Click para cambiar el estado de este ítem"
+                                                                    >
+                                                                        <span className="status-badge" style={{
+                                                                            backgroundColor: statusColors[order.status],
+                                                                            boxShadow: `0 0 6px ${statusColors[order.status]}30`,
+                                                                            fontSize: '0.72rem',
+                                                                            padding: '2px 6px',
+                                                                            cursor: 'pointer'
+                                                                        }}>
+                                                                            {statusLabels[order.status]}
+                                                                        </span>
+                                                                    </div>
+                                                                    {order.envio && (
+                                                                        <span className="shipping-pill">
+                                                                            🚚 {order.envio}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="composite-bottom-row">
+                                                                    <span style={{ fontWeight: '600', color: 'var(--accent)', fontSize: '0.8rem' }}>
+                                                                        📅 {order.fechaEntrega ? (() => {
+                                                                            const d = new Date(order.fechaEntrega + 'T12:00:00');
+                                                                            if (!isNaN(d.getTime())) {
+                                                                                return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                                                                            }
+                                                                            return order.fechaEntrega;
+                                                                        })() : '--'}
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                                        Hora: {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </td>
-                                                        {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
+                                                        {isAdmin && (
                                                             <td>
                                                                 <div className="price-cell">
                                                                     <span className="currency">$</span>
@@ -1809,57 +1771,19 @@ export default function Entrada() {
                                                                 </div>
                                                             </td>
                                                         )}
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                                    {order.fechaEntrega ? (() => {
-                                                                        const d = new Date(order.fechaEntrega + 'T12:00:00');
-                                                                        if (!isNaN(d.getTime())) {
-                                                                            return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-                                                                        }
-                                                                        return order.fechaEntrega;
-                                                                    })() : '--'}
-                                                                </span>
-                                                                {order.envio && (
-                                                                    <span style={{
-                                                                        fontSize: '0.68rem',
-                                                                        fontWeight: 700,
-                                                                        padding: '1px 5px',
-                                                                        borderRadius: '4px',
-                                                                        background: 'rgba(245, 158, 11, 0.15)',
-                                                                        color: '#fbbf24',
-                                                                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                                                                        whiteSpace: 'nowrap'
-                                                                    }}>
-                                                                        🚚 {order.envio}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
                                                         <td>
-                                                            <div className="order-actions-row">
+                                                            <div className="order-actions-compact">
                                                                 <button
+                                                                    type="button"
                                                                     className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); setChatOrder(order); setIsChatModalOpen(true); }}
-                                                                    title="Mensajería / Chat"
+                                                                    onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
+                                                                    title="Ver Detalle"
+                                                                    style={{ background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.5)' }}
                                                                 >
-                                                                    <span style={{ pointerEvents: 'none' }}>💬</span>
+                                                                    <span style={{ pointerEvents: 'none' }}>👁️</span>
                                                                 </button>
                                                                 <button
-                                                                    className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); openPdfModeModal([order], `Presupuesto ${order.ot || order.id}`); }}
-                                                                    title="Presupuesto PDF"
-                                                                >
-                                                                    <span style={{ pointerEvents: 'none' }}>📄</span>
-                                                                </button>
-                                                                <button
-                                                                    className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); generateProductionLabel([order]); }}
-                                                                    title="Etiqueta Rollo / Producción"
-                                                                >
-                                                                    <span style={{ pointerEvents: 'none' }}>🏷️</span>
-                                                                </button>
-                                                                <button
+                                                                    type="button"
                                                                     className="btn-icon-action"
                                                                     onClick={(e) => { e.stopPropagation(); handleDownloadSingle(order); }}
                                                                     title={order.archivos?.length ? `Descargar archivo(s) (${order.archivos.length})` : 'Sin archivos adjuntos'}
@@ -1873,34 +1797,88 @@ export default function Entrada() {
                                                                 >
                                                                     <span style={{ pointerEvents: 'none' }}>📥</span>
                                                                 </button>
-                                                                <button
-                                                                    className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
-                                                                    title="Ver Detalle"
-                                                                >
-                                                                    <span style={{ pointerEvents: 'none' }}>👁️</span>
-                                                                </button>
-                                                                <button
-                                                                    className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); setStatusOrder(order); setStatusBatchOrders(undefined); setIsStatusModalOpen(true); }}
-                                                                    title="Estado"
-                                                                >
-                                                                    <span style={{ pointerEvents: 'none' }}>⚙️</span>
-                                                                </button>
-                                                                <button
-                                                                    className="btn-icon-action"
-                                                                    onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
-                                                                    title="Editar"
-                                                                >
-                                                                    <span style={{ pointerEvents: 'none' }}>✏️</span>
-                                                                </button>
-                                                                <button
-                                                                    className="btn-icon-action btn-danger-action"
-                                                                    onClick={(e) => { e.stopPropagation(); handleSoftDeleteOrder(order); }}
-                                                                    title="Papelera"
-                                                                >
-                                                                    <span style={{ pointerEvents: 'none' }}>🗑️</span>
-                                                                </button>
+                                                                <div className="action-menu-container">
+                                                                    <button
+                                                                        type="button"
+                                                                        className={`btn-icon-action action-menu-trigger ${actionMenuOrderId === String(order.id || order.ot) ? 'active' : ''}`}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const oid = String(order.id || order.ot);
+                                                                            setActionMenuOrderId(prev => prev === oid ? null : oid);
+                                                                        }}
+                                                                        title="Más opciones de orden"
+                                                                    >
+                                                                        <span style={{ pointerEvents: 'none', letterSpacing: '-1px', fontWeight: 900 }}>•••</span>
+                                                                    </button>
+                                                                    {actionMenuOrderId === String(order.id || order.ot) && (
+                                                                        <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-menu-item"
+                                                                                onClick={() => {
+                                                                                    setActionMenuOrderId(null);
+                                                                                    setChatOrder(order);
+                                                                                    setIsChatModalOpen(true);
+                                                                                }}
+                                                                            >
+                                                                                <span>💬</span> Chat / Mensajes
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-menu-item"
+                                                                                onClick={() => {
+                                                                                    setActionMenuOrderId(null);
+                                                                                    openPdfModeModal([order], `Presupuesto ${order.ot || order.id}`);
+                                                                                }}
+                                                                            >
+                                                                                <span>📄</span> Presupuesto PDF
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-menu-item"
+                                                                                onClick={() => {
+                                                                                    setActionMenuOrderId(null);
+                                                                                    generateProductionLabel([order]);
+                                                                                }}
+                                                                            >
+                                                                                <span>🏷️</span> Etiqueta Rollo
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-menu-item"
+                                                                                onClick={() => {
+                                                                                    setActionMenuOrderId(null);
+                                                                                    setStatusOrder(order);
+                                                                                    setStatusBatchOrders(undefined);
+                                                                                    setIsStatusModalOpen(true);
+                                                                                }}
+                                                                            >
+                                                                                <span>⚙️</span> Cambiar Estado
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-menu-item"
+                                                                                onClick={() => {
+                                                                                    setActionMenuOrderId(null);
+                                                                                    handleEditOrder(order);
+                                                                                }}
+                                                                            >
+                                                                                <span>✏️</span> Editar Pedido
+                                                                            </button>
+                                                                            <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-menu-item danger"
+                                                                                onClick={() => {
+                                                                                    setActionMenuOrderId(null);
+                                                                                    handleSoftDeleteOrder(order);
+                                                                                }}
+                                                                            >
+                                                                                <span>🗑️</span> Enviar a Papelera
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1922,8 +1900,13 @@ export default function Entrada() {
                                 }
 
                                 return (
-                                    <tr key={order.id || order.ot} className={`fade-in hover-row ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''} ${isSpecialLaminationOrder(order, consumption) ? 'is-special-lamination' : ''}`} style={selectedIds.has(String(order.id || order.ot)) ? { background: 'rgba(var(--primary-rgb), 0.05)' } : {}}>
-                                        <td>
+                                    <tr
+                                        key={order.id || order.ot}
+                                        className={`fade-in hover-row ${selectedIds.has(String(order.id || order.ot)) ? 'selected-row' : ''} ${isSpecialLaminationOrder(order, consumption) ? 'is-special-lamination' : ''}`}
+                                        onDoubleClick={() => handlePreview(order)}
+                                        style={selectedIds.has(String(order.id || order.ot)) ? { background: 'rgba(var(--primary-rgb), 0.05)', cursor: 'pointer' } : { cursor: 'pointer' }}
+                                    >
+                                        <td style={{ textAlign: 'center' }}>
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.has(String(order.id || order.ot))}
@@ -1932,132 +1915,111 @@ export default function Entrada() {
                                             />
                                         </td>
                                         <td>
-                                            <div className="order-id">
-                                                <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.95rem' }}>{otDisplay}</span>
-                                                {cleanDesc && (
-                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cleanDesc}>
-                                                        {cleanDesc}
-                                                    </span>
-                                                )}
-                                                <OrderTagBadges
-                                                    order={order}
-                                                    tagPopoverOrderId={tagPopoverOrderId}
-                                                    setTagPopoverOrderId={setTagPopoverOrderId}
-                                                    onToggleTag={handleToggleOrderTag}
-                                                />
-                                            </div>
-                                        </td>
-                                        <td>
-                                            {isMobile ? (
-                                                <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 700,
-                                                    padding: '2px 8px',
-                                                    borderRadius: '12px',
-                                                    background: 'rgba(0, 218, 243, 0.15)',
-                                                    color: '#00daf3',
-                                                    border: '1px solid rgba(0, 218, 243, 0.4)'
-                                                }} title={`Enviado por: ${operarioNombre || 'Operario Móvil'}`}>
-                                                    📱 App {operarioNombre ? operarioNombre : 'Móvil'}
-                                                </span>
-                                            ) : (
-                                                <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 600,
-                                                    padding: '2px 8px',
-                                                    borderRadius: '12px',
-                                                    background: 'rgba(147, 51, 234, 0.15)',
-                                                    color: '#c084fc',
-                                                    border: '1px solid rgba(147, 51, 234, 0.3)'
-                                                }}>
-                                                    💻 Sistema Web
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                                                {order.createdAt ? new Date(order.createdAt).toLocaleString('es-AR', {
-                                                    timeZone: 'America/Argentina/Buenos_Aires',
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                    hour12: false
-                                                }) : (order.fechaCreacion || '-')}
-                                            </span>
-                                        </td>
-                                        <td
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setStatusOrder(order);
-                                                setStatusBatchOrders(undefined);
-                                                setIsStatusModalOpen(true);
-                                            }}
-                                            title="Click para cambiar el estado del pedido"
-                                        >
-                                            <span className="status-badge" style={{
-                                                backgroundColor: statusColors[order.status],
-                                                boxShadow: `0 0 8px ${statusColors[order.status]}40`,
-                                                cursor: 'pointer'
-                                            }}>
-                                                {statusLabels[order.status]}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="client-cell">
-                                                <span style={{ fontWeight: 600 }}>{order.clienteNombre}</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                                <span className="material-tag-sm">{order.material}</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            {(() => {
-                                                const w = Number(order.ancho) || 0;
-                                                const h = Number(order.alto) || 0;
-                                                const isSpecial = isSpecialLaminationOrder(order, consumption);
-                                                return (
-                                                    <span className="dims-text">
-                                                        <span style={w > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{w.toFixed(2)}</span>
-                                                        {' x '}
-                                                        <span style={h > 2.93 ? { color: '#c084fc', fontWeight: 800 } : undefined}>{h.toFixed(2)}</span>
-                                                        {' m'}
-                                                        {isSpecial && <span style={{ marginLeft: '3px', fontSize: '0.72rem', color: '#c084fc' }} title="Paño > 2.93m: Requiere laminado especial">⚡</span>}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <span className="copies-badge">{order.copias}</span>
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) ? (
-                                                <div className="demasia-indicator-group" style={{ margin: '0 auto', width: 'fit-content' }}>
-                                                    <span className="demasia-arrows">
-                                                        {order.demasiasConfig.top ? '↑' : ''}
-                                                        {order.demasiasConfig.bottom ? '↓' : ''}
-                                                        {order.demasiasConfig.left ? '←' : ''}
-                                                        {order.demasiasConfig.right ? '→' : ''}
-                                                    </span>
-                                                    <span className="demasia-target">🎯</span>
+                                            <div className="composite-cell-primary">
+                                                <div className="composite-top-row">
+                                                    <span className="ot-text" style={{ fontWeight: 800, color: 'var(--ot-color)', fontSize: '0.95rem' }}>{otDisplay}</span>
+                                                    {isMobile ? (
+                                                        <span className="origin-badge origin-badge-mobile" title={`Enviado por: ${operarioNombre || 'Operario Móvil'}`}>
+                                                            📱 App {operarioNombre ? operarioNombre : 'Móvil'}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="origin-badge origin-badge-web">
+                                                            💻 Web
+                                                        </span>
+                                                    )}
+                                                    {cleanDesc && (
+                                                        <span className="composite-work-title" title={cleanDesc}>
+                                                            {cleanDesc}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-                                            )}
+                                                <div className="composite-bottom-row">
+                                                    <span className="composite-client">🏢 {order.clienteNombre}</span>
+                                                    <OrderTagBadges
+                                                        order={order}
+                                                        tagPopoverOrderId={tagPopoverOrderId}
+                                                        setTagPopoverOrderId={setTagPopoverOrderId}
+                                                        onToggleTag={handleToggleOrderTag}
+                                                    />
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            {renderConsumptionBadge(order, consumption)}
+                                        <td>
+                                            <div className="composite-cell-tech">
+                                                <div className="composite-top-row">
+                                                    <span className="material-tag-sm">{order.material}</span>
+                                                    {(() => {
+                                                        const w = Number(order.ancho) || 0;
+                                                        const h = Number(order.alto) || 0;
+                                                        const isSpecial = isSpecialLaminationOrder(order, consumption);
+                                                        return (
+                                                            <span className="dims-text">
+                                                                <span style={w > 2.93 ? { color: 'var(--badge-purple-text)', fontWeight: 800 } : undefined}>{w.toFixed(2)}</span>
+                                                                {' × '}
+                                                                <span style={h > 2.93 ? { color: 'var(--badge-purple-text)', fontWeight: 800 } : undefined}>{h.toFixed(2)}</span>
+                                                                {' m'}
+                                                                {isSpecial && <span style={{ marginLeft: '3px', fontSize: '0.72rem', color: 'var(--badge-purple-text)' }} title="Paño > 2.93m: Requiere laminado especial">⚡</span>}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                    <span className="copies-badge">{order.copias} cop.</span>
+                                                    {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) && (
+                                                        <span className="demasia-indicator" title={`Demasías: ${[order.demasiasConfig.top?'Arriba':'', order.demasiasConfig.bottom?'Abajo':'', order.demasiasConfig.left?'Izq':'', order.demasiasConfig.right?'Der':''].filter(Boolean).join(', ')}`}>
+                                                            🎯 Demasías
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="composite-bottom-row">
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Consumo:</span>
+                                                    {renderConsumptionBadge(order, consumption)}
+                                                </div>
+                                            </div>
                                         </td>
-                                        {((user?.role as string) === 'administrador' || (user?.role as string) === 'principal' || (user?.role as string) === 'sistema') && (
+                                        <td>
+                                            <div className="composite-cell-status">
+                                                <div className="composite-top-row">
+                                                    <div
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setStatusOrder(order);
+                                                            setStatusBatchOrders(undefined);
+                                                            setIsStatusModalOpen(true);
+                                                        }}
+                                                        title="Click para cambiar el estado"
+                                                    >
+                                                        <span className="status-badge" style={{
+                                                            backgroundColor: statusColors[order.status],
+                                                            boxShadow: `0 0 8px ${statusColors[order.status]}40`,
+                                                            cursor: 'pointer'
+                                                        }}>
+                                                            {statusLabels[order.status]}
+                                                        </span>
+                                                    </div>
+                                                    {order.envio && (
+                                                        <span className="shipping-pill">
+                                                            🚚 {order.envio}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="composite-bottom-row">
+                                                    <span style={{ fontWeight: '600', color: 'var(--accent)', fontSize: '0.8rem' }}>
+                                                        📅 {order.fechaEntrega ? (() => {
+                                                            const d = new Date(order.fechaEntrega + 'T12:00:00');
+                                                            if (!isNaN(d.getTime())) {
+                                                                const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
+                                                                return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                                                            }
+                                                            return order.fechaEntrega;
+                                                        })() : '--'}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                        Ingreso: {order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : (order.fechaCreacion || '-')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        {isAdmin && (
                                             <td>
                                                 <div className="price-cell">
                                                     <span className="currency">$</span>
@@ -2067,47 +2029,21 @@ export default function Entrada() {
                                                 </div>
                                             </td>
                                         )}
-                                        <td style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                                                <div className="date-cell" style={{ fontWeight: '600', color: 'var(--accent)' }}>
-                                                    {order.fechaEntrega ? (() => {
-                                                        const d = new Date(order.fechaEntrega + 'T12:00:00');
-                                                        if (!isNaN(d.getTime())) {
-                                                            const dayName = d.toLocaleDateString('es-AR', { weekday: 'short' }).toUpperCase().replace('.', '');
-                                                            return `${dayName} ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-                                                        }
-                                                        return order.fechaEntrega;
-                                                    })() : <span className="text-muted italic">--</span>}
-                                                </div>
-                                                {order.envio && (
-                                                    <span style={{
-                                                        fontSize: '0.7rem',
-                                                        fontWeight: 700,
-                                                        padding: '1px 6px',
-                                                        borderRadius: '4px',
-                                                        background: 'rgba(245, 158, 11, 0.15)',
-                                                        color: '#fbbf24',
-                                                        border: '1px solid rgba(245, 158, 11, 0.35)',
-                                                        whiteSpace: 'nowrap'
-                                                    }}>
-                                                        🚚 {order.envio}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
                                         <td>
-                                            <div className="order-actions-row">
+                                            <div className="order-actions-compact">
                                                 {order.status === 'eliminado' ? (
                                                     <>
                                                         <button
+                                                            type="button"
                                                             className="btn-icon-action"
                                                             onClick={(e) => { e.stopPropagation(); handleRestoreOrder(order); }}
                                                             title="Restaurar Orden"
                                                             style={{ filter: 'grayscale(0)' }}
                                                         >
-                                                            <span style={{ pointerEvents: 'none', fontSize: '1.2rem' }}>🔁</span>
+                                                            <span style={{ pointerEvents: 'none', fontSize: '1.1rem' }}>🔁</span>
                                                         </button>
                                                         <button
+                                                            type="button"
                                                             className="btn-icon-action btn-danger-action"
                                                             onClick={(e) => { e.stopPropagation(); handlePermanentDelete(order); }}
                                                             title="Eliminar Definitivamente"
@@ -2118,40 +2054,16 @@ export default function Entrada() {
                                                 ) : (
                                                     <>
                                                         <button
+                                                            type="button"
                                                             className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setChatOrder(order);
-                                                                setIsChatModalOpen(true);
-                                                            }}
-                                                            title="Mensajería / Chat con Operario"
-                                                            style={{ background: 'rgba(37, 99, 235, 0.25)', border: '1px solid rgba(37, 99, 235, 0.6)' }}
+                                                            onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
+                                                            title="Ver Detalle (Doble clic en fila también abre)"
+                                                            style={{ background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.5)' }}
                                                         >
-                                                            <span style={{ pointerEvents: 'none' }}>💬</span>
+                                                            <span style={{ pointerEvents: 'none' }}>👁️</span>
                                                         </button>
                                                         <button
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openPdfModeModal([order], `Presupuesto ${order.ot || order.id}`);
-                                                            }}
-                                                            title="Imprimir / Ver Presupuesto PDF"
-                                                            style={{ background: 'rgba(249, 115, 22, 0.25)', border: '1px solid rgba(249, 115, 22, 0.6)' }}
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>📄</span>
-                                                        </button>
-                                                        <button
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                generateProductionLabel([order]);
-                                                            }}
-                                                            title="Etiqueta Rollo / Producción"
-                                                            style={{ background: 'rgba(13, 148, 136, 0.25)', border: '1px solid rgba(13, 148, 136, 0.6)' }}
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>🏷️</span>
-                                                        </button>
-                                                        <button
+                                                            type="button"
                                                             className="btn-icon-action"
                                                             onClick={(e) => { e.stopPropagation(); handleDownloadSingle(order); }}
                                                             title={order.archivos?.length ? `Descargar archivo(s) (${order.archivos.length})` : 'Sin archivos adjuntos'}
@@ -2165,39 +2077,88 @@ export default function Entrada() {
                                                         >
                                                             <span style={{ pointerEvents: 'none' }}>📥</span>
                                                         </button>
-                                                        <button
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => { e.stopPropagation(); handlePreview(order); }}
-                                                            title="Ver Detalle / Previsualizar"
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>👁️</span>
-                                                        </button>
-                                                        <button
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setStatusOrder(order);
-                                                                setStatusBatchOrders(undefined);
-                                                                setIsStatusModalOpen(true);
-                                                            }}
-                                                            title="Operaciones / Estado"
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>⚙️</span>
-                                                        </button>
-                                                        <button
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
-                                                            title="Editar Pedido"
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>✏️</span>
-                                                        </button>
-                                                        <button
-                                                            className="btn-icon-action btn-danger-action"
-                                                            onClick={(e) => { e.stopPropagation(); handleSoftDeleteOrder(order); }}
-                                                            title="Enviar a Papelera"
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>🗑️</span>
-                                                        </button>
+                                                        <div className="action-menu-container">
+                                                            <button
+                                                                type="button"
+                                                                className={`btn-icon-action action-menu-trigger ${actionMenuOrderId === String(order.id || order.ot) ? 'active' : ''}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const oid = String(order.id || order.ot);
+                                                                    setActionMenuOrderId(prev => prev === oid ? null : oid);
+                                                                }}
+                                                                title="Más opciones de orden"
+                                                            >
+                                                                <span style={{ pointerEvents: 'none', letterSpacing: '-1px', fontWeight: 900 }}>•••</span>
+                                                            </button>
+                                                            {actionMenuOrderId === String(order.id || order.ot) && (
+                                                                <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            setChatOrder(order);
+                                                                            setIsChatModalOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <span>💬</span> Chat / Mensajes
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            openPdfModeModal([order], `Presupuesto ${order.ot || order.id}`);
+                                                                        }}
+                                                                    >
+                                                                        <span>📄</span> Presupuesto PDF
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            generateProductionLabel([order]);
+                                                                        }}
+                                                                    >
+                                                                        <span>🏷️</span> Etiqueta Rollo
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            setStatusOrder(order);
+                                                                            setStatusBatchOrders(undefined);
+                                                                            setIsStatusModalOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <span>⚙️</span> Cambiar Estado
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            handleEditOrder(order);
+                                                                        }}
+                                                                    >
+                                                                        <span>✏️</span> Editar Pedido
+                                                                    </button>
+                                                                    <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item danger"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            handleSoftDeleteOrder(order);
+                                                                        }}
+                                                                    >
+                                                                        <span>🗑️</span> Enviar a Papelera
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </>
                                                 )}
                                             </div>

@@ -48,6 +48,7 @@
     border-radius: var(--radius-lg);
     overflow-x: auto;
     box-shadow: var(--shadow-md);
+    margin-bottom: 70px; /* Space for the floating dock */
 }
 
 .orders-table {
@@ -56,22 +57,22 @@
 }
 
 .orders-table th {
-    background: rgba(0, 0, 0, 0.25);
-    padding: 8px 10px;
+    background: var(--table-header-bg);
+    padding: 10px 12px;
     text-align: left;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--table-border-subtle);
     white-space: nowrap;
 }
 
 .orders-table td {
-    padding: 8px 10px;
+    padding: 10px 12px;
     font-size: 12.5px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--table-border-subtle);
     vertical-align: middle;
 }
 
@@ -80,7 +81,7 @@
 }
 
 .orders-table tr.hover-row:hover td {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--table-row-hover);
 }
 
 /* Cell Components */
@@ -836,4 +837,293 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* ============================================================
+   ERGONOMIC V1.1.0 COMPOSITE CELLS & ACTION DOCK
+   ============================================================ */
+
+.composite-cell-primary {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 190px;
+    max-width: 280px;
+}
+
+.composite-cell-tech {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 160px;
+}
+
+.composite-cell-status {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 130px;
+}
+
+.work-desc-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: block;
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.origin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+
+.origin-badge-mobile {
+    background: var(--metric-cyan-bg);
+    color: var(--metric-cyan);
+    border: 1px solid var(--metric-cyan-border);
+}
+
+.origin-badge-web {
+    background: var(--badge-purple-bg);
+    color: var(--badge-purple-color);
+    border: 1px solid var(--badge-purple-border);
+}
+
+.shipping-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--badge-amber-bg);
+    color: var(--badge-amber-color);
+    border: 1px solid var(--badge-amber-border);
+    white-space: nowrap;
+}
+
+.demasia-indicator {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--badge-amber-color);
+    background: var(--badge-amber-bg);
+    border: 1px solid var(--badge-amber-border);
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* Compact Actions (2 direct + Menu) */
+.order-actions-compact {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: center;
+}
+
+.action-menu-container {
+    position: relative;
+    display: inline-flex;
+}
+
+.action-menu-popover {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 1050;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    min-width: 175px;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.action-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+    width: 100%;
+    white-space: nowrap;
+}
+
+.action-menu-item:hover {
+    background: rgba(255, 107, 0, 0.12);
+    color: var(--accent);
+}
+
+.action-menu-item.danger-item:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.action-menu-item span.icon {
+    font-size: 14px;
+    width: 18px;
+    text-align: center;
+}
+
+/* Floating Batch Actions Dock */
+.batch-actions-dock {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--dock-bg);
+    backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--dock-border);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    border-radius: 9999px;
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 95vw;
+    animation: dockSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dockSlideUp {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 20px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+}
+
+.dock-selection-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 12px;
+    border-right: 1px solid var(--border);
+}
+
+.dock-count-badge {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 2px 7px;
+    border-radius: 9999px;
+}
+
+.dock-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dock-cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    margin-left: 2px;
+}
+
+.dock-cancel-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.dock-metrics {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding-right: 12px;
+    border-right: 1px solid var(--border);
+}
+
+.dock-metrics strong {
+    color: var(--metric-cyan);
+}
+
+.dock-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+.dock-btn {
+    padding: 5px 10px;
+    border-radius: 9999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dock-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    transform: translateY(-1px);
+}
+
+.dock-btn-primary {
+    background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.dock-btn-secondary {
+    background: #4f46e5 !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+.dock-btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+.dock-btn-danger {
+    background: #ef4444 !important;
+    color: #fff !important;
+    border: none !important;
 }

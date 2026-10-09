@@ -898,6 +898,36 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - Verificada la remoción interactiva de la imagen mediante el botón `✕ Quitar` (cambiando a estado "Sin archivo (o arrastra y suelta)") sin ninguna caída de React ni excepciones en consola.
   - Verificada la compilación para producción (`npm run build` en 6.71s).
 
+### Sesión 09/10/2026: Upgrade de Sistema v1.1.0, Ergonomía Operativa de Entrada (6 Celdas Compuestas, Dock Flotante, Acciones Fitts, Doble Clic) y Sidebar Colapsable (Focus Mode) (completado)
+- [x] **Salvaguarda y Rollback Previo**:
+  - Creado tag git `v1.0.0-baseline` en commit `bfd8749` y rama de respaldo `backup/pre-ergonomics-upgrade` pusheada a GitHub remoto.
+  - Incremento de versión del sistema a `v1.1.0` en `package.json`, `vite.config.ts`, `src/data/db.ts`, `Login.tsx` y `Sidebar.tsx`.
+- [x] **Sidebar Colapsable (Focus Mode) para Amplitud de Taller**:
+  - Botón de alternancia rápida `[◀] / [▶]` en la cabecera del menú lateral.
+  - Transición fluida de 260px a 72px (rail mode con tooltips y alineación de iconos centrados).
+  - Persistencia del estado colapsado en `localStorage.luxius_sidebar_collapsed`.
+  - Ganancia neta de +188px de ancho horizontal directo para maximizar visualización de tablas en pantallas 1080p y portátiles.
+- [x] **Eliminación Total de Scroll Horizontal en Entrada (De 14 a 6 Celdas Compuestas)**:
+  - Fusión de 14 columnas dispersas en 6 columnas compactas de dos niveles jerárquicos:
+    1. `[Checkbox]` (42px)
+    2. `Trabajo & Cliente`: Fila superior con OT en color semántico (`--ot-color`), insignia de origen (`📱 Móvil` / `💻 Web`), descripción; fila inferior con Cliente (`🏢`) y badges de etiquetas operativas.
+    3. `Especificaciones Técnicas`: Fila superior con material, medidas métricas ($Ancho \times Alto$) destacando paños > 2.93m con laminado especial, copias y demasías; fila inferior con consumo en $m^2$ o $ml$ por bobina y ahorro de Nesting.
+    4. `Estado & Entrega`: Fila superior con badge de estado interactivo y tipo de envío (`🚚`); fila inferior con fecha de entrega formateada y fecha de ingreso.
+    5. `Importe`: Monto en pesos (visible condicionalmente solo para roles autorizados).
+    6. `Acciones`: Centrado, limpio y racionalizado.
+  - Atajo ergonómico de taller: **Doble clic en cualquier fila** (`onDoubleClick`) para abrir la previsualización del detalle de la orden sin necesidad de apuntar al icono.
+- [x] **Racionalización de Acciones (Ley de Fitts)**:
+  - Reemplazada la fila saturada de 8 botones (260px) por 2 botones primarios directos de alta frecuencia (`👁️` Detalle, `📥` Descargar) + menú popover desplegable (`•••`) para acciones secundarias (💬 Chat, 📄 Presupuesto PDF, 🏷️ Etiqueta Rollo, ⚙️ Estado, ✏️ Editar, 🗑️ Papelera).
+- [x] **Dock Flotante de Acciones en Lote (`.batch-actions-dock`)**:
+  - Reemplazada la barra estática superior por una cápsula flotante centrada inferior con efecto Glassmorphism (`backdrop-filter: blur(16px)`).
+  - Siempre visible al desplazarse verticalmente por la lista sin tener que scrollear hacia arriba.
+  - Incluye selector de tags rápidos, totales en vivo ($m^2$, $ml$, $\$$), Nesting Studio, Unificar Lote, Descarga ZIP, PDFs y transiciones de estado.
+- [x] **Armonización Dual-Theme (WCAG Semantic Contrast)**:
+  - Definidos tokens semánticos `--metric-cyan`, `--ot-color`, `--badge-purple-text`, `--table-header-bg` calibrados para modo Oscuro y Claro.
+  - Eliminados colores cian/ámbar fluorescentes no legibles sobre fondos claros.
+- [x] **Compilación y Build Verificado**:
+  - `npm run build` ejecutado en 6.36s con cero errores de TypeScript y CSS.
+
 ---
 
 ### 🔮 Roadmap Maestro de Cambios Futuros (Guía de Implementación Paso a Paso para Cualquier Modelo de IA)

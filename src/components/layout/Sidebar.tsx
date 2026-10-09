@@ -32,9 +32,11 @@ const navItems: NavItem[] = [
 interface SidebarProps {
     isOpen?: boolean
     onClose?: () => void
+    isCollapsed?: boolean
+    onToggleCollapse?: () => void
 }
 
-export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
     const navigate = useNavigate()
     const { user, logout } = useAuthStore()
     const [isArcadeOpen, setIsArcadeOpen] = useState(false)
@@ -52,15 +54,26 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     });
 
     return (
-        <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
             <div className="sidebar-header">
                 <div className="sidebar-logo">
                     <div className="logo-brand">
-                        <span className="logo-icon">✦</span>
-                        <span className="logo-text">LuXius</span>
+                        <span className="logo-icon" title="LuXius">✦</span>
+                        {!isCollapsed && <span className="logo-text">LuXius</span>}
                     </div>
-                    <span className="logo-subtitle">...núcleo operativo de XignuX</span>
+                    {!isCollapsed && <span className="logo-subtitle">...núcleo operativo de XignuX</span>}
                 </div>
+                {onToggleCollapse && (
+                    <button
+                        type="button"
+                        className="sidebar-collapse-btn"
+                        onClick={onToggleCollapse}
+                        title={isCollapsed ? "Expandir menú lateral" : "Colapsar menú lateral (Modo Taller)"}
+                        aria-label="Colapsar menú lateral"
+                    >
+                        {isCollapsed ? '▶' : '◀'}
+                    </button>
+                )}
                 {onClose && (
                     <button
                         type="button"
@@ -85,9 +98,10 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                                 }
                                 end={item.path === '/'}
                                 onClick={() => onClose?.()}
+                                title={isCollapsed ? item.label : undefined}
                             >
                                 <span className="nav-icon">{item.icon}</span>
-                                <span className="nav-label">{item.label}</span>
+                                {!isCollapsed && <span className="nav-label">{item.label}</span>}
                             </NavLink>
                         </li>
                     ))}
@@ -95,35 +109,71 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             </nav>
 
             <div className="sidebar-footer">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
-                    <ServerStatusLed />
-                    <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.5px',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        background: 'rgba(255, 107, 0, 0.12)',
-                        color: 'var(--accent)',
-                        border: '1px solid rgba(255, 107, 0, 0.25)',
-                        fontFamily: 'monospace'
-                    }} title="Versión del Sistema LuXius">
-                        v1.1.0
-                    </span>
-                </div>
-                <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <ThemeToggle />
-                    <button
-                        className="sidebar-arcade-btn"
-                        onClick={() => setIsArcadeOpen(true)}
-                        title="Abrir Arcade Center de Minijuegos"
-                    >
-                        🕹️ Arcade
-                    </button>
-                    <button className="logout-btn" onClick={handleLogout}>
-                        Salir
-                    </button>
-                </div>
+                {!isCollapsed ? (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                            <ServerStatusLed />
+                            <span style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                letterSpacing: '0.5px',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(255, 107, 0, 0.12)',
+                                color: 'var(--accent)',
+                                border: '1px solid rgba(255, 107, 0, 0.25)',
+                                fontFamily: 'monospace'
+                            }} title="Versión del Sistema LuXius">
+                                v1.1.0
+                            </span>
+                        </div>
+                        <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <ThemeToggle />
+                            <button
+                                className="sidebar-arcade-btn"
+                                onClick={() => setIsArcadeOpen(true)}
+                                title="Abrir Arcade Center de Minijuegos"
+                            >
+                                🕹️ Arcade
+                            </button>
+                            <button className="logout-btn" onClick={handleLogout}>
+                                Salir
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <ServerStatusLed />
+                        <ThemeToggle />
+                        <button
+                            className="sidebar-arcade-btn"
+                            onClick={() => setIsArcadeOpen(true)}
+                            title="Abrir Arcade"
+                            style={{ padding: '6px', minWidth: '32px' }}
+                        >
+                            🕹️
+                        </button>
+                        <button
+                            className="logout-btn"
+                            onClick={handleLogout}
+                            title="Cerrar Sesión"
+                            style={{ padding: '6px 8px', fontSize: '0.75rem' }}
+                        >
+                            🚪
+                        </button>
+                        <span style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            padding: '1px 4px',
+                            borderRadius: '4px',
+                            background: 'rgba(255, 107, 0, 0.12)',
+                            color: 'var(--accent)',
+                            fontFamily: 'monospace'
+                        }}>
+                            1.1
+                        </span>
+                    </div>
+                )}
             </div>
 
             <ArcadeModal isOpen={isArcadeOpen} onClose={() => setIsArcadeOpen(false)} />

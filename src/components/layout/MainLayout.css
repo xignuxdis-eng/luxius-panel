@@ -4,6 +4,11 @@
     display: grid;
     grid-template-columns: 260px 1fr;
     min-height: 100vh;
+    transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-layout.sidebar-collapsed {
+    grid-template-columns: 72px 1fr;
 }
 
 .main-content {
