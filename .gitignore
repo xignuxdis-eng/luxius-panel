@@ -3,6 +3,7 @@ node_modules/
 dist/
 build/
 .cache/
+public/version.json
 
 # Environments & Secrets
 .env

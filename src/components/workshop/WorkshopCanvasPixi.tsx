@@ -343,9 +343,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     };
 
     /**
-     * PARTICLE POOL: Reusable smoke / solvent vapor and VIP golden sparkles
+     * PARTICLE POOL: Reusable smoke / solvent vapor and VIP golden sparkles (Max 40 items)
      */
-    const initParticles = (layer: Container, count: number) => {
+    const initParticles = (layer: Container, count: number = 40) => {
         const pool: ParticleItem[] = [];
         for (let i = 0; i < count; i++) {
             const gfx = new Graphics();
@@ -374,7 +374,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         p.x = x + (Math.random() * 8 - 4);
         p.y = y + (Math.random() * 4 - 2);
         p.vx = (Math.random() - 0.5) * 0.4;
-        p.vy = -0.3 - Math.random() * 0.4; // float upward
+        p.vy = -0.3 - Math.random() * 0.4;
         p.life = 0;
         p.maxLife = 24 + Math.floor(Math.random() * 16);
         p.color = isVip ? 0xfbbf24 : (Math.random() > 0.4 ? 0x38bdf8 : 0xffffff);
@@ -649,6 +649,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
      */
     const setupPlotterTicker = (app: Application) => {
         let frameCount = 0;
+        let lastSweepSoundTime = 0;
+        let prevSweepCos = 0;
 
         app.ticker.add(() => {
             frameCount++;
@@ -663,35 +665,52 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             const progressFill = plotterProgressFillRef.current;
             const progressText = plotterProgressTextRef.current;
 
-            if (isPrinting && carriage && sheet && glow && progressFill && progressText) {
-                // 1. Animate Printhead Carriage across the 70px rail
+            if (!carriage || !sheet || !glow || !progressFill || !progressText) return;
+
+            const stations = getPixiStations();
+            const plotterStation = stations.find(s => s.id === 'plotter1');
+            const isOffline = plotterStation?.estado === 'offline';
+
+            const railMinX = Math.floor((154 - 110) / 2) + 16;
+            const railRange = 66;
+
+            if (isPrinting && !isOffline) {
+                // 1. Animate Printhead Carriage across the rail
                 const sweepSpeed = 0.06;
+                const cosVal = Math.cos(frameCount * sweepSpeed);
                 const sweepRatio = (Math.sin(frameCount * sweepSpeed) + 1) / 2; // 0..1
-                const railMinX = 108 + Math.floor((154 - 110) / 2) + 16;
-                const railRange = 66;
 
-                carriage.x = Math.floor((154 - 110) / 2) + 16 + sweepRatio * railRange;
+                // Audio sweep trigger on new stroke pass with 2.5s cooldown
+                if (cosVal >= 0 && prevSweepCos < 0 && Date.now() - lastSweepSoundTime > 2500) {
+                    audioEngine.playPrintSweep();
+                    lastSweepSoundTime = Date.now();
+                }
+                prevSweepCos = cosVal;
 
-                // 2. Animate Printhead Glow (flashes gently when printing)
+                const targetCarriageX = railMinX + sweepRatio * railRange;
+                carriage.x += (targetCarriageX - carriage.x) * 0.2;
+
+                // 2. Animate Printhead Glow with fade-in
                 glow.clear();
                 glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
                 glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
+                glow.alpha += (1 - glow.alpha) * 0.08;
 
-                // 3. Animate Unrolling Printed Sheet (grows from 4px to 14px as job runs)
-                const cycleProgress = ((frameCount / 3) % 100) / 100; // 0..1 loop per print slice
+                // 3. Animate Unrolling Printed Sheet with fade-in
+                const cycleProgress = ((frameCount / 3) % 100) / 100;
                 const sheetH = 4 + Math.floor(cycleProgress * 11);
                 sheet.clear();
-                // Vinyl substrate
                 sheet.rect(0, 0, 70, sheetH);
                 sheet.fill({ color: 0xf8fafc });
                 sheet.stroke({ width: 0.5, color: 0x94a3b8 });
-                // Simulated CMYK fresh ink band
+                // CMYK ink bands
                 sheet.rect(4, Math.max(0, sheetH - 4), 62, 3);
                 sheet.fill({ color: 0x06b6d4 });
                 sheet.rect(20, Math.max(0, sheetH - 4), 24, 3);
                 sheet.fill({ color: 0xec4899 });
                 sheet.rect(36, Math.max(0, sheetH - 4), 16, 3);
                 sheet.fill({ color: 0xeab308 });
+                sheet.alpha += (1 - sheet.alpha) * 0.08;
 
                 // 4. Update Floating Progress Bar
                 const percent = Math.floor(cycleProgress * 100);
@@ -699,21 +718,31 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 progressFill.clear();
                 progressFill.rect(0, 0, Math.max(2, (barWidth * percent) / 100), 7);
                 progressFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
+                progressFill.alpha += (1 - progressFill.alpha) * 0.08;
                 progressText.text = `OT #${currentJob.ot || currentJob.id} · ${percent}%`;
 
                 // 5. Emit particles at carriage position
                 if (frameCount % 4 === 0) {
                     emitParticle(108 + carriage.x + 6, 42 + carriage.y + 10, isVip);
                 }
-            } else if (carriage && sheet && glow && progressFill && progressText) {
-                // Idle / Standby state
-                glow.clear();
-                sheet.clear();
-                progressFill.clear();
-                progressText.text = 'PLOTTER EN ESPERA';
+            } else {
+                // Standby / Offline State with Smooth Lerp Fades
+                // Smoothly park carriage at home position
+                carriage.x += (railMinX - carriage.x) * 0.06;
+
+                // Fade out glow, sheet, and progress fill
+                glow.alpha += (0 - glow.alpha) * 0.08;
+                sheet.alpha += (0 - sheet.alpha) * 0.08;
+                progressFill.alpha += (0 - progressFill.alpha) * 0.08;
+
+                if (isOffline) {
+                    progressText.text = 'OFFLINE';
+                } else {
+                    progressText.text = 'STANDBY (LISTO)';
+                }
             }
 
-            // Update particles pool
+            // Update particles pool (max 40 items)
             particlesPoolRef.current.forEach(p => {
                 if (p.active) {
                     p.x += p.vx;
