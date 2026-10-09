@@ -170,15 +170,6 @@ export async function checkServerVersion(): Promise<boolean> {
                 return false;
             }
 
-            // Protección estricta contra bucles de recarga (< 15 segundos)
-            const RELOAD_GUARD_KEY = 'luxius_last_version_reload';
-            const lastReload = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || '0');
-            if (Date.now() - lastReload < 15000) {
-                console.warn('[VersionEngine] Recarga reciente detectada (<15s). Bucle evitado.');
-                return false;
-            }
-            sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
-
             localStorage.setItem(VERSION_KEY, serverBuild);
             await purgeServiceWorkersAndCaches();
             window.location.reload();
