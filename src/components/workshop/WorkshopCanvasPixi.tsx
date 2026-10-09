@@ -92,10 +92,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
         // Update badge counters on all stations
         badgesMapRef.current.forEach((textNode, stationId) => {
+            if (!textNode || textNode.destroyed) return;
             const count = countOrdersForStation(stationId, orders);
             textNode.text = count > 0 ? `${count}` : '';
             textNode.visible = count > 0;
-            if (textNode.parent) {
+            if (textNode.parent && !textNode.parent.destroyed) {
                 textNode.parent.visible = count > 0;
             }
         });
@@ -105,20 +106,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         selectedStationRef.current = selectedStation;
         // Refresh highlight states
         highlightsMapRef.current.forEach((gfx, stationId) => {
+            if (!gfx || gfx.destroyed) return;
             const isSelected = selectedStation === stationId;
             const isHovered = hoveredStation === stationId;
-            gfx.clear();
-            const parent = gfx.parent as Container;
-            const boundsW = parent ? (parent as any)._stationW || 86 : 86;
-            const boundsH = parent ? (parent as any)._stationH || 66 : 66;
+            try {
+                gfx.clear();
+                const parent = gfx.parent as Container;
+                const boundsW = parent ? (parent as any)._stationW || 86 : 86;
+                const boundsH = parent ? (parent as any)._stationH || 66 : 66;
 
-            if (isSelected) {
-                gfx.rect(-2, -2, boundsW + 4, boundsH + 4);
-                gfx.stroke({ width: 2, color: 0x38bdf8 });
-            } else if (isHovered) {
-                gfx.rect(-1, -1, boundsW + 2, boundsH + 2);
-                gfx.stroke({ width: 1.5, color: 0xf59e0b });
-            }
+                if (isSelected) {
+                    gfx.rect(-2, -2, boundsW + 4, boundsH + 4);
+                    gfx.stroke({ width: 2, color: 0x38bdf8 });
+                } else if (isHovered) {
+                    gfx.rect(-1, -1, boundsW + 2, boundsH + 2);
+                    gfx.stroke({ width: 1.5, color: 0xf59e0b });
+                }
+            } catch (_) {}
         });
     }, [selectedStation, hoveredStation]);
 
@@ -134,26 +138,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     useEffect(() => {
         let isCancelled = false;
         let resizeObserver: ResizeObserver | null = null;
-        const app = new Application();
-        (app as any)._cancelResize = () => {};
-        appRef.current = app;
+        let tickerFn: (() => void) | null = null;
+        let activeApp: Application | null = null;
 
         const VIRTUAL_W = 480;
         const VIRTUAL_H = 270;
 
-        const safeDestroy = (targetApp: Application | null) => {
-            if (!targetApp) return;
-            try {
-                if (typeof (targetApp as any)._cancelResize !== 'function') {
-                    (targetApp as any)._cancelResize = () => {};
-                }
-                targetApp.destroy(true, { children: true });
-            } catch (err) {
-                console.warn('Safe Pixi destroy notice:', err);
-            }
-        };
-
         const initPixi = async () => {
+            const app = new Application();
             try {
                 await app.init({
                     width: VIRTUAL_W,
@@ -161,13 +153,21 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     resolution: window.devicePixelRatio || 1,
                     autoDensity: true,
                     roundPixels: true,
-                    backgroundColor: 0x090714
+                    backgroundColor: 0x090714,
+                    preference: 'webgl'
                 });
 
                 if (isCancelled || !canvasHostRef.current) {
-                    safeDestroy(app);
+                    try {
+                        if (app.renderer && !app.renderer.destroyed) {
+                            app.destroy({ removeView: true }, { children: true });
+                        }
+                    } catch (_) {}
                     return;
                 }
+
+                activeApp = app;
+                appRef.current = app;
 
                 if (canvasHostRef.current) {
                     canvasHostRef.current.innerHTML = '';
@@ -209,7 +209,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     resizeObserver = setupFractionalScaling(canvas, containerRef.current);
 
                     // 5. Start Plotter Render Loop Ticker
-                    setupPlotterTicker(app);
+                    tickerFn = setupPlotterTicker(app);
                 }
             } catch (initErr) {
                 console.error('Failed to initialize Pixi Application:', initErr);
@@ -219,55 +219,96 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         initPixi();
 
         const handleVisibilityChange = () => {
-            if (!appRef.current) return;
-            if (document.visibilityState === 'hidden') {
-                appRef.current.ticker.stop();
-            } else {
-                appRef.current.ticker.start();
-            }
+            if (!activeApp || isCancelled) return;
+            try {
+                if (document.visibilityState === 'hidden') {
+                    activeApp.ticker.stop();
+                } else {
+                    activeApp.ticker.start();
+                }
+            } catch (_) {}
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             isCancelled = true;
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            
             if (resizeObserver) {
                 resizeObserver.disconnect();
+                resizeObserver = null;
             }
-            destroyTextureCache();
-            if (appRef.current) {
-                safeDestroy(appRef.current);
-                appRef.current = null;
+
+            if (activeApp && tickerFn) {
+                try {
+                    activeApp.ticker.remove(tickerFn);
+                } catch (_) {}
+                tickerFn = null;
             }
-            if (canvasHostRef.current) {
-                canvasHostRef.current.innerHTML = '';
-            }
+
+            // Immediately clear interactive element references to prevent ticker access
+            plotterCarriageSpriteRef.current = null;
+            plotterSheetGfxRef.current = null;
+            plotterGlowGfxRef.current = null;
+            plotterProgressFillRef.current = null;
+            plotterProgressTextRef.current = null;
+            tooltipContainerRef.current = null;
+            tooltipTextRef.current = null;
             highlightsMapRef.current.clear();
             badgesMapRef.current.clear();
             particlesPoolRef.current = [];
+
+            if (activeApp) {
+                try {
+                    if (activeApp.ticker) {
+                        activeApp.ticker.stop();
+                    }
+                    if (activeApp.stage && !activeApp.stage.destroyed) {
+                        activeApp.stage.destroy({ children: true });
+                    }
+                    if (activeApp.renderer && !activeApp.renderer.destroyed) {
+                        activeApp.destroy({ removeView: true }, { children: true });
+                    }
+                } catch (err) {
+                    console.warn('Safe Pixi destroy notice:', err);
+                }
+                activeApp = null;
+                appRef.current = null;
+            }
+
+            if (canvasHostRef.current) {
+                canvasHostRef.current.innerHTML = '';
+            }
         };
     }, []);
 
     /**
      * FRACTIONAL SCALING: Fills 96% of container width, maintaining 16:9 ratio.
-     * Allows large, commanding presentation on 1080p, 2K and 4K displays while preserving nearest pixel art.
+     * Prevents ResizeObserver loop and layout thrashing.
      */
     const setupFractionalScaling = (canvas: HTMLCanvasElement, container: HTMLDivElement | null): ResizeObserver | null => {
-        if (!container) return null;
+        if (!container || !canvas) return null;
+
+        let lastW = 0;
+        let lastH = 0;
+        let rafId: number | null = null;
 
         const updateScale = () => {
+            if (!container || !canvas) return;
             const containerW = container.clientWidth || 480;
-            // Target 96% container width to fill comfortably with slight breathing margin
             const targetW = Math.max(480, Math.floor(containerW * 0.96));
             const maxAllowedH = Math.min(560, Math.floor(window.innerHeight * 0.62));
 
-            // Scale to fill width, but respect max-height
             const scaleByW = targetW / 480;
             const scaleByH = maxAllowedH / 270;
             const finalScale = Math.max(1, Math.min(scaleByW, scaleByH));
 
             const displayW = Math.round(480 * finalScale);
             const displayH = Math.round(270 * finalScale);
+
+            if (displayW === lastW && displayH === lastH) return;
+            lastW = displayW;
+            lastH = displayH;
 
             canvas.style.width = `${displayW}px`;
             canvas.style.height = `${displayH}px`;
@@ -278,11 +319,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             canvas.style.borderRadius = '8px';
         };
 
-        const ro = new ResizeObserver(() => updateScale());
+        const ro = new ResizeObserver(() => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(updateScale);
+        });
         ro.observe(container);
         updateScale();
         return ro;
     };
+
 
     /**
      * BACKGROUND MAP: Large Low-Contrast Concrete Slabs + Fine 2px Guide Line
@@ -647,118 +692,145 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     /**
      * Plotter Animation & Ticker Loop (Fase 2)
      */
-    const setupPlotterTicker = (app: Application) => {
+    const setupPlotterTicker = (app: Application): (() => void) => {
         let frameCount = 0;
         let lastSweepSoundTime = 0;
         let prevSweepCos = 0;
 
-        app.ticker.add(() => {
-            frameCount++;
-            const printingOrders = ordersRef.current.filter(o => o.status === 'orden');
-            const isPrinting = printingOrders.length > 0;
-            const currentJob = printingOrders[0];
-            const isVip = Boolean(currentJob && (String(currentJob.batchId || '').includes('VIP') || String(currentJob.ot || '').includes('URG')));
+        // Cache initial offline status to avoid querying localStorage 60x/sec
+        let isPlotterOffline = false;
+        try {
+            const stations = getPixiStations();
+            const plotterStation = stations.find(s => s.id === 'plotter1');
+            isPlotterOffline = plotterStation?.estado === 'offline';
+        } catch (_) {}
 
+        const tickerFn = () => {
+            frameCount++;
             const carriage = plotterCarriageSpriteRef.current;
             const sheet = plotterSheetGfxRef.current;
             const glow = plotterGlowGfxRef.current;
             const progressFill = plotterProgressFillRef.current;
             const progressText = plotterProgressTextRef.current;
 
-            if (!carriage || !sheet || !glow || !progressFill || !progressText) return;
-
-            const stations = getPixiStations();
-            const plotterStation = stations.find(s => s.id === 'plotter1');
-            const isOffline = plotterStation?.estado === 'offline';
-
-            const railMinX = Math.floor((154 - 110) / 2) + 16;
-            const railRange = 66;
-
-            if (isPrinting && !isOffline) {
-                // 1. Animate Printhead Carriage across the rail
-                const sweepSpeed = 0.06;
-                const cosVal = Math.cos(frameCount * sweepSpeed);
-                const sweepRatio = (Math.sin(frameCount * sweepSpeed) + 1) / 2; // 0..1
-
-                // Audio sweep trigger on new stroke pass with 2.5s cooldown
-                if (cosVal >= 0 && prevSweepCos < 0 && Date.now() - lastSweepSoundTime > 2500) {
-                    audioEngine.playPrintSweep();
-                    lastSweepSoundTime = Date.now();
-                }
-                prevSweepCos = cosVal;
-
-                const targetCarriageX = railMinX + sweepRatio * railRange;
-                carriage.x += (targetCarriageX - carriage.x) * 0.2;
-
-                // 2. Animate Printhead Glow with fade-in
-                glow.clear();
-                glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
-                glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
-                glow.alpha += (1 - glow.alpha) * 0.08;
-
-                // 3. Animate Unrolling Printed Sheet with fade-in
-                const cycleProgress = ((frameCount / 3) % 100) / 100;
-                const sheetH = 4 + Math.floor(cycleProgress * 11);
-                sheet.clear();
-                sheet.rect(0, 0, 70, sheetH);
-                sheet.fill({ color: 0xf8fafc });
-                sheet.stroke({ width: 0.5, color: 0x94a3b8 });
-                // CMYK ink bands
-                sheet.rect(4, Math.max(0, sheetH - 4), 62, 3);
-                sheet.fill({ color: 0x06b6d4 });
-                sheet.rect(20, Math.max(0, sheetH - 4), 24, 3);
-                sheet.fill({ color: 0xec4899 });
-                sheet.rect(36, Math.max(0, sheetH - 4), 16, 3);
-                sheet.fill({ color: 0xeab308 });
-                sheet.alpha += (1 - sheet.alpha) * 0.08;
-
-                // 4. Update Floating Progress Bar
-                const percent = Math.floor(cycleProgress * 100);
-                const barWidth = 98;
-                progressFill.clear();
-                progressFill.rect(0, 0, Math.max(2, (barWidth * percent) / 100), 7);
-                progressFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
-                progressFill.alpha += (1 - progressFill.alpha) * 0.08;
-                progressText.text = `OT #${currentJob.ot || currentJob.id} · ${percent}%`;
-
-                // 5. Emit particles at carriage position
-                if (frameCount % 4 === 0) {
-                    emitParticle(108 + carriage.x + 6, 42 + carriage.y + 10, isVip);
-                }
-            } else {
-                // Standby / Offline State with Smooth Lerp Fades
-                // Smoothly park carriage at home position
-                carriage.x += (railMinX - carriage.x) * 0.06;
-
-                // Fade out glow, sheet, and progress fill
-                glow.alpha += (0 - glow.alpha) * 0.08;
-                sheet.alpha += (0 - sheet.alpha) * 0.08;
-                progressFill.alpha += (0 - progressFill.alpha) * 0.08;
-
-                if (isOffline) {
-                    progressText.text = 'OFFLINE';
-                } else {
-                    progressText.text = 'STANDBY (LISTO)';
-                }
+            // Strict guards: if any object is uninitialized or destroyed, exit cleanly
+            if (!carriage || carriage.destroyed ||
+                !sheet || sheet.destroyed ||
+                !glow || glow.destroyed ||
+                !progressFill || progressFill.destroyed ||
+                !progressText || progressText.destroyed) {
+                return;
             }
 
-            // Update particles pool (max 40 items)
-            particlesPoolRef.current.forEach(p => {
-                if (p.active) {
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.life++;
-                    p.gfx.x = p.x;
-                    p.gfx.y = p.y;
-                    p.gfx.alpha = 1 - p.life / p.maxLife;
+            try {
+                const printingOrders = ordersRef.current.filter(o => o.status === 'orden');
+                const isPrinting = printingOrders.length > 0;
+                const currentJob = printingOrders[0];
+                const isVip = Boolean(currentJob && (String(currentJob.batchId || '').includes('VIP') || String(currentJob.ot || '').includes('URG')));
 
-                    if (p.life >= p.maxLife) {
-                        p.active = false;
-                        p.gfx.visible = false;
+                // Refresh offline state every ~3 seconds
+                if (frameCount % 180 === 0) {
+                    try {
+                        const stations = getPixiStations();
+                        const plotterStation = stations.find(s => s.id === 'plotter1');
+                        isPlotterOffline = plotterStation?.estado === 'offline';
+                    } catch (_) {}
+                }
+
+                const railMinX = Math.floor((154 - 110) / 2) + 16;
+                const railRange = 66;
+
+                if (isPrinting && !isPlotterOffline) {
+                    // 1. Animate Printhead Carriage across the rail
+                    const sweepSpeed = 0.06;
+                    const cosVal = Math.cos(frameCount * sweepSpeed);
+                    const sweepRatio = (Math.sin(frameCount * sweepSpeed) + 1) / 2; // 0..1
+
+                    // Audio sweep trigger on new stroke pass with 2.5s cooldown
+                    if (cosVal >= 0 && prevSweepCos < 0 && Date.now() - lastSweepSoundTime > 2500) {
+                        audioEngine.playPrintSweep();
+                        lastSweepSoundTime = Date.now();
+                    }
+                    prevSweepCos = cosVal;
+
+                    const targetCarriageX = railMinX + sweepRatio * railRange;
+                    carriage.x += (targetCarriageX - carriage.x) * 0.2;
+
+                    // 2. Animate Printhead Glow with fade-in
+                    glow.clear();
+                    glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
+                    glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
+                    glow.alpha += (1 - glow.alpha) * 0.08;
+
+                    // 3. Animate Unrolling Printed Sheet with fade-in
+                    const cycleProgress = ((frameCount / 3) % 100) / 100;
+                    const sheetH = 4 + Math.floor(cycleProgress * 11);
+                    sheet.clear();
+                    sheet.rect(0, 0, 70, sheetH);
+                    sheet.fill({ color: 0xf8fafc });
+                    sheet.stroke({ width: 0.5, color: 0x94a3b8 });
+                    // CMYK ink bands
+                    sheet.rect(4, Math.max(0, sheetH - 4), 62, 3);
+                    sheet.fill({ color: 0x06b6d4 });
+                    sheet.rect(20, Math.max(0, sheetH - 4), 24, 3);
+                    sheet.fill({ color: 0xec4899 });
+                    sheet.rect(36, Math.max(0, sheetH - 4), 16, 3);
+                    sheet.fill({ color: 0xeab308 });
+                    sheet.alpha += (1 - sheet.alpha) * 0.08;
+
+                    // 4. Update Floating Progress Bar
+                    const percent = Math.floor(cycleProgress * 100);
+                    const barWidth = 98;
+                    progressFill.clear();
+                    progressFill.rect(0, 0, Math.max(2, (barWidth * percent) / 100), 7);
+                    progressFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
+                    progressFill.alpha += (1 - progressFill.alpha) * 0.08;
+                    const targetProgressText = `OT #${currentJob.ot || currentJob.id} · ${percent}%`;
+                    if (progressText.text !== targetProgressText) {
+                        progressText.text = targetProgressText;
+                    }
+
+                    // 5. Emit particles at carriage position
+                    if (frameCount % 4 === 0) {
+                        emitParticle(108 + carriage.x + 6, 42 + carriage.y + 10, isVip);
+                    }
+                } else {
+                    // Standby / Offline State with Smooth Lerp Fades
+                    carriage.x += (railMinX - carriage.x) * 0.06;
+
+                    glow.alpha += (0 - glow.alpha) * 0.08;
+                    sheet.alpha += (0 - sheet.alpha) * 0.08;
+                    progressFill.alpha += (0 - progressFill.alpha) * 0.08;
+
+                    const targetStandbyText = isPlotterOffline ? 'OFFLINE' : 'STANDBY (LISTO)';
+                    if (progressText.text !== targetStandbyText) {
+                        progressText.text = targetStandbyText;
                     }
                 }
-            });
-        });
+
+                // Update particles pool (max 40 items)
+                particlesPoolRef.current.forEach(p => {
+                    if (p.active && p.gfx && !p.gfx.destroyed) {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.life++;
+                        p.gfx.x = p.x;
+                        p.gfx.y = p.y;
+                        p.gfx.alpha = Math.max(0, 1 - p.life / p.maxLife);
+
+                        if (p.life >= p.maxLife) {
+                            p.active = false;
+                            p.gfx.visible = false;
+                        }
+                    }
+                });
+            } catch (frameErr) {
+                console.warn('Plotter ticker frame skipped:', frameErr);
+            }
+        };
+
+        app.ticker.add(tickerFn);
+        return tickerFn;
     };
 
     return (

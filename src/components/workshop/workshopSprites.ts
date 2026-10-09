@@ -13,6 +13,13 @@ export interface PixelArtDef {
 const textureCache = new Map<string, Texture>();
 
 /**
+ * Checks if a texture and its underlying source are still valid and usable.
+ */
+function isTextureValid(tex: Texture | undefined): boolean {
+    return !!(tex && !tex.destroyed && tex.source && !tex.source.destroyed);
+}
+
+/**
  * Renders a character matrix into an offscreen canvas and returns a Pixi Texture with scaleMode = 'nearest'.
  */
 export function createPixelTexture(
@@ -21,8 +28,9 @@ export function createPixelTexture(
     palette: Record<string, string>,
     pixelScale = 1
 ): Texture {
-    if (textureCache.has(cacheKey)) {
-        return textureCache.get(cacheKey)!;
+    const cached = textureCache.get(cacheKey);
+    if (isTextureValid(cached)) {
+        return cached!;
     }
 
     const height = matrix.length;
@@ -54,20 +62,27 @@ export function createPixelTexture(
         }
     }
 
-    // Pixi v8 Texture.from with nearest scale mode
-    const texture = Texture.from(canvas, {
-        scaleMode: 'nearest'
-    });
+    // Pixi v8 Texture.from with skipCache=true to avoid stale cache issues
+    const texture = Texture.from(canvas, true);
+    if (texture.source) {
+        texture.source.scaleMode = 'nearest';
+    }
 
     textureCache.set(cacheKey, texture);
     return texture;
 }
 
 /**
- * Clears the texture cache on unmount to prevent GPU memory leaks
+ * Safely clears the texture cache if explicit memory reclamation is requested.
  */
 export function destroyTextureCache(): void {
-    textureCache.forEach(tex => tex.destroy(true));
+    textureCache.forEach(tex => {
+        try {
+            if (tex && !tex.destroyed) {
+                tex.destroy(true);
+            }
+        } catch (_) {}
+    });
     textureCache.clear();
 }
 
@@ -248,7 +263,8 @@ export function getSignDenTexture(): Texture {
  */
 export function getPlotterChassisTexture(isOffline = false): Texture {
     const key = isOffline ? 'plotter_chassis_offline' : 'plotter_chassis_online';
-    if (textureCache.has(key)) return textureCache.get(key)!;
+    const cached = textureCache.get(key);
+    if (isTextureValid(cached)) return cached!;
 
     const W = 110;
     const H = 48;
@@ -325,7 +341,10 @@ export function getPlotterChassisTexture(isOffline = false): Texture {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
     ctx.fillRect(16, 28, W - 32, 10);
 
-    const texture = Texture.from(canvas, { scaleMode: 'nearest' });
+    const texture = Texture.from(canvas, true);
+    if (texture.source) {
+        texture.source.scaleMode = 'nearest';
+    }
     textureCache.set(key, texture);
     return texture;
 }
@@ -357,6 +376,10 @@ export function getPlotterPrintheadTexture(): Texture {
  * Vinyl Roll on Feed Core (Loaded on the back)
  */
 export function getPlotterVinylRollTexture(): Texture {
+    const key = 'plotter_vinyl_roll';
+    const cached = textureCache.get(key);
+    if (isTextureValid(cached)) return cached!;
+
     const W = 76;
     const H = 8;
     const canvas = document.createElement('canvas');
@@ -378,7 +401,10 @@ export function getPlotterVinylRollTexture(): Texture {
     ctx.fillRect(0, 0, 3, H);
     ctx.fillRect(W - 3, 0, 3, H);
 
-    const texture = Texture.from(canvas, { scaleMode: 'nearest' });
-    textureCache.set('plotter_vinyl_roll', texture);
+    const texture = Texture.from(canvas, true);
+    if (texture.source) {
+        texture.source.scaleMode = 'nearest';
+    }
+    textureCache.set(key, texture);
     return texture;
 }

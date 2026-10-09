@@ -10,6 +10,44 @@ import { StationId } from './types';
 import { audioEngine } from './AudioEngine';
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal';
 
+interface ErrorBoundaryProps {
+    children: React.ReactNode;
+    fallback: (retry: () => void) => React.ReactNode;
+    onCatch?: (err: Error) => void;
+}
+
+interface ErrorBoundaryState {
+    hasError: boolean;
+    error: Error | null;
+}
+
+class WorkshopPixiErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    constructor(props: ErrorBoundaryProps) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.warn('🩺 [Workshop ErrorBoundary] Interceptado fallo en motor PixiJS:', error, errorInfo);
+        this.props.onCatch?.(error);
+    }
+
+    retry = () => {
+        this.setState({ hasError: false, error: null });
+    };
+
+    render() {
+        if (this.state.hasError) {
+            return this.props.fallback(this.retry);
+        }
+        return this.props.children;
+    }
+}
+
 export const WorkshopDashboard: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [selectedStation, setSelectedStation] = useState<StationId | null>(null);
@@ -185,12 +223,56 @@ export const WorkshopDashboard: React.FC = () => {
                 />
 
                 {rendererType === 'pixi' ? (
-                    <WorkshopCanvasPixi
-                        orders={orders}
-                        onSelectStation={(stationId) => setSelectedStation(stationId)}
-                        onSelectOrder={(order) => setPreviewOrder(order)}
-                        selectedStation={selectedStation}
-                    />
+                    <WorkshopPixiErrorBoundary
+                        onCatch={(err) => {
+                            console.error('Pixi Workshop Error caught by boundary:', err);
+                        }}
+                        fallback={(retry) => (
+                            <div>
+                                <div style={{
+                                    backgroundColor: '#1e293b',
+                                    border: '1px solid #f59e0b',
+                                    borderRadius: '6px',
+                                    padding: '8px 12px',
+                                    marginBottom: '10px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    color: '#f8fafc',
+                                    fontSize: '12px'
+                                }}>
+                                    <span>⚠️ El motor PixiJS experimentó un reinicio. Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
+                                    <button
+                                        onClick={retry}
+                                        style={{
+                                            backgroundColor: '#38bdf8',
+                                            color: '#0f172a',
+                                            border: 'none',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            fontWeight: 'bold',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        🔄 Reintentar Pixi HD
+                                    </button>
+                                </div>
+                                <WorkshopCanvas
+                                    orders={orders}
+                                    onSelectStation={(stationId) => setSelectedStation(stationId)}
+                                    onSelectOrder={(order) => setPreviewOrder(order)}
+                                    selectedStation={selectedStation}
+                                />
+                            </div>
+                        )}
+                    >
+                        <WorkshopCanvasPixi
+                            orders={orders}
+                            onSelectStation={(stationId) => setSelectedStation(stationId)}
+                            onSelectOrder={(order) => setPreviewOrder(order)}
+                            selectedStation={selectedStation}
+                        />
+                    </WorkshopPixiErrorBoundary>
                 ) : (
                     <WorkshopCanvas
                         orders={orders}

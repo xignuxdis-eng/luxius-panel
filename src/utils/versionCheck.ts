@@ -132,6 +132,11 @@ export async function applyPendingUpdateIfSafe(): Promise<void> {
  * actualiza automáticamente el sistema únicamente si es seguro.
  */
 export async function checkServerVersion(): Promise<boolean> {
+    // En desarrollo local Vite gestiona HMR. Jamás recargar automáticamente.
+    if (import.meta.env.DEV) {
+        return false;
+    }
+
     try {
         const res = await fetch(`./version.json?_t=${Date.now()}`, {
             cache: 'no-store',
@@ -165,6 +170,15 @@ export async function checkServerVersion(): Promise<boolean> {
                 return false;
             }
 
+            // Protección estricta contra bucles de recarga (< 15 segundos)
+            const RELOAD_GUARD_KEY = 'luxius_last_version_reload';
+            const lastReload = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || '0');
+            if (Date.now() - lastReload < 15000) {
+                console.warn('[VersionEngine] Recarga reciente detectada (<15s). Bucle evitado.');
+                return false;
+            }
+            sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
+
             localStorage.setItem(VERSION_KEY, serverBuild);
             await purgeServiceWorkersAndCaches();
             window.location.reload();
@@ -180,6 +194,11 @@ export async function checkServerVersion(): Promise<boolean> {
  * Inicializador global del motor de versiones.
  */
 export function initVersionEngine(): void {
+    // En entorno de desarrollo nunca inicializar el detector de versión
+    if (import.meta.env.DEV) {
+        return;
+    }
+
     // 1. Registrar versión local
     localStorage.setItem(VERSION_KEY, CURRENT_BUILD);
 
