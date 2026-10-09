@@ -33,6 +33,7 @@ export interface WorkshopCanvasPixiProps {
     onSelectStation: (stationId: StationId) => void;
     onSelectOrder?: (order: Order) => void;
     selectedStation: StationId | null;
+    onError?: (err: Error) => void;
 }
 
 interface ParticleItem {
@@ -51,11 +52,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     orders,
     onSelectStation,
     onSelectOrder: _onSelectOrder,
-    selectedStation
+    selectedStation,
+    onError
 }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasHostRef = useRef<HTMLDivElement | null>(null);
-    const [hoveredStation, setHoveredStation] = useState<StationId | null>(null);
+    const hoveredStationRef = useRef<StationId | null>(null);
 
     // Refs for real-time synchronization
     const ordersRef = useRef<Order[]>(orders);
@@ -123,7 +125,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         highlightsMapRef.current.forEach((gfx, stationId) => {
             if (!gfx || gfx.destroyed) return;
             const isSelected = selectedStation === stationId;
-            const isHovered = hoveredStation === stationId;
+            const isHovered = hoveredStationRef.current === stationId;
+            const isPlotter = stationId === 'plotter1' || stationId === 'plotter2' || stationId.startsWith('maquina_');
             try {
                 gfx.clear();
                 const parent = gfx.parent as Container;
@@ -131,15 +134,27 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 const boundsH = parent ? (parent as any)._stationH || 66 : 66;
 
                 if (isSelected) {
-                    gfx.rect(-2, -2, boundsW + 4, boundsH + 4);
+                    if (isPlotter) {
+                        const plotterW = Math.min(116, boundsW - 6);
+                        const offX = Math.floor((boundsW - plotterW) / 2);
+                        gfx.roundRect(offX - 2, 10, plotterW + 4, 52, 4);
+                    } else {
+                        gfx.rect(-2, -2, boundsW + 4, boundsH + 4);
+                    }
                     gfx.stroke({ width: 2, color: 0x38bdf8 });
                 } else if (isHovered) {
-                    gfx.rect(-1, -1, boundsW + 2, boundsH + 2);
+                    if (isPlotter) {
+                        const plotterW = Math.min(116, boundsW - 6);
+                        const offX = Math.floor((boundsW - plotterW) / 2);
+                        gfx.roundRect(offX - 2, 10, plotterW + 4, 52, 4);
+                    } else {
+                        gfx.rect(-1, -1, boundsW + 2, boundsH + 2);
+                    }
                     gfx.stroke({ width: 1.5, color: 0xf59e0b });
                 }
             } catch (_) {}
         });
-    }, [selectedStation, hoveredStation]);
+    }, [selectedStation]);
 
     // Audio Ambient
     useEffect(() => {
@@ -183,6 +198,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                 activeApp = app;
                 appRef.current = app;
+                if (typeof window !== 'undefined') {
+                    (window as any).__PIXI_APP__ = app;
+                }
 
                 if (canvasHostRef.current) {
                     canvasHostRef.current.innerHTML = '';
@@ -228,6 +246,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 }
             } catch (initErr) {
                 console.error('Failed to initialize Pixi Application:', initErr);
+                onError?.(initErr instanceof Error ? initErr : new Error(String(initErr)));
             }
         };
 
@@ -279,9 +298,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     if (activeApp.ticker) {
                         activeApp.ticker.stop();
                     }
-                    if (activeApp.stage && !activeApp.stage.destroyed) {
-                        activeApp.stage.destroy({ children: true });
-                    }
                     if (activeApp.renderer && !activeApp.renderer.destroyed) {
                         activeApp.destroy({ removeView: true }, { children: true });
                     }
@@ -290,6 +306,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 }
                 activeApp = null;
                 appRef.current = null;
+                if (typeof window !== 'undefined') {
+                    (window as any).__PIXI_APP__ = null;
+                }
             }
 
             if (canvasHostRef.current) {
@@ -365,19 +384,19 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             layer.addChild(wallSprite);
         }
 
-        // 3 Low-glare industrial windows
-        const windowPositions = [48, 208, 368];
+        // 3 Large Low-glare industrial windows (enlarged)
+        const windowPositions = [36, 176, 356];
         windowPositions.forEach(wx => {
             const winSprite = new Sprite(texWindow);
             winSprite.x = wx;
-            winSprite.y = 12;
+            winSprite.y = 11;
             layer.addChild(winSprite);
         });
 
-        // "DEN" Sign
+        // "DEN" Sign (enlarged, centered above workshop core)
         const denSign = new Sprite(texSignDen);
-        denSign.x = 228;
-        denSign.y = 14;
+        denSign.x = 226;
+        denSign.y = 11;
         layer.addChild(denSign);
 
         // B. Floor Tiles (32x32 px large slabs, soft slate-blue tone)
@@ -430,6 +449,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const emitParticle = (x: number, y: number, isVip: boolean) => {
         const p = particlesPoolRef.current.find(item => !item.active);
         if (!p) return;
+        if (!p.gfx || p.gfx.destroyed) return;
 
         p.active = true;
         p.x = x + (Math.random() * 8 - 4);
@@ -440,13 +460,17 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         p.maxLife = 24 + Math.floor(Math.random() * 16);
         p.color = isVip ? 0xfbbf24 : (Math.random() > 0.4 ? 0x38bdf8 : 0xffffff);
 
-        p.gfx.clear();
-        p.gfx.rect(0, 0, isVip ? 2 : 1.5, isVip ? 2 : 1.5);
-        p.gfx.fill({ color: p.color });
-        p.gfx.x = p.x;
-        p.gfx.y = p.y;
-        p.gfx.alpha = 0.9;
-        p.gfx.visible = true;
+        try {
+            p.gfx.clear();
+            p.gfx.rect(0, 0, isVip ? 2 : 1.5, isVip ? 2 : 1.5);
+            p.gfx.fill({ color: p.color });
+            p.gfx.x = p.x;
+            p.gfx.y = p.y;
+            p.gfx.alpha = 0.9;
+            p.gfx.visible = true;
+        } catch (_) {
+            p.active = false;
+        }
     };
 
     /**
@@ -470,33 +494,37 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             (visualContainer as any)._stationW = width;
             (visualContainer as any)._stationH = height;
 
-            // Base Floor Platform
-            const baseGfx = new Graphics();
-            baseGfx.rect(0, 0, width, height);
-            baseGfx.fill({ color: 0x161c24, alpha: 0.96 });
-            baseGfx.stroke({ width: 1, color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
-            visualContainer.addChild(baseGfx);
+            const isPlotter = id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_');
 
-            // Title Bar
-            const headerGfx = new Graphics();
-            headerGfx.rect(0, 0, width, 14);
-            headerGfx.fill({ color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
-            visualContainer.addChild(headerGfx);
+            if (!isPlotter) {
+                // Base Floor Platform for normal workshop stations
+                const baseGfx = new Graphics();
+                baseGfx.rect(0, 0, width, height);
+                baseGfx.fill({ color: 0x161c24, alpha: 0.96 });
+                baseGfx.stroke({ width: 1, color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
+                visualContainer.addChild(baseGfx);
 
-            // Station Title Text (Concise: "Diseño", "Plotter", "Insumos", etc.)
-            const titleStyle = new TextStyle({
-                fontFamily: 'monospace',
-                fontSize: 9,
-                fontWeight: 'bold',
-                fill: '#ffffff'
-            });
-            const titleText = new Text({
-                text: `${icon} ${title}`,
-                style: titleStyle
-            });
-            titleText.x = 4;
-            titleText.y = 1;
-            visualContainer.addChild(titleText);
+                // Title Bar
+                const headerGfx = new Graphics();
+                headerGfx.rect(0, 0, width, 14);
+                headerGfx.fill({ color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
+                visualContainer.addChild(headerGfx);
+
+                // Station Title Text (Concise: "Diseño", "Insumos", etc.)
+                const titleStyle = new TextStyle({
+                    fontFamily: 'monospace',
+                    fontSize: 9,
+                    fontWeight: 'bold',
+                    fill: '#ffffff'
+                });
+                const titleText = new Text({
+                    text: `${icon} ${title}`,
+                    style: titleStyle
+                });
+                titleText.x = 4;
+                titleText.y = 1;
+                visualContainer.addChild(titleText);
+            }
 
             // Selection / Hover Highlight Frame
             const highlightGfx = new Graphics();
@@ -505,9 +533,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
             // Notification Badge (Counter)
             const badgeContainer = new Container();
-            badgeContainer.x = width - 8;
-            badgeContainer.y = -2;
-
             const badgeBg = new Graphics();
             badgeBg.circle(0, 0, 7.5);
             badgeBg.fill({ color: 0xef4444 });
@@ -531,62 +556,90 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             visualContainer.addChild(badgeContainer);
 
             // ================================================================
-            // FASE 2: DETAILED GRAND FORMAT PLOTTER STATION
+            // FASE 2: DETAILED GRAND FORMAT PLOTTER STATION (Sin marco de tarjeta)
             // ================================================================
-            if (id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_')) {
+            let plotterOffsetX = 0;
+            let plotterOffsetY = 14;
+            let plotterActualW = 110;
+
+            if (isPlotter) {
                 const isOffline = station.estado === 'offline';
-                const plotterW = Math.min(110, width - 8);
-                const offsetX = Math.floor((width - plotterW) / 2);
-                const offsetY = 16;
+                plotterActualW = Math.min(116, width - 6);
+                plotterOffsetX = Math.floor((width - plotterActualW) / 2);
+                plotterOffsetY = 14;
+
+                // Cartel pequeño de nombre exclusivo para la máquina
+                const nameplate = new Container();
+                const nameplateBg = new Graphics();
+                nameplateBg.roundRect(0, 0, 78, 11, 2);
+                nameplateBg.fill({ color: 0x0f172a, alpha: 0.9 });
+                nameplateBg.stroke({ width: 1, color: isOffline ? 0x64748b : 0x38bdf8 });
+                nameplate.addChild(nameplateBg);
+
+                const nameStyle = new TextStyle({
+                    fontFamily: 'monospace',
+                    fontSize: 7,
+                    fontWeight: 'bold',
+                    fill: isOffline ? '#94a3b8' : '#ffffff'
+                });
+                const nameText = new Text({ text: `${icon} ${title}`, style: nameStyle });
+                nameText.x = 4;
+                nameText.y = 1;
+                nameplate.addChild(nameText);
+                nameplate.x = plotterOffsetX;
+                nameplate.y = plotterOffsetY - 13;
+                visualContainer.addChild(nameplate);
+
+                // Badge posicionado en la esquina superior derecha del plotter
+                badgeContainer.x = plotterOffsetX + plotterActualW - 4;
+                badgeContainer.y = plotterOffsetY - 7;
 
                 // 1. Rear Vinyl Roll
                 const rollSprite = new Sprite(getPlotterVinylRollTexture());
-                rollSprite.x = offsetX + 17;
-                rollSprite.y = offsetY + 3;
+                rollSprite.x = plotterOffsetX + 17;
+                rollSprite.y = plotterOffsetY + 3;
                 visualContainer.addChild(rollSprite);
 
                 // 2. Unrolling Printed Vinyl Sheet (Front catch tray)
                 const sheetGfx = new Graphics();
-                sheetGfx.x = offsetX + 20;
-                sheetGfx.y = offsetY + 24;
+                sheetGfx.x = plotterOffsetX + 20;
+                sheetGfx.y = plotterOffsetY + 24;
                 sheetGfx.alpha = 0;
                 visualContainer.addChild(sheetGfx);
 
                 // 3. Main Plotter Roland Chassis
                 const chassisSprite = new Sprite(getPlotterChassisTexture(isOffline));
-                chassisSprite.x = offsetX;
-                chassisSprite.y = offsetY;
+                chassisSprite.x = plotterOffsetX;
+                chassisSprite.y = plotterOffsetY;
                 visualContainer.addChild(chassisSprite);
 
                 // 4. Moving Printhead Carriage
                 const carriageSprite = new Sprite(getPlotterPrintheadTexture());
-                carriageSprite.x = offsetX + 24;
-                carriageSprite.y = offsetY + 15;
+                carriageSprite.x = plotterOffsetX + 24;
+                carriageSprite.y = plotterOffsetY + 15;
                 visualContainer.addChild(carriageSprite);
 
-                // 5. Printing Light / Glow (blendMode add)
+                // 5. Printing Light / Glow (anclado en cabezal sin doble offset)
                 const glowGfx = new Graphics();
                 glowGfx.blendMode = 'add';
-                glowGfx.x = offsetX + 24;
-                glowGfx.y = offsetY + 20;
                 glowGfx.alpha = 0;
                 visualContainer.addChild(glowGfx);
 
                 // 6. Real-time Status LED on control panel
                 const statusLed = new Graphics();
-                statusLed.x = offsetX + plotterW - 22;
-                statusLed.y = offsetY + 19;
+                statusLed.x = plotterOffsetX + plotterActualW - 22;
+                statusLed.y = plotterOffsetY + 19;
                 statusLed.rect(0, 0, 3, 3);
                 statusLed.fill({ color: isOffline ? 0x334155 : 0x22c55e });
                 visualContainer.addChild(statusLed);
 
-                // 7. Floating Progress Bar (Top of plotter)
+                // 7. Floating Progress / Activity Bar anclada justo sobre la máquina
                 const barContainer = new Container();
-                barContainer.x = offsetX + 6;
-                barContainer.y = -9;
+                barContainer.x = plotterOffsetX + 6;
+                barContainer.y = plotterOffsetY - 2;
 
                 const barBg = new Graphics();
-                barBg.rect(0, 0, plotterW - 12, 7);
+                barBg.rect(0, 0, plotterActualW - 12, 6);
                 barBg.fill({ color: 0x0f172a, alpha: 0.9 });
                 barBg.stroke({ width: 1, color: 0x334155 });
                 barContainer.addChild(barBg);
@@ -597,13 +650,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                 const progressStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 6,
+                    fontSize: 5.5,
                     fontWeight: 'bold',
                     fill: '#ffffff'
                 });
                 const progressText = new Text({ text: isOffline ? 'OFFLINE' : 'STANDBY (LISTO)', style: progressStyle });
-                progressText.x = (plotterW - 12) / 2;
-                progressText.y = 3.5;
+                progressText.x = (plotterActualW - 12) / 2;
+                progressText.y = 3;
                 progressText.anchor.set(0.5);
                 barContainer.addChild(progressText);
 
@@ -620,9 +673,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     statusLed,
                     isOffline,
                     maquinaId: station.maquinaId,
-                    baseX: x + offsetX,
-                    baseY: y + offsetY,
-                    width: plotterW
+                    baseX: x,
+                    baseY: y,
+                    width: plotterActualW
                 });
 
                 if (id === 'plotter1') {
@@ -632,6 +685,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     plotterProgressFillRef.current = barFill;
                     plotterProgressTextRef.current = progressText;
                 }
+            } else {
+                badgeContainer.x = width - 8;
+                badgeContainer.y = -2;
             }
 
             stationsLayer.addChild(visualContainer);
@@ -647,27 +703,36 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             hitArea.hitArea = new Rectangle(0, 0, width, height);
 
             hitArea.on('pointerover', () => {
-                setHoveredStation(id);
+                hoveredStationRef.current = id;
                 highlightGfx.clear();
-                highlightGfx.rect(-1, -1, width + 2, height + 2);
-                highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
+                if (isPlotter) {
+                    highlightGfx.roundRect(plotterOffsetX - 2, plotterOffsetY - 4, plotterActualW + 4, 52, 4);
+                    highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
+                } else {
+                    highlightGfx.rect(-1, -1, width + 2, height + 2);
+                    highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
+                }
 
                 // If hovering Plotter, display rich Hover HUD Tooltip inside canvas
-                if ((id.startsWith('plotter') || id.startsWith('maquina_')) && tooltipContainerRef.current) {
+                if (isPlotter && tooltipContainerRef.current) {
                     updatePlotterTooltip(id);
                     tooltipContainerRef.current.visible = true;
                 }
             });
 
             hitArea.on('pointerout', () => {
-                setHoveredStation(null);
+                hoveredStationRef.current = null;
                 highlightGfx.clear();
                 if (selectedStationRef.current === id) {
-                    highlightGfx.rect(-2, -2, width + 4, height + 4);
+                    if (isPlotter) {
+                        highlightGfx.roundRect(plotterOffsetX - 2, plotterOffsetY - 4, plotterActualW + 4, 52, 4);
+                    } else {
+                        highlightGfx.rect(-2, -2, width + 4, height + 4);
+                    }
                     highlightGfx.stroke({ width: 2, color: 0x38bdf8 });
                 }
 
-                if ((id.startsWith('plotter') || id.startsWith('maquina_')) && tooltipContainerRef.current) {
+                if (isPlotter && tooltipContainerRef.current) {
                     tooltipContainerRef.current.visible = false;
                 }
             });
@@ -750,11 +815,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         const current = printingOrders[0];
         const m2 = (Number(current.ancho || 1) * Number(current.alto || 1)).toFixed(2);
         tooltipTextRef.current.text =
-            `🖨️ EN PRODUCCIÓN: OT #${current.ot || current.id}\n` +
+            `🖨️ SIGUIENTE EN COLA: OT #${current.ot || current.id}\n` +
             `Cliente: ${current.clienteNombre || 'Sin Cliente'}\n` +
             `Medidas: ${current.ancho}x${current.alto}m (${m2} m²)\n` +
             `Material: ${current.material || 'Vinilo'}\n` +
-            `Cola: ${printingOrders.length} ordenes en cola`;
+            `Cola: ${printingOrders.length} orden${printingOrders.length === 1 ? '' : 'es'} en espera`;
     };
 
     /**
@@ -817,9 +882,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         const targetCarriageX = railMinX + sweepRatio * railRange;
                         carriage.x += (targetCarriageX - carriage.x) * 0.2;
 
-                        // 2. Glow
+                        // 2. Glow (centrado con precisión en el cabezal de impresión, sin desfasajes)
                         glow.clear();
-                        glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
+                        glow.circle(carriage.x + 6, carriage.y + 4, 6);
                         glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
                         glow.alpha += (1 - glow.alpha) * 0.08;
 
@@ -837,19 +902,34 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         sheet.fill({ color: 0xeab308 });
                         sheet.alpha += (1 - sheet.alpha) * 0.08;
 
-                        // 4. Progress bar (estático 65% del legacy WorkshopCanvas.tsx:447, sin simulación)
+                        // NOTA TÉCNICA: En Luxius, el estado 'orden' representa una orden ingresada/enviada a taller
+                        // que se encuentra "en cola" de espera para impresión en máquina, no un estado de impresión en tiempo real.
+                        // No se calculan porcentajes ni progresos simulados hasta contar con telemetría directa de hardware.
+                        // 4. Barra de actividad indeterminada animada (sin números ni porcentajes inventados)
                         const barWidth = plotterW - 12;
+                        const barH = 6;
                         barFill.clear();
-                        barFill.rect(0, 0, Math.floor(barWidth * 0.65), 7);
-                        barFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
+                        barFill.rect(0, 0, barWidth, barH);
+                        barFill.fill({ color: 0x0f172a, alpha: 0.85 });
+                        // Haz de luz en movimiento horizontal continuo (estilo barra indeterminada)
+                        const beamW = Math.floor(barWidth * 0.35);
+                        const beamOffset = ((frameCount * 1.5 + pIdx * 25) % (barWidth + beamW)) - beamW;
+                        const beamStart = Math.max(0, beamOffset);
+                        const beamEnd = Math.min(barWidth, beamOffset + beamW);
+                        if (beamEnd > beamStart) {
+                            barFill.rect(beamStart, 0, beamEnd - beamStart, barH);
+                            barFill.fill({ color: isVip ? 0xfbbf24 : 0x0ea5e9 });
+                        }
                         barFill.alpha += (1 - barFill.alpha) * 0.08;
 
-                        const targetProgressText = `OT #${assignedOrder.ot || assignedOrder.id} · 65%`;
+                        const targetProgressText = assignedOrder
+                            ? `SIGUIENTE EN COLA: OT #${assignedOrder.ot || assignedOrder.id}`
+                            : 'STANDBY (LISTO)';
                         if (progressText.text !== targetProgressText) {
                             progressText.text = targetProgressText;
                         }
 
-                        // 5. LED azul activo durante impresión
+                        // 5. LED azul activo durante proceso
                         statusLed.clear();
                         statusLed.rect(0, 0, 3, 3);
                         statusLed.fill({ color: 0x38bdf8 });

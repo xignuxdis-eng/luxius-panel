@@ -86,6 +86,17 @@ export function destroyTextureCache(): void {
     textureCache.clear();
 }
 
+export function getTextureCacheSize(): number {
+    let count = 0;
+    textureCache.forEach(tex => {
+        if (tex && !tex.destroyed) count++;
+    });
+    return count;
+}
+if (typeof window !== 'undefined') {
+    (window as any).__GET_TEXTURE_CACHE_SIZE__ = getTextureCacheSize;
+}
+
 /* ==========================================================================
    PALETTES: Refined, Low-Contrast Slate-Blue Workshop Palette
    ========================================================================== */
@@ -208,17 +219,19 @@ export function getWallTileTexture(): Texture {
 
 export function getWindowTexture(): Texture {
     const matrix = [
-        'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'FGGLLLLLLLLGGGGGGGGGGLLLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGGGGGLLLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGGGGGLLLLLLLLGGW',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'FGGLLLLLLLLGGGGGGGGGGLLLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGGGGGLLLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGGGGGLLLLLLLLGGW',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW'
+        'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
+        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
+        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
+        'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW'
     ];
     const palette = {
         'F': '#475569',
@@ -226,20 +239,23 @@ export function getWindowTexture(): Texture {
         'G': '#0f172a',
         'L': '#38bdf8'
     };
-    return createPixelTexture('window_32x11', matrix, palette);
+    return createPixelTexture('window_large_v2', matrix, palette);
 }
 
 export function getSignDenTexture(): Texture {
     const matrix = [
-        '####################',
-        '#RRRRRRRRRRRRRRRRRR#',
-        '#R.DD..EEE.N...N..R#',
-        '#R.D.D.E...NN..N..R#',
-        '#R.D.D.EE..N.N.N..R#',
-        '#R.D.D.E...N..NN..R#',
-        '#R.DD..EEE.N...N..R#',
-        '#RRRRRRRRRRRRRRRRRR#',
-        '####################'
+        '############################',
+        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
+        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
+        '#R..DDD...EEEEE..N....N...R#',
+        '#R..D..D..E......NN...N...R#',
+        '#R..D..D..EEEE...N.N..N...R#',
+        '#R..D..D..E......N..N.N...R#',
+        '#R..D..D..E......N...NN...R#',
+        '#R..DDD...EEEEE..N....N...R#',
+        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
+        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
+        '############################'
     ];
     const palette = {
         '#': '#0f172a',
@@ -249,7 +265,7 @@ export function getSignDenTexture(): Texture {
         'N': '#ffffff',
         '.': '#ef4444'
     };
-    return createPixelTexture('sign_den', matrix, palette);
+    return createPixelTexture('sign_den_large_v2', matrix, palette);
 }
 
 /* ==========================================================================
