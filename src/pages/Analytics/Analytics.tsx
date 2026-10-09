@@ -39,6 +39,7 @@ function computeDashboardFromOrders(orders: Order[], rawMateriales: Material[] =
     let m2Sold = 0;
     let m2Printed = 0;
     const clientTotals: Record<string, number> = {};
+    const clientM2Totals: Record<string, number> = {};
     const materialTotals: Record<string, number> = {};
     const serviceCounts: Record<string, number> = {};
     const monthlyStats: Record<string, { billing: number; sold: number; printed: number; month: string }> = {};
@@ -55,11 +56,14 @@ function computeDashboardFromOrders(orders: Order[], rawMateriales: Material[] =
         const cname = o.clienteNombre || (o as any).clientName || 'Cliente General';
         clientTotals[cname] = (clientTotals[cname] || 0) + tot;
 
-        const w = Number(o.ancho) || 0;
-        const h = Number(o.alto) || 0;
+        const rawW = Number(o.ancho) || 0;
+        const rawH = Number(o.alto) || 0;
+        const w = rawW > 20 ? rawW / 100 : rawW;
+        const h = rawH > 20 ? rawH / 100 : rawH;
         const c = Number(o.copias) || 1;
-        const m2 = Math.round(w * h * c * 1000) / 1000;
+        const m2 = Math.round(w * h * c * 100) / 100;
         m2Sold += m2;
+        clientM2Totals[cname] = (clientM2Totals[cname] || 0) + m2;
 
         const isPrinted = ['impreso', 'post', 'completo', 'entregado', 'finalizado'].includes(o.status);
         if (isPrinted) {
@@ -183,13 +187,16 @@ function computeDashboardFromOrders(orders: Order[], rawMateriales: Material[] =
             efficiencyByMaterial: materialData.slice(0, 4).map(m => ({ name: m.name, efficiency: 96, status: 'good' })),
             stockForecast: materialData.slice(0, 3).map(m => ({ material: m.name, avgDaily: Math.round(m.value / 30) || 5, daysRemaining: 25, status: 'good' })),
             leakage: [],
-            profitability: Object.entries(clientTotals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([cliente, facturacion]) => ({
-                cliente,
-                facturacion: Math.round(facturacion),
-                m2Facturado: 0,
-                m2Real: 0,
-                ratio: 1.0
-            }))
+            profitability: Object.entries(clientTotals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([cliente, facturacion]) => {
+                const clientM2 = Math.round((clientM2Totals[cliente] || 0) * 100) / 100;
+                return {
+                    cliente,
+                    facturacion: Math.round(facturacion),
+                    m2Facturado: clientM2,
+                    m2Real: clientM2,
+                    ratio: clientM2 > 0 ? Math.round(facturacion / clientM2) : 0
+                };
+            })
         }
     };
 }
@@ -200,10 +207,12 @@ function buildStatsFromOrders(orders: Order[]): PrinterStat[] {
     return orders
         .filter(o => printedStatuses.includes(o.status))
         .map((o) => {
-            const w = Number(o.ancho) || 0;
-            const h = Number(o.alto) || 0;
+            const rawW = Number(o.ancho) || 0;
+            const rawH = Number(o.alto) || 0;
+            const w = rawW > 20 ? rawW / 100 : rawW;
+            const h = rawH > 20 ? rawH / 100 : rawH;
             const c = Number(o.copias) || 1;
-            const m2 = Math.round(w * h * c * 1000) / 1000;
+            const m2 = Math.round(w * h * c * 100) / 100;
             const inkPerChannel = Math.round(m2 * ML_PER_M2_PER_CHANNEL * 100) / 100;
             const ts = o.createdAt || new Date().toISOString();
             return {
@@ -569,16 +578,20 @@ export default function Analytics() {
                                         {(dashboardData.intelligence?.profitability || []).map((c: any, idx: number) => {
                                             const clientName = c.cliente || c.name || `Cliente ${idx + 1}`;
                                             const billingVal = Number(c.facturacion ?? c.billing ?? 0);
-                                            const m2Val = Number(c.m2Real || c.m2Facturado || 1);
-                                            const indexVal = Number(c.index ?? (billingVal > 0 ? Math.round(billingVal / Math.max(1, m2Val)) : 3500));
+                                            const m2Val = Number(c.m2Facturado || c.m2Real || c.m2 || 0);
+                                            const indexVal = Number(c.ratio ?? (m2Val > 0 ? Math.round(billingVal / m2Val) : 0));
                                             return (
                                                 <tr key={clientName + idx}>
                                                     <td><span className="leakage-ot">{idx + 1}. {clientName}</span></td>
                                                     <td>${billingVal.toLocaleString()}</td>
-                                                    <td><span className="profit-index">${indexVal.toLocaleString()}</span></td>
                                                     <td>
-                                                        <div className={`efficiency-badge badge-${indexVal > 5000 ? 'success' : (indexVal > 3000 ? 'warning' : 'danger')}`}>
-                                                            {indexVal > 5000 ? 'Premium' : (indexVal > 3000 ? 'Standard' : 'Bajo Margen')}
+                                                        <span className="profit-index">
+                                                            {indexVal > 0 ? `$${indexVal.toLocaleString()}/m² (${m2Val.toFixed(1)} m²)` : '—'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className={`efficiency-badge badge-${indexVal > 15000 ? 'success' : (indexVal > 8000 ? 'warning' : 'danger')}`}>
+                                                            {indexVal > 15000 ? 'Premium' : (indexVal > 8000 ? 'Standard' : 'Bajo Margen')}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -971,7 +984,7 @@ function AnalyticsDetailModal({ type, isOpen, onClose, data, filters, setFilters
                                 <td>{o.clienteNombre}</td>
                                 <td>{o.material}</td>
                                 <td>{new Date(o.fecha).toLocaleDateString()}</td>
-                                <td style={{ textAlign: 'right' }}>{o.m2Sold?.toFixed(2) || '0.00'}</td>
+                                <td style={{ textAlign: 'right' }}>{(Number(o.m2 ?? o.m2Sold ?? 0)).toFixed(2)}</td>
                             </tr>
                         )) : (
                             <tr><td colSpan={5} className="text-center p-4">No hay datos de venta registrados.</td></tr>

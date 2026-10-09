@@ -342,7 +342,9 @@ function InkCoverageWidget() {
                 ]
 
                 const estimates = inks.map(inkType => {
-                    const stockLiters = (materiales as any[])
+                    let totalStockMl = 0
+
+                    ;(materiales as any[])
                         .filter((m: any) => {
                             if (!m) return false
                             const desc = `${m.descripcion || ''} ${m.codigo || ''}`.toLowerCase()
@@ -351,15 +353,24 @@ function InkCoverageWidget() {
 
                             return inkType.matcher.some(term => desc.includes(term))
                         })
-                        .reduce((sum: number, m: any) => sum + (Number(m.stockActual) || 0), 0)
+                        .forEach((m: any) => {
+                            const rawStock = Number(m.stockActual) || 0
+                            // En Stock.tsx los tanques se manejan en ml (capacidad 2000ml, alerta 300ml).
+                            // Si el valor ingresado es > 20, ya viene en mililitros (ej: 500 ml).
+                            // Si es <= 20, representa litros directos (ej: 2 L = 2000 ml).
+                            const tankMl = rawStock > 20 ? rawStock : rawStock * 1000
+                            const sealedMl = (Number(m.botellasCerradas) || 0) * 1000 + (Number(m.botellasMl) || 0)
+                            totalStockMl += (tankMl + sealedMl)
+                        })
 
-                    const stockmL = stockLiters * 1000
                     const usagePerM2 = avgUsage[inkType.code.toLowerCase()] || 3.0
-                    const capacityM2 = usagePerM2 > 0 ? stockmL / usagePerM2 : 0
+                    const capacityM2 = usagePerM2 > 0 ? totalStockMl / usagePerM2 : 0
+                    const stockLiters = totalStockMl / 1000
 
                     return {
                         ...inkType,
                         stockLiters,
+                        totalStockMl,
                         avgUsage,
                         capacityM2
                     }
@@ -386,14 +397,13 @@ function InkCoverageWidget() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Autonomía Estimada de Tinta</h3>
                 <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>
-                    Limita: <strong style={{ color: minmetrics?.color === '#dddddd' ? '#fff' : minmetrics?.color }}>{minmetrics?.name}</strong> (~{Math.floor(minmetrics?.capacityM2).toLocaleString()} m²)
+                    Limita: <strong style={{ color: minmetrics?.color === '#dddddd' ? '#fff' : minmetrics?.color }}>{minmetrics?.name}</strong> (~{Math.round(minmetrics?.capacityM2 || 0).toLocaleString('es-AR')} m²)
                 </div>
             </div>
 
             <div className="ink-bars" style={{ display: 'flex', gap: '1rem', height: '120px', alignItems: 'flex-end', justifyContent: 'space-around' }}>
                 {coverage.map(ink => {
-                    // Scale height relative to the max capacity or a fixed reliable max (e.g. 2000 m2) to visualize
-                    // Or just relative to each other. Let's do relative to max in set.
+                    // Scale height relative to the max capacity or a fixed reliable max to visualize
                     const maxInSet = Math.max(...coverage.map(c => c.capacityM2))
                     const heightPercent = maxInSet > 0 ? (ink.capacityM2 / maxInSet) * 100 : 0
 
@@ -427,11 +437,13 @@ function InkCoverageWidget() {
                                     color: '#000',
                                     textShadow: '0 0 2px rgba(255,255,255,0.8)'
                                 }}>
-                                    {Math.floor(ink.capacityM2).toLocaleString()} m²
+                                    {Math.round(ink.capacityM2).toLocaleString('es-AR')} m²
                                 </div>
                             </div>
                             <div style={{ marginTop: '6px', fontSize: '0.8rem', fontWeight: 600 }}>{ink.name}</div>
-                            <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>{ink.stockLiters.toFixed(1)} L</div>
+                            <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                                {ink.stockLiters < 1 ? `${Math.round(ink.totalStockMl)} ml` : `${ink.stockLiters.toFixed(2)} L`}
+                            </div>
                         </div>
                     )
                 })}

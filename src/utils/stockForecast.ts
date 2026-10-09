@@ -60,12 +60,20 @@ function severityOf(restante: number, minimo: number): ForecastSeverity {
 
 function orderConsumption(order: Order, mat: Material | undefined): number {
     if (mat && mat.tipoCobro === 'ml') {
-        return toNum(order.consumoEstimado ?? order.precioDetalle?.consumoML)
+        const mlVal = toNum(order.consumoEstimado ?? order.precioDetalle?.consumoML)
+        if (mlVal > 0) return mlVal
+        const h = toNum(order.alto)
+        const realH = h > 20 ? h / 100 : h
+        return realH * toNum(order.copias || 1)
     }
     if (mat && (mat.unidad === 'un' || mat.unidad === 'plancha' || mat.unidad === 'Litros')) {
         return toNum(order.copias || 1)
     }
-    return toNum(order.ancho) * toNum(order.alto) * toNum(order.copias || 1)
+    const w = toNum(order.ancho)
+    const h = toNum(order.alto)
+    const realW = w > 20 ? w / 100 : w
+    const realH = h > 20 ? h / 100 : h
+    return realW * realH * toNum(order.copias || 1)
 }
 
 export function computeStockForecast(orders: Order[], materials: Material[]): StockForecast {

@@ -152,8 +152,10 @@ export default function Reportes() {
             totalSena += sena
             totalSaldo += saldo
 
-            const w = Number(o.ancho) || 0
-            const h = Number(o.alto) || 0
+            const rawW = Number(o.ancho) || 0
+            const rawH = Number(o.alto) || 0
+            const w = rawW > 20 ? rawW / 100 : rawW
+            const h = rawH > 20 ? rawH / 100 : rawH
             const c = Number(o.copias) || 1
             totalM2 += (w * h * c)
         })

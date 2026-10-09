@@ -928,6 +928,30 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Compilación y Build Verificado**:
   - `npm run build` ejecutado en 6.36s con cero errores de TypeScript y CSS.
 
+### Sesión 09/10/2026 (2ª parte): Normalización de Métricas de Superficie (m²), Autonomía de Tintas y Protección Dimensional (completado)
+- [x] **Diagnóstico de Métricas Infladas a Miles de m²**:
+  - **Autonomía de Tintas en Dashboard (`Dashboard.tsx`)**: En `materiales`, los tanques de tinta (Cyan, Magenta, Yellow, Black) poseen `stockActual: 500` (almacenado en mililitros, según los subtanques de 2000 ml definidos en `Stock.tsx`). El Dashboard multiplicaba erróneamente `stockActual * 1000` asumiendo que eran litros, convirtiendo 500 ml en 500.000 ml. Al dividir por el consumo de 3.0 ml/m², arrojaba un falso astronómico de **166.666 m²** (y subtítulo de cuello de botella de `~142.857 m²`).
+  - **Métricas de Rentabilidad y Desglose en Analytics (`Analytics.tsx` y `luXius-Backend/app.py`)**: El modal de detalle leía `o.m2Sold` en vez de `o.m2`, y la tabla de rentabilidad por cliente mantenía `m2Facturado: 0` y `m2Real: 0` hardcodeados, defaulting a 1 y arrojando ratios anómalos de millones de $/m².
+  - **Discrepancia Dimensional cm vs m**: Si una orden se cargaba o importaba con cotas en centímetros (ej. 100 × 200) sin previa conversión métrica, el producto bruto generaba cotizaciones y consumos de 20.000 m².
+- [x] **Corrección de Autonomía de Tintas y Subtanques (`Dashboard.tsx`)**:
+  - Normalización inteligente de unidades: si `rawStock > 20` se interpreta como mL de subtanque; si `<= 20` como Litros. Se suma además el stock de botellas cerradas de repuesto en mL.
+  - Cálculo de capacidad real de impresión: $500\text{ ml} / 3\text{ ml/m}^2 = 167\text{ m}^2$.
+  - Formato amigable de volumen (`< 1 L` muestra mililitros ej. `500 ml`; `>= 1 L` muestra litros ej. `1.50 L`) y metraje legible con separador de miles local (`Math.round(ink.capacityM2).toLocaleString('es-AR') + ' m²'`).
+- [x] **Normalización de Rentabilidad y Detalle en Analytics (`Analytics.tsx` y `app.py`)**:
+  - Implementada agregación de metros cuadrados acumulados por cliente (`clientM2Totals` en frontend y backend).
+  - Cálculo dinámico de facturación por m² (`totalVentas / totalM2`) eliminando valores falsos en cero.
+  - Corrección de columna en `AnalyticsDetailModal` leyendo `Number(o.m2 ?? o.m2Sold ?? 0)`.
+- [x] **Blindaje Dimensional Global (Anti-Discrepancia cm/m)**:
+  - Aplicada regla defensiva `raw > 20 ? raw / 100 : raw` en todos los puntos de cálculo de m²:
+    - `src/pages/Impresion/Impresion.tsx` (cálculo de m² en tabla y estadísticas de cola).
+    - `src/pages/Reportes/Reportes.tsx` (KPI total de m² impresos).
+    - `src/pages/Entrada/Entrada.tsx` (desglose de consumo).
+    - `src/utils/pricingCalculator.ts` (cálculo de cotizaciones detalladas).
+    - `src/utils/ripLogReconcile.ts` (reconciliación de logs RIP).
+    - `src/utils/stockForecast.ts` (pronóstico de agotamiento de stock).
+- [x] **Verificación y Compilación**:
+  - `npm run build` ejecutado exitosamente en 6.38s con cero errores de TypeScript y bundle limpio.
+
 ---
 
 ### 🔮 Roadmap Maestro de Cambios Futuros (Guía de Implementación Paso a Paso para Cualquier Modelo de IA)

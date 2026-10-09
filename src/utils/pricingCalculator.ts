@@ -40,8 +40,8 @@ export function calculateItemPriceDetailed(
         String(m.codigo).toLowerCase() === String(materialCode).toLowerCase()
     );
 
-    let w = round2(rawW);
-    let h = round2(rawH);
+    let w = round2(rawW > 20 ? rawW / 100 : rawW);
+    let h = round2(rawH > 20 ? rawH / 100 : rawH);
 
     // Si hay demasias activas (lona), agregar 5cm (0.05m) por lado
     if (demasiasConfig) {

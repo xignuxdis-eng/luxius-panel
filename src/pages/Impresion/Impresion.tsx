@@ -171,15 +171,31 @@ export default function Impresion() {
                                         <span className="material-tag-sm">{order.material}</span>
                                     </td>
                                     <td>
-                                        <span className="dims-text">{Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m</span>
+                                        {(() => {
+                                            const rawW = Number(order.ancho) || 0;
+                                            const rawH = Number(order.alto) || 0;
+                                            const realW = rawW > 20 ? rawW / 100 : rawW;
+                                            const realH = rawH > 20 ? rawH / 100 : rawH;
+                                            return <span className="dims-text">{realW.toFixed(2)} x {realH.toFixed(2)} m</span>;
+                                        })()}
                                     </td>
                                     <td>
                                         <span className="copies-badge">{order.copias}</span>
                                     </td>
                                     <td>
-                                        <span className="m2-text font-mono text-muted">
-                                            {(Number(order.ancho) * Number(order.alto) * Number(order.copias)).toFixed(2)}
-                                        </span>
+                                        {(() => {
+                                            const rawW = Number(order.ancho) || 0;
+                                            const rawH = Number(order.alto) || 0;
+                                            const realW = rawW > 20 ? rawW / 100 : rawW;
+                                            const realH = rawH > 20 ? rawH / 100 : rawH;
+                                            const c = Number(order.copias) || 1;
+                                            const m2 = realW * realH * c;
+                                            return (
+                                                <span className="m2-text font-mono text-muted">
+                                                    {m2.toFixed(2)}
+                                                </span>
+                                            );
+                                        })()}
                                     </td>
                                     <td>
                                         {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) ? (

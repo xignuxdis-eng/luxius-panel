@@ -387,8 +387,10 @@ export default function Entrada() {
     const getConsumption = (order: Order) => {
         const matData = allMateriales.find(m => m.codigo === order.material);
 
-        const w = round2(Number(order.ancho) || 0);
-        const h = round2(Number(order.alto) || 0);
+        const rawW = Number(order.ancho) || 0;
+        const rawH = Number(order.alto) || 0;
+        const w = round2(rawW > 20 ? rawW / 100 : rawW);
+        const h = round2(rawH > 20 ? rawH / 100 : rawH);
         const c = Number(order.copias) || 1;
 
         const isMl = matData?.tipoCobro === 'ml' || (matData?.bobinas && matData.bobinas.length > 0) || order.material === 'VV' || order.material === 'VVP';

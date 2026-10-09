@@ -53,10 +53,12 @@ export function reconcileRipLogs(orders: Order[], logs: RipLog[]): ReconciledIte
     const usedLogs = new Set<string>()
 
     const items = orders.map(o => {
-        const w = Number(o.ancho) || 0
-        const h = Number(o.alto) || 0
+        const rawW = Number(o.ancho) || 0
+        const rawH = Number(o.alto) || 0
+        const w = rawW > 20 ? rawW / 100 : rawW
+        const h = rawH > 20 ? rawH / 100 : rawH
         const c = Number(o.copias) || 1
-        const teorico = Math.round(w * h * c * 1000) / 1000
+        const teorico = Math.round(w * h * c * 100) / 100
         const cliente = o.clienteNombre || 'Cliente'
         const trabajo = o.ot || `OT-${o.id}`
         const material = o.material || 'Vinilo'
