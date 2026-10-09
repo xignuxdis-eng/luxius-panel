@@ -69,6 +69,21 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const badgesMapRef = useRef<Map<string, Text>>(new Map());
 
     // Plotter Interactive Elements Refs (Fase 2)
+    interface PlotterStationItem {
+        id: StationId;
+        carriage: Sprite;
+        sheet: Graphics;
+        glow: Graphics;
+        barFill: Graphics;
+        progressText: Text;
+        statusLed: Graphics;
+        isOffline: boolean;
+        maquinaId?: number;
+        baseX: number;
+        baseY: number;
+        width: number;
+    }
+    const plottersListRef = useRef<PlotterStationItem[]>([]);
     const plotterProgressFillRef = useRef<Graphics | null>(null);
     const plotterProgressTextRef = useRef<Text | null>(null);
     const plotterCarriageSpriteRef = useRef<Sprite | null>(null);
@@ -257,6 +272,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             highlightsMapRef.current.clear();
             badgesMapRef.current.clear();
             particlesPoolRef.current = [];
+            plottersListRef.current = [];
 
             if (activeApp) {
                 try {
@@ -517,9 +533,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             // ================================================================
             // FASE 2: DETAILED GRAND FORMAT PLOTTER STATION
             // ================================================================
-            if (id === 'plotter1' || id === 'plotter2') {
+            if (id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_')) {
                 const isOffline = station.estado === 'offline';
-                const plotterW = 110;
+                const plotterW = Math.min(110, width - 8);
                 const offsetX = Math.floor((width - plotterW) / 2);
                 const offsetY = 16;
 
@@ -533,8 +549,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 const sheetGfx = new Graphics();
                 sheetGfx.x = offsetX + 20;
                 sheetGfx.y = offsetY + 24;
+                sheetGfx.alpha = 0;
                 visualContainer.addChild(sheetGfx);
-                plotterSheetGfxRef.current = sheetGfx;
 
                 // 3. Main Plotter Roland Chassis
                 const chassisSprite = new Sprite(getPlotterChassisTexture(isOffline));
@@ -547,17 +563,24 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 carriageSprite.x = offsetX + 24;
                 carriageSprite.y = offsetY + 15;
                 visualContainer.addChild(carriageSprite);
-                plotterCarriageSpriteRef.current = carriageSprite;
 
                 // 5. Printing Light / Glow (blendMode add)
                 const glowGfx = new Graphics();
                 glowGfx.blendMode = 'add';
                 glowGfx.x = offsetX + 24;
                 glowGfx.y = offsetY + 20;
+                glowGfx.alpha = 0;
                 visualContainer.addChild(glowGfx);
-                plotterGlowGfxRef.current = glowGfx;
 
-                // 6. Floating Progress Bar (Top of plotter)
+                // 6. Real-time Status LED on control panel
+                const statusLed = new Graphics();
+                statusLed.x = offsetX + plotterW - 22;
+                statusLed.y = offsetY + 19;
+                statusLed.rect(0, 0, 3, 3);
+                statusLed.fill({ color: isOffline ? 0x334155 : 0x22c55e });
+                visualContainer.addChild(statusLed);
+
+                // 7. Floating Progress Bar (Top of plotter)
                 const barContainer = new Container();
                 barContainer.x = offsetX + 6;
                 barContainer.y = -9;
@@ -569,8 +592,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 barContainer.addChild(barBg);
 
                 const barFill = new Graphics();
+                barFill.alpha = 0;
                 barContainer.addChild(barFill);
-                plotterProgressFillRef.current = barFill;
 
                 const progressStyle = new TextStyle({
                     fontFamily: 'monospace',
@@ -578,14 +601,37 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     fontWeight: 'bold',
                     fill: '#ffffff'
                 });
-                const progressText = new Text({ text: 'PRINTING 0%', style: progressStyle });
+                const progressText = new Text({ text: isOffline ? 'OFFLINE' : 'STANDBY (LISTO)', style: progressStyle });
                 progressText.x = (plotterW - 12) / 2;
                 progressText.y = 3.5;
                 progressText.anchor.set(0.5);
                 barContainer.addChild(progressText);
-                plotterProgressTextRef.current = progressText;
 
                 visualContainer.addChild(barContainer);
+
+                // Register plotter item in synchronized list
+                plottersListRef.current.push({
+                    id,
+                    carriage: carriageSprite,
+                    sheet: sheetGfx,
+                    glow: glowGfx,
+                    barFill,
+                    progressText,
+                    statusLed,
+                    isOffline,
+                    maquinaId: station.maquinaId,
+                    baseX: x + offsetX,
+                    baseY: y + offsetY,
+                    width: plotterW
+                });
+
+                if (id === 'plotter1') {
+                    plotterCarriageSpriteRef.current = carriageSprite;
+                    plotterSheetGfxRef.current = sheetGfx;
+                    plotterGlowGfxRef.current = glowGfx;
+                    plotterProgressFillRef.current = barFill;
+                    plotterProgressTextRef.current = progressText;
+                }
             }
 
             stationsLayer.addChild(visualContainer);
@@ -606,9 +652,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 highlightGfx.rect(-1, -1, width + 2, height + 2);
                 highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
 
-                // If hovering Plotter, display rich Hover HUD Tooltip
-                if (id.startsWith('plotter') && tooltipContainerRef.current) {
-                    updatePlotterTooltip();
+                // If hovering Plotter, display rich Hover HUD Tooltip inside canvas
+                if ((id.startsWith('plotter') || id.startsWith('maquina_')) && tooltipContainerRef.current) {
+                    updatePlotterTooltip(id);
                     tooltipContainerRef.current.visible = true;
                 }
             });
@@ -621,7 +667,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     highlightGfx.stroke({ width: 2, color: 0x38bdf8 });
                 }
 
-                if (id.startsWith('plotter') && tooltipContainerRef.current) {
+                if ((id.startsWith('plotter') || id.startsWith('maquina_')) && tooltipContainerRef.current) {
                     tooltipContainerRef.current.visible = false;
                 }
             });
@@ -667,12 +713,34 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     /**
      * Updates Plotter Tooltip HUD with real active order data
      */
-    const updatePlotterTooltip = () => {
-        if (!tooltipTextRef.current) return;
+    /**
+     * Updates Plotter Tooltip HUD with real active order data
+     */
+    const updatePlotterTooltip = (stationId: StationId = 'plotter1') => {
+        if (!tooltipTextRef.current || !tooltipContainerRef.current) return;
+        const stations = getPixiStations();
+        const station = stations.find(s => s.id === stationId);
+        const isOffline = station?.estado === 'offline';
+        const title = station?.title || 'Plotter';
+
+        if (station) {
+            tooltipContainerRef.current.x = Math.max(10, Math.min(310, station.x - 10));
+            tooltipContainerRef.current.y = station.y + station.height + 4;
+        }
+
+        if (isOffline) {
+            tooltipTextRef.current.text =
+                `🖨️ ${title.toUpperCase()}\n` +
+                'Estado: DESCONECTADO (OFFLINE)\n' +
+                'Sin comunicación de red\n' +
+                'Click para configuración';
+            return;
+        }
+
         const printingOrders = ordersRef.current.filter(o => o.status === 'orden');
         if (printingOrders.length === 0) {
             tooltipTextRef.current.text =
-                '🖨️ PLOTTER PRINCIPAL\n' +
+                `🖨️ ${title.toUpperCase()}\n` +
                 'Estado: EN ESPERA (STANDBY)\n' +
                 'Cola: 0 órdenes pendientes\n' +
                 'Click para ver historial';
@@ -686,7 +754,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             `Cliente: ${current.clienteNombre || 'Sin Cliente'}\n` +
             `Medidas: ${current.ancho}x${current.alto}m (${m2} m²)\n` +
             `Material: ${current.material || 'Vinilo'}\n` +
-            `Cola: ${printingOrders.length} ordenes listas`;
+            `Cola: ${printingOrders.length} ordenes en cola`;
     };
 
     /**
@@ -697,116 +765,127 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         let lastSweepSoundTime = 0;
         let prevSweepCos = 0;
 
-        // Cache initial offline status to avoid querying localStorage 60x/sec
-        let isPlotterOffline = false;
-        try {
-            const stations = getPixiStations();
-            const plotterStation = stations.find(s => s.id === 'plotter1');
-            isPlotterOffline = plotterStation?.estado === 'offline';
-        } catch (_) {}
-
         const tickerFn = () => {
             frameCount++;
-            const carriage = plotterCarriageSpriteRef.current;
-            const sheet = plotterSheetGfxRef.current;
-            const glow = plotterGlowGfxRef.current;
-            const progressFill = plotterProgressFillRef.current;
-            const progressText = plotterProgressTextRef.current;
-
-            // Strict guards: if any object is uninitialized or destroyed, exit cleanly
-            if (!carriage || carriage.destroyed ||
-                !sheet || sheet.destroyed ||
-                !glow || glow.destroyed ||
-                !progressFill || progressFill.destroyed ||
-                !progressText || progressText.destroyed) {
-                return;
-            }
 
             try {
-                const printingOrders = ordersRef.current.filter(o => o.status === 'orden');
-                const isPrinting = printingOrders.length > 0;
-                const currentJob = printingOrders[0];
-                const isVip = Boolean(currentJob && (String(currentJob.batchId || '').includes('VIP') || String(currentJob.ot || '').includes('URG')));
-
-                // Refresh offline state every ~3 seconds
+                // Refresh offline state periodically (~3s)
                 if (frameCount % 180 === 0) {
                     try {
-                        const stations = getPixiStations();
-                        const plotterStation = stations.find(s => s.id === 'plotter1');
-                        isPlotterOffline = plotterStation?.estado === 'offline';
+                        const currentStations = getPixiStations();
+                        plottersListRef.current.forEach(p => {
+                            const found = currentStations.find(s => s.id === p.id);
+                            if (found) p.isOffline = found.estado === 'offline';
+                        });
                     } catch (_) {}
                 }
 
-                const railMinX = Math.floor((154 - 110) / 2) + 16;
-                const railRange = 66;
+                const allPrintingOrders = ordersRef.current.filter(o => o.status === 'orden');
 
-                if (isPrinting && !isPlotterOffline) {
-                    // 1. Animate Printhead Carriage across the rail
-                    const sweepSpeed = 0.06;
-                    const cosVal = Math.cos(frameCount * sweepSpeed);
-                    const sweepRatio = (Math.sin(frameCount * sweepSpeed) + 1) / 2; // 0..1
-
-                    // Audio sweep trigger on new stroke pass with 2.5s cooldown
-                    if (cosVal >= 0 && prevSweepCos < 0 && Date.now() - lastSweepSoundTime > 2500) {
-                        audioEngine.playPrintSweep();
-                        lastSweepSoundTime = Date.now();
-                    }
-                    prevSweepCos = cosVal;
-
-                    const targetCarriageX = railMinX + sweepRatio * railRange;
-                    carriage.x += (targetCarriageX - carriage.x) * 0.2;
-
-                    // 2. Animate Printhead Glow with fade-in
-                    glow.clear();
-                    glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
-                    glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
-                    glow.alpha += (1 - glow.alpha) * 0.08;
-
-                    // 3. Animate Unrolling Printed Sheet with fade-in
-                    const cycleProgress = ((frameCount / 3) % 100) / 100;
-                    const sheetH = 4 + Math.floor(cycleProgress * 11);
-                    sheet.clear();
-                    sheet.rect(0, 0, 70, sheetH);
-                    sheet.fill({ color: 0xf8fafc });
-                    sheet.stroke({ width: 0.5, color: 0x94a3b8 });
-                    // CMYK ink bands
-                    sheet.rect(4, Math.max(0, sheetH - 4), 62, 3);
-                    sheet.fill({ color: 0x06b6d4 });
-                    sheet.rect(20, Math.max(0, sheetH - 4), 24, 3);
-                    sheet.fill({ color: 0xec4899 });
-                    sheet.rect(36, Math.max(0, sheetH - 4), 16, 3);
-                    sheet.fill({ color: 0xeab308 });
-                    sheet.alpha += (1 - sheet.alpha) * 0.08;
-
-                    // 4. Update Floating Progress Bar
-                    const percent = Math.floor(cycleProgress * 100);
-                    const barWidth = 98;
-                    progressFill.clear();
-                    progressFill.rect(0, 0, Math.max(2, (barWidth * percent) / 100), 7);
-                    progressFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
-                    progressFill.alpha += (1 - progressFill.alpha) * 0.08;
-                    const targetProgressText = `OT #${currentJob.ot || currentJob.id} · ${percent}%`;
-                    if (progressText.text !== targetProgressText) {
-                        progressText.text = targetProgressText;
+                plottersListRef.current.forEach((plotter, pIdx) => {
+                    const { carriage, sheet, glow, barFill, progressText, statusLed, isOffline, width: plotterW } = plotter;
+                    if (!carriage || carriage.destroyed ||
+                        !sheet || sheet.destroyed ||
+                        !glow || glow.destroyed ||
+                        !barFill || barFill.destroyed ||
+                        !progressText || progressText.destroyed ||
+                        !statusLed || statusLed.destroyed) {
+                        return;
                     }
 
-                    // 5. Emit particles at carriage position
-                    if (frameCount % 4 === 0) {
-                        emitParticle(108 + carriage.x + 6, 42 + carriage.y + 10, isVip);
-                    }
-                } else {
-                    // Standby / Offline State with Smooth Lerp Fades
-                    carriage.x += (railMinX - carriage.x) * 0.06;
+                    const railMinX = Math.floor((plotterW - 110) / 2) + 24;
+                    const railRange = 56;
 
-                    glow.alpha += (0 - glow.alpha) * 0.08;
-                    sheet.alpha += (0 - sheet.alpha) * 0.08;
-                    progressFill.alpha += (0 - progressFill.alpha) * 0.08;
+                    // Distribute orders: plotter 0 takes first, plotter 1 takes second, or standby
+                    const assignedOrder = allPrintingOrders[pIdx] || (pIdx === 0 ? allPrintingOrders[0] : undefined);
+                    const isPlotterPrinting = Boolean(assignedOrder) && !isOffline;
+                    const isVip = Boolean(assignedOrder && (String(assignedOrder.batchId || '').includes('VIP') || String(assignedOrder.ot || '').includes('URG')));
 
-                    const targetStandbyText = isPlotterOffline ? 'OFFLINE' : 'STANDBY (LISTO)';
-                    if (progressText.text !== targetStandbyText) {
-                        progressText.text = targetStandbyText;
+                    if (isPlotterPrinting && assignedOrder) {
+                        // 1. Carriage sweep
+                        const sweepSpeed = 0.06;
+                        const cosVal = Math.cos((frameCount + pIdx * 30) * sweepSpeed);
+                        const sweepRatio = (Math.sin((frameCount + pIdx * 30) * sweepSpeed) + 1) / 2;
+
+                        // Audio sweep trigger on new stroke pass with 2.5s cooldown
+                        if (pIdx === 0 && cosVal >= 0 && prevSweepCos < 0 && Date.now() - lastSweepSoundTime > 2500) {
+                            audioEngine.playPrintSweep();
+                            lastSweepSoundTime = Date.now();
+                        }
+                        if (pIdx === 0) prevSweepCos = cosVal;
+
+                        const targetCarriageX = railMinX + sweepRatio * railRange;
+                        carriage.x += (targetCarriageX - carriage.x) * 0.2;
+
+                        // 2. Glow
+                        glow.clear();
+                        glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
+                        glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
+                        glow.alpha += (1 - glow.alpha) * 0.08;
+
+                        // 3. Unrolling printed sheet (estable, sin reinicio ni bucles artificiales)
+                        const sheetH = 14;
+                        sheet.clear();
+                        sheet.rect(0, 0, 70, sheetH);
+                        sheet.fill({ color: 0xf8fafc });
+                        sheet.stroke({ width: 0.5, color: 0x94a3b8 });
+                        sheet.rect(4, Math.max(0, sheetH - 4), 62, 3);
+                        sheet.fill({ color: 0x06b6d4 });
+                        sheet.rect(20, Math.max(0, sheetH - 4), 24, 3);
+                        sheet.fill({ color: 0xec4899 });
+                        sheet.rect(36, Math.max(0, sheetH - 4), 16, 3);
+                        sheet.fill({ color: 0xeab308 });
+                        sheet.alpha += (1 - sheet.alpha) * 0.08;
+
+                        // 4. Progress bar (estático 65% del legacy WorkshopCanvas.tsx:447, sin simulación)
+                        const barWidth = plotterW - 12;
+                        barFill.clear();
+                        barFill.rect(0, 0, Math.floor(barWidth * 0.65), 7);
+                        barFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
+                        barFill.alpha += (1 - barFill.alpha) * 0.08;
+
+                        const targetProgressText = `OT #${assignedOrder.ot || assignedOrder.id} · 65%`;
+                        if (progressText.text !== targetProgressText) {
+                            progressText.text = targetProgressText;
+                        }
+
+                        // 5. LED azul activo durante impresión
+                        statusLed.clear();
+                        statusLed.rect(0, 0, 3, 3);
+                        statusLed.fill({ color: 0x38bdf8 });
+
+                        // 6. Particles
+                        if (frameCount % 4 === 0) {
+                            emitParticle(plotter.baseX + carriage.x + 6, plotter.baseY + carriage.y + 10, isVip);
+                        }
+                    } else if (isOffline) {
+                        // Offline: grises, sin luz ni movimiento, carriage quieto en posición de reposo
+                        carriage.x += (railMinX - carriage.x) * 0.06;
+                        glow.alpha += (0 - glow.alpha) * 0.08;
+                        sheet.alpha += (0 - sheet.alpha) * 0.08;
+                        barFill.alpha += (0 - barFill.alpha) * 0.08;
+
+                        if (progressText.text !== 'OFFLINE') {
+                            progressText.text = 'OFFLINE';
+                        }
+                        statusLed.clear();
+                        statusLed.rect(0, 0, 3, 3);
+                        statusLed.fill({ color: 0x334155 }); // Sin luz (gris apagado)
+                    } else {
+                        // Standby (0 órdenes): quieto y LED verde
+                        carriage.x += (railMinX - carriage.x) * 0.06;
+                        glow.alpha += (0 - glow.alpha) * 0.08;
+                        sheet.alpha += (0 - sheet.alpha) * 0.08;
+                        barFill.alpha += (0 - barFill.alpha) * 0.08;
+
+                        if (progressText.text !== 'STANDBY (LISTO)') {
+                            progressText.text = 'STANDBY (LISTO)';
+                        }
+                        statusLed.clear();
+                        statusLed.rect(0, 0, 3, 3);
+                        statusLed.fill({ color: 0x22c55e }); // LED verde encendido
                     }
-                }
+                });
 
                 // Update particles pool (max 40 items)
                 particlesPoolRef.current.forEach(p => {

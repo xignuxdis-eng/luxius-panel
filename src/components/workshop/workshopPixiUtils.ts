@@ -115,8 +115,8 @@ export const getPixiStations = (): StationConfig[] => {
 
             baseStations.push({
                 id: stationId,
-                title: m.nombre && m.nombre.length <= 10 ? m.nombre : 'Plotter',
-                description: `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m)`,
+                title: m.nombre && m.nombre.length <= 12 ? m.nombre : (idx === 0 ? 'Plotter 1' : idx === 1 ? 'Plotter 2' : (m.nombre || 'Plotter')),
+                description: `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m) - Status: ${(m.estado || 'online').toUpperCase()}`,
                 x: startX + idx * stepX,
                 y: 42,
                 width: Math.max(120, Math.min(154, stepX - 6)),
@@ -189,6 +189,8 @@ export const getPixiStations = (): StationConfig[] => {
 
     return baseStations;
 };
+
+export const getDynamicStations = getPixiStations;
 
 export const countOrdersForStation = (stationId: StationId, ordersList: Order[]): number => {
     if (stationId === 'diseno') return ordersList.filter(o => o.status === 'diseno' || o.status === 'rebotado').length;

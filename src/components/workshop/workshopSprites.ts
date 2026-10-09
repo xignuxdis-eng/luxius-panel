@@ -325,15 +325,21 @@ export function getPlotterChassisTexture(isOffline = false): Texture {
     // 4. Control Panel on Right Wing
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(W - 24, 9, 16, 16);
-    ctx.fillStyle = isOffline ? '#334155' : '#0284c7';
+    ctx.fillStyle = isOffline ? '#1e293b' : '#0284c7';
     ctx.fillRect(W - 22, 11, 12, 6); // LCD Screen
-    // Status button LEDs
-    ctx.fillStyle = isOffline ? '#ef4444' : '#22c55e';
-    ctx.fillRect(W - 22, 19, 3, 3);
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillRect(W - 17, 19, 3, 3);
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(W - 12, 19, 3, 3);
+    // Status button LEDs: offline = pure grays (sin luz); online = LED verde
+    if (isOffline) {
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(W - 22, 19, 3, 3);
+        ctx.fillRect(W - 17, 19, 3, 3);
+        ctx.fillRect(W - 12, 19, 3, 3);
+    } else {
+        ctx.fillStyle = '#22c55e'; // LED verde standby/operativo
+        ctx.fillRect(W - 22, 19, 3, 3);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(W - 17, 19, 3, 3);
+        ctx.fillRect(W - 12, 19, 3, 3);
+    }
 
     // 5. Front Catch Basket / Collection Tray Frame
     ctx.fillStyle = '#1e293b';
