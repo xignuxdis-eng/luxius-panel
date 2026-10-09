@@ -1,20 +1,29 @@
 // WorkshopCanvasPixi.tsx - High-Fidelity PixiJS v8 Pixel Art Render Loop for XignuX Print Den
-// Implements integer scaling (480x270 native), independent station hit-areas,
-// snapshot-based order diff tracking, and robust cleanup.
+// Implements fractional scaling (95%+ container width, 16:9), refined low-contrast concrete floor,
+// enlarged stations with short labels, independent hit-areas, diffOrders snapshotting,
+// and the COMPLETE PLOTTER with moving carriage, unrolling vinyl, live progress bar, particles, and hover tooltip.
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Application, Container, Graphics, Sprite, Text, TextStyle, Rectangle } from 'pixi.js';
 import { Order, OrderStatus } from '@/types/orden';
 import { StationId, StationConfig } from './types';
 import { audioEngine } from './AudioEngine';
-import { getMaquinas } from '@/data/db';
 import {
-    getTileTextureConcreteA,
-    getTileTextureConcreteB,
-    getTileTextureHazard,
+    diffOrders,
+    getPixiStations,
+    countOrdersForStation,
+    OrderStateSnapshot,
+    OrderDiff
+} from './workshopPixiUtils';
+import {
+    getTileLargeConcreteA,
+    getTileLargeConcreteB,
     getWallTileTexture,
     getWindowTexture,
     getSignDenTexture,
+    getPlotterChassisTexture,
+    getPlotterPrintheadTexture,
+    getPlotterVinylRollTexture,
     destroyTextureCache,
     PALETTE
 } from './workshopSprites';
@@ -26,202 +35,17 @@ export interface WorkshopCanvasPixiProps {
     selectedStation: StationId | null;
 }
 
-export interface OrderStateSnapshot {
-    [orderId: number]: OrderStatus;
+interface ParticleItem {
+    gfx: Graphics;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    life: number;
+    maxLife: number;
+    active: boolean;
+    color: number;
 }
-
-export interface OrderDiff {
-    orderId: number;
-    prevStatus: OrderStatus | undefined;
-    nextStatus: OrderStatus;
-    order: Order;
-    changeType: 'new' | 'status_change' | 'removed';
-}
-
-/**
- * Calculates diffs between previous order state and incoming orders.
- * Foundation for event-driven animations in Fase 3.
- */
-export function diffOrders(
-    prevSnapshot: OrderStateSnapshot,
-    nextOrders: Order[]
-): { diffs: OrderDiff[]; nextSnapshot: OrderStateSnapshot } {
-    const nextSnapshot: OrderStateSnapshot = {};
-    const diffs: OrderDiff[] = [];
-    const seenIds = new Set<number>();
-
-    for (const order of nextOrders) {
-        seenIds.add(order.id);
-        nextSnapshot[order.id] = order.status;
-        const prevStatus = prevSnapshot[order.id];
-
-        if (prevStatus === undefined) {
-            diffs.push({
-                orderId: order.id,
-                prevStatus: undefined,
-                nextStatus: order.status,
-                order,
-                changeType: 'new'
-            });
-        } else if (prevStatus !== order.status) {
-            diffs.push({
-                orderId: order.id,
-                prevStatus,
-                nextStatus: order.status,
-                order,
-                changeType: 'status_change'
-            });
-        }
-    }
-
-    // Check for removed orders
-    for (const idStr of Object.keys(prevSnapshot)) {
-        const id = Number(idStr);
-        if (!seenIds.has(id)) {
-            diffs.push({
-                orderId: id,
-                prevStatus: prevSnapshot[id],
-                nextStatus: 'entregado', // fallback or purged
-                order: { id } as Order,
-                changeType: 'removed'
-            });
-        }
-    }
-
-    return { diffs, nextSnapshot };
-}
-
-/**
- * Native 480x270 Top-down Workshop Stations Layout
- * Proportioned and pixel-aligned for crisp 16-bit presentation.
- */
-export const getPixiStations = (): StationConfig[] => {
-    const maquinas = getMaquinas();
-
-    const baseStations: StationConfig[] = [
-        {
-            id: 'diseno',
-            title: 'Diseño & Preprensa',
-            description: 'Mesa de pre-prensa y validación de artes.',
-            x: 18,
-            y: 50,
-            width: 78,
-            height: 60,
-            color: '#8b5cf6',
-            icon: '🖥️'
-        }
-    ];
-
-    if (maquinas.length === 0) {
-        baseStations.push({
-            id: 'plotter1',
-            title: 'Plotter Principal',
-            description: 'Impresora de gran formato.',
-            x: 110,
-            y: 46,
-            width: 110,
-            height: 64,
-            color: '#22c55e',
-            icon: '🖨️'
-        });
-    } else {
-        const startX = 106;
-        const availableW = 260;
-        const count = maquinas.length;
-        const stepX = Math.min(125, Math.floor(availableW / Math.max(1, count)));
-
-        maquinas.forEach((m, idx) => {
-            const colors = ['#22c55e', '#06b6d4', '#ec4899', '#eab308', '#3b82f6'];
-            const color = colors[idx % colors.length];
-            const stationId = idx === 0 ? 'plotter1' : idx === 1 ? 'plotter2' : `maquina_${m.id}`;
-
-            baseStations.push({
-                id: stationId,
-                title: m.nombre,
-                description: `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m)`,
-                x: startX + idx * stepX,
-                y: 46,
-                width: Math.max(84, Math.min(115, stepX - 8)),
-                height: 64,
-                color: m.estado === 'offline' ? '#64748b' : color,
-                icon: '🖨️',
-                maquinaId: m.id,
-                estado: m.estado
-            });
-        });
-    }
-
-    baseStations.push(
-        {
-            id: 'insumos',
-            title: 'Depósito Insumos',
-            description: 'Tintas CMYK y bobinas en stock.',
-            x: 378,
-            y: 48,
-            width: 84,
-            height: 62,
-            color: '#eab308',
-            icon: '🎨'
-        },
-        {
-            id: 'despacho',
-            title: 'Muelle Despacho',
-            description: 'Salida de paquetes y flete.',
-            x: 18,
-            y: 154,
-            width: 84,
-            height: 68,
-            color: '#64748b',
-            icon: '🚚'
-        },
-        {
-            id: 'empaque',
-            title: 'Empaquetado',
-            description: 'Doblado, ojalillos y embalaje.',
-            x: 114,
-            y: 154,
-            width: 86,
-            height: 68,
-            color: '#a855f7',
-            icon: '📦'
-        },
-        {
-            id: 'corte',
-            title: 'Mesa de Refilado',
-            description: 'Corte, refilado y trillado.',
-            x: 212,
-            y: 154,
-            width: 88,
-            height: 68,
-            color: '#ec4899',
-            icon: '✂️'
-        },
-        {
-            id: 'caja',
-            title: 'Caja & Mostrador',
-            description: 'Ventas, cobros y mostrador.',
-            x: 378,
-            y: 154,
-            width: 84,
-            height: 68,
-            color: '#f59e0b',
-            icon: '🪙'
-        }
-    );
-
-    return baseStations;
-};
-
-export const countOrdersForStation = (stationId: StationId, ordersList: Order[]): number => {
-    if (stationId === 'diseno') return ordersList.filter(o => o.status === 'diseno' || o.status === 'rebotado').length;
-    if (stationId === 'plotter1' || stationId === 'plotter2' || stationId.startsWith('maquina_')) {
-        return ordersList.filter(o => o.status === 'orden').length;
-    }
-    if (stationId === 'corte') return ordersList.filter(o => o.status === 'impreso' || o.status === 'post').length;
-    if (stationId === 'empaque') return ordersList.filter(o => o.status === 'completo').length;
-    if (stationId === 'despacho') return ordersList.filter(o => o.status === 'entregado').length;
-    return 0;
-};
 
 export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     orders,
@@ -233,7 +57,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const canvasHostRef = useRef<HTMLDivElement | null>(null);
     const [hoveredStation, setHoveredStation] = useState<StationId | null>(null);
 
-    // Refs for synchronization
+    // Refs for real-time synchronization
     const ordersRef = useRef<Order[]>(orders);
     const selectedStationRef = useRef<StationId | null>(selectedStation);
     const prevOrdersSnapshotRef = useRef<OrderStateSnapshot>({});
@@ -241,9 +65,18 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     // Pixi References
     const appRef = useRef<Application | null>(null);
-    const stationsLayerRef = useRef<Container | null>(null);
     const highlightsMapRef = useRef<Map<string, Graphics>>(new Map());
     const badgesMapRef = useRef<Map<string, Text>>(new Map());
+
+    // Plotter Interactive Elements Refs (Fase 2)
+    const plotterProgressFillRef = useRef<Graphics | null>(null);
+    const plotterProgressTextRef = useRef<Text | null>(null);
+    const plotterCarriageSpriteRef = useRef<Sprite | null>(null);
+    const plotterSheetGfxRef = useRef<Graphics | null>(null);
+    const plotterGlowGfxRef = useRef<Graphics | null>(null);
+    const particlesPoolRef = useRef<ParticleItem[]>([]);
+    const tooltipContainerRef = useRef<Container | null>(null);
+    const tooltipTextRef = useRef<Text | null>(null);
 
     // Update synced refs
     useEffect(() => {
@@ -275,17 +108,21 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             const isSelected = selectedStation === stationId;
             const isHovered = hoveredStation === stationId;
             gfx.clear();
+            const parent = gfx.parent as Container;
+            const boundsW = parent ? (parent as any)._stationW || 86 : 86;
+            const boundsH = parent ? (parent as any)._stationH || 66 : 66;
+
             if (isSelected) {
-                gfx.rect(-2, -2, gfx.width ? gfx.width + 4 : 80, gfx.height ? gfx.height + 4 : 64);
+                gfx.rect(-2, -2, boundsW + 4, boundsH + 4);
                 gfx.stroke({ width: 2, color: 0x38bdf8 });
             } else if (isHovered) {
-                gfx.rect(-1, -1, gfx.width ? gfx.width + 2 : 80, gfx.height ? gfx.height + 2 : 64);
-                gfx.stroke({ width: 1, color: 0xf59e0b });
+                gfx.rect(-1, -1, boundsW + 2, boundsH + 2);
+                gfx.stroke({ width: 1.5, color: 0xf59e0b });
             }
         });
     }, [selectedStation, hoveredStation]);
 
-    // Initialize Audio Ambient on mount
+    // Audio Ambient
     useEffect(() => {
         audioEngine.startAmbient();
         return () => {
@@ -298,7 +135,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         let isCancelled = false;
         let resizeObserver: ResizeObserver | null = null;
         const app = new Application();
-        // PixiJS v8 guard: prevents TypeError: this._cancelResize is not a function when resizeTo is not used
         (app as any)._cancelResize = () => {};
         appRef.current = app;
 
@@ -333,19 +169,20 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     return;
                 }
 
-                // Clean previous canvas if any
                 if (canvasHostRef.current) {
                     canvasHostRef.current.innerHTML = '';
                     const canvas = app.canvas;
                     canvasHostRef.current.appendChild(canvas);
 
-                    // Setup root layers
+                    // Root scene layers
                     const mapLayer = new Container();
                     mapLayer.label = 'MapLayer';
 
                     const stationsLayer = new Container();
                     stationsLayer.label = 'StationsLayer';
-                    stationsLayerRef.current = stationsLayer;
+
+                    const particlesLayer = new Container();
+                    particlesLayer.label = 'ParticlesLayer';
 
                     const hitAreasLayer = new Container();
                     hitAreasLayer.label = 'HitAreasLayer';
@@ -355,17 +192,24 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     app.stage.addChild(mapLayer);
                     app.stage.addChild(stationsLayer);
+                    app.stage.addChild(particlesLayer);
                     app.stage.addChild(hitAreasLayer);
                     app.stage.addChild(uiLayer);
 
-                    // 1. Build Background Map (Tiles & Wall)
+                    // 1. Build Refined Low-Contrast Background Map
                     buildBackgroundMap(mapLayer, VIRTUAL_W, VIRTUAL_H);
 
-                    // 2. Build Stations & Independent Hit Areas
-                    buildStations(stationsLayer, hitAreasLayer);
+                    // 2. Build Stations with Full Animated Plotter (Fase 2)
+                    buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
 
-                    // 3. Setup Integer Scaling via ResizeObserver
-                    resizeObserver = setupIntegerScaling(canvas, containerRef.current);
+                    // 3. Initialize Particle Pool
+                    initParticles(particlesLayer, 18);
+
+                    // 4. Fractional Scaling setup
+                    resizeObserver = setupFractionalScaling(canvas, containerRef.current);
+
+                    // 5. Start Plotter Render Loop Ticker
+                    setupPlotterTicker(app);
                 }
             } catch (initErr) {
                 console.error('Failed to initialize Pixi Application:', initErr);
@@ -374,7 +218,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
         initPixi();
 
-        // Handle page visibility to pause ticker and prevent CPU/GPU waste
         const handleVisibilityChange = () => {
             if (!appRef.current) return;
             if (document.visibilityState === 'hidden') {
@@ -401,32 +244,38 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             }
             highlightsMapRef.current.clear();
             badgesMapRef.current.clear();
+            particlesPoolRef.current = [];
         };
     }, []);
 
-    // ResizeObserver: Computes exact integer scale (1x, 2x, 3x) and centers with bars
-    const setupIntegerScaling = (canvas: HTMLCanvasElement, container: HTMLDivElement | null): ResizeObserver | null => {
+    /**
+     * FRACTIONAL SCALING: Fills 96% of container width, maintaining 16:9 ratio.
+     * Allows large, commanding presentation on 1080p, 2K and 4K displays while preserving nearest pixel art.
+     */
+    const setupFractionalScaling = (canvas: HTMLCanvasElement, container: HTMLDivElement | null): ResizeObserver | null => {
         if (!container) return null;
 
         const updateScale = () => {
             const containerW = container.clientWidth || 480;
-            // Target height based on container aspect or client height
-            const containerH = container.clientHeight > 100 ? container.clientHeight : Math.floor(containerW * (270 / 480));
+            // Target 96% container width to fill comfortably with slight breathing margin
+            const targetW = Math.max(480, Math.floor(containerW * 0.96));
+            const maxAllowedH = Math.min(560, Math.floor(window.innerHeight * 0.62));
 
-            const scaleX = Math.floor(containerW / 480);
-            const scaleY = Math.floor(containerH / 270);
-            const intScale = Math.max(1, Math.min(scaleX, scaleY || scaleX));
+            // Scale to fill width, but respect max-height
+            const scaleByW = targetW / 480;
+            const scaleByH = maxAllowedH / 270;
+            const finalScale = Math.max(1, Math.min(scaleByW, scaleByH));
 
-            const displayW = 480 * intScale;
-            const displayH = 270 * intScale;
+            const displayW = Math.round(480 * finalScale);
+            const displayH = Math.round(270 * finalScale);
 
             canvas.style.width = `${displayW}px`;
             canvas.style.height = `${displayH}px`;
             canvas.style.imageRendering = 'pixelated';
             canvas.style.display = 'block';
-            canvas.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.8)';
+            canvas.style.boxShadow = '0 12px 36px rgba(0, 0, 0, 0.7)';
             canvas.style.border = '2px solid #1e293b';
-            canvas.style.borderRadius = '6px';
+            canvas.style.borderRadius = '8px';
         };
 
         const ro = new ResizeObserver(() => updateScale());
@@ -435,27 +284,27 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         return ro;
     };
 
-    // 1. Build Background Map
+    /**
+     * BACKGROUND MAP: Large Low-Contrast Concrete Slabs + Fine 2px Guide Line
+     */
     const buildBackgroundMap = (layer: Container, mapW: number, mapH: number) => {
-        const texConcreteA = getTileTextureConcreteA();
-        const texConcreteB = getTileTextureConcreteB();
-        const texHazard = getTileTextureHazard();
+        const texConcreteA = getTileLargeConcreteA();
+        const texConcreteB = getTileLargeConcreteB();
         const texWall = getWallTileTexture();
         const texWindow = getWindowTexture();
         const texSignDen = getSignDenTexture();
 
-        const tileSize = 16;
-        const wallH = 40;
+        const wallH = 38;
 
-        // A. Wall & Windows
-        for (let x = 0; x < mapW; x += tileSize) {
+        // A. Upper Wall & Steel Structure
+        for (let x = 0; x < mapW; x += 16) {
             const wallSprite = new Sprite(texWall);
             wallSprite.x = x;
             wallSprite.y = 8;
             layer.addChild(wallSprite);
         }
 
-        // Add 3 Workshop Windows with light spill
+        // 3 Low-glare industrial windows
         const windowPositions = [48, 208, 368];
         windowPositions.forEach(wx => {
             const winSprite = new Sprite(texWindow);
@@ -464,72 +313,128 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             layer.addChild(winSprite);
         });
 
-        // Add "DEN" neon industrial sign
+        // "DEN" Sign
         const denSign = new Sprite(texSignDen);
         denSign.x = 228;
-        denSign.y = 16;
+        denSign.y = 14;
         layer.addChild(denSign);
 
-        // B. Floor Tiles (varied textures)
-        for (let y = wallH; y < mapH; y += tileSize) {
-            for (let x = 0; x < mapW; x += tileSize) {
-                const isHallway = y >= 120 && y < 144;
-                const isHazardBorder = y === 120 || y === 136;
-
-                let tileSprite: Sprite;
-                if (isHazardBorder && (x % 32 === 0)) {
-                    tileSprite = new Sprite(texHazard);
-                } else if ((x + y) % 32 === 0) {
-                    tileSprite = new Sprite(texConcreteB);
-                } else {
-                    tileSprite = new Sprite(texConcreteA);
-                }
-
+        // B. Floor Tiles (32x32 px large slabs, soft slate-blue tone)
+        const slabSize = 32;
+        for (let y = wallH; y < mapH; y += slabSize) {
+            for (let x = 0; x < mapW; x += slabSize) {
+                const isAlt = (Math.floor(x / slabSize) + Math.floor(y / slabSize)) % 2 === 0;
+                const tileSprite = new Sprite(isAlt ? texConcreteA : texConcreteB);
                 tileSprite.x = x;
                 tileSprite.y = y;
                 layer.addChild(tileSprite);
             }
         }
+
+        // C. Clean, Muted 2px Safety Guide Lines (Replaces distracting hazard blocks)
+        const guideGfx = new Graphics();
+        // Top guide line
+        guideGfx.rect(14, 118, mapW - 28, 2);
+        guideGfx.fill({ color: 0x334155, alpha: 0.6 });
+        // Bottom guide line
+        guideGfx.rect(14, 144, mapW - 28, 2);
+        guideGfx.fill({ color: 0x334155, alpha: 0.6 });
+        layer.addChild(guideGfx);
     };
 
-    // 2. Build Stations and Independent Hit Areas
-    const buildStations = (stationsLayer: Container, hitAreasLayer: Container) => {
+    /**
+     * PARTICLE POOL: Reusable smoke / solvent vapor and VIP golden sparkles
+     */
+    const initParticles = (layer: Container, count: number) => {
+        const pool: ParticleItem[] = [];
+        for (let i = 0; i < count; i++) {
+            const gfx = new Graphics();
+            gfx.visible = false;
+            layer.addChild(gfx);
+            pool.push({
+                gfx,
+                x: 0,
+                y: 0,
+                vx: 0,
+                vy: 0,
+                life: 0,
+                maxLife: 30,
+                active: false,
+                color: 0x38bdf8
+            });
+        }
+        particlesPoolRef.current = pool;
+    };
+
+    const emitParticle = (x: number, y: number, isVip: boolean) => {
+        const p = particlesPoolRef.current.find(item => !item.active);
+        if (!p) return;
+
+        p.active = true;
+        p.x = x + (Math.random() * 8 - 4);
+        p.y = y + (Math.random() * 4 - 2);
+        p.vx = (Math.random() - 0.5) * 0.4;
+        p.vy = -0.3 - Math.random() * 0.4; // float upward
+        p.life = 0;
+        p.maxLife = 24 + Math.floor(Math.random() * 16);
+        p.color = isVip ? 0xfbbf24 : (Math.random() > 0.4 ? 0x38bdf8 : 0xffffff);
+
+        p.gfx.clear();
+        p.gfx.rect(0, 0, isVip ? 2 : 1.5, isVip ? 2 : 1.5);
+        p.gfx.fill({ color: p.color });
+        p.gfx.x = p.x;
+        p.gfx.y = p.y;
+        p.gfx.alpha = 0.9;
+        p.gfx.visible = true;
+    };
+
+    /**
+     * STATIONS & FULL PLOTTER (FASE 2)
+     */
+    const buildStations = (
+        stationsLayer: Container,
+        hitAreasLayer: Container,
+        _particlesLayer: Container,
+        uiLayer: Container
+    ) => {
         const stations = getPixiStations();
 
         stations.forEach(station => {
             const { id, x, y, width, height, title, icon, color } = station;
 
-            // A. Visual Container (Will be upgraded in Fase 2 & Fase 4)
+            // Visual Container
             const visualContainer = new Container();
             visualContainer.x = x;
             visualContainer.y = y;
+            (visualContainer as any)._stationW = width;
+            (visualContainer as any)._stationH = height;
 
-            // Station Base Floor Mat / Platform
+            // Base Floor Platform
             const baseGfx = new Graphics();
             baseGfx.rect(0, 0, width, height);
-            baseGfx.fill({ color: 0x1e1b18, alpha: 0.95 });
-            baseGfx.stroke({ width: 1, color: parseInt(color.replace('#', '0x'), 16) || 0x475569 });
+            baseGfx.fill({ color: 0x161c24, alpha: 0.96 });
+            baseGfx.stroke({ width: 1, color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
             visualContainer.addChild(baseGfx);
 
-            // Title Strip
+            // Title Bar
             const headerGfx = new Graphics();
             headerGfx.rect(0, 0, width, 14);
             headerGfx.fill({ color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
             visualContainer.addChild(headerGfx);
 
-            // Title Text
+            // Station Title Text (Concise: "Diseño", "Plotter", "Insumos", etc.)
             const titleStyle = new TextStyle({
                 fontFamily: 'monospace',
-                fontSize: 8,
+                fontSize: 9,
                 fontWeight: 'bold',
                 fill: '#ffffff'
             });
             const titleText = new Text({
-                text: `${icon} ${title.length > 13 ? title.substring(0, 11) + '..' : title}`,
+                text: `${icon} ${title}`,
                 style: titleStyle
             });
             titleText.x = 4;
-            titleText.y = 2;
+            titleText.y = 1;
             visualContainer.addChild(titleText);
 
             // Selection / Hover Highlight Frame
@@ -537,13 +442,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             visualContainer.addChild(highlightGfx);
             highlightsMapRef.current.set(id, highlightGfx);
 
-            // Counter Badge Container
+            // Notification Badge (Counter)
             const badgeContainer = new Container();
             badgeContainer.x = width - 8;
             badgeContainer.y = -2;
 
             const badgeBg = new Graphics();
-            badgeBg.circle(0, 0, 7);
+            badgeBg.circle(0, 0, 7.5);
             badgeBg.fill({ color: 0xef4444 });
             badgeBg.stroke({ width: 1, color: 0xffffff });
             badgeContainer.addChild(badgeBg);
@@ -559,15 +464,90 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             badgeContainer.addChild(badgeCountText);
             badgesMapRef.current.set(id, badgeCountText);
 
-            // Initial count visibility
             const count = countOrdersForStation(id, ordersRef.current);
             badgeCountText.text = count > 0 ? `${count}` : '';
             badgeContainer.visible = count > 0;
             visualContainer.addChild(badgeContainer);
 
+            // ================================================================
+            // FASE 2: DETAILED GRAND FORMAT PLOTTER STATION
+            // ================================================================
+            if (id === 'plotter1' || id === 'plotter2') {
+                const isOffline = station.estado === 'offline';
+                const plotterW = 110;
+                const offsetX = Math.floor((width - plotterW) / 2);
+                const offsetY = 16;
+
+                // 1. Rear Vinyl Roll
+                const rollSprite = new Sprite(getPlotterVinylRollTexture());
+                rollSprite.x = offsetX + 17;
+                rollSprite.y = offsetY + 3;
+                visualContainer.addChild(rollSprite);
+
+                // 2. Unrolling Printed Vinyl Sheet (Front catch tray)
+                const sheetGfx = new Graphics();
+                sheetGfx.x = offsetX + 20;
+                sheetGfx.y = offsetY + 24;
+                visualContainer.addChild(sheetGfx);
+                plotterSheetGfxRef.current = sheetGfx;
+
+                // 3. Main Plotter Roland Chassis
+                const chassisSprite = new Sprite(getPlotterChassisTexture(isOffline));
+                chassisSprite.x = offsetX;
+                chassisSprite.y = offsetY;
+                visualContainer.addChild(chassisSprite);
+
+                // 4. Moving Printhead Carriage
+                const carriageSprite = new Sprite(getPlotterPrintheadTexture());
+                carriageSprite.x = offsetX + 24;
+                carriageSprite.y = offsetY + 15;
+                visualContainer.addChild(carriageSprite);
+                plotterCarriageSpriteRef.current = carriageSprite;
+
+                // 5. Printing Light / Glow (blendMode add)
+                const glowGfx = new Graphics();
+                glowGfx.blendMode = 'add';
+                glowGfx.x = offsetX + 24;
+                glowGfx.y = offsetY + 20;
+                visualContainer.addChild(glowGfx);
+                plotterGlowGfxRef.current = glowGfx;
+
+                // 6. Floating Progress Bar (Top of plotter)
+                const barContainer = new Container();
+                barContainer.x = offsetX + 6;
+                barContainer.y = -9;
+
+                const barBg = new Graphics();
+                barBg.rect(0, 0, plotterW - 12, 7);
+                barBg.fill({ color: 0x0f172a, alpha: 0.9 });
+                barBg.stroke({ width: 1, color: 0x334155 });
+                barContainer.addChild(barBg);
+
+                const barFill = new Graphics();
+                barContainer.addChild(barFill);
+                plotterProgressFillRef.current = barFill;
+
+                const progressStyle = new TextStyle({
+                    fontFamily: 'monospace',
+                    fontSize: 6,
+                    fontWeight: 'bold',
+                    fill: '#ffffff'
+                });
+                const progressText = new Text({ text: 'PRINTING 0%', style: progressStyle });
+                progressText.x = (plotterW - 12) / 2;
+                progressText.y = 3.5;
+                progressText.anchor.set(0.5);
+                barContainer.addChild(progressText);
+                plotterProgressTextRef.current = progressText;
+
+                visualContainer.addChild(barContainer);
+            }
+
             stationsLayer.addChild(visualContainer);
 
-            // B. Independent Hit Area (Decoupled from visual sprite)
+            // ================================================================
+            // INDEPENDENT HIT AREA (Decoupled from visual sprites)
+            // ================================================================
             const hitArea = new Container();
             hitArea.x = x;
             hitArea.y = y;
@@ -579,7 +559,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 setHoveredStation(id);
                 highlightGfx.clear();
                 highlightGfx.rect(-1, -1, width + 2, height + 2);
-                highlightGfx.stroke({ width: 1, color: 0xf59e0b });
+                highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
+
+                // If hovering Plotter, display rich Hover HUD Tooltip
+                if (id.startsWith('plotter') && tooltipContainerRef.current) {
+                    updatePlotterTooltip();
+                    tooltipContainerRef.current.visible = true;
+                }
             });
 
             hitArea.on('pointerout', () => {
@@ -588,6 +574,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 if (selectedStationRef.current === id) {
                     highlightGfx.rect(-2, -2, width + 4, height + 4);
                     highlightGfx.stroke({ width: 2, color: 0x38bdf8 });
+                }
+
+                if (id.startsWith('plotter') && tooltipContainerRef.current) {
+                    tooltipContainerRef.current.visible = false;
                 }
             });
 
@@ -598,6 +588,148 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
             hitAreasLayer.addChild(hitArea);
         });
+
+        // ================================================================
+        // HOVER TOOLTIP HUD (Pop-over on UI Layer)
+        // ================================================================
+        const tooltip = new Container();
+        tooltip.x = 112;
+        tooltip.y = 118;
+        tooltip.visible = false;
+
+        const tipBg = new Graphics();
+        tipBg.rect(0, 0, 150, 48);
+        tipBg.fill({ color: 0x0f172a, alpha: 0.95 });
+        tipBg.stroke({ width: 1, color: 0x38bdf8 });
+        tooltip.addChild(tipBg);
+
+        const tipStyle = new TextStyle({
+            fontFamily: 'monospace',
+            fontSize: 7,
+            fill: '#f8fafc',
+            lineHeight: 9
+        });
+        const tipText = new Text({ text: '', style: tipStyle });
+        tipText.x = 6;
+        tipText.y = 4;
+        tooltip.addChild(tipText);
+
+        tooltipContainerRef.current = tooltip;
+        tooltipTextRef.current = tipText;
+        uiLayer.addChild(tooltip);
+    };
+
+    /**
+     * Updates Plotter Tooltip HUD with real active order data
+     */
+    const updatePlotterTooltip = () => {
+        if (!tooltipTextRef.current) return;
+        const printingOrders = ordersRef.current.filter(o => o.status === 'orden');
+        if (printingOrders.length === 0) {
+            tooltipTextRef.current.text =
+                '🖨️ PLOTTER PRINCIPAL\n' +
+                'Estado: EN ESPERA (STANDBY)\n' +
+                'Cola: 0 órdenes pendientes\n' +
+                'Click para ver historial';
+            return;
+        }
+
+        const current = printingOrders[0];
+        const m2 = (Number(current.ancho || 1) * Number(current.alto || 1)).toFixed(2);
+        tooltipTextRef.current.text =
+            `🖨️ EN PRODUCCIÓN: OT #${current.ot || current.id}\n` +
+            `Cliente: ${current.clienteNombre || 'Sin Cliente'}\n` +
+            `Medidas: ${current.ancho}x${current.alto}m (${m2} m²)\n` +
+            `Material: ${current.material || 'Vinilo'}\n` +
+            `Cola: ${printingOrders.length} ordenes listas`;
+    };
+
+    /**
+     * Plotter Animation & Ticker Loop (Fase 2)
+     */
+    const setupPlotterTicker = (app: Application) => {
+        let frameCount = 0;
+
+        app.ticker.add(() => {
+            frameCount++;
+            const printingOrders = ordersRef.current.filter(o => o.status === 'orden');
+            const isPrinting = printingOrders.length > 0;
+            const currentJob = printingOrders[0];
+            const isVip = Boolean(currentJob && (String(currentJob.batchId || '').includes('VIP') || String(currentJob.ot || '').includes('URG')));
+
+            const carriage = plotterCarriageSpriteRef.current;
+            const sheet = plotterSheetGfxRef.current;
+            const glow = plotterGlowGfxRef.current;
+            const progressFill = plotterProgressFillRef.current;
+            const progressText = plotterProgressTextRef.current;
+
+            if (isPrinting && carriage && sheet && glow && progressFill && progressText) {
+                // 1. Animate Printhead Carriage across the 70px rail
+                const sweepSpeed = 0.06;
+                const sweepRatio = (Math.sin(frameCount * sweepSpeed) + 1) / 2; // 0..1
+                const railMinX = 108 + Math.floor((154 - 110) / 2) + 16;
+                const railRange = 66;
+
+                carriage.x = Math.floor((154 - 110) / 2) + 16 + sweepRatio * railRange;
+
+                // 2. Animate Printhead Glow (flashes gently when printing)
+                glow.clear();
+                glow.circle(carriage.x + 6, carriage.y + 4, 8 + Math.sin(frameCount * 0.2) * 2);
+                glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
+
+                // 3. Animate Unrolling Printed Sheet (grows from 4px to 14px as job runs)
+                const cycleProgress = ((frameCount / 3) % 100) / 100; // 0..1 loop per print slice
+                const sheetH = 4 + Math.floor(cycleProgress * 11);
+                sheet.clear();
+                // Vinyl substrate
+                sheet.rect(0, 0, 70, sheetH);
+                sheet.fill({ color: 0xf8fafc });
+                sheet.stroke({ width: 0.5, color: 0x94a3b8 });
+                // Simulated CMYK fresh ink band
+                sheet.rect(4, Math.max(0, sheetH - 4), 62, 3);
+                sheet.fill({ color: 0x06b6d4 });
+                sheet.rect(20, Math.max(0, sheetH - 4), 24, 3);
+                sheet.fill({ color: 0xec4899 });
+                sheet.rect(36, Math.max(0, sheetH - 4), 16, 3);
+                sheet.fill({ color: 0xeab308 });
+
+                // 4. Update Floating Progress Bar
+                const percent = Math.floor(cycleProgress * 100);
+                const barWidth = 98;
+                progressFill.clear();
+                progressFill.rect(0, 0, Math.max(2, (barWidth * percent) / 100), 7);
+                progressFill.fill({ color: isVip ? 0xfbbf24 : 0x22c55e });
+                progressText.text = `OT #${currentJob.ot || currentJob.id} · ${percent}%`;
+
+                // 5. Emit particles at carriage position
+                if (frameCount % 4 === 0) {
+                    emitParticle(108 + carriage.x + 6, 42 + carriage.y + 10, isVip);
+                }
+            } else if (carriage && sheet && glow && progressFill && progressText) {
+                // Idle / Standby state
+                glow.clear();
+                sheet.clear();
+                progressFill.clear();
+                progressText.text = 'PLOTTER EN ESPERA';
+            }
+
+            // Update particles pool
+            particlesPoolRef.current.forEach(p => {
+                if (p.active) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life++;
+                    p.gfx.x = p.x;
+                    p.gfx.y = p.y;
+                    p.gfx.alpha = 1 - p.life / p.maxLife;
+
+                    if (p.life >= p.maxLife) {
+                        p.active = false;
+                        p.gfx.visible = false;
+                    }
+                }
+            });
+        });
     };
 
     return (
@@ -606,14 +738,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             style={{
                 position: 'relative',
                 width: '100%',
-                minHeight: '290px',
+                minHeight: '420px',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
-                backgroundColor: PALETTE.floorDark,
+                backgroundColor: PALETTE.floorBase,
                 borderRadius: '8px',
                 overflow: 'hidden',
-                padding: '8px',
+                padding: '12px',
                 boxSizing: 'border-box'
             }}
         >
