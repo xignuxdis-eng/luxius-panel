@@ -96,6 +96,9 @@ export default defineConfig({
     server: {
         port: 3005,
         open: true,
+        watch: {
+            ignored: ['**/*.crdownload', '**/*.tmp']
+        },
         proxy: {
             '/api': {
                 target: 'http://localhost:5000',
