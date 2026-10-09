@@ -1546,7 +1546,7 @@ interface Config {
 export function getConfig(): Config {
     return {
         empresa: { nombre: 'Luxius', direccion: '', telefono: '', email: '', cuit: '', logo: '' },
-        sistema: { version: '1.0', nombre: 'Luxius', nombreAnterior: '', ultimaActualizacion: '' },
+        sistema: { version: '1.1.0', nombre: 'Luxius', nombreAnterior: '', ultimaActualizacion: '' },
         ordenes: { proximoId: 0, proximaOT: 0, prefijo: 'OT' },
         defaults: { demasias: 0, envio: '', calidadId: 0, materialId: 0 },
         contadores: { ordenesHoy: 0, pendientesImpresion: 0, trabajosCompletados: 0, entregasHoy: 0 }

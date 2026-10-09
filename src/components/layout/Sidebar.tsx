@@ -95,7 +95,22 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             </nav>
 
             <div className="sidebar-footer">
-                <ServerStatusLed />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                    <ServerStatusLed />
+                    <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.5px',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(255, 107, 0, 0.12)',
+                        color: 'var(--accent)',
+                        border: '1px solid rgba(255, 107, 0, 0.25)',
+                        fontFamily: 'monospace'
+                    }} title="Versión del Sistema LuXius">
+                        v1.1.0
+                    </span>
+                </div>
                 <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <ThemeToggle />
                     <button

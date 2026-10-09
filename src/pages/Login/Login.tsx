@@ -156,8 +156,10 @@ export default function Login() {
 
                     <div className="login-footer">
                         <p>Sistema de Gestión de Impresión</p>
-                        <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '5px' }}>
-                            Build: {buildTime}
+                        <div style={{ fontSize: '11px', opacity: 0.65, marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>v1.1.0</span>
+                            <span>•</span>
+                            <span>Build: {buildTime}</span>
                         </div>
                     </div>
 

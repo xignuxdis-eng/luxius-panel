@@ -10,7 +10,7 @@ function versionGeneratorPlugin(): Plugin {
         name: 'version-generator',
         buildStart() {
             const versionData = JSON.stringify({
-                version: '1.0.0',
+                version: '1.1.0',
                 buildTime: buildTimestamp,
                 generatedAt: Date.now()
             }, null, 2)
@@ -26,7 +26,7 @@ function versionGeneratorPlugin(): Plugin {
                 type: 'asset',
                 fileName: 'version.json',
                 source: JSON.stringify({
-                    version: '1.0.0',
+                    version: '1.1.0',
                     buildTime: buildTimestamp,
                     generatedAt: Date.now()
                 }, null, 2)
