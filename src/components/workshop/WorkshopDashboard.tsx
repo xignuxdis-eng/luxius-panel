@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { getOrdenes, saveOrden } from '@/data/db';
 import { Order, OrderStatus } from '@/types/orden';
 import { WorkshopCanvas } from './WorkshopCanvas';
+import { WorkshopCanvasPixi } from './WorkshopCanvasPixi';
 import { PrintManagerHUD } from './PrintManagerHUD';
 import { StationModal } from './StationModal';
 import { StationId } from './types';
@@ -15,6 +16,14 @@ export const WorkshopDashboard: React.FC = () => {
     const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
     const [isMuted, setIsMuted] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
+    const [rendererType, setRendererType] = useState<'legacy' | 'pixi'>(() => {
+        return (localStorage.getItem('luxius_print_den_renderer') as 'legacy' | 'pixi') || 'legacy';
+    });
+
+    const toggleRenderer = (nextType: 'legacy' | 'pixi') => {
+        setRendererType(nextType);
+        localStorage.setItem('luxius_print_den_renderer', nextType);
+    };
 
     const fetchOrders = async () => {
         try {
@@ -88,7 +97,9 @@ export const WorkshopDashboard: React.FC = () => {
                 alignItems: 'center',
                 marginBottom: '12px',
                 color: '#f8fafc',
-                fontFamily: 'sans-serif'
+                fontFamily: 'sans-serif',
+                flexWrap: 'wrap',
+                gap: '8px'
             }}>
                 <div>
                     <h2 style={{ margin: 0, fontSize: '20px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -100,6 +111,50 @@ export const WorkshopDashboard: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    {/* Engine Switcher */}
+                    <div style={{
+                        display: 'flex',
+                        backgroundColor: '#1e293b',
+                        padding: '2px',
+                        borderRadius: '6px',
+                        border: '1px solid #334155'
+                    }}>
+                        <button
+                            onClick={() => toggleRenderer('legacy')}
+                            style={{
+                                backgroundColor: rendererType === 'legacy' ? '#38bdf8' : 'transparent',
+                                color: rendererType === 'legacy' ? '#0f172a' : '#94a3b8',
+                                border: 'none',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            title="Canvas 2D Clásico (Original)"
+                        >
+                            🕹️ Canvas 2D
+                        </button>
+                        <button
+                            onClick={() => toggleRenderer('pixi')}
+                            style={{
+                                backgroundColor: rendererType === 'pixi' ? '#38bdf8' : 'transparent',
+                                color: rendererType === 'pixi' ? '#0f172a' : '#94a3b8',
+                                border: 'none',
+                                padding: '5px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            title="Nuevo Motor PixiJS v8 Pixel Art HD"
+                        >
+                            ⚡ Pixi HD
+                        </button>
+                    </div>
+
                     <button
                         onClick={toggleAudio}
                         style={{
@@ -129,12 +184,21 @@ export const WorkshopDashboard: React.FC = () => {
                     onSimulateStatusChange={handleUpdateStatus}
                 />
 
-                <WorkshopCanvas
-                    orders={orders}
-                    onSelectStation={(stationId) => setSelectedStation(stationId)}
-                    onSelectOrder={(order) => setPreviewOrder(order)}
-                    selectedStation={selectedStation}
-                />
+                {rendererType === 'pixi' ? (
+                    <WorkshopCanvasPixi
+                        orders={orders}
+                        onSelectStation={(stationId) => setSelectedStation(stationId)}
+                        onSelectOrder={(order) => setPreviewOrder(order)}
+                        selectedStation={selectedStation}
+                    />
+                ) : (
+                    <WorkshopCanvas
+                        orders={orders}
+                        onSelectStation={(stationId) => setSelectedStation(stationId)}
+                        onSelectOrder={(order) => setPreviewOrder(order)}
+                        selectedStation={selectedStation}
+                    />
+                )}
             </div>
 
             {/* Station Data Modal */}

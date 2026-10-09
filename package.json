@@ -16,6 +16,7 @@
     "lucide-react": "^0.563.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.530",
+    "pixi.js": "^8.22.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^20.1.1",
