@@ -441,11 +441,20 @@ export const WorkshopCanvas: React.FC<WorkshopCanvasProps> = ({
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(x + 25, y + 50, Math.min(rollW, 30), 4);
 
+                // NOTA: El estado 'orden' significa "en cola" de espera para impresión, no "imprimiendo".
+                // Barra de actividad indeterminada animada sin números ni porcentajes inventados
                 ctx.fillStyle = '#1e293b';
                 ctx.fillRect(x + 20, y - 12, width - 40, 10);
-                ctx.fillStyle = '#22c55e';
-                ctx.fillRect(x + 22, y - 10, (width - 44) * 0.65, 6);
-                ctx.strokeStyle = '#ffffff';
+                const barInnerW = width - 44;
+                const beamW = Math.floor(barInnerW * 0.35);
+                const beamOffset = ((Date.now() / 15) % (barInnerW + beamW)) - beamW;
+                const bStart = Math.max(0, beamOffset);
+                const bEnd = Math.min(barInnerW, beamOffset + beamW);
+                if (bEnd > bStart) {
+                    ctx.fillStyle = '#0ea5e9';
+                    ctx.fillRect(x + 22 + bStart, y - 10, bEnd - bStart, 6);
+                }
+                ctx.strokeStyle = '#38bdf8';
                 ctx.strokeRect(x + 20, y - 12, width - 40, 10);
             } else {
                 ctx.fillStyle = '#eab308';
