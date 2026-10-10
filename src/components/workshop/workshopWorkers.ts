@@ -16,6 +16,7 @@ import {
     type CharacterDirection,
     type CharacterTextures
 } from './workshopCharacters';
+import { BANTER_SCRIPTS, lineDurationMs, nextBanterDelayMs, pickBanterIndex } from './workshopBanter';
 
 export const MAP_W = 480;
 export const MAX_WORKERS = 4;
@@ -108,7 +109,7 @@ export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
 }
 
 export type HeldKind = 'carpeta' | 'rebotada' | 'rollo';
-export type BubbleTone = 'ok' | 'warn' | 'info';
+export type BubbleTone = 'ok' | 'warn' | 'info' | 'chat';
 
 export interface Errand {
     role: WorkerRole;
@@ -307,6 +308,8 @@ interface WorkerState {
     sprite: Sprite;
     /** Número de la orden que motivó el viaje actual (para el clic). */
     errandOrderId: number | null;
+    /** true mientras participa de una charla. */
+    chatting: boolean;
     hit: Container | null;
 }
 
@@ -322,6 +325,22 @@ const WALK_FPS = 8;
 const IDLE_BREATH_MS = 700;
 /** Tope de tiempo por cuadro: evita saltos enormes al volver de una pestaña en segundo plano. */
 const MAX_DELTA_MS = 100;
+/** Separación entre los dos operarios que charlan. */
+const CHAT_GAP_PX = 18;
+/** Si el que se acerca no llega en este tiempo, se cancela la charla. */
+const CHAT_APPROACH_TIMEOUT_MS = 12000;
+/** Primera charla poco después de abrir el taller. */
+const FIRST_CHAT_DELAY_MS = 6000;
+
+interface ChatState {
+    a: WorkerState; // quien se acerca (dice las frases 1, 3, 5...)
+    b: WorkerState; // quien espera (frases 2, 4...)
+    lines: string[];
+    phase: 'approach' | 'talk' | 'return';
+    lineIdx: number;
+    lineMs: number;
+    approachMs: number;
+}
 
 export class WorkerCrew {
     private workers: WorkerState[] = [];
@@ -330,6 +349,10 @@ export class WorkerCrew {
     private _destroyed = false;
     private queue: Errand[] = [];
     private hooks?: CrewHooks;
+    private chat: ChatState | null = null;
+    private chatTimerMs = FIRST_CHAT_DELAY_MS;
+    private lastBanter = -1;
+    private rng: () => number = Math.random;
 
     constructor(layer: Container, users: WorkerUser[], stations: StationConfig[], hooks?: CrewHooks) {
         this.hooks = hooks;
@@ -394,6 +417,7 @@ export class WorkerCrew {
                 bubble: null,
                 held: null,
                 errandOrderId: null,
+                chatting: false,
                 hit,
                 textures,
                 container,
@@ -500,13 +524,154 @@ export class WorkerCrew {
         w.held = g;
     }
 
+    /* ----------------------------- CHARLAS ----------------------------- */
+
+    private clearChatBubble(w: WorkerState) {
+        if (w.errand === 'none' && w.bubble && w.bubble.tone === 'chat') w.bubble = null;
+    }
+
+    private freeForChat(w: WorkerState) {
+        return w.errand === 'none' && w.mode === 'idle' && !w.chatting;
+    }
+
+    /** Cambia el generador de azar (para pruebas). */
+    setRandom(rng: () => number) {
+        this.rng = rng;
+    }
+
+    isChatting(): boolean {
+        return this.chat !== null;
+    }
+
+    /**
+     * Empieza una charla entre dos operarios libres. Sin argumentos elige al azar.
+     * Devuelve false si no hay dos operarios libres.
+     */
+    startChat(aId?: string, bId?: string, scriptIdx?: number): boolean {
+        if (this._destroyed || this.chat) return false;
+        const free = this.workers.filter((w) => this.freeForChat(w));
+        if (free.length < 2) return false;
+        let a = aId ? free.find((w) => w.spec.id === aId) : undefined;
+        let b = bId ? free.find((w) => w.spec.id === bId) : undefined;
+        if (aId && !a) return false;
+        if (bId && !b) return false;
+        if (!a) a = free[Math.floor(this.rng() * free.length)];
+        if (!b) {
+            const others = free.filter((w) => w !== a);
+            b = others[Math.floor(this.rng() * others.length)];
+        }
+        if (!a || !b || a === b) return false;
+
+        const idx = scriptIdx ?? pickBanterIndex(this.rng, this.lastBanter);
+        this.lastBanter = idx;
+        const side = a.x <= b.x ? -1 : 1; // el que se acerca queda a la izquierda (-1) o derecha (+1) del otro
+        const meetX = Math.max(14, Math.min(MAP_W - 14, Math.round(b.x + side * CHAT_GAP_PX)));
+        const facing: CharacterDirection = side < 0 ? 'right' : 'left';
+
+        a.chatting = true;
+        b.chatting = true;
+        this.startPath(a, { x: meetX, y: a.y, facing });
+        this.chat = {
+            a,
+            b,
+            lines: BANTER_SCRIPTS[idx % BANTER_SCRIPTS.length],
+            phase: 'approach',
+            lineIdx: 0,
+            lineMs: 0,
+            approachMs: 0
+        };
+        return true;
+    }
+
+    /** Termina la charla de golpe. El operario `taken` (si hay) no vuelve solo: va a hacer un encargo. */
+    private abortChat(taken?: WorkerState) {
+        const c = this.chat;
+        if (!c) return;
+        for (const w of [c.a, c.b]) {
+            w.chatting = false;
+            this.clearChatBubble(w);
+            if (w === taken) continue;
+            const away = w.mode === 'walk' || Math.hypot(w.x - w.home.x, w.y - w.home.y) > 1;
+            if (w.errand === 'none' && away) {
+                w.errand = 'returning';
+                this.startPath(w, w.home);
+            } else if (w.errand === 'none') {
+                w.facing = w.home.facing;
+            }
+        }
+        this.chat = null;
+        this.chatTimerMs = nextBanterDelayMs(this.rng);
+    }
+
+    private showChatLine(c: ChatState) {
+        const speaker = c.lineIdx % 2 === 0 ? c.a : c.b;
+        const other = speaker === c.a ? c.b : c.a;
+        speaker.bubble = { text: c.lines[c.lineIdx], tone: 'chat' };
+        this.clearChatBubble(other);
+        c.lineMs = lineDurationMs(c.lines[c.lineIdx]);
+    }
+
+    private updateChat(dt: number) {
+        const c = this.chat;
+        if (!c) {
+            this.chatTimerMs -= dt;
+            if (this.chatTimerMs <= 0) {
+                // si no hay dos operarios libres, se reintenta pronto
+                if (!this.startChat()) this.chatTimerMs = 3000;
+            }
+            return;
+        }
+
+        // Si alguien dejó de estar disponible (viaje de una orden), la charla se corta.
+        if (c.a.errand !== 'none' || c.b.errand !== 'none') {
+            this.abortChat();
+            return;
+        }
+
+        if (c.phase === 'approach') {
+            c.approachMs += dt;
+            if (c.a.mode === 'idle') {
+                c.phase = 'talk';
+                c.lineIdx = 0;
+                const toRight = c.a.x < c.b.x;
+                c.a.facing = toRight ? 'right' : 'left';
+                c.b.facing = toRight ? 'left' : 'right';
+                this.showChatLine(c);
+            } else if (c.approachMs > CHAT_APPROACH_TIMEOUT_MS) {
+                this.abortChat();
+            }
+        } else if (c.phase === 'talk') {
+            c.lineMs -= dt;
+            if (c.lineMs <= 0) {
+                c.lineIdx++;
+                if (c.lineIdx >= c.lines.length) {
+                    this.clearChatBubble(c.a);
+                    this.clearChatBubble(c.b);
+                    c.phase = 'return';
+                    c.b.facing = c.b.home.facing;
+                    c.b.chatting = false;
+                    this.startPath(c.a, c.a.home);
+                } else {
+                    this.showChatLine(c);
+                }
+            }
+        } else if (c.a.mode === 'idle') {
+            c.a.chatting = false;
+            this.chat = null;
+            this.chatTimerMs = nextBanterDelayMs(this.rng);
+        }
+    }
+
     private processQueue() {
         if (this.queue.length === 0) return;
         this.queue = this.queue.filter((e) => {
             const ofRole = this.workers.filter((w) => w.spec.role === e.role);
             if (ofRole.length === 0) return false; // nadie con ese rol: se descarta
-            const free = ofRole.find((w) => w.errand === 'none' && w.mode === 'idle');
+            // Un operario en charla puede ser reclamado: el viaje de la orden tiene prioridad.
+            const isFree = (w: WorkerState) => w.errand === 'none' && (w.mode === 'idle' || w.chatting);
+            const free = ofRole.find((w) => isFree(w) && !w.chatting) ?? ofRole.find(isFree);
             if (!free) return true; // todos ocupados: espera
+            if (free.chatting) this.abortChat(free);
             if (this.sendTo(free.spec.id, e.stationId)) {
                 free.errand = 'going';
                 free.bubble = e.text ? { text: e.text, tone: e.tone ?? 'info' } : null;
@@ -523,6 +688,7 @@ export class WorkerCrew {
         if (this._destroyed) return;
         const dt = Math.max(0, Math.min(deltaMS, MAX_DELTA_MS));
         this.processQueue();
+        this.updateChat(dt);
 
         for (const w of this.workers) {
             w.animMs += dt;
@@ -611,6 +777,7 @@ export class WorkerCrew {
         }
         this.workers = [];
         this.queue = [];
+        this.chat = null;
     }
 }
 
