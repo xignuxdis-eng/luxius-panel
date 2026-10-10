@@ -93,9 +93,7 @@ export function getTextureCacheSize(): number {
     });
     return count;
 }
-if (typeof window !== 'undefined') {
-    (window as any).__GET_TEXTURE_CACHE_SIZE__ = getTextureCacheSize;
-}
+
 
 /* ==========================================================================
    PALETTES: Refined, Low-Contrast Slate-Blue Workshop Palette
