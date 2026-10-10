@@ -33,7 +33,41 @@ export const BANTER_SCRIPTS: string[][] = [
     ['Skyrim tiene dragones, nosotros tenemos plotters.', 'Y los nuestros sí entregan a tiempo.'],
     ['¿Tendrá un Easter egg este diseño?', 'Sí: la calidad con la que salió.'],
     ['¡Minecraft de calidad! Cada píxel en su lugar.', 'Y sin picar ni un solo bloque de tinta.'],
-    ['Nuevo récord: cero errores de color hoy.', 'Logro desbloqueado: Impresor Maestro.']
+    ['Nuevo récord: cero errores de color hoy.', 'Logro desbloqueado: Impresor Maestro.'],
+    // --- Universo Blizzard: StarCraft ---
+    ['Necesitamos más gas vespeno... de tinta.', 'Y más minerales. Pero la impresión salió perfecta.'],
+    ['¡Hay que construir más pilones de lona!', 'Con esta calidad, ni los zerg nos frenan.'],
+    ['Zerg rush de pedidos y todo salió impecable.', 'Es que el plotter juega en nivel Protoss.'],
+    ['En posición, comandante. Esta impresión está lista.', 'Marine aprobado: colores de otro nivel.'],
+    ['Tu diseño es como Jim Raynor: un héroe.', 'Y la impresión, digna de Terran Dominion.'],
+    ['¡En nombre de Aiur! Qué diseño más pulido.', 'El Khala lo aprueba: calidad perfecta.'],
+    ['Kerrigan quedaría fascinada con estos rojos.', 'Hasta la Reina de Espadas aplaude el acabado.'],
+    ['Sin dinero suficiente... ¡pero esta lona vale oro!', 'Y la tinta nunca falta con vos a cargo.'],
+    ['Tanque de asedio listo: este corte es de precisión.', 'Ni un milímetro de error. Siege mode ON.'],
+    // --- Warcraft ---
+    ['¡Trabajo completado! La lona quedó genial.', 'Los peones estarían orgullosos de este acabado.'],
+    ['Lok\'tar ogar! Qué colores más vibrantes.', 'Por la Horda, es la mejor impresión del año.'],
+    ['Por el Rey Exánime... qué diseño más frío y nítido.', 'Y sin una sola mancha. Digno de Arthas.'],
+    ['Jaina diría que este azul es mágico.', 'Y Thrall, que la impresión tiene espíritu.'],
+    ['Es hora de la acción: a imprimir se ha dicho.', 'Zug zug. Todo quedó listo, jefe.'],
+    ['Lordaeron nunca vio una impresión tan nítida.', 'Ni Stratholme. Y eso que es zona de purga.'],
+    // --- World of Warcraft ---
+    ['Este diseño es épico, drop garantizado.', 'Y la impresión, al menos un ítem legendario.'],
+    ['Lok\'tar! Tanque, healer y diseño, trío ganador.', 'Con esta lona hacemos raid sin wipear.'],
+    ['Ya van tres pedidos y ni un solo wipe.', 'Es que el plotter tiene el equipo full BiS.'],
+    ['Me debés una montura por este diseño.', 'Te la pago en tinta: calidad Mythic.'],
+    ['Esto es más épico que Wrath of the Lich King.', 'Y más pulido que el parche de Dragonflight.'],
+    ['Los colores de esta lona parecen de Pandaria.', 'Mists of Pandaria: ¡el mejor diseño de la expansión!'],
+    ['El diseño parece sacado de Shadowlands...', 'Pero este sí que no necesita parche de balance.'],
+    ['Gnomos, ingeniería y esta impresión: caos perfecto.', 'Mientras nada explote, la calidad es de Legion.'],
+    ['Tu arte vale más que el Cataclismo entero.', 'Deathwing se retiraría ante esta calidad.'],
+    ['Ding! Subimos de nivel 60 en calidad de impresión.', 'Ahora a por la montura de la entrega rápida.'],
+    ['Este vinilo tiene más brillo que la Espada Sulfuras.', 'Si Ragnaros lo viera, pediría una copia.'],
+    ['Pedido listo: no hace falta ni la Piedra de Hogar.', 'Estoy en Orgrimmar y ya llegó, qué velocidad.'],
+    ['Las tintas de hoy son nivel Burning Crusade.', 'Outland quedó chico, qué impresión.'],
+    ['Hordas y Alianzas: todos aprueban este diseño.', 'Ni los murlocs se atreven a criticar. Mrglglgl.'],
+    ['Encontré una gema en el diseño: es perfecto.', 'Epic gem, epic print. Todo en su lugar.']
+
 ];
 
 /** Elige el índice de una charla distinta de la anterior. `rng` devuelve un número entre 0 y 1. */
