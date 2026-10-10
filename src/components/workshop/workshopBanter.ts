@@ -80,7 +80,7 @@ export function pickBanterIndex(rng: () => number, last: number): number {
 
 /** Cuánto tiempo se muestra una frase: base + tiempo de lectura según el largo. */
 export function lineDurationMs(text: string): number {
-    return Math.max(2600, 1400 + text.length * 55);
+    return Math.max(3600, 2400 + text.length * 55);
 }
 
 /** Pausa entre una charla y la siguiente (12 a 20 s). */
