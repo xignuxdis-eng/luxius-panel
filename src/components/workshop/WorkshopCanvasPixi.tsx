@@ -129,6 +129,21 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const tooltipContainerRef = useRef<Container | null>(null);
     const tooltipTextRef = useRef<Text | null>(null);
 
+    const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
+        const text = count > 0 ? `${count}` : '';
+        textNode.text = text;
+        badgeBg.clear();
+        if (count > 0) {
+            const isMultiDigit = text.length > 1;
+            const w = isMultiDigit ? 26 : 20;
+            const h = 20;
+            const r = 10;
+            badgeBg.roundRect(-w / 2, -h / 2, w, h, r);
+            badgeBg.fill({ color: 0xef4444 });
+            badgeBg.stroke({ width: 1.5, color: 0xffffff });
+        }
+    };
+
     // Update synced refs
     useEffect(() => {
         ordersRef.current = orders;
@@ -142,6 +157,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         }
 
         // Update badge counters on all stations
+        stationsUIRef.current.forEach((s) => {
+            if (!s.badgeCountText || s.badgeCountText.destroyed) return;
+            const count = countOrdersForStation(s.id, orders);
+            updateBadgeVisual(s.badgeBg, s.badgeCountText, count);
+            s.badgeContainer.visible = count > 0;
+        });
+
         badgesMapRef.current.forEach((textNode, stationId) => {
             if (!textNode || textNode.destroyed) return;
             const count = countOrdersForStation(stationId, orders);
@@ -388,7 +410,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         // 1. Layout Plotters UI (Status Bar & Nameplate)
         plottersListRef.current.forEach((p) => {
             const barW = Math.round((p.plotterActualW - 24) * scale);
-            const barH = 20; // 20px real screen pixels
+            const barH = 22; // 22px real screen pixels
             p.barContainer.x = Math.round((p.baseX + p.plotterOffsetX + 12) * scale);
             p.barContainer.y = Math.round((p.baseY + 11) * scale);
 
@@ -397,7 +419,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             p.barBg.fill({ color: 0x090d16, alpha: 1.0 }); // Fondo oscuro sólido opaco
             p.barBg.stroke({ width: 1, color: 0x334155 }); // Borde nítido
 
-            p.progressText.style.fontSize = 11;
+            p.progressText.style.fontSize = 12;
             p.progressText.x = Math.floor(barW / 2);
             p.progressText.y = Math.floor(barH / 2);
 
@@ -405,25 +427,28 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             p.nameplate.x = Math.round((p.baseX + p.plotterOffsetX + 12) * scale);
             p.nameplate.y = Math.round((p.baseY + 0) * scale);
             p.nameplateBg.clear();
-            p.nameplateBg.roundRect(0, 0, 84, 18, 3);
+            p.nameplateBg.roundRect(0, 0, 104, 22, 3);
             p.nameplateBg.fill({ color: 0x090d16, alpha: 1.0 });
             p.nameplateBg.stroke({ width: 1, color: 0x06b6d4 });
-            p.nameText.style.fontSize = 11;
-            p.nameText.x = 6;
-            p.nameText.y = 2;
+            p.nameText.style.fontSize = 13;
+            p.nameText.x = 8;
+            p.nameText.y = 3;
         });
 
         // 2. Layout Station Titles & Badges
         stationsUIRef.current.forEach((s) => {
             const isPlotter = s.id === 'plotter1' || s.id === 'plotter2' || s.id.startsWith('maquina_');
             if (!isPlotter) {
-                s.titleText.x = Math.round((s.x + 6) * scale);
-                s.titleText.y = Math.round((s.y + 2) * scale);
-                s.titleText.style.fontSize = 11;
+                s.titleText.x = Math.round((s.x + 8) * scale);
+                s.titleText.y = Math.round((s.y + 3) * scale);
+                s.titleText.style.fontSize = 13;
+                s.badgeContainer.x = Math.round((s.x + s.width - 12) * scale);
+                s.badgeContainer.y = Math.round((s.y + 10) * scale);
+            } else {
+                s.badgeContainer.x = Math.round((s.x + s.width - 14) * scale);
+                s.badgeContainer.y = Math.round((s.y + 12) * scale);
             }
-
-            s.badgeContainer.x = Math.round((s.x + s.width - 10) * scale);
-            s.badgeContainer.y = Math.round((s.y + 8) * scale);
+            updateBadgeVisual(s.badgeBg, s.badgeCountText, countOrdersForStation(s.id, ordersRef.current));
         });
 
         // 3. BUILD_TAG
@@ -652,14 +677,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                 // Title Bar Header Platform Background
                 const headerGfx = new Graphics();
-                headerGfx.rect(0, 0, width, 14);
+                headerGfx.rect(0, 0, width, 16);
                 headerGfx.fill({ color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
                 visualContainer.addChild(headerGfx);
 
-                // Station Title Text in UILayer (B0.2: Native resolution 11-12px)
+                // Station Title Text in UILayer (B0.2: Native resolution 13px)
                 const titleStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: 'bold',
                     fill: '#ffffff'
                 });
@@ -669,17 +694,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 });
                 uiLayer.addChild(titleText);
 
-                // Notification Badge (Counter) in UILayer (B0.2)
+                // Notification Badge (Counter) in UILayer (B0.2: 12px)
                 const badgeContainer = new Container();
                 const badgeBg = new Graphics();
-                badgeBg.circle(0, 0, 8.5);
-                badgeBg.fill({ color: 0xef4444 });
-                badgeBg.stroke({ width: 1.5, color: 0xffffff });
                 badgeContainer.addChild(badgeBg);
 
                 const badgeStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 'bold',
                     fill: '#ffffff'
                 });
@@ -689,7 +711,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 badgesMapRef.current.set(id, badgeCountText);
 
                 const count = countOrdersForStation(id, ordersRef.current);
-                badgeCountText.text = count > 0 ? `${count}` : '';
+                updateBadgeVisual(badgeBg, badgeCountText, count);
                 badgeContainer.visible = count > 0;
                 uiLayer.addChild(badgeContainer);
 
@@ -727,20 +749,20 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 // 1. Cartel con el nombre "Plotter" en UILayer (B0.2: Native resolution, fondo oscuro opaco)
                 const nameplate = new Container();
                 const nameplateBg = new Graphics();
-                nameplateBg.roundRect(0, 0, 84, 18, 3);
+                nameplateBg.roundRect(0, 0, 104, 22, 3);
                 nameplateBg.fill({ color: 0x090d16, alpha: 1.0 }); // fondo oscuro sólido
                 nameplateBg.stroke({ width: 1, color: isOffline ? 0x64748b : 0x06b6d4 });
                 nameplate.addChild(nameplateBg);
 
                 const nameStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: 'bold',
                     fill: isOffline ? '#94a3b8' : '#ffffff'
                 });
                 const nameText = new Text({ text: `${icon} ${title}`, style: nameStyle });
-                nameText.x = 6;
-                nameText.y = 2;
+                nameText.x = 8;
+                nameText.y = 3;
                 nameplate.addChild(nameText);
                 uiLayer.addChild(nameplate);
 
@@ -770,17 +792,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 plotterProgressFillRef.current = barFill;
                 plotterProgressTextRef.current = progressText;
 
-                // Badge contador para plotter en UILayer (B0.2)
+                // Badge contador para plotter en UILayer (B0.2: 12px)
                 const plotterBadgeContainer = new Container();
                 const plotterBadgeBg = new Graphics();
-                plotterBadgeBg.circle(0, 0, 8.5);
-                plotterBadgeBg.fill({ color: 0xef4444 });
-                plotterBadgeBg.stroke({ width: 1.5, color: 0xffffff });
                 plotterBadgeContainer.addChild(plotterBadgeBg);
 
                 const plotterBadgeStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 'bold',
                     fill: '#ffffff'
                 });
@@ -790,7 +809,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 badgesMapRef.current.set(id, plotterBadgeCountText);
 
                 const pCount = countOrdersForStation(id, ordersRef.current);
-                plotterBadgeCountText.text = pCount > 0 ? `${pCount}` : '';
+                updateBadgeVisual(plotterBadgeBg, plotterBadgeCountText, pCount);
                 plotterBadgeContainer.visible = pCount > 0;
                 uiLayer.addChild(plotterBadgeContainer);
 
@@ -819,9 +838,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 carriageSprite.y = plotterOffsetY + 14;
                 visualContainer.addChild(carriageSprite);
 
-                // 8. Luz / Resplandor anclado con precisión sobre el cabezal
+                // 8. Destello cuadrado centrado sobre el cabezal (baja opacidad)
                 const glowGfx = new Graphics();
-                glowGfx.blendMode = 'add';
+                glowGfx.blendMode = 'normal';
                 glowGfx.alpha = 0;
                 visualContainer.addChild(glowGfx);
 
@@ -1067,11 +1086,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         const targetCarriageX = railMinX + sweepRatio * railRange;
                         carriage.x += (targetCarriageX - carriage.x) * 0.2;
 
-                        // 2. Glow (centrado con precisión en el cabezal de impresión)
+                        // 2. Destello cuadrado centrado con precisión sobre el carro (6-8 px, baja opacidad)
                         glow.clear();
-                        glow.circle(carriage.x + 6, carriage.y + 4, 6);
-                        glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.35 });
-                        glow.alpha += (1 - glow.alpha) * 0.08;
+                        const flashSize = 7;
+                        const flashX = Math.round(carriage.x + 6 - flashSize / 2);
+                        const flashY = Math.round(carriage.y + 4 - flashSize / 2);
+                        glow.rect(flashX, flashY, flashSize, flashSize);
+                        glow.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.22 });
+                        glow.alpha += (1 - glow.alpha) * 0.1;
 
                         // 3. Unrolling printed sheet (adaptado a la mesa ancha con bandas CMYK decorativas)
                         const sheetW = plotterW - 66;
@@ -1215,23 +1237,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             }}
         >
             <div ref={canvasHostRef} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
-            {/* BUILD_TAG temporal (se retira en Fase 6) */}
-            <div style={{
-                position: 'absolute',
-                bottom: '8px',
-                right: '8px',
-                backgroundColor: '#090d16',
-                border: '1px solid #334155',
-                color: '#38bdf8',
-                fontSize: '9px',
-                fontFamily: 'monospace',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                zIndex: 20,
-                pointerEvents: 'none'
-            }}>
-                {BUILD_TAG}
-            </div>
         </div>
     );
 };
