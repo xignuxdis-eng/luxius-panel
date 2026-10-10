@@ -48,7 +48,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'B0-r4';
+export const BUILD_TAG = 'F3-r1';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
