@@ -1,8 +1,9 @@
 // WorkerSheetCard.tsx - Ficha técnica "estilo WoW" del operario (se abre al hacer clic en el personaje)
+// Se cierra con la X, con Escape o haciendo clic fuera de la ficha.
 // Muestra lo que está haciendo en este momento (datos reales del taller) y una ficha de FANTASÍA
 // con estadísticas, fortalezas y debilidades (se aclara en pantalla).
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkerSnapshot } from './workshopWorkers';
 import { ROLE_LABEL, buildWorkerSheet, describeActivity } from './workshopSheets';
 
@@ -15,6 +16,8 @@ export interface WorkerSheetCardProps {
     /** Si hay una orden asociada (la del viaje o la primera de su rol), permite abrirla. */
     onOpenOrder?: () => void;
     onClose: () => void;
+    /** Se llama cuando se cierra por un clic fuera de la ficha (o Escape), antes de `onClose`. */
+    onOutsideClose?: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -45,8 +48,30 @@ const sectionTitle: React.CSSProperties = {
     margin: '10px 0 4px'
 };
 
-export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getSnapshot, waitingOrders, onOpenOrder, onClose }) => {
+export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getSnapshot, waitingOrders, onOpenOrder, onClose, onOutsideClose }) => {
     const [snap, setSnap] = useState<WorkerSnapshot | undefined>(() => getSnapshot(workerId));
+    const panelRef = useRef<HTMLDivElement | null>(null);
+    const closeRef = useRef({ onClose, onOutsideClose });
+    closeRef.current = { onClose, onOutsideClose };
+
+    // Cerrar al hacer clic fuera de la ficha o con Escape
+    useEffect(() => {
+        const onDown = (e: PointerEvent) => {
+            const el = panelRef.current;
+            if (el && e.target instanceof Node && el.contains(e.target)) return;
+            closeRef.current.onOutsideClose?.();
+            closeRef.current.onClose();
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeRef.current.onClose();
+        };
+        document.addEventListener('pointerdown', onDown, true);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('pointerdown', onDown, true);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [workerId]);
 
     useEffect(() => {
         setSnap(getSnapshot(workerId));
@@ -59,7 +84,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
     if (!snap || !sheet) return null;
 
     return (
-        <div style={panelStyle} role="dialog" aria-label={`Ficha técnica de ${snap.name}`} id="worker-sheet-card">
+        <div ref={panelRef} style={panelStyle} role="dialog" aria-label={`Ficha técnica de ${snap.name}`} id="worker-sheet-card">
             <button
                 type="button"
                 onClick={onClose}

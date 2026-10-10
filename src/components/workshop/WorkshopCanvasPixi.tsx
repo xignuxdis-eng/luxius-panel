@@ -179,10 +179,19 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         []
     );
     // Clic en un operario: abre su ficha técnica (lo que hace ahora + estadísticas de fantasía).
+    const lastOutsideCloseRef = useRef<{ id: string; t: number } | null>(null);
+    const sheetIdRef = useRef<string | null>(null);
+    sheetIdRef.current = sheetWorkerId;
     const handleWorkerTap = (workerId: string) => {
         if (dragMovedRef.current) return; // arrastre de cámara
         audioEngine.playClick();
-        setSheetWorkerId((prev) => (prev === workerId ? null : workerId));
+        // Si la ficha de este mismo operario acaba de cerrarse por el clic fuera, el clic en el operario no la reabre
+        const last = lastOutsideCloseRef.current;
+        if (last && last.id === workerId && Date.now() - last.t < 600) {
+            lastOutsideCloseRef.current = null;
+            return;
+        }
+        setSheetWorkerId(workerId);
     };
 
     const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
@@ -1486,6 +1495,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                                 : undefined
                         }
                         onClose={() => setSheetWorkerId(null)}
+                        onOutsideClose={() => {
+                            lastOutsideCloseRef.current = { id: sheetWorkerId, t: Date.now() };
+                        }}
                     />
                 );
             })()}
