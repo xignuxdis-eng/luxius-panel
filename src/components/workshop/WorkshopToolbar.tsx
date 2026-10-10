@@ -8,6 +8,7 @@ export interface FxToggles {
     events: boolean;
     weather: boolean;
     alerts: boolean;
+    petSound: boolean;
 }
 
 export interface ToolbarStation {
@@ -29,6 +30,9 @@ export interface WorkshopToolbarProps {
     achievementsOpen: boolean;
     onToggleAchievements: () => void;
     weatherText: string | null;
+    /** Mascotas que están ahora en el taller (clic = abrir su ficha). */
+    pets?: { id: string; name: string; emoji: string }[];
+    onOpenPet?: (id: string) => void;
 }
 
 const chip = (active: boolean, accent = '#38bdf8'): React.CSSProperties => ({
@@ -46,10 +50,11 @@ const chip = (active: boolean, accent = '#38bdf8'): React.CSSProperties => ({
 });
 
 const FX_LABEL: Record<keyof FxToggles, { icon: string; label: string; title: string }> = {
-    pet: { icon: '🐱', label: 'Mascota', title: 'Mostrar/ocultar a Tóner, la gata del taller (decorativa)' },
+    pet: { icon: '🐾', label: 'Mascotas', title: 'Mostrar/ocultar a las mascotas del taller: Frijol, Jaina, Muchi, Teo y Borry (decorativas)' },
     events: { icon: '🎲', label: 'Eventos', title: 'Eventos y visitas aleatorias (decorativas): apagón, café, hora feliz, repartidor, técnico, guardia nocturno' },
     weather: { icon: '🌦️', label: 'Clima', title: 'Clima real por las ventanas (Open-Meteo)' },
-    alerts: { icon: '🔔', label: 'Alertas', title: 'Íconos de alerta sobre las estaciones (stock bajo, máquina offline, atrasos)' }
+    alerts: { icon: '🔔', label: 'Alertas', title: 'Íconos de alerta sobre las estaciones (stock bajo, máquina offline, atrasos)' },
+    petSound: { icon: '🔊', label: 'Animales', title: 'Sonido de las mascotas al hacer clic en ellas' }
 };
 
 export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
@@ -64,7 +69,9 @@ export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
     achievementsTotal,
     achievementsOpen,
     onToggleAchievements,
-    weatherText
+    weatherText,
+    pets = [],
+    onOpenPet
 }) => (
     <div
         id="workshop-toolbar"
@@ -97,6 +104,12 @@ export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
                 {FX_LABEL[k].icon} {FX_LABEL[k].label} {fx[k] ? 'ON' : 'OFF'}
             </button>
         ))}
+        {fx.pet &&
+            pets.map((p) => (
+                <button key={p.id} type="button" style={chip(false, '#c084fc')} onClick={() => onOpenPet?.(p.id)} title={`Ver la ficha de ${p.name}`}>
+                    {p.emoji} {p.name}
+                </button>
+            ))}
         {fx.weather && weatherText && (
             <span style={{ color: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} title="Clima real por las ventanas">
                 {weatherText}

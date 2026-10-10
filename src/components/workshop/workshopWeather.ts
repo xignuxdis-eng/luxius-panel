@@ -1,7 +1,7 @@
 // workshopWeather.ts - Clima real para las ventanas del Print Den (Bloque F8)
 // Usa Open-Meteo (gratis, sin clave). La ubicación se puede configurar en el navegador con
 //   localStorage.setItem('luxius_print_den_geo', 'latitud,longitud,Nombre del lugar')
-// Si no hay ubicación configurada se usa Buenos Aires y se aclara en pantalla. Si no hay internet
+// Si no hay ubicación configurada se usa Córdoba (donde está el taller). Si no hay internet
 // o el servicio falla, simplemente no se muestra clima (nunca se inventa).
 
 export type WeatherKind = 'clear' | 'cloudy' | 'fog' | 'rain' | 'snow' | 'storm';
@@ -17,7 +17,7 @@ export interface WeatherInfo {
     fetchedAt: number;
 }
 
-const DEFAULT_GEO = { lat: -34.6037, lon: -58.3816, name: 'Buenos Aires' };
+const DEFAULT_GEO = { lat: -31.4201, lon: -64.1888, name: 'Córdoba' };
 const GEO_KEY = 'luxius_print_den_geo';
 export const WEATHER_REFRESH_MS = 30 * 60 * 1000;
 
@@ -58,7 +58,7 @@ function readGeo(): { lat: number; lon: number; name: string; isDefault: boolean
             }
         }
     } catch (_) {}
-    return { ...DEFAULT_GEO, isDefault: true };
+    return { ...DEFAULT_GEO, isDefault: false }; // Córdoba es donde está el taller: no hace falta aclararlo
 }
 
 /** Pide el clima actual. Devuelve null si no se pudo obtener. */

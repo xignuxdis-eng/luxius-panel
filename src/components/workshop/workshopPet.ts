@@ -1,28 +1,206 @@
-// workshopPet.ts - Tóner, la mascota (gata) del Print Den (Bloque F9)
-// DECORATIVA: no representa ningún dato del sistema. Pasea por el taller sin atravesar estaciones, se sienta,
-// se echa a dormir y, si le hacés clic, se despierta y suelta corazoncitos.
+// workshopPet.ts - Las mascotas del Print Den (Bloque F9, ampliado): Frijol, Jaina, Muchi, Teo y Borry.
+// TODO es DECORATIVO: no representa ningún dato del sistema (las estadísticas de las fichas son de fantasía).
+// Siempre hay una mascota en el taller (la "residente"); cada tanto se turnan. Solo cuando vuelve la luz después de
+// un apagón aparecen todas juntas y luego se van yendo de a una hasta quedar una sola, que renueva la rotación.
+// Pasean por el taller sin atravesar estaciones, se sientan, duermen (o se rascan las pulgas) y los operarios
+// a veces las acarician; algunas se dejan más que otras. Al hacerles clic suena su sonido característico.
 
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { StationConfig } from './types';
-import { MAP_W, computeLanes, isWalkable, type Lanes, type Point } from './workshopWorkers';
+import { MAP_W, computeLanes, isWalkable, type Lanes, type Point, type WorkerCrew } from './workshopWorkers';
+import type { AnimalVoice } from './workshopAnimalSound';
 
-export const PET_NAME = 'Tóner';
+export interface PetStat {
+    label: string;
+    value: number;
+    color: string;
+}
 
-type PetState = 'sit' | 'walk' | 'sleep';
+export interface PetProfile {
+    id: AnimalVoice;
+    name: string;
+    species: 'gato' | 'perro';
+    emoji: string;
+    /** Título estilo WoW para la ficha. */
+    title: string;
+    level: number;
+    body: number;
+    shade: number;
+    belly: number;
+    eye: number;
+    nose: number;
+    chubby?: boolean;
+    bulgyEyes?: boolean;
+    /** Velocidad al caminar (px/s del mapa). */
+    speed: number;
+    /** Pausa entre paseos [min, max] en ms. */
+    rest: [number, number];
+    sleepChance: number;
+    scratchChance: number;
+    /** Probabilidad de dejarse acariciar (por un operario o por el usuario). */
+    petChance: number;
+    /** Prefiere recorridos largos. */
+    farWalker?: boolean;
+    stats: PetStat[];
+    strengths: string[];
+    weaknesses: string[];
+}
 
-const BODY = 0xf59e0b;
-const SHADE = 0xb45309;
-const BELLY = 0xfde68a;
+export const PET_PROFILES: PetProfile[] = [
+    {
+        id: 'frijol',
+        name: 'Frijol',
+        species: 'gato',
+        emoji: '🐈‍⬛',
+        title: 'Gata Negra de Guardia',
+        level: 7,
+        body: 0x2b2b35,
+        shade: 0x111116,
+        belly: 0x3c3c48,
+        eye: 0xfacc15,
+        nose: 0xfda4af,
+        speed: 14,
+        rest: [3000, 8000],
+        sleepChance: 0.4,
+        scratchChance: 0,
+        petChance: 0.7,
+        stats: [
+            { label: 'Sigilo', value: 92, color: '#a78bfa' },
+            { label: 'Cariño', value: 70, color: '#f472b6' },
+            { label: 'Curiosidad', value: 78, color: '#38bdf8' },
+            { label: 'Energía', value: 55, color: '#fbbf24' },
+            { label: 'Siesta', value: 85, color: '#34d399' }
+        ],
+        strengths: ['Se pasea por todo el taller como si fuera suyo', 'Ronroneo calmante: +5 de buen ánimo al equipo'],
+        weaknesses: ['Se camufla con el vinilo negro', 'Despierta de mal humor si la siesta se interrumpe']
+    },
+    {
+        id: 'jaina',
+        name: 'Jaina',
+        species: 'gato',
+        emoji: '🐈',
+        title: 'Gata Gris Serena',
+        level: 9,
+        body: 0x9ca3af,
+        shade: 0x6b7280,
+        belly: 0xd1d5db,
+        eye: 0x34d399,
+        nose: 0xfda4af,
+        speed: 12,
+        rest: [4000, 10000],
+        sleepChance: 0.5,
+        scratchChance: 0,
+        petChance: 0.25,
+        stats: [
+            { label: 'Calma', value: 98, color: '#34d399' },
+            { label: 'Cariño', value: 35, color: '#f472b6' },
+            { label: 'Curiosidad', value: 60, color: '#38bdf8' },
+            { label: 'Energía', value: 40, color: '#fbbf24' },
+            { label: 'Siesta', value: 95, color: '#a78bfa' }
+        ],
+        strengths: ['Calma inalterable, incluso con una entrega urgente', 'Elegancia: nunca pisa un charco de tinta'],
+        weaknesses: ['Solo acepta caricias cuando ella lo decide', 'Ignora olímpicamente cuando la llaman']
+    },
+    {
+        id: 'muchi',
+        name: 'Muchi',
+        species: 'perro',
+        emoji: '🐕‍🦺',
+        title: 'Torbellino Negro',
+        level: 4,
+        body: 0x25252d,
+        shade: 0x101015,
+        belly: 0x3a3a45,
+        eye: 0xf8fafc,
+        nose: 0x52525b,
+        speed: 32,
+        rest: [500, 1800],
+        sleepChance: 0.04,
+        scratchChance: 0,
+        petChance: 0.12,
+        farWalker: true,
+        stats: [
+            { label: 'Velocidad', value: 96, color: '#38bdf8' },
+            { label: 'Energía', value: 99, color: '#fbbf24' },
+            { label: 'Cariño', value: 40, color: '#f472b6' },
+            { label: 'Obediencia', value: 22, color: '#a78bfa' },
+            { label: 'Siesta', value: 8, color: '#34d399' }
+        ],
+        strengths: ['Primero en llegar a cualquier rincón', 'Detecta repartidores a tres cuadras'],
+        weaknesses: ['Imposible de acariciar: no se queda quieto', 'Persigue su propia cola (y a veces la alcanza)']
+    },
+    {
+        id: 'teo',
+        name: 'Teo',
+        species: 'perro',
+        emoji: '🐕',
+        title: 'Guardián de la Panza',
+        level: 10,
+        body: 0x25252d,
+        shade: 0x101015,
+        belly: 0x3a3a45,
+        eye: 0xf8fafc,
+        nose: 0x52525b,
+        chubby: true,
+        bulgyEyes: true,
+        speed: 10,
+        rest: [4000, 9000],
+        sleepChance: 0.45,
+        scratchChance: 0,
+        petChance: 0.9,
+        stats: [
+            { label: 'Cariño', value: 97, color: '#f472b6' },
+            { label: 'Apetito', value: 99, color: '#fbbf24' },
+            { label: 'Obediencia', value: 60, color: '#a78bfa' },
+            { label: 'Energía', value: 30, color: '#38bdf8' },
+            { label: 'Siesta', value: 90, color: '#34d399' }
+        ],
+        strengths: ['Mimos ilimitados: +10 de buen ánimo', 'Ojitos saltones que derriten cualquier corazón'],
+        weaknesses: ['Se duerme en medio del pasillo', 'Cualquier galletita lo distrae']
+    },
+    {
+        id: 'borry',
+        name: 'Borry',
+        species: 'perro',
+        emoji: '🐕',
+        title: 'Rascador Errante',
+        level: 6,
+        body: 0x92623a,
+        shade: 0x5e3a1c,
+        belly: 0xc79a6a,
+        eye: 0x1f2937,
+        nose: 0x1f2937,
+        speed: 22,
+        rest: [1200, 4000],
+        sleepChance: 0.12,
+        scratchChance: 0.4,
+        petChance: 0.7,
+        farWalker: true,
+        stats: [
+            { label: 'Resistencia', value: 85, color: '#34d399' },
+            { label: 'Caminata', value: 92, color: '#38bdf8' },
+            { label: 'Cariño', value: 65, color: '#f472b6' },
+            { label: 'Energía', value: 70, color: '#fbbf24' },
+            { label: 'Pulgas', value: 99, color: '#ef4444' }
+        ],
+        strengths: ['Gran caminante: recorre el taller completo', 'Leal con todo el equipo'],
+        weaknesses: ['Se rasca en los peores momentos', 'Debuff permanente: Pulgas']
+    }
+];
+
+export const PET_BY_ID: Record<string, PetProfile> = Object.fromEntries(PET_PROFILES.map((p) => [p.id, p]));
+
+type PetState = 'sit' | 'walk' | 'sleep' | 'scratch';
+
 const DARK = 0x1f2937;
-const NOSE = 0xfda4af;
-
-const SPEED_PX_S = 16;
 const MARGIN = 2;
 const MAX_Y = 262;
 
 export interface PetHooks {
-    /** Clic sobre la mascota (posición en el mapa). */
-    onTap?: (x: number, y: number) => void;
+    /** Clic sobre una mascota (posición en el mapa). `petted` indica si se dejó acariciar. */
+    onTap?: (profile: PetProfile, x: number, y: number, petted: boolean) => void;
+    /** Un operario la acarició con éxito. */
+    onWorkerPet?: (profile: PetProfile, x: number, y: number) => void;
 }
 
 export class WorkshopPet {
@@ -44,10 +222,20 @@ export class WorkshopPet {
     private animMs = 0;
     private lastPose = '';
     private enabled = true;
+    private visible = false;
+    private leaving = false;
     private destroyed = false;
+    private workerCooldownMs = 0;
     private rng: () => number;
 
-    constructor(layer: Container, hitLayer: Container | undefined, stations: StationConfig[], private hooks: PetHooks = {}, rng: () => number = Math.random) {
+    constructor(
+        readonly profile: PetProfile,
+        layer: Container,
+        hitLayer: Container | undefined,
+        stations: StationConfig[],
+        private hooks: PetHooks = {},
+        rng: () => number = Math.random
+    ) {
         this.stations = stations;
         this.rng = rng;
         this.lanes = computeLanes(stations);
@@ -60,41 +248,155 @@ export class WorkshopPet {
         }
         if (lowerRow.length) this.lowerRowBottom = Math.max(...lowerRow.map((s) => s.y + s.height));
 
-        this.container.label = 'Pet:Toner';
+        this.container.label = `Pet:${profile.name}`;
         this.container.eventMode = 'none';
+        this.container.visible = false;
         this.container.addChild(this.body);
         this.container.addChild(this.zz);
         layer.addChild(this.container);
 
         if (hitLayer) {
             this.hit = new Container();
-            this.hit.label = 'PetHit';
-            this.hit.hitArea = new Rectangle(-9, -12, 18, 14);
-            this.hit.eventMode = 'static';
+            this.hit.label = `PetHit:${profile.name}`;
+            this.hit.hitArea = new Rectangle(-9, -13, 18, 15);
+            this.hit.eventMode = 'none';
             this.hit.cursor = 'pointer';
             this.hit.on('pointertap', () => this.tap());
             hitLayer.addChild(this.hit);
         }
-        this.setState('sit', 3000 + this.rng() * 4000);
-        this.sync();
     }
+
+    /* ------------------------------ Estado público ------------------------------ */
 
     getPosition(): Point {
         return { x: this.x, y: this.y };
     }
 
+    isVisible(): boolean {
+        return this.visible;
+    }
+
+    isLeaving(): boolean {
+        return this.leaving;
+    }
+
+    /** Qué está haciendo ahora (para la ficha). */
+    getActivity(): string {
+        if (!this.visible) return 'Descansando fuera del taller';
+        if (this.leaving) return 'Yéndose a dar una vuelta';
+        switch (this.state) {
+            case 'walk':
+                return 'Paseando por el taller';
+            case 'sleep':
+                return 'Durmiendo la siesta 💤';
+            case 'scratch':
+                return 'Rascándose las pulgas';
+            default:
+                return this.profile.species === 'gato' ? 'Sentada, mirando todo' : 'Sentado, atento';
+        }
+    }
+
     setEnabled(v: boolean) {
         this.enabled = v;
+        this.applyVisibility();
+    }
+
+    private applyVisibility() {
         if (this.container.destroyed) return;
-        this.container.visible = v;
-        if (this.hit && !this.hit.destroyed) this.hit.eventMode = v ? 'static' : 'none';
+        const show = this.enabled && this.visible;
+        this.container.visible = show;
+        if (this.hit && !this.hit.destroyed) this.hit.eventMode = show ? 'static' : 'none';
+    }
+
+    /** Aparece en el taller. `instant`: en un lugar al azar; si no, entra caminando por un costado. */
+    enter(instant = false) {
+        if (this.destroyed) return;
+        if (this.visible && !this.leaving) return;
+        if (this.visible && this.leaving) {
+            this.leaving = false;
+            this.setState('sit', 400);
+            return;
+        }
+        this.visible = true;
+        this.leaving = false;
+        const laneY = this.lanes.low + 4;
+        if (instant) {
+            for (let i = 0; i < 20; i++) {
+                const p = this.sampleTarget();
+                if (isWalkable(p, this.stations, MARGIN) && p.y <= MAX_Y) {
+                    this.x = p.x;
+                    this.y = p.y;
+                    break;
+                }
+            }
+            this.setState('sit', 1000 + this.rng() * 3000);
+        } else {
+            const fromLeft = this.rng() < 0.5;
+            this.x = fromLeft ? 1 : MAP_W - 1;
+            this.y = laneY;
+            this.facingLeft = !fromLeft;
+            this.path = [{ x: fromLeft ? 40 + this.rng() * 80 : MAP_W - 40 - this.rng() * 80, y: laneY }];
+            this.setState('walk', 0);
+        }
+        this.sync();
+        this.applyVisibility();
+    }
+
+    /** Se va caminando hacia un costado del mapa y desaparece. */
+    leave() {
+        if (this.destroyed || !this.visible || this.leaving) return;
+        const laneY = this.lanes.low + 4;
+        const toLeft = this.x < MAP_W / 2;
+        const edge = toLeft ? -6 : MAP_W + 6;
+        const near: Point = { x: toLeft ? 14 : MAP_W - 14, y: laneY };
+        const from: Point = { x: this.x, y: this.y };
+        const cands: Point[][] = [[{ x: from.x, y: laneY }, near], [{ x: from.x, y: laneY }]];
+        for (const gx of this.gapXs) cands.push([{ x: gx, y: from.y }, { x: gx, y: laneY }, near]);
+        for (const cand of cands) {
+            const clean = cand.filter((p, i) => Math.hypot(p.x - (i === 0 ? from.x : cand[i - 1].x), p.y - (i === 0 ? from.y : cand[i - 1].y)) > 0.01);
+            if (clean.length && !this.pathClear(from, clean)) continue;
+            const last = clean.length ? clean[clean.length - 1] : from;
+            this.path = [...clean, ...(Math.abs(last.y - laneY) < 0.5 ? [{ x: edge, y: laneY }] : [{ x: last.x, y: laneY }, { x: edge, y: laneY }])];
+            this.leaving = true;
+            this.setState('walk', 0);
+            return;
+        }
+        // No hay camino despejado: simplemente se escabulle
+        this.visible = false;
+        this.applyVisibility();
+    }
+
+    /** Un operario intenta acariciarla. Devuelve true si se dejó. */
+    tryPetByWorker(): boolean {
+        if (!this.visible || this.leaving || this.workerCooldownMs > 0) return false;
+        this.workerCooldownMs = 22000 + this.rng() * 12000;
+        if (this.rng() < this.profile.petChance) {
+            this.path = [];
+            this.setState('sit', 3500);
+            this.hooks.onWorkerPet?.(this.profile, this.x, this.y - 10);
+            return true;
+        }
+        this.evade();
+        return false;
     }
 
     private tap() {
-        if (!this.enabled || this.destroyed) return;
-        this.path = [];
-        this.setState('sit', 4500);
-        this.hooks.onTap?.(this.x, this.y - 10);
+        if (!this.enabled || !this.visible || this.destroyed) return;
+        const petted = this.rng() < this.profile.petChance;
+        if (petted) {
+            this.path = [];
+            this.leaving = false;
+            this.setState('sit', 4500);
+        } else if (!this.leaving) {
+            this.evade();
+        }
+        this.hooks.onTap?.(this.profile, this.x, this.y - 10, petted);
+    }
+
+    /** Se aparta (no quiso caricias). */
+    private evade() {
+        if (this.leaving) return;
+        if (!this.planLeg()) this.setState('sit', 1500);
     }
 
     private setState(s: PetState, timerMs: number) {
@@ -120,7 +422,7 @@ export class WorkshopPet {
         return true;
     }
 
-    private sampleTarget(): Point {
+    private sampleOne(): Point {
         const rand = (a: number, b: number) => Math.round(a + this.rng() * (b - a));
         const L = this.lanes;
         const r = this.rng();
@@ -130,6 +432,17 @@ export class WorkshopPet {
             return { x: gx, y: rand(L.bottomEdge + 10, Math.min(MAX_Y, this.lowerRowBottom + 12)) };
         }
         return { x: rand(14, MAP_W - 14), y: rand(this.lowerRowBottom + 6, MAX_Y) };
+    }
+
+    private sampleTarget(): Point {
+        if (!this.profile.farWalker) return this.sampleOne();
+        // Los caminadores prefieren destinos lejanos: de 3 candidatos, el más lejano
+        let best = this.sampleOne();
+        for (let i = 0; i < 2; i++) {
+            const c = this.sampleOne();
+            if (Math.hypot(c.x - this.x, c.y - this.y) > Math.hypot(best.x - this.x, best.y - this.y)) best = c;
+        }
+        return best;
     }
 
     private planLeg(): boolean {
@@ -155,11 +468,12 @@ export class WorkshopPet {
 
     /* ------------------------------ Dibujo ------------------------------ */
 
-    private drawPose(pose: string) {
+    private drawCat(pose: string) {
         const g = this.body;
-        g.clear();
-        // sombra
-        g.ellipse(0, 0, 6, 1.6).fill({ color: 0x000000, alpha: 0.28 });
+        const p = this.profile;
+        const BODY = p.body;
+        const SHADE = p.shade;
+        const BELLY = p.belly;
         const ears = (hx: number, hy: number) => {
             g.rect(hx, hy - 2, 1, 2).rect(hx + 3, hy - 2, 1, 2).fill({ color: SHADE });
         };
@@ -169,8 +483,8 @@ export class WorkshopPet {
             g.rect(-3, -4, 1, 2).rect(-1, -5, 1, 2).fill({ color: SHADE });
             g.rect(0, -8, 5, 4).fill({ color: BODY });
             ears(0, -8);
-            g.rect(3, -7, 1, 1).fill({ color: DARK });
-            g.rect(5, -6, 1, 1).fill({ color: NOSE });
+            g.rect(3, -7, 1, 1).fill({ color: p.eye });
+            g.rect(5, -6, 1, 1).fill({ color: p.nose });
             g.rect(-7, -1, 3, 1).rect(-7, -4, 1, 3).fill({ color: SHADE });
         } else if (pose === 'walk0' || pose === 'walk1') {
             const step = pose === 'walk0' ? 0 : 1;
@@ -179,11 +493,9 @@ export class WorkshopPet {
             g.rect(-3, -5, 1, 2).rect(0, -5, 1, 2).fill({ color: SHADE });
             g.rect(3, -8, 4, 4).fill({ color: BODY });
             ears(3, -8);
-            g.rect(6, -7, 1, 1).fill({ color: DARK });
-            g.rect(7, -6, 1, 1).fill({ color: NOSE });
-            // patas
+            g.rect(6, -7, 1, 1).fill({ color: p.eye });
+            g.rect(7, -6, 1, 1).fill({ color: p.nose });
             g.rect(-5 + step, -2, 1, 2).rect(-2 - step, -2, 1, 2).rect(0 + step, -2, 1, 2).rect(2 - step, -2, 1, 2).fill({ color: SHADE });
-            // cola en alto
             g.rect(-7, -6, 2, 1).rect(-7, -9, 1, 3).fill({ color: SHADE });
         } else {
             // dormida (hecha un ovillo)
@@ -192,18 +504,87 @@ export class WorkshopPet {
             g.rect(-3, -3, 1, 2).rect(0, -3, 1, 2).fill({ color: SHADE });
             g.rect(2, -4, 4, 3).fill({ color: BODY });
             g.rect(2, -5, 1, 1).rect(5, -5, 1, 1).fill({ color: SHADE });
-            g.rect(4, -3, 1, 1).fill({ color: DARK });
+            g.rect(4, -3, 1, 1).fill({ color: p.eye === 0xfacc15 ? 0x6b7280 : DARK });
             g.rect(-6, -2, 2, 1).fill({ color: SHADE });
         }
+    }
+
+    private drawDog(pose: string) {
+        const g = this.body;
+        const p = this.profile;
+        const B = p.body;
+        const S = p.shade;
+        const L = p.belly;
+        const w = p.chubby ? 2 : 0; // los regordetes son más anchos
+        const eyes = (ex: number, ey: number) => {
+            if (p.bulgyEyes) {
+                g.rect(ex - 1, ey - 1, 3, 3).fill({ color: 0xffffff });
+                g.rect(ex, ey, 1, 1).fill({ color: 0x111111 });
+            } else {
+                g.rect(ex, ey, 1, 1).fill({ color: p.eye === 0xf8fafc ? 0xf8fafc : p.eye });
+            }
+        };
+        const wag = Math.floor(this.animMs / 140) % 2;
+        if (pose === 'sit' || pose === 'scratch0' || pose === 'scratch1') {
+            g.rect(-5 - w, -7, 7 + w, 7).fill({ color: B });
+            g.rect(-4 - w, -3, 5 + w, 3).fill({ color: L });
+            // cola que se mueve
+            g.rect(-7 - w, wag ? -6 : -4, 2, 1).fill({ color: S });
+            g.rect(1, -11, 6, 5).fill({ color: B });
+            g.rect(1, -11, 2, 3).fill({ color: S }); // oreja caída
+            g.rect(6, -9, 3, 3).fill({ color: L });
+            g.rect(8, -9, 1, 1).fill({ color: p.nose });
+            eyes(4, -10);
+            g.rect(0, -4, 1, 4).fill({ color: S });
+            if (pose === 'scratch0') g.rect(-2 - w, -2, 4, 1).fill({ color: S });
+            if (pose === 'scratch1') g.rect(-1 - w, -6, 3, 1).rect(1, -7, 1, 1).fill({ color: S });
+        } else if (pose === 'walk0' || pose === 'walk1') {
+            const step = pose === 'walk0' ? 0 : 1;
+            g.rect(-7 - w, -8, 11 + w, 5 + (w ? 1 : 0)).fill({ color: B });
+            g.rect(-6 - w, -4, 9 + w, 1).fill({ color: L });
+            g.rect(4, -11, 5, 5).fill({ color: B });
+            g.rect(4, -11, 2, 3).fill({ color: S });
+            g.rect(8, -9, 3, 3).fill({ color: L });
+            g.rect(10, -9, 1, 1).fill({ color: p.nose });
+            eyes(7, -10);
+            g.rect(-7 + step - w, -3, 1, 3).rect(-4 - step - w, -3, 1, 3).rect(0 + step, -3, 1, 3).rect(3 - step, -3, 1, 3).fill({ color: S });
+            g.rect(-9 - w, -9 + (wag ? 0 : 1), 2, 1).fill({ color: S });
+        } else {
+            // durmiendo
+            g.rect(-6 - w, -4, 11 + w, 4).fill({ color: B });
+            g.rect(-5 - w, -1, 9 + w, 1).fill({ color: L });
+            g.rect(4, -5, 5, 4).fill({ color: B });
+            g.rect(4, -5, 2, 2).fill({ color: S });
+            g.rect(8, -3, 2, 2).fill({ color: L });
+            g.rect(9, -3, 1, 1).fill({ color: p.nose });
+            g.rect(6, -4, 1, 1).fill({ color: DARK });
+            g.rect(-8 - w, -2, 2, 1).fill({ color: S });
+        }
+    }
+
+    private drawPose(pose: string) {
+        const g = this.body;
+        g.clear();
+        const w = this.profile.chubby ? 8 : 6;
+        g.ellipse(0, 0, w, 1.6).fill({ color: 0x000000, alpha: 0.28 });
+        if (this.profile.species === 'gato') this.drawCat(pose);
+        else this.drawDog(pose);
     }
 
     private drawZz(t: number) {
         const g = this.zz;
         g.clear();
-        if (this.state !== 'sleep') return;
-        const a = 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(t / 420));
-        const dy = -((t / 90) % 6);
-        g.rect(4, -9 + dy, 3, 1).rect(5, -8 + dy, 1, 1).rect(4, -7 + dy, 3, 1).fill({ color: 0xe0f2fe, alpha: a });
+        if (this.state === 'sleep') {
+            const a = 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(t / 420));
+            const dy = -((t / 90) % 6);
+            g.rect(4, -9 + dy, 3, 1).rect(5, -8 + dy, 1, 1).rect(4, -7 + dy, 3, 1).fill({ color: 0xe0f2fe, alpha: a });
+        } else if (this.state === 'scratch') {
+            // pulguitas saltando
+            for (let i = 0; i < 3; i++) {
+                const ph = (t / 160 + i * 1.7) % 4;
+                g.rect(-4 + i * 3, -8 - Math.abs(Math.sin(ph)) * 5, 1, 1).fill({ color: 0x1f2937, alpha: 0.9 });
+            }
+        }
     }
 
     private sync() {
@@ -216,23 +597,25 @@ export class WorkshopPet {
             this.hit.x = this.container.x;
             this.hit.y = this.container.y;
         }
-        let pose = this.state === 'walk' ? (Math.floor(this.animMs / 200) % 2 === 0 ? 'walk0' : 'walk1') : this.state;
+        let pose: string = this.state;
+        if (this.state === 'walk') pose = Math.floor(this.animMs / 200) % 2 === 0 ? 'walk0' : 'walk1';
+        else if (this.state === 'scratch') pose = Math.floor(this.animMs / 110) % 2 === 0 ? 'scratch0' : 'scratch1';
         if (pose !== this.lastPose) {
             this.lastPose = pose;
             this.drawPose(pose);
         }
         this.drawZz(this.animMs);
-        // El zz no debe voltearse con la gata
         this.zz.scale.x = this.facingLeft ? -1 : 1;
     }
 
     update(dtMs: number) {
-        if (this.destroyed || !this.enabled) return;
+        if (this.destroyed || !this.enabled || !this.visible) return;
         const dt = Math.max(0, Math.min(dtMs, 100));
         this.animMs += dt;
+        if (this.workerCooldownMs > 0) this.workerCooldownMs -= dt;
 
         if (this.state === 'walk') {
-            let budget = (SPEED_PX_S * dt) / 1000;
+            let budget = (this.profile.speed * (this.leaving ? 1.25 : 1) * dt) / 1000;
             while (budget > 0 && this.path.length > 0) {
                 const t = this.path[0];
                 const dx = t.x - this.x;
@@ -251,8 +634,18 @@ export class WorkshopPet {
                 }
             }
             if (this.path.length === 0) {
-                // al llegar: a veces se echa a dormir, a veces se sienta
-                this.setState(this.rng() < 0.35 ? 'sleep' : 'sit', this.rng() < 0.35 ? 15000 + this.rng() * 20000 : 3000 + this.rng() * 5000);
+                if (this.leaving) {
+                    this.leaving = false;
+                    this.visible = false;
+                    this.applyVisibility();
+                    return;
+                }
+                const pr = this.profile;
+                const roll = this.rng();
+                const restMs = pr.rest[0] + this.rng() * (pr.rest[1] - pr.rest[0]);
+                if (roll < pr.sleepChance) this.setState('sleep', 15000 + this.rng() * 20000);
+                else if (roll < pr.sleepChance + pr.scratchChance) this.setState('scratch', 2500 + this.rng() * 3000);
+                else this.setState('sit', restMs);
             }
         } else {
             this.timerMs -= dt;
@@ -271,5 +664,127 @@ export class WorkshopPet {
         try {
             if (this.hit && !this.hit.destroyed) this.hit.destroy({ children: true });
         } catch (_) {}
+    }
+}
+
+/** Pausa entre cambios de residente (ms). En modo rápido de pruebas: localStorage 'luxius_print_den_events_fast' = '1'. */
+function rotationDelayMs(rng: () => number): number {
+    let fast = false;
+    try {
+        fast = localStorage.getItem('luxius_print_den_events_fast') === '1';
+    } catch (_) {}
+    return fast ? 18000 + rng() * 10000 : 150000 + rng() * 120000;
+}
+
+/**
+ * Coordina a las cinco mascotas: siempre hay una "residente" en el taller y se turnan.
+ * Después de un apagón se juntan todas y luego se van yendo de a una hasta quedar una sola.
+ */
+export class PetManager {
+    readonly pets: WorkshopPet[];
+    private resident: WorkshopPet;
+    private rotateMs: number;
+    private phase: 'normal' | 'gather' | 'disperse' = 'normal';
+    private phaseMs = 0;
+    private pendingEnters: { pet: WorkshopPet; delayMs: number }[] = [];
+    private nextLeaveMs = 0;
+    private careMs = 1500;
+    private enabled = true;
+
+    constructor(
+        layer: Container,
+        hitLayer: Container | undefined,
+        stations: StationConfig[],
+        hooks: PetHooks = {},
+        private rng: () => number = Math.random
+    ) {
+        this.pets = PET_PROFILES.map((p) => new WorkshopPet(p, layer, hitLayer, stations, hooks, rng));
+        this.resident = this.pets[Math.floor(rng() * this.pets.length)];
+        this.resident.enter(true);
+        this.rotateMs = rotationDelayMs(rng);
+    }
+
+    setEnabled(v: boolean) {
+        this.enabled = v;
+        this.pets.forEach((p) => p.setEnabled(v));
+    }
+
+    getPet(id: string): WorkshopPet | undefined {
+        return this.pets.find((p) => p.profile.id === id);
+    }
+
+    visiblePets(): WorkshopPet[] {
+        return this.pets.filter((p) => p.isVisible());
+    }
+
+    /** Apagón superado: aparecen todas juntas y luego se van de a una. */
+    reunion() {
+        if (!this.enabled || this.phase !== 'normal') return;
+        this.phase = 'gather';
+        this.phaseMs = 0;
+        this.pendingEnters = this.pets.filter((p) => !p.isVisible() || p.isLeaving()).map((pet, i) => ({ pet, delayMs: 400 + i * 1400 }));
+    }
+
+    private rotate() {
+        const others = this.pets.filter((p) => p !== this.resident && !p.isVisible());
+        if (others.length === 0) return;
+        const next = others[Math.floor(this.rng() * others.length)];
+        this.resident.leave();
+        next.enter(false);
+        this.resident = next;
+    }
+
+    update(dtMs: number, crew: WorkerCrew | null) {
+        if (!this.enabled) return;
+        const dt = Math.max(0, Math.min(dtMs, 100));
+        this.pets.forEach((p) => p.update(dt));
+
+        if (this.phase === 'normal') {
+            this.rotateMs -= dt;
+            if (this.rotateMs <= 0) {
+                this.rotateMs = rotationDelayMs(this.rng);
+                this.rotate();
+            }
+        } else if (this.phase === 'gather') {
+            this.phaseMs += dt;
+            this.pendingEnters.forEach((e) => (e.delayMs -= dt));
+            this.pendingEnters.filter((e) => e.delayMs <= 0).forEach((e) => e.pet.enter(false));
+            this.pendingEnters = this.pendingEnters.filter((e) => e.delayMs > 0);
+            if (this.pendingEnters.length === 0 && this.phaseMs > 14000) {
+                this.phase = 'disperse';
+                this.nextLeaveMs = 2000;
+            }
+        } else {
+            this.nextLeaveMs -= dt;
+            if (this.nextLeaveMs <= 0) {
+                const staying = this.pets.filter((p) => p.isVisible() && !p.isLeaving());
+                if (staying.length <= 1) {
+                    if (staying[0]) this.resident = staying[0];
+                    this.phase = 'normal';
+                    this.rotateMs = rotationDelayMs(this.rng);
+                } else {
+                    const goer = staying[Math.floor(this.rng() * staying.length)];
+                    goer.leave();
+                    this.nextLeaveMs = 9000 + this.rng() * 5000;
+                }
+            }
+        }
+
+        // Los operarios pasan cerca y a veces las acarician
+        this.careMs -= dt;
+        if (this.careMs <= 0 && crew) {
+            this.careMs = 1500;
+            const roles = ['disenador', 'impresor', 'cortador', 'empaquetador'] as const;
+            const spots = roles.map((r) => crew.getPositionByRole(r)).filter((p): p is Point => !!p);
+            for (const pet of this.pets) {
+                if (!pet.isVisible() || pet.isLeaving()) continue;
+                const pp = pet.getPosition();
+                if (spots.some((s) => Math.hypot(s.x - pp.x, s.y - pp.y) < 16)) pet.tryPetByWorker();
+            }
+        }
+    }
+
+    destroy() {
+        this.pets.forEach((p) => p.destroy());
     }
 }

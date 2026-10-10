@@ -35,6 +35,8 @@ export interface EventDeps {
     floorSpot: () => Point;
     /** Hora decimal actual del taller (para el guardia nocturno). */
     hour: () => number;
+    /** Se llama cuando vuelve la luz después de un apagón (las mascotas se juntan). */
+    onPowerBack?: () => void;
 }
 
 interface Running {
@@ -133,6 +135,7 @@ export class WorkshopEvents {
                 }
                 if (r.t >= 4400) {
                     this.deps.lighting()?.setBlackout(0);
+                    this.deps.onPowerBack?.();
                     this.running = null;
                     this.timer = nextDelayMs(this.rng);
                 }

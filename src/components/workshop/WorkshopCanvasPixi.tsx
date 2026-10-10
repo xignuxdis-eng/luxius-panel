@@ -45,7 +45,10 @@ import {
 import { WorkshopFx } from './workshopFx';
 import { WorkshopSky } from './workshopSky';
 import { GuestManager } from './workshopGuests';
-import { WorkshopPet, PET_NAME } from './workshopPet';
+import { PetManager, type PetProfile } from './workshopPet';
+import { playAnimalSound } from './workshopAnimalSound';
+import PetSheetCard from './PetSheetCard';
+import WallPanel from './WallPanel';
 import { WorkshopEvents } from './workshopEvents';
 import { computeLanes } from './workshopWorkers';
 import { fetchWeather, WEATHER_REFRESH_MS, type WeatherInfo } from './workshopWeather';
@@ -80,7 +83,7 @@ export const BUILD_TAG = 'F-r1';
 /** Pizarra del día en la pared (coordenadas del mapa). */
 const BOARD = { x: 108, y: 10, w: 100, h: 23 };
 const FX_STORAGE_KEY = 'luxius_print_den_fx';
-const DEFAULT_FX: FxToggles = { pet: true, events: true, weather: true, alerts: true };
+const DEFAULT_FX: FxToggles = { pet: true, events: true, weather: true, alerts: true, petSound: true };
 
 const loadFxToggles = (): FxToggles => {
     try {
@@ -185,7 +188,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const fxRef = useRef<WorkshopFx | null>(null);
     const skyRef = useRef<WorkshopSky | null>(null);
     const guestsRef = useRef<GuestManager | null>(null);
-    const petRef = useRef<WorkshopPet | null>(null);
+    const petRef = useRef<PetManager | null>(null);
     const eventsRef = useRef<WorkshopEvents | null>(null);
     const alertIconsRef = useRef<Map<string, { container: Container; bg: Graphics; text: Text }>>(new Map());
     const alertsRef = useRef<StationAlert[]>([]);
@@ -201,6 +204,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     fxToggleRef.current = fxToggles;
     const [alerts, setAlerts] = useState<StationAlert[]>([]);
     const [sheetStationId, setSheetStationId] = useState<string | null>(null);
+    // Ficha de mascota y paneles de la pizarra / el reloj de pared
+    const [sheetPetId, setSheetPetId] = useState<string | null>(null);
+    const [wallPanel, setWallPanel] = useState<'board' | 'clock' | null>(null);
+    const lastPetCloseRef = useRef<{ id: string; t: number } | null>(null);
+    const lastWallCloseRef = useRef<{ kind: string; t: number } | null>(null);
+    const wallPanelRef = useRef<'board' | 'clock' | null>(null);
+    wallPanelRef.current = wallPanel;
     const lastStationCloseRef = useRef<{ id: string; t: number } | null>(null);
     const [focusedId, setFocusedId] = useState<string | null>(null);
     const [isFs, setIsFs] = useState(false);
@@ -208,6 +218,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const [achievements, setAchievements] = useState<Achievement[]>([]);
     const [toast, setToast] = useState<string | null>(null);
     const [weather, setWeather] = useState<WeatherInfo | null>(null);
+    // Mascotas presentes ahora en el taller (para los atajos de la barra)
+    const [visiblePets, setVisiblePets] = useState<{ id: string; name: string; emoji: string }[]>([]);
+    useEffect(() => {
+        const iv = window.setInterval(() => {
+            const list = (petRef.current?.visiblePets() ?? []).map((p) => ({ id: p.profile.id, name: p.profile.name, emoji: p.profile.emoji }));
+            setVisiblePets((prev) => (prev.map((p) => p.id).join(',') === list.map((p) => p.id).join(',') ? prev : list));
+        }, 1000);
+        return () => window.clearInterval(iv);
+    }, []);
     const weatherRef = useRef<WeatherInfo | null>(null);
     weatherRef.current = weather;
     const onSelectStationRef = useRef(onSelectStation);
@@ -257,6 +276,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             return;
         }
         setSheetStationId(null);
+        setSheetPetId(null);
+        setWallPanel(null);
         setSheetWorkerId(workerId);
     };
 
@@ -276,9 +297,46 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             return;
         }
         setSheetWorkerId(null);
+        setSheetPetId(null);
+        setWallPanel(null);
         setSheetStationId(id);
     };
     const handleStationTapRef = useRef(handleStationTap);
+    handleStationTapRef.current = handleStationTap;
+
+    // Clic en una mascota: suena su sonido, se deja (o no) acariciar y se abre su ficha de fantasía.
+    const handlePetTap = (profile: PetProfile, px: number, py: number, petted: boolean) => {
+        if (dragMovedRef.current) return;
+        if (fxToggleRef.current.petSound) playAnimalSound(profile.id);
+        if (petted) fxRef.current?.hearts(px, py);
+        else showToast(`${profile.emoji} ${profile.name} no se dejó acariciar esta vez 💨`);
+        const last = lastPetCloseRef.current;
+        if (last && last.id === profile.id && Date.now() - last.t < 600) {
+            lastPetCloseRef.current = null;
+            return;
+        }
+        setSheetWorkerId(null);
+        setSheetStationId(null);
+        setWallPanel(null);
+        setSheetPetId(profile.id);
+    };
+
+    // Clic en la pizarra o en el reloj de pared: abre su panel.
+    const handleWallTap = (kind: 'board' | 'clock') => {
+        if (dragMovedRef.current) return;
+        audioEngine.playClick();
+        const last = lastWallCloseRef.current;
+        if (last && last.kind === kind && Date.now() - last.t < 600) {
+            lastWallCloseRef.current = null;
+            return;
+        }
+        setSheetWorkerId(null);
+        setSheetStationId(null);
+        setSheetPetId(null);
+        setWallPanel(kind);
+    };
+    const handleWallTapRef = useRef(handleWallTap);
+    handleWallTapRef.current = handleWallTap;
     handleStationTapRef.current = handleStationTap;
 
     const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
@@ -555,7 +613,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     // 1b. Cielo por las ventanas (hora real + clima real) y pizarra/reloj de pared
                     skyRef.current = new WorkshopSky(skyLayer, [32, 396], 9);
-                    buildWallBoard(mapLayer, uiLayer);
+                    buildWallBoard(mapLayer, uiLayer, workerHitLayer);
 
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
@@ -593,11 +651,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const hallLanes = computeLanes(hallStations);
                     fxRef.current = new WorkshopFx(floorFxLayer, particlesLayer);
                     guestsRef.current = new GuestManager(workersLayer, hallStations);
-                    petRef.current = new WorkshopPet(workersLayer, workerHitLayer, hallStations, {
-                        onTap: (px, py) => {
-                            fxRef.current?.hearts(px, py);
-                            showToast(`🐱 ${PET_NAME}, la gata del taller (decorativa), ronronea ♥`);
-                        }
+                    petRef.current = new PetManager(workersLayer, workerHitLayer, hallStations, {
+                        onWorkerPet: (_p, px, py) => fxRef.current?.hearts(px, py),
+                        onTap: (profile, px, py, petted) => handlePetTap(profile, px, py, petted)
                     });
                     petRef.current.setEnabled(fxToggleRef.current.pet);
                     eventsRef.current = new WorkshopEvents({
@@ -609,7 +665,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             x: Math.round(40 + Math.random() * 400),
                             y: Math.round(hallLanes.topEdge + 10 + Math.random() * Math.max(4, hallLanes.bottomEdge - hallLanes.topEdge - 16))
                         }),
-                        hour: () => hourOf(workshopNow())
+                        hour: () => hourOf(workshopNow()),
+                        onPowerBack: () => petRef.current?.reunion()
                     });
                     eventsRef.current.setEnabled(fxToggleRef.current.events);
                     skyRef.current?.setHour(hourOf(workshopNow()));
@@ -620,7 +677,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         (window as any).__printDen = {
                             trigger: (n: any) => eventsRef.current?.trigger(n),
                             spawn: (k: any) => guestsRef.current?.spawn(k),
-                            celebrate: () => celebrateDelivery({ id: 0, ancho: 3, alto: 2, copias: 1 } as Order)
+                            celebrate: () => celebrateDelivery({ id: 0, ancho: 3, alto: 2, copias: 1 } as Order),
+                            reunion: () => petRef.current?.reunion()
                         };
                     }
 
@@ -773,7 +831,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
      * All banners have solid dark opaque background (#090d16) and crisp 1px stroke.
      */
     /** Pizarra del día (datos reales) y reloj de pared (hora real del equipo) en la pared del fondo. */
-    const buildWallBoard = (mapLayer: Container, uiLayer: Container) => {
+    const buildWallBoard = (mapLayer: Container, uiLayer: Container, hitLayer: Container) => {
         const g = new Graphics();
         g.rect(BOARD.x - 1, BOARD.y - 1, BOARD.w + 2, BOARD.h + 2).fill({ color: 0x5b3a1e });
         g.rect(BOARD.x, BOARD.y, BOARD.w, BOARD.h).fill({ color: 0x13241f });
@@ -799,6 +857,18 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         const hands = new Graphics();
         mapLayer.addChild(hands);
         clockRef.current = { hands, minute: -1, cx, cy };
+        // Áreas clicables (pizarra y reloj)
+        const mkHit = (x: number, y: number, w: number, h: number, kind: 'board' | 'clock') => {
+            const c = new Container();
+            c.label = `WallHit:${kind}`;
+            c.hitArea = new Rectangle(x, y, w, h);
+            c.eventMode = 'static';
+            c.cursor = 'pointer';
+            c.on('pointertap', () => handleWallTapRef.current(kind));
+            hitLayer.addChild(c);
+        };
+        mkHit(BOARD.x - 1, BOARD.y - 1, BOARD.w + 2, BOARD.h + 2, 'board');
+        mkHit(cx - 9, cy - 9, 18, 18, 'clock');
         updateClock(true);
         updateBoard(ordersRef.current);
     };
@@ -823,7 +893,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         if (!b || b.text.destroyed || b.late.destroyed) return;
         const s = computeDaySummary(list, workshopNow());
         b.text.text =
-            `📋 HOY EN EL TALLER\n` +
             `✔ ${s.entregadasHoy} ${s.entregadasHoy === 1 ? 'entregada' : 'entregadas'}\n` +
             `▣ ${fmtM2(s.m2Hoy)} m² producidos`;
         if (s.atrasadas > 0) {
@@ -839,7 +908,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const layoutBoard = (scale: number) => {
         const b = boardRef.current;
         if (!b || b.text.destroyed || b.late.destroyed) return;
-        const fs = Math.min(12, Math.floor((BOARD.h * scale - 6) / 4 / 1.2));
+        const fs = Math.min(12, Math.floor((BOARD.h * scale - 6) / 3 / 1.2));
         const show = fs >= 7;
         b.text.visible = show;
         b.late.visible = show;
@@ -853,7 +922,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         b.text.x = x;
         b.text.y = y;
         b.late.x = x;
-        b.late.y = y + lh * 3;
+        b.late.y = y + lh * 2;
     };
 
     /** Muestra u oculta los íconos de alerta según las alertas reales y si el usuario las tiene encendidas. */
@@ -1692,7 +1761,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 crewRef.current?.update(dtMs);
                 // Extras del Bloque F
                 fxRef.current?.update(dtMs);
-                petRef.current?.update(dtMs);
+                petRef.current?.update(dtMs, crewRef.current);
                 guestsRef.current?.update(dtMs, crewRef.current?.isSpeaking() ?? false);
                 eventsRef.current?.update(dtMs);
                 skyRef.current?.update(dtMs, elapsedMs);
@@ -1932,6 +2001,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 achievementsTotal={achievements.length}
                 achievementsOpen={achOpen}
                 onToggleAchievements={() => setAchOpen((v) => !v)}
+                pets={visiblePets}
+                onOpenPet={(id) => {
+                    const prof = petRef.current?.getPet(id)?.profile;
+                    if (!prof) return;
+                    if (fxToggleRef.current.petSound) playAnimalSound(prof.id);
+                    setSheetWorkerId(null);
+                    setSheetStationId(null);
+                    setWallPanel(null);
+                    setSheetPetId(id);
+                }}
                 weatherText={
                     weather
                         ? `${weather.label} ${weather.tempC}°C · ${weather.place}${weather.isDefaultPlace ? ' (ubicación por defecto)' : ''}`
@@ -1989,6 +2068,42 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     />
                 );
             })()}
+            {sheetPetId && (() => {
+                const pet = petRef.current?.getPet(sheetPetId);
+                if (!pet) return null;
+                return (
+                    <PetSheetCard
+                        profile={pet.profile}
+                        getActivity={() => pet.getActivity()}
+                        soundOn={fxToggles.petSound}
+                        onPlaySound={() => playAnimalSound(pet.profile.id)}
+                        onClose={() => setSheetPetId(null)}
+                        onOutsideClose={() => {
+                            lastPetCloseRef.current = { id: pet.profile.id, t: Date.now() };
+                        }}
+                    />
+                );
+            })()}
+            {wallPanel && (
+                <WallPanel
+                    mode={wallPanel}
+                    orders={orders}
+                    alerts={alerts}
+                    stationTitle={(id) => getPixiStations().find((s) => s.id === id)?.title ?? id}
+                    getNow={workshopNow}
+                    onOpenOrder={onSelectOrderRef.current ? (o) => onSelectOrderRef.current?.(o) : undefined}
+                    onFocusStation={(id) => {
+                        audioEngine.playClick();
+                        setWallPanel(null);
+                        focusStation(id);
+                        setSheetStationId(id);
+                    }}
+                    onClose={() => setWallPanel(null)}
+                    onOutsideClose={() => {
+                        lastWallCloseRef.current = { kind: wallPanel, t: Date.now() };
+                    }}
+                />
+            )}
             {achOpen && <AchievementsPanel list={achievements} onClose={() => setAchOpen(false)} />}
             {toast && (
                 <div
