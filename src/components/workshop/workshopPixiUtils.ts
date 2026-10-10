@@ -12,7 +12,8 @@ export interface OrderStateSnapshot {
 export interface OrderDiff {
     orderId: number;
     prevStatus: OrderStatus | undefined;
-    nextStatus: OrderStatus;
+    /** undefined cuando la orden desapareció de la lista (no se inventa un estado). */
+    nextStatus: OrderStatus | undefined;
     order: Order;
     changeType: 'new' | 'status_change' | 'removed';
 }
@@ -59,7 +60,7 @@ export function diffOrders(
             diffs.push({
                 orderId: id,
                 prevStatus: prevSnapshot[id],
-                nextStatus: 'entregado',
+                nextStatus: undefined,
                 order: { id } as Order,
                 changeType: 'removed'
             });

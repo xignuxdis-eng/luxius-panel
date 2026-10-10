@@ -26,7 +26,7 @@ import {
     getPlotterVinylRollTexture,
     PALETTE
 } from './workshopSprites';
-import { WorkerCrew } from './workshopWorkers';
+import { WorkerCrew, planErrand } from './workshopWorkers';
 import { getUsuarios } from '@/data/db';
 
 export interface WorkshopCanvasPixiProps {
@@ -50,7 +50,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'F3-r2';
+export const BUILD_TAG = 'F3-r3';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -75,6 +75,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const selectedStationRef = useRef<StationId | null>(selectedStation);
     const prevOrdersSnapshotRef = useRef<OrderStateSnapshot>({});
     const pendingDiffsRef = useRef<OrderDiff[]>([]);
+    const baselineDoneRef = useRef(false);
 
     // Pixi References
     const appRef = useRef<Application | null>(null);
@@ -155,8 +156,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         const { diffs, nextSnapshot } = diffOrders(prevOrdersSnapshotRef.current, orders);
         prevOrdersSnapshotRef.current = nextSnapshot;
 
-        if (diffs.length > 0) {
-            pendingDiffsRef.current.push(...diffs);
+        // La primera lectura es solo la línea base: no dispara animaciones (evita una ráfaga al abrir el taller).
+        if (!baselineDoneRef.current) {
+            baselineDoneRef.current = true;
+        } else if (diffs.length > 0) {
+            // Cola acotada (tope 20): se conserva solo lo más reciente.
+            pendingDiffsRef.current = [...pendingDiffsRef.current, ...diffs].slice(-20);
+            for (const d of diffs) {
+                const errand = planErrand(d);
+                if (errand) crewRef.current?.enqueueErrand(errand);
+            }
         }
 
         // Update badge counters on all stations

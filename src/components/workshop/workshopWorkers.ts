@@ -19,6 +19,10 @@ import {
 
 export const MAP_W = 480;
 export const MAX_WORKERS = 4;
+/** Tope de encargos esperando (si se acumulan, se descarta el más viejo). */
+export const MAX_ERRAND_QUEUE = 20;
+/** Tiempo que el operario se queda en la estación antes de volver a su puesto. */
+export const ERRAND_DWELL_MS = 3000;
 
 /** Orden de roles del sistema viejo (WorkshopCanvas.tsx L161-166), usado como respaldo. */
 export const LEGACY_ROLE_ORDER: WorkerRole[] = ['disenador', 'impresor', 'cortador', 'empaquetador'];
@@ -101,6 +105,32 @@ const ROLE_ALIASES: Record<string, WorkerRole> = {
 /** Rol de taller que corresponde a un rol del sistema, o null si no es un rol de taller. */
 export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
     return ROLE_ALIASES[norm(rol)] ?? null;
+}
+
+export interface Errand {
+    role: WorkerRole;
+    stationId: StationId;
+}
+
+/**
+ * Qué operario va adónde cuando una orden CAMBIA de estado (mismas reglas del sistema viejo,
+ * WorkshopCanvas.tsx L198-258). Solo cuentan los cambios reales: las órdenes nuevas,
+ * las que desaparecen y la primera lectura no disparan nada.
+ * Decisión de 4.3: el sistema viejo mandaba a puntos sueltos del mapa; aquí van a la estación equivalente.
+ */
+export function planErrand(diff: { changeType: string; nextStatus?: string }): Errand | null {
+    if (diff.changeType !== 'status_change') return null;
+    switch (diff.nextStatus) {
+        case 'rebotado':
+        case 'standby':
+            return { role: 'impresor', stationId: 'diseno' };
+        case 'orden':
+            return { role: 'disenador', stationId: 'plotter1' };
+        case 'impreso':
+            return { role: 'impresor', stationId: 'corte' };
+        default:
+            return null;
+    }
 }
 
 const DUP_OFFSETS = [0, 20, -20, 40];
@@ -246,6 +276,8 @@ interface WorkerState {
     arriveFacing: CharacterDirection;
     home: StandPoint;
     animMs: number;
+    errand: 'none' | 'going' | 'dwell' | 'returning';
+    dwellMs: number;
     textures: CharacterTextures;
     container: Container;
     sprite: Sprite;
@@ -261,6 +293,7 @@ export class WorkerCrew {
     private stations: StationConfig[];
     private lanes: Lanes;
     private _destroyed = false;
+    private queue: Errand[] = [];
 
     constructor(layer: Container, users: WorkerUser[], stations: StationConfig[]) {
         this.stations = stations;
@@ -306,6 +339,8 @@ export class WorkerCrew {
                 arriveFacing: home.facing,
                 home,
                 animMs: spec.index * 260, // desfasa el respiro entre operarios
+                errand: 'none',
+                dwellMs: 0,
                 textures,
                 container,
                 sprite
@@ -375,10 +410,35 @@ export class WorkerCrew {
         }
     }
 
+    /** Encarga un viaje a un rol. Si ya hay uno igual esperando se ignora; la cola tiene tope. */
+    enqueueErrand(errand: Errand): void {
+        if (this._destroyed) return;
+        if (this.queue.some((e) => e.role === errand.role && e.stationId === errand.stationId)) return;
+        this.queue.push(errand);
+        while (this.queue.length > MAX_ERRAND_QUEUE) this.queue.shift();
+    }
+
+    getQueueLength(): number {
+        return this.queue.length;
+    }
+
+    private processQueue() {
+        if (this.queue.length === 0) return;
+        this.queue = this.queue.filter((e) => {
+            const ofRole = this.workers.filter((w) => w.spec.role === e.role);
+            if (ofRole.length === 0) return false; // nadie con ese rol: se descarta
+            const free = ofRole.find((w) => w.errand === 'none' && w.mode === 'idle');
+            if (!free) return true; // todos ocupados: espera
+            if (this.sendTo(free.spec.id, e.stationId)) free.errand = 'going';
+            return false;
+        });
+    }
+
     /** Avanza la simulación. `deltaMS` es el tiempo real del cuadro (ticker.deltaMS): la velocidad no depende de los FPS. */
     update(deltaMS: number) {
         if (this._destroyed) return;
         const dt = Math.max(0, Math.min(deltaMS, MAX_DELTA_MS));
+        this.processQueue();
 
         for (const w of this.workers) {
             w.animMs += dt;
@@ -408,6 +468,19 @@ export class WorkerCrew {
                     w.mode = 'idle';
                     w.facing = w.arriveFacing;
                 }
+            }
+
+            if (w.errand === 'going' && w.mode === 'idle') {
+                w.errand = 'dwell';
+                w.dwellMs = ERRAND_DWELL_MS;
+            } else if (w.errand === 'dwell') {
+                w.dwellMs -= dt;
+                if (w.dwellMs <= 0) {
+                    w.errand = 'returning';
+                    this.startPath(w, w.home);
+                }
+            } else if (w.errand === 'returning' && w.mode === 'idle') {
+                w.errand = 'none';
             }
 
             this.syncVisual(w);
