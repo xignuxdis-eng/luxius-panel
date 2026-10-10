@@ -16,7 +16,7 @@ import {
     type CharacterDirection,
     type CharacterTextures
 } from './workshopCharacters';
-import { BANTER_SCRIPTS, lineDurationMs, nextBanterDelayMs, pickBanterIndex } from './workshopBanter';
+import { BANTER_SCRIPTS, THOUGHTS, lineDurationMs, nextBanterDelayMs, nextThoughtDelayMs, pickBanterIndex, pickThoughtIndex } from './workshopBanter';
 
 export const MAP_W = 480;
 export const MAX_WORKERS = 4;
@@ -109,7 +109,9 @@ export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
 }
 
 export type HeldKind = 'carpeta' | 'rebotada' | 'rollo';
-export type BubbleTone = 'ok' | 'warn' | 'info' | 'chat';
+export type BubbleTone = 'ok' | 'warn' | 'info' | 'chat' | 'think';
+/** Fase del paseo: 'rest' = en su puesto; 'out' = paseando; 'back' = volviendo por donde vino. */
+export type StrollPhase = 'rest' | 'out' | 'back';
 
 export interface Errand {
     role: WorkerRole;
@@ -287,6 +289,7 @@ export interface WorkerSnapshot {
     bubble: { text: string; tone: BubbleTone } | null;
     /** Orden del viaje actual, o null. */
     orderId: number | null;
+    stroll: StrollPhase;
 }
 
 interface WorkerState {
@@ -311,6 +314,14 @@ interface WorkerState {
     /** true mientras participa de una charla. */
     chatting: boolean;
     hit: Container | null;
+    /** Paseo de los operarios sin tareas. `trail` = puntos recorridos desde el puesto (para volver por el mismo camino). */
+    stroll: StrollPhase;
+    strollTimerMs: number;
+    strollLegs: number;
+    strollPauseMs: number;
+    trail: Point[];
+    thoughtMs: number;
+    thoughtShowMs: number;
 }
 
 export interface CrewHooks {
@@ -331,6 +342,12 @@ const CHAT_GAP_PX = 18;
 const CHAT_APPROACH_TIMEOUT_MS = 12000;
 /** Primera charla poco después de abrir el taller. */
 const FIRST_CHAT_DELAY_MS = 6000;
+/** Los que pasean caminan más lento que los que van a una tarea. */
+const STROLL_SPEED_FACTOR = 0.55;
+/** Margen (px) con las estaciones al pasear. */
+const STROLL_MARGIN = 2;
+/** Límite inferior de los pies al pasear (el mapa mide 270 de alto). */
+const STROLL_MAX_Y = 264;
 
 interface ChatState {
     a: WorkerState; // quien se acerca (dice las frases 1, 3, 5...)
@@ -353,11 +370,22 @@ export class WorkerCrew {
     private chatTimerMs = FIRST_CHAT_DELAY_MS;
     private lastBanter = -1;
     private rng: () => number = Math.random;
+    private lastThought = -1;
+    /** Centros de los huecos entre estaciones de la fila de abajo (para pasear hacia el borde inferior). */
+    private gapXs: number[] = [];
+    private lowerRowBottom = 240;
 
     constructor(layer: Container, users: WorkerUser[], stations: StationConfig[], hooks?: CrewHooks) {
         this.hooks = hooks;
         this.stations = stations;
         this.lanes = computeLanes(stations);
+        const lowerRow = stations.filter((s) => s.y >= 120).sort((a, b) => a.x - b.x);
+        for (let i = 0; i + 1 < lowerRow.length; i++) {
+            const gapStart = lowerRow[i].x + lowerRow[i].width;
+            const gapEnd = lowerRow[i + 1].x;
+            if (gapEnd - gapStart >= 8) this.gapXs.push(Math.round((gapStart + gapEnd) / 2));
+        }
+        if (lowerRow.length) this.lowerRowBottom = Math.max(...lowerRow.map((s) => s.y + s.height));
         layer.sortableChildren = true;
 
         const shadowTex = getCharacterShadowTexture();
@@ -418,6 +446,13 @@ export class WorkerCrew {
                 held: null,
                 errandOrderId: null,
                 chatting: false,
+                stroll: 'rest',
+                strollTimerMs: 3000 + this.rng() * 6000,
+                strollLegs: 0,
+                strollPauseMs: -1,
+                trail: [],
+                thoughtMs: 4000 + this.rng() * 6000,
+                thoughtShowMs: 0,
                 hit,
                 textures,
                 container,
@@ -452,7 +487,8 @@ export class WorkerCrew {
             mode: w.mode,
             facing: w.facing,
             bubble: w.bubble,
-            orderId: w.errandOrderId
+            orderId: w.errandOrderId,
+            stroll: w.stroll
         }));
     }
 
@@ -480,13 +516,174 @@ export class WorkerCrew {
     }
 
     private startPath(w: WorkerState, target: StandPoint) {
-        w.path = planPath({ x: w.x, y: w.y }, target);
+        // Si estaba paseando, primero vuelve por donde vino (camino ya comprobado) y de ahí va al destino.
+        let points: Point[] = [];
+        let end: Point = { x: w.x, y: w.y };
+        if (w.trail.length > 0) {
+            const r = this.routeBack(w);
+            points = r.points;
+            end = r.end;
+        }
+        w.trail = [];
+        w.stroll = 'rest';
+        w.strollPauseMs = -1;
+        w.strollLegs = 0;
+        w.path = [...points, ...planPath(end, target)];
         w.arriveFacing = target.facing;
         if (w.path.length === 0) {
             w.mode = 'idle';
             w.facing = target.facing;
         } else {
             w.mode = 'walk';
+        }
+    }
+
+    /* ----------------------------- PASEO Y PENSAMIENTOS ----------------------------- */
+
+    /** Camino de vuelta al puesto: los puntos recorridos, en orden inverso. */
+    private routeBack(w: WorkerState): { points: Point[]; end: Point } {
+        while (w.trail.length > 0) {
+            const t = w.trail[w.trail.length - 1];
+            if (Math.hypot(t.x - w.x, t.y - w.y) < 0.01) w.trail.pop();
+            else break;
+        }
+        if (w.trail.length === 0) return { points: [], end: { x: w.x, y: w.y } };
+        const points = [...w.trail].reverse().map((p) => ({ x: p.x, y: p.y }));
+        return { points, end: points[points.length - 1] };
+    }
+
+    private pathClear(from: Point, path: Point[]): boolean {
+        let prev = from;
+        for (const p of path) {
+            const len = Math.hypot(p.x - prev.x, p.y - prev.y);
+            const n = Math.max(1, Math.ceil(len / 2));
+            for (let i = 0; i <= n; i++) {
+                const t = i / n;
+                const pt = { x: prev.x + (p.x - prev.x) * t, y: prev.y + (p.y - prev.y) * t };
+                if (pt.y > STROLL_MAX_Y || !isWalkable(pt, this.stations, STROLL_MARGIN)) return false;
+            }
+            prev = p;
+        }
+        return true;
+    }
+
+    private sampleStrollTarget(): Point {
+        const r = this.rng();
+        const rand = (a: number, b: number) => Math.round(a + this.rng() * (b - a));
+        const L = this.lanes;
+        if (r < 0.4 || (this.gapXs.length === 0 && r < 0.75)) {
+            return { x: rand(14, MAP_W - 14), y: rand(L.topEdge + 6, L.bottomEdge - 6) };
+        }
+        if (r < 0.75) {
+            const gx = this.gapXs[Math.floor(this.rng() * this.gapXs.length)];
+            return { x: gx, y: rand(L.bottomEdge + 10, Math.min(STROLL_MAX_Y, this.lowerRowBottom + 16)) };
+        }
+        return { x: rand(14, MAP_W - 14), y: rand(this.lowerRowBottom + 6, STROLL_MAX_Y) };
+    }
+
+    /** Elige un tramo del paseo con ruta libre de estaciones. Devuelve false si no encontró. */
+    private planStrollLeg(w: WorkerState): boolean {
+        const from: Point = { x: w.x, y: w.y };
+        for (let tries = 0; tries < 30; tries++) {
+            const to = this.sampleStrollTarget();
+            if (Math.hypot(to.x - from.x, to.y - from.y) < 24) continue;
+            const cands: Point[][] = [
+                [{ x: from.x, y: to.y }, to],
+                [{ x: to.x, y: from.y }, to]
+            ];
+            for (const gx of this.gapXs) cands.push([{ x: gx, y: from.y }, { x: gx, y: to.y }, to]);
+            for (const cand of cands) {
+                const clean = cand.filter((p, i) => {
+                    const prev = i === 0 ? from : cand[i - 1];
+                    return Math.hypot(p.x - prev.x, p.y - prev.y) > 0.01;
+                });
+                if (clean.length === 0 || !this.pathClear(from, clean)) continue;
+                w.path = clean;
+                w.arriveFacing = 'down';
+                w.mode = 'walk';
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private startStroll(w: WorkerState) {
+        w.trail = [{ x: w.x, y: w.y }];
+        w.stroll = 'out';
+        w.strollLegs = 1 + Math.floor(this.rng() * 2);
+        w.strollPauseMs = -1;
+        if (!this.planStrollLeg(w)) this.finishStroll(w);
+    }
+
+    private startStrollBack(w: WorkerState) {
+        const r = this.routeBack(w);
+        w.stroll = 'back';
+        w.strollPauseMs = -1;
+        w.path = r.points;
+        w.arriveFacing = w.home.facing;
+        if (w.path.length === 0) this.finishStroll(w);
+        else w.mode = 'walk';
+    }
+
+    private finishStroll(w: WorkerState) {
+        w.trail = [];
+        w.stroll = 'rest';
+        w.path = [];
+        w.mode = 'idle';
+        w.strollPauseMs = -1;
+        w.facing = w.home.facing;
+        w.strollTimerMs = 8000 + this.rng() * 8000;
+    }
+
+    private clearThought(w: WorkerState) {
+        if (w.bubble && w.bubble.tone === 'think') w.bubble = null;
+        w.thoughtMs = nextThoughtDelayMs(this.rng);
+    }
+
+    /** Lógica de los operarios libres: pasear y pensar. */
+    private updateIdleLife(w: WorkerState, dt: number) {
+        if (w.errand !== 'none' || w.chatting) return;
+
+        // Paseo
+        if (w.stroll === 'rest') {
+            if (w.mode === 'idle') {
+                w.strollTimerMs -= dt;
+                if (w.strollTimerMs <= 0) {
+                    if (this.queue.length === 0) this.startStroll(w);
+                    else w.strollTimerMs = 2000;
+                }
+            }
+        } else if (w.stroll === 'out') {
+            if (w.mode === 'idle') {
+                if (w.strollPauseMs < 0) w.strollPauseMs = 1500 + this.rng() * 2500;
+                w.strollPauseMs -= dt;
+                if (w.strollPauseMs <= 0) {
+                    w.strollPauseMs = -1;
+                    w.strollLegs--;
+                    if (w.strollLegs > 0 && this.planStrollLeg(w)) {
+                        // sigue paseando
+                    } else {
+                        this.startStrollBack(w);
+                    }
+                }
+            }
+        } else if (w.mode === 'idle') {
+            this.finishStroll(w);
+        }
+
+        // Pensamientos
+        if (w.bubble && w.bubble.tone === 'think') {
+            w.thoughtShowMs -= dt;
+            if (w.thoughtShowMs <= 0) this.clearThought(w);
+        } else if (!w.bubble) {
+            w.thoughtMs -= dt;
+            if (w.thoughtMs <= 0) {
+                const idx = pickThoughtIndex(this.rng, this.lastThought);
+                this.lastThought = idx;
+                const text = THOUGHTS[idx % THOUGHTS.length];
+                w.bubble = { text, tone: 'think' };
+                w.thoughtShowMs = lineDurationMs(text);
+            }
         }
     }
 
@@ -531,7 +728,7 @@ export class WorkerCrew {
     }
 
     private freeForChat(w: WorkerState) {
-        return w.errand === 'none' && w.mode === 'idle' && !w.chatting;
+        return w.errand === 'none' && w.mode === 'idle' && !w.chatting && w.stroll === 'rest';
     }
 
     /** Cambia el generador de azar (para pruebas). */
@@ -568,6 +765,8 @@ export class WorkerCrew {
         const meetX = Math.max(14, Math.min(MAP_W - 14, Math.round(b.x + side * CHAT_GAP_PX)));
         const facing: CharacterDirection = side < 0 ? 'right' : 'left';
 
+        this.clearThought(a);
+        this.clearThought(b);
         a.chatting = true;
         b.chatting = true;
         this.startPath(a, { x: meetX, y: a.y, facing });
@@ -668,7 +867,8 @@ export class WorkerCrew {
             const ofRole = this.workers.filter((w) => w.spec.role === e.role);
             if (ofRole.length === 0) return false; // nadie con ese rol: se descarta
             // Un operario en charla puede ser reclamado: el viaje de la orden tiene prioridad.
-            const isFree = (w: WorkerState) => w.errand === 'none' && (w.mode === 'idle' || w.chatting);
+            // Quien pasea (sin tarea) también puede ser reclamado: vuelve por su camino y va a la estación.
+            const isFree = (w: WorkerState) => w.errand === 'none' && (w.mode === 'idle' || w.chatting || w.stroll !== 'rest');
             const free = ofRole.find((w) => isFree(w) && !w.chatting) ?? ofRole.find(isFree);
             if (!free) return true; // todos ocupados: espera
             if (free.chatting) this.abortChat(free);
@@ -677,6 +877,7 @@ export class WorkerCrew {
                 free.bubble = e.text ? { text: e.text, tone: e.tone ?? 'info' } : null;
                 this.setHeld(free, e.held ?? null);
                 free.errandOrderId = e.orderId ?? null;
+                free.thoughtMs = nextThoughtDelayMs(this.rng);
                 try { this.hooks?.onErrandStart?.(e, free.spec.id); } catch (_) {}
             }
             return false;
@@ -694,7 +895,8 @@ export class WorkerCrew {
             w.animMs += dt;
 
             if (w.mode === 'walk' && w.path.length > 0) {
-                let budget = (w.spec.speedPxPerSec * dt) / 1000;
+                const speedFactor = w.errand === 'none' && !w.chatting && w.stroll !== 'rest' ? STROLL_SPEED_FACTOR : 1;
+                let budget = (w.spec.speedPxPerSec * speedFactor * dt) / 1000;
                 while (budget > 0 && w.path.length > 0) {
                     const target = w.path[0];
                     const dx = target.x - w.x;
@@ -707,7 +909,11 @@ export class WorkerCrew {
                         w.x = target.x;
                         w.y = target.y;
                         budget -= dist;
-                        w.path.shift();
+                        const reached = w.path.shift();
+                        if (w.errand === 'none') {
+                            if (w.stroll === 'out' && reached) w.trail.push({ x: reached.x, y: reached.y });
+                            else if (w.stroll === 'back') w.trail.pop();
+                        }
                     } else {
                         w.x += (dx / dist) * budget;
                         w.y += (dy / dist) * budget;
@@ -736,6 +942,7 @@ export class WorkerCrew {
                 w.errand = 'none';
             }
 
+            this.updateIdleLife(w, dt);
             this.syncVisual(w);
         }
     }

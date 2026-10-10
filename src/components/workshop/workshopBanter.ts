@@ -70,6 +70,62 @@ export const BANTER_SCRIPTS: string[][] = [
 
 ];
 
+/**
+ * Pensamientos de los operarios que pasean sin tareas (globito de nube). Frases cortas de una sola línea,
+ * en el mismo universo que las charlas: cultura pop, videojuegos y Blizzard, siempre elogiando el trabajo.
+ */
+export const THOUGHTS: string[] = [
+    'Qué buena quedó esa lona...',
+    'Ese diseño es nivel Final Boss.',
+    'Ojalá hoy no haya wipe de pedidos.',
+    'Necesito más gas vespeno... de tinta.',
+    'Impresión 4K, cero banding.',
+    'Mmm, ¿y si le pongo música de Zelda al plotter?',
+    'Logro desbloqueado: impresión perfecta.',
+    'Todavía pienso en Wrath of the Lich King...',
+    'Esos negros son más profundos que Dark Souls.',
+    'Me debo una partida de Diablo esta noche.',
+    'Hay que construir más pilones... digo, estantes.',
+    'Qué colores: CMYK nivel legendario.',
+    'Me pregunto qué dropeará el próximo pedido.',
+    'Los diseñadores se pasaron hoy.',
+    'Pac-Man también necesitaría una pausa.',
+    'Este lugar es más épico que Orgrimmar.',
+    'El Jefe Maestro aprobaría este acabado.',
+    'Mejor que cualquier remaster, esta impresión.',
+    'Zug zug... qué buen día de trabajo.',
+    'Mi nivel de orgullo: 60.',
+    'Tomaría un café... y una montura nueva.',
+    'Cuando termine, a jugar un rato de StarCraft.',
+    'Esa gráfica quedó como de Pixar.',
+    'Nadie imprime como nosotros. Nadie.',
+    'Si Kerrigan viera estos rojos...',
+    'Ding! Otro pedido sin errores.',
+    'Pensando en el próximo parche de WoW...',
+    'Este taller merece un logro propio.',
+    'Un Hadouken de calidad en cada lona.',
+    'Los murlocs no entenderían tanta nitidez. Mrglgl.',
+    'Qué lindo es ver los diseños salir del plotter.',
+    'Todo en su lugar, como en Tetris.',
+    'Hoy el cliente se va a ir feliz.',
+    'Estoy en modo Protoss: todo perfecto.',
+    '¿Será que Thrall pediría una copia?',
+    'La calidad hoy está en modo Mythic.'
+];
+
+/** Elige un pensamiento distinto del anterior. */
+export function pickThoughtIndex(rng: () => number, last: number): number {
+    if (THOUGHTS.length <= 1) return 0;
+    let idx = Math.floor(rng() * THOUGHTS.length);
+    if (idx === last) idx = (idx + 1) % THOUGHTS.length;
+    return idx;
+}
+
+/** Pausa entre un pensamiento y el siguiente (8 a 14 s, cuenta desde que el globo desaparece). */
+export function nextThoughtDelayMs(rng: () => number): number {
+    return 8000 + Math.floor(rng() * 6000);
+}
+
 /** Elige el índice de una charla distinta de la anterior. `rng` devuelve un número entre 0 y 1. */
 export function pickBanterIndex(rng: () => number, last: number): number {
     if (BANTER_SCRIPTS.length <= 1) return 0;

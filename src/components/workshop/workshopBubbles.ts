@@ -11,7 +11,8 @@ const TONE_COLOR: Record<BubbleTone, number> = {
     ok: 0x22c55e,
     warn: 0xef4444,
     info: 0x38bdf8,
-    chat: 0xfacc15
+    chat: 0xfacc15,
+    think: 0x7dd3fc
 };
 
 const FONT_PX = 12;
@@ -44,6 +45,16 @@ export class WorkerBubbles {
         fontSize: FONT_PX,
         fontWeight: 'bold',
         fill: 0xf8fafc,
+        wordWrap: true,
+        wordWrapWidth: WRAP_PX
+    });
+    /** Texto oscuro sobre fondo claro para los pensamientos. */
+    private thinkStyle = new TextStyle({
+        fontFamily: 'monospace',
+        fontSize: FONT_PX,
+        fontWeight: 'bold',
+        fontStyle: 'italic',
+        fill: 0x0f172a,
         wordWrap: true,
         wordWrapWidth: WRAP_PX
     });
@@ -80,15 +91,28 @@ export class WorkerBubbles {
             }
 
             if (item.text !== w.bubble.text || item.tone !== w.bubble.tone) {
+                const isThink = w.bubble.tone === 'think';
                 item.text = w.bubble.text;
                 item.tone = w.bubble.tone;
+                item.label.style = isThink ? this.thinkStyle : this.style;
                 item.label.text = w.bubble.text;
                 item.w = Math.ceil(item.label.width) + PAD_X * 2;
-                item.h = Math.ceil(item.label.height) + PAD_Y * 2 + 2;
+                const boxH = Math.ceil(item.label.height) + PAD_Y * 2 + 2;
+                // El pensamiento suma 10 px debajo para los puntitos de la nube (cuentan como parte del globo).
+                item.h = boxH + (isThink ? 10 : 0);
                 item.bg.clear();
-                item.bg.roundRect(0, 0, item.w, item.h, 4);
-                item.bg.fill({ color: 0x090d16, alpha: 1 });
-                item.bg.stroke({ width: 1.5, color: TONE_COLOR[w.bubble.tone] });
+                if (isThink) {
+                    item.bg.roundRect(0, 0, item.w, boxH, Math.min(10, boxH / 2));
+                    item.bg.fill({ color: 0xf1f5f9, alpha: 0.97 });
+                    item.bg.stroke({ width: 1.5, color: TONE_COLOR.think });
+                    const cx = Math.round(item.w / 2);
+                    item.bg.circle(cx - 2, boxH + 3, 3).fill({ color: 0xf1f5f9, alpha: 0.97 }).stroke({ width: 1, color: TONE_COLOR.think });
+                    item.bg.circle(cx - 7, boxH + 8, 1.6).fill({ color: 0xf1f5f9, alpha: 0.97 }).stroke({ width: 1, color: TONE_COLOR.think });
+                } else {
+                    item.bg.roundRect(0, 0, item.w, item.h, 4);
+                    item.bg.fill({ color: 0x090d16, alpha: 1 });
+                    item.bg.stroke({ width: 1.5, color: TONE_COLOR[w.bubble.tone] });
+                }
             }
 
             let x = Math.round(w.x * scale - item.w / 2);
