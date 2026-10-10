@@ -51,7 +51,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'F3-r4';
+export const BUILD_TAG = 'F3-r5';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -59,7 +59,7 @@ const VIRTUAL_H = 270;
 export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     orders,
     onSelectStation,
-    onSelectOrder: _onSelectOrder,
+    onSelectOrder,
     selectedStation,
     onError
 }) => {
@@ -134,6 +134,34 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const particlesPoolRef = useRef<ParticleItem[]>([]);
     const tooltipContainerRef = useRef<Container | null>(null);
     const tooltipTextRef = useRef<Text | null>(null);
+
+    // Clic en un operario: abre la orden de su viaje actual; si no tiene viaje, la primera orden que le corresponde
+    // por rol (mismas reglas del sistema viejo, WorkshopCanvas.tsx L594-603). Usa solo refs (el efecto de inicio es de una sola vez).
+    const onSelectOrderRef = useRef(onSelectOrder);
+    onSelectOrderRef.current = onSelectOrder;
+    const handleWorkerTap = (workerId: string) => {
+        const crew = crewRef.current;
+        const cb = onSelectOrderRef.current;
+        if (!crew || crew.destroyed || !cb) return;
+        const snap = crew.getWorkers().find((w) => w.id === workerId);
+        if (!snap) return;
+        let order: Order | undefined;
+        if (snap.orderId != null) order = ordersRef.current.find((o) => o.id === snap.orderId);
+        if (!order) {
+            const roleStatusMap: Record<string, string> = {
+                disenador: 'diseno',
+                impresor: 'orden',
+                cortador: 'impreso',
+                empaquetador: 'completo'
+            };
+            const needed = roleStatusMap[snap.role];
+            if (needed) order = ordersRef.current.find((o) => o.status === needed);
+        }
+        if (order) {
+            audioEngine.playClick();
+            cb(order);
+        }
+    };
 
     const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
         const text = count > 0 ? `${count}` : '';
@@ -296,6 +324,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     worldContainer.addChild(workersLayer);
                     worldContainer.addChild(particlesLayer);
                     worldContainer.addChild(hitAreasLayer);
+                    // Clic en operarios: capa por encima de las áreas de las estaciones (riesgo R5)
+                    const workerHitLayer = new Container();
+                    workerHitLayer.label = 'WorkerHitLayer';
+                    worldContainer.addChild(workerHitLayer);
 
                     const uiLayer = new Container();
                     uiLayer.label = 'UILayer';
@@ -310,7 +342,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
 
                     // 2b. Operarios (Fase 3, 4.2)
-                    crewRef.current = new WorkerCrew(workersLayer, getUsuarios(), getPixiStations());
+                    crewRef.current = new WorkerCrew(workersLayer, getUsuarios(), getPixiStations(), {
+                        hitLayer: workerHitLayer,
+                        onWorkerTap: (workerId) => handleWorkerTap(workerId),
+                        // Sonidos: una sola vez por viaje que realmente empieza (nunca en cada actualización)
+                        onErrandStart: (errand) => {
+                            if (errand.held === 'rebotada') audioEngine.playBounceWarning();
+                            else if (errand.held === 'rollo') audioEngine.playScissorsCut();
+                        }
+                    });
 
                     // BUILD_TAG temporal (se retira en Fase 6) - UILayer a resolución real
                     const tagContainer = new Container();

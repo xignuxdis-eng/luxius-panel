@@ -7,7 +7,7 @@
 //        Quienes no tienen rol de taller ocupan los puestos libres en el orden del sistema viejo.
 //  - D3: los operarios se paran en el pasillo, al borde de su estación, nunca dentro de la máquina.
 
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite } from 'pixi.js';
 import type { StationConfig, StationId, WorkerRole } from './types';
 import {
     CHARACTER_H,
@@ -118,6 +118,8 @@ export interface Errand {
     tone?: BubbleTone;
     /** Objeto que lleva en la mano mientras dura el encargo. */
     held?: HeldKind;
+    /** Orden que motivó el viaje (el clic en el operario abre esa orden). */
+    orderId?: number;
 }
 
 /**
@@ -133,16 +135,17 @@ export function planErrand(diff: {
 }): Errand | null {
     if (diff.changeType !== 'status_change') return null;
     const ot = `OT #${diff.order?.ot || diff.order?.id || '?'}`;
+    const orderId = diff.order?.id;
     switch (diff.nextStatus) {
         case 'rebotado':
         case 'standby':
             // Decisión del usuario: las rebotadas vuelven a diseño.
-            return { role: 'impresor', stationId: 'diseno', text: `${ot} REBOTADA`, tone: 'warn', held: 'rebotada' };
+            return { role: 'impresor', stationId: 'diseno', text: `${ot} REBOTADA`, tone: 'warn', held: 'rebotada', orderId };
         case 'orden':
-            return { role: 'disenador', stationId: 'plotter1', text: `${ot} EN COLA`, tone: 'ok', held: 'carpeta' };
+            return { role: 'disenador', stationId: 'plotter1', text: `${ot} EN COLA`, tone: 'ok', held: 'carpeta', orderId };
         case 'impreso':
             // Decisión del usuario: las impresas van a despacho.
-            return { role: 'impresor', stationId: 'despacho', text: `${ot} A DESPACHO`, tone: 'info', held: 'rollo' };
+            return { role: 'impresor', stationId: 'despacho', text: `${ot} A DESPACHO`, tone: 'info', held: 'rollo', orderId };
         default:
             return null;
     }
@@ -281,6 +284,8 @@ export interface WorkerSnapshot {
     facing: CharacterDirection;
     /** Globo activo (texto + tono) o null. */
     bubble: { text: string; tone: BubbleTone } | null;
+    /** Orden del viaje actual, o null. */
+    orderId: number | null;
 }
 
 interface WorkerState {
@@ -300,6 +305,17 @@ interface WorkerState {
     textures: CharacterTextures;
     container: Container;
     sprite: Sprite;
+    /** Número de la orden que motivó el viaje actual (para el clic). */
+    errandOrderId: number | null;
+    hit: Container | null;
+}
+
+export interface CrewHooks {
+    /** Capa donde se crean las áreas de clic de los operarios. */
+    hitLayer?: Container;
+    onWorkerTap?: (workerId: string) => void;
+    /** Se llama UNA vez cuando un viaje realmente empieza (aquí suenan los sonidos). */
+    onErrandStart?: (errand: Errand, workerId: string) => void;
 }
 
 const WALK_FPS = 8;
@@ -313,8 +329,10 @@ export class WorkerCrew {
     private lanes: Lanes;
     private _destroyed = false;
     private queue: Errand[] = [];
+    private hooks?: CrewHooks;
 
-    constructor(layer: Container, users: WorkerUser[], stations: StationConfig[]) {
+    constructor(layer: Container, users: WorkerUser[], stations: StationConfig[], hooks?: CrewHooks) {
+        this.hooks = hooks;
         this.stations = stations;
         this.lanes = computeLanes(stations);
         layer.sortableChildren = true;
@@ -348,6 +366,19 @@ export class WorkerCrew {
 
             layer.addChild(container);
 
+            // Área de clic del operario (capa aparte, por encima de las áreas de las estaciones)
+            let hit: Container | null = null;
+            if (hooks?.hitLayer) {
+                hit = new Container();
+                hit.label = `WorkerHit:${spec.id}`;
+                hit.hitArea = new Rectangle(-9, -CHARACTER_H, 18, CHARACTER_H);
+                hit.eventMode = 'static';
+                hit.cursor = 'pointer';
+                const workerId = spec.id;
+                hit.on('pointertap', () => hooks.onWorkerTap?.(workerId));
+                hooks.hitLayer.addChild(hit);
+            }
+
             this.workers.push({
                 spec,
                 x: home.x,
@@ -362,6 +393,8 @@ export class WorkerCrew {
                 dwellMs: 0,
                 bubble: null,
                 held: null,
+                errandOrderId: null,
+                hit,
                 textures,
                 container,
                 sprite
@@ -394,7 +427,8 @@ export class WorkerCrew {
             y: w.y,
             mode: w.mode,
             facing: w.facing,
-            bubble: w.bubble
+            bubble: w.bubble,
+            orderId: w.errandOrderId
         }));
     }
 
@@ -477,6 +511,8 @@ export class WorkerCrew {
                 free.errand = 'going';
                 free.bubble = e.text ? { text: e.text, tone: e.tone ?? 'info' } : null;
                 this.setHeld(free, e.held ?? null);
+                free.errandOrderId = e.orderId ?? null;
+                try { this.hooks?.onErrandStart?.(e, free.spec.id); } catch (_) {}
             }
             return false;
         });
@@ -526,6 +562,7 @@ export class WorkerCrew {
                 if (w.dwellMs <= 0) {
                     w.errand = 'returning';
                     w.bubble = null;
+                    w.errandOrderId = null;
                     this.setHeld(w, null);
                     this.startPath(w, w.home);
                 }
@@ -543,6 +580,10 @@ export class WorkerCrew {
         w.container.y = Math.round(w.y);
         // Profundidad: quien está más abajo en el mapa se dibuja delante.
         w.container.zIndex = Math.round(w.y);
+        if (w.hit && !w.hit.destroyed) {
+            w.hit.x = w.container.x;
+            w.hit.y = w.container.y;
+        }
 
         if (w.mode === 'walk') {
             const frame = Math.floor((w.animMs / 1000) * WALK_FPS) % 4;
@@ -564,8 +605,12 @@ export class WorkerCrew {
             try {
                 if (!w.container.destroyed) w.container.destroy({ children: true });
             } catch (_) {}
+            try {
+                if (w.hit && !w.hit.destroyed) w.hit.destroy({ children: true });
+            } catch (_) {}
         }
         this.workers = [];
+        this.queue = [];
     }
 }
 
