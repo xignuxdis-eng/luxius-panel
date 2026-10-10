@@ -3,7 +3,7 @@
 // enlarged stations with short labels, independent hit-areas, diffOrders snapshotting,
 // and the COMPLETE PLOTTER with moving carriage, unrolling vinyl, live progress bar, particles, and hover tooltip.
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Application, Container, Graphics, Sprite, Text, TextStyle, Rectangle } from 'pixi.js';
 import { Order } from '@/types/orden';
 import { StationId } from './types';
@@ -30,6 +30,7 @@ import { WorkerCrew, planErrand } from './workshopWorkers';
 import { WorkerBubbles } from './workshopBubbles';
 import { getUsuarios } from '@/data/db';
 import { createStationProps, StationProps } from './workshopStationProps';
+import WorkerSheetCard from './WorkerSheetCard';
 
 export interface WorkshopCanvasPixiProps {
     orders: Order[];
@@ -142,28 +143,36 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     // por rol (mismas reglas del sistema viejo, WorkshopCanvas.tsx L594-603). Usa solo refs (el efecto de inicio es de una sola vez).
     const onSelectOrderRef = useRef(onSelectOrder);
     onSelectOrderRef.current = onSelectOrder;
-    const handleWorkerTap = (workerId: string) => {
+    const ROLE_STATUS_MAP: Record<string, string> = {
+        disenador: 'diseno',
+        impresor: 'orden',
+        cortador: 'impreso',
+        empaquetador: 'completo'
+    };
+    const findOrderForWorker = (workerId: string): Order | undefined => {
         const crew = crewRef.current;
-        const cb = onSelectOrderRef.current;
-        if (!crew || crew.destroyed || !cb) return;
+        if (!crew || crew.destroyed) return undefined;
         const snap = crew.getWorkers().find((w) => w.id === workerId);
-        if (!snap) return;
+        if (!snap) return undefined;
         let order: Order | undefined;
         if (snap.orderId != null) order = ordersRef.current.find((o) => o.id === snap.orderId);
         if (!order) {
-            const roleStatusMap: Record<string, string> = {
-                disenador: 'diseno',
-                impresor: 'orden',
-                cortador: 'impreso',
-                empaquetador: 'completo'
-            };
-            const needed = roleStatusMap[snap.role];
+            const needed = ROLE_STATUS_MAP[snap.role];
             if (needed) order = ordersRef.current.find((o) => o.status === needed);
         }
-        if (order) {
-            audioEngine.playClick();
-            cb(order);
-        }
+        return order;
+    };
+
+    // Ficha técnica del operario seleccionado (clic en el personaje)
+    const [sheetWorkerId, setSheetWorkerId] = useState<string | null>(null);
+    const getWorkerSnapshot = useCallback(
+        (workerId: string) => crewRef.current?.getWorkers().find((w) => w.id === workerId),
+        []
+    );
+    // Clic en un operario: abre su ficha técnica (lo que hace ahora + estadísticas de fantasía).
+    const handleWorkerTap = (workerId: string) => {
+        audioEngine.playClick();
+        setSheetWorkerId((prev) => (prev === workerId ? null : workerId));
     };
 
     const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
@@ -1346,6 +1355,29 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             }}
         >
             <div ref={canvasHostRef} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
+            {sheetWorkerId && (() => {
+                const snap = getWorkerSnapshot(sheetWorkerId);
+                if (!snap) return null;
+                const needed = ROLE_STATUS_MAP[snap.role];
+                const waiting = needed ? orders.filter((o) => o.status === needed).length : 0;
+                const orderToOpen = findOrderForWorker(sheetWorkerId);
+                return (
+                    <WorkerSheetCard
+                        workerId={sheetWorkerId}
+                        getSnapshot={getWorkerSnapshot}
+                        waitingOrders={waiting}
+                        onOpenOrder={
+                            orderToOpen && onSelectOrderRef.current
+                                ? () => {
+                                      audioEngine.playClick();
+                                      onSelectOrderRef.current?.(orderToOpen);
+                                  }
+                                : undefined
+                        }
+                        onClose={() => setSheetWorkerId(null)}
+                    />
+                );
+            })()}
         </div>
     );
 };

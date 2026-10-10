@@ -290,6 +290,16 @@ export interface WorkerSnapshot {
     /** Orden del viaje actual, o null. */
     orderId: number | null;
     stroll: StrollPhase;
+    /** Estado del encargo: 'none' | 'going' | 'dwell' | 'returning'. */
+    errand: 'none' | 'going' | 'dwell' | 'returning';
+    chatting: boolean;
+    /** true mientras trabaja un rato en una estación durante el paseo. */
+    visiting: boolean;
+    roleFromUser: boolean;
+    shirtColor: string;
+    skinColor: string;
+    /** Texto del globo de encargo (p. ej. `OT #123 EN COLA`) si lo hay. */
+    errandText: string | null;
 }
 
 interface WorkerState {
@@ -516,7 +526,14 @@ export class WorkerCrew {
             facing: w.facing,
             bubble: w.bubble,
             orderId: w.errandOrderId,
-            stroll: w.stroll
+            stroll: w.stroll,
+            errand: w.errand,
+            chatting: w.chatting,
+            visiting: w.visiting && w.stroll === 'out' && w.mode === 'idle',
+            roleFromUser: w.spec.roleFromUser,
+            shirtColor: w.spec.shirtColor,
+            skinColor: w.spec.skinColor,
+            errandText: w.errand !== 'none' && w.bubble ? w.bubble.text : null
         }));
     }
 
