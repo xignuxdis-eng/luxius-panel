@@ -344,6 +344,8 @@ const CHAT_APPROACH_TIMEOUT_MS = 12000;
 const FIRST_CHAT_DELAY_MS = 6000;
 /** Los que pasean caminan más lento que los que van a una tarea. */
 const STROLL_SPEED_FACTOR = 0.55;
+/** Multiplicador global de velocidad de caminata (todos los operarios). */
+const WALK_SLOWDOWN = 0.75;
 /** Margen (px) con las estaciones al pasear. */
 const STROLL_MARGIN = 2;
 /** Límite inferior de los pies al pasear (el mapa mide 270 de alto). */
@@ -896,7 +898,7 @@ export class WorkerCrew {
 
             if (w.mode === 'walk' && w.path.length > 0) {
                 const speedFactor = w.errand === 'none' && !w.chatting && w.stroll !== 'rest' ? STROLL_SPEED_FACTOR : 1;
-                let budget = (w.spec.speedPxPerSec * speedFactor * dt) / 1000;
+                let budget = (w.spec.speedPxPerSec * speedFactor * WALK_SLOWDOWN * dt) / 1000;
                 while (budget > 0 && w.path.length > 0) {
                     const target = w.path[0];
                     const dx = target.x - w.x;

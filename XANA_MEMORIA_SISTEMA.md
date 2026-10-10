@@ -289,8 +289,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Auditoría Ergonómica y Diagnóstico de Doble Interfaz**: Mapeo completo de fricciones de scroll horizontal, fatiga motriz y contrastes WCAG en modo claro/oscuro.
 - [ ] **Arquitectura de Celdas Compuestas (Fin del Scroll Horizontal)**: Consolidación de 14 columnas a 6 bloques maestros en `Entrada.tsx`.
 - [ ] **Acciones Racionales y Menú Contextual**: Reducción de 8 botones a 2 acciones clave (`👁️` y `📥`) + menú desplegable `•••`.
-- [ ] **Barra de Lotes Flotante (Floating Dock)**: Dock centrado inferior para operaciones masivas accesible en cualquier scroll.
-- [ ] **Sidebar Colapsable (Focus Mode)**: Modo compacto a 64px para maximizar espacio de trabajo en pantallas de producción.
+- [x] **Barra de Lotes Flotante (Floating Dock)**: Dock centrado inferior para operaciones masivas accesible en cualquier scroll.
+- [x] **Sidebar Colapsable (Focus Mode)**: Modo compacto a 64px para maximizar espacio de trabajo en pantallas de producción.
 - [ ] **Tokens Semánticos Dual-Theme**: Calibración de contraste editorial para Modo Claro (zinc/papel técnico) y profundidad en capas para Modo Oscuro (grafito satinado).
 
 ### Fase 1: Higiene del repositorio y Sincronización de Base de Datos (22-25/09/2026)
