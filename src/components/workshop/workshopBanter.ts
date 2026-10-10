@@ -66,8 +66,35 @@ export const BANTER_SCRIPTS: string[][] = [
     ['Pedido listo: no hace falta ni la Piedra de Hogar.', 'Estoy en Orgrimmar y ya llegó, qué velocidad.'],
     ['Las tintas de hoy son nivel Burning Crusade.', 'Outland quedó chico, qué impresión.'],
     ['Hordas y Alianzas: todos aprueban este diseño.', 'Ni los murlocs se atreven a criticar. Mrglglgl.'],
-    ['Encontré una gema en el diseño: es perfecto.', 'Epic gem, epic print. Todo en su lugar.']
-
+    ['Encontré una gema en el diseño: es perfecto.', 'Epic gem, epic print. Todo en su lugar.'],
+    // --- Más clásicos y cultura pop ---
+    ['Hey, listen! Este diseño quedó increíble.', 'Navi tiene razón: la impresión es de otro mundo.'],
+    ['Es peligroso ir solo, pero este pedido va seguro.', 'Con esta calidad, hasta Link se queda a mirarlo.'],
+    ['¡Kamehameha de color! Qué saturación.', 'Y el nivel de detalle supera los nueve mil.'],
+    ['Un gran poder conlleva una gran impresión.', 'Spider-Man firmaría esta lona sin dudarlo.'],
+    ['Que la Fuerza te acompañe en el refilado.', 'Y que los bordes queden más rectos que un sable.'],
+    ['Yo soy Groot... y también fan de este diseño.', 'Groot dice que los colores están espectaculares.'],
+    ['Houston, no tenemos problemas: salió perfecto.', 'Alunizaje impecable de tinta sobre la lona.'],
+    ['Tomá el anillo, pero dejame este diseño.', 'Mi tesssoro... digo, mi lona. Qué belleza.'],
+    ['Winter is coming, pero esta lona es eterna.', 'Y el diseño no se olvida ni en Poniente.'],
+    ['Este diseño tiene más estilo que Mario Kart.', 'Y llegó primero: ni un caparazón azul lo frenó.'],
+    ['¡Combo x10! Pedido, impresión y corte perfectos.', 'Perfect! Ranking S en el tablero del taller.'],
+    ['Necesito una hoguera: este diseño me tiene fascinado.', 'Alabado sea el sol... y este degradé perfecto.'],
+    ['Este trabajo merece un trofeo de platino.', 'Y una mención especial por el acabado.'],
+    ['Rayman perdió los brazos, pero este diseño no pierde nada.', 'Ni un píxel fuera de lugar. Qué prolijidad.'],
+    ['¿Viste ese negro? Parece un agujero negro.', 'Interstellar queda corto frente a esta profundidad.'],
+    ['Pasaste de nivel con ese diseño.', 'Y el plotter te da bonus de calidad extra.'],
+    ['Dice Mario que este pedido es una estrella.', 'Invencibles por diez segundos... y por siempre en calidad.'],
+    ['Este corte quedó más limpio que un headshot.', 'Cero rebabas. Boom, headshot de precisión.'],
+    ['El diseñador entró en modo Super Saiyajin.', 'Se nota: el arte tiene aura dorada.'],
+    ['Aquí no hay glitches, solo calidad de impresión.', 'Speedrun perfecto: sin errores y a tiempo.'],
+    ['Cada tinta cuenta, como cada vida en Contra.', 'Arriba, arriba, abajo, abajo... ¡y a imprimir!'],
+    ['Frodo llevó el anillo; nosotros llevamos el rollo.', 'Y sin perderlo en el camino. Misión cumplida.'],
+    ['Los Minions dirían: ¡banana! Qué colorido.', 'Bello, bello, bello. Impresión de 10.'],
+    ['Este plotter tiene más precisión que un Zerg.', 'Y es mucho más amigable. Hasta da gusto verlo.'],
+    ['Estoy a punto de terminar esta pasada.', 'Yo me ocupo del refilado. Equipo ganador.'],
+    ['Mirá este acabado, parece de museo.', 'Ni el Louvre tiene tanta nitidez en sus obras.'],
+    ['Pocos saben imprimir como vos.', 'Y menos aún diseñar tan lindo. Somos un gran equipo.']
 ];
 
 /**
@@ -110,8 +137,59 @@ export const THOUGHTS: string[] = [
     'Hoy el cliente se va a ir feliz.',
     'Estoy en modo Protoss: todo perfecto.',
     '¿Será que Thrall pediría una copia?',
-    'La calidad hoy está en modo Mythic.'
+    'La calidad hoy está en modo Mythic.',
+    'Presioná start para iniciar otro pedido.',
+    'Este taller es mi base de operaciones.',
+    'Cada lona es una nueva misión.',
+    'Hoy me siento nivel Ultra Instinto.',
+    'Un plotter bien calibrado vale más que una espada legendaria.',
+    'Me quedan dos vidas... y una buena racha de pedidos.',
+    'El café es mi poción de maná.',
+    'Si imprimo bien, subo de rango.',
+    'Siempre hay un pedido más antes del jefe final.',
+    'Esta tinta huele a victoria.',
+    'Hoy me toca ser el héroe del refilado.',
+    'Un píxel a la vez, así se construyen imperios.',
+    'Quién diría que el CMYK era tan épico.',
+    'Más calidad que un Mario dorado.'
 ];
+
+/**
+ * Saludos al cruzarse por el taller. Cada par es [saludo de quien saluda, respuesta del otro].
+ * Son cortos y temáticos (videojuegos, Blizzard, cultura pop); los operarios siguen su camino.
+ */
+export const GREETINGS: [string, string][] = [
+    ['¡Lok\'tar ogar!', '¡Por la Horda!'],
+    ['¡Por Aiur!', 'En nombre de Aiur, hola.'],
+    ['¡Que la Fuerza te acompañe!', 'Y a vos también.'],
+    ['¡Hey, listen!', '¡Ya te escuché, Navi!'],
+    ['¡Hola, aventurero!', 'Que tu camino sea épico.'],
+    ['Stay a while and listen.', '¡Otro día, estoy apurado!'],
+    ['¡Zug zug!', '¡Trabajo completado!'],
+    ['Es hora de la acción.', 'Siempre, jefe.'],
+    ['Buenas, comandante.', 'En posición, ya voy.'],
+    ['¡Excelsior!', '¡Nos vemos, compañero!'],
+    ['Un gran poder conlleva...', '...una gran lona. ¡Hola!'],
+    ['¡Mrglglgl!', '¡Mrglgl! Hasta luego.'],
+    ['¡Wassup, campeón!', 'Todo bien, seguimos.'],
+    ['¡Logro desbloqueado: amigos!', 'Bonus de equipo activado.'],
+    ['¡It\'s a-me!', '¡Mamma mia, hola!'],
+    ['¡Hola, mi precioso!', 'Que no te vea Sauron. ¡Chau!'],
+    ['¡Buen día, jefe del taller!', 'Buen día. ¡A darle!'],
+    ['¡Pika pika!', '¡Chuuu! Hasta luego.'],
+    ['Choca esos cinco.', '¡Top-secret high five!'],
+    ['A tus órdenes, Hokage.', 'Dattebayo. Nos vemos.'],
+    ['¡Hola! Todo perfecto por acá.', 'Por acá también. ¡Seguimos!'],
+    ['Ding! Nivel de amistad +1.', 'Combo de saludos x2.']
+];
+
+/** Elige un saludo distinto del anterior. */
+export function pickGreetingIndex(rng: () => number, last: number): number {
+    if (GREETINGS.length <= 1) return 0;
+    let idx = Math.floor(rng() * GREETINGS.length);
+    if (idx === last) idx = (idx + 1) % GREETINGS.length;
+    return idx;
+}
 
 /** Elige un pensamiento distinto del anterior. */
 export function pickThoughtIndex(rng: () => number, last: number): number {

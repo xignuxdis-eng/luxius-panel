@@ -29,6 +29,7 @@ import {
 import { WorkerCrew, planErrand } from './workshopWorkers';
 import { WorkerBubbles } from './workshopBubbles';
 import { getUsuarios } from '@/data/db';
+import { createStationProps, StationProps } from './workshopStationProps';
 
 export interface WorkshopCanvasPixiProps {
     orders: Order[];
@@ -51,7 +52,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'F3-r9';
+export const BUILD_TAG = 'D-r1';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -122,6 +123,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const crewRef = useRef<WorkerCrew | null>(null);
     const bubblesRef = useRef<WorkerBubbles | null>(null);
     const stationsUIRef = useRef<StationUIItem[]>([]);
+    const stationPropsRef = useRef<Map<string, StationProps>>(new Map());
+    const prevCountsRef = useRef<Map<string, number>>(new Map());
     const currentScaleRef = useRef<number>(1);
     const tagContainerRef = useRef<Container | null>(null);
     const tagBgRef = useRef<Graphics | null>(null);
@@ -202,6 +205,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         stationsUIRef.current.forEach((s) => {
             if (!s.badgeCountText || s.badgeCountText.destroyed) return;
             const count = countOrdersForStation(s.id, orders);
+            const prevCount = prevCountsRef.current.get(s.id);
+            // "Pop" del contador cuando el número real cambia
+            if (prevCount !== undefined && prevCount !== count && !s.badgeContainer.destroyed) {
+                s.badgeContainer.scale.set(1.5);
+            }
+            prevCountsRef.current.set(s.id, count);
+            stationPropsRef.current.get(s.id)?.setCount(count);
             updateBadgeVisual(s.badgeBg, s.badgeCountText, count);
             s.badgeContainer.visible = count > 0;
         });
@@ -450,6 +460,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             particlesPoolRef.current = [];
             plottersListRef.current = [];
             stationsUIRef.current = [];
+            stationPropsRef.current.clear();
+            prevCountsRef.current.clear();
 
             if (activeApp) {
                 try {
@@ -800,6 +812,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 });
             }
 
+            // Objetos de la estación (Bloque D): escritorio, estantes, mesa de corte, cajas, portón, mostrador
+            if (!isPlotter) {
+                const props = createStationProps(id, width, height);
+                if (props) {
+                    visualContainer.addChild(props.container);
+                    props.setCount(countOrdersForStation(id, ordersRef.current));
+                    stationPropsRef.current.set(id, props);
+                }
+            }
+
             // Selection / Hover Highlight Frame
             const highlightGfx = new Graphics();
             visualContainer.addChild(highlightGfx);
@@ -1103,6 +1125,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
      */
     const setupPlotterTicker = (app: Application): (() => void) => {
         let frameCount = 0;
+        let elapsedMs = 0;
         let lastSweepSoundTime = 0;
         let prevSweepCos = 0;
 
@@ -1110,6 +1133,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             frameCount++;
 
             try {
+                elapsedMs += app.ticker.deltaMS;
+                stationPropsRef.current.forEach((p) => p.update(elapsedMs));
+                // El "pop" de los contadores vuelve a su tamaño normal
+                stationsUIRef.current.forEach((s) => {
+                    const bc = s.badgeContainer;
+                    if (!bc || bc.destroyed || bc.scale.x === 1) return;
+                    const next = bc.scale.x + (1 - bc.scale.x) * 0.18;
+                    bc.scale.set(Math.abs(next - 1) < 0.01 ? 1 : next);
+                });
                 crewRef.current?.update(app.ticker.deltaMS);
                 if (crewRef.current && bubblesRef.current) {
                     bubblesRef.current.sync(crewRef.current.getWorkers(), currentScaleRef.current, app.screen.width);
