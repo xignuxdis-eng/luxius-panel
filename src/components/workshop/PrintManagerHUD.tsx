@@ -29,16 +29,14 @@ export const PrintManagerHUD: React.FC<PrintManagerHUDProps> = ({
 
     return (
         <div className="hud-container pixel-box-cyan" style={{
-            position: 'absolute',
-            top: '16px',
-            left: '16px',
-            width: '270px',
+            position: 'relative',
+            width: '100%',
             backgroundColor: 'var(--pixel-bg-card)',
             border: '3px solid #000',
             padding: '10px',
             color: '#f8fafc',
             fontFamily: 'var(--font-pixel-ui)',
-            zIndex: 10
+            boxSizing: 'border-box'
         }}>
             <div style={{
                 display: 'flex',

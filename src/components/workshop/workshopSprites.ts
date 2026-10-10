@@ -218,20 +218,24 @@ export function getWallTileTexture(): Texture {
 }
 
 export function getWindowTexture(): Texture {
+    // Ventana industrial ampliada (52x18 px) con marco metálico y 4 paneles translúcidos
     const matrix = [
-        'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGLLLLLLLLGGGGGGLLLLLLLLGGGGGGLLLLLLGGW',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW'
+        'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
+        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
+        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
+        'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW'
     ];
     const palette = {
         'F': '#475569',
@@ -239,33 +243,39 @@ export function getWindowTexture(): Texture {
         'G': '#0f172a',
         'L': '#38bdf8'
     };
-    return createPixelTexture('window_large_v2', matrix, palette);
+    return createPixelTexture('window_industrial_large_v3', matrix, palette);
 }
 
 export function getSignDenTexture(): Texture {
+    // Cartel "DEN" ampliado (46x16 px) estilo placa industrial de esmalte rojo y tornillos
     const matrix = [
-        '############################',
-        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
-        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
-        '#R..DDD...EEEEE..N....N...R#',
-        '#R..D..D..E......NN...N...R#',
-        '#R..D..D..EEEE...N.N..N...R#',
-        '#R..D..D..E......N..N.N...R#',
-        '#R..D..D..E......N...NN...R#',
-        '#R..DDD...EEEEE..N....N...R#',
-        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
-        '#RRRRRRRRRRRRRRRRRRRRRRRRRR#',
-        '############################'
+        '##############################################',
+        '#O..........................................O#',
+        '#.RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR.#',
+        '#.RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR.#',
+        '#.RR..DDDDD....EEEEEEE..NN.....NN...RRRRRRRR.#',
+        '#.RR..DD..DD...EE.......NNN....NN...RRRRRRRR.#',
+        '#.RR..DD...DD..EE.......NNNN...NN...RRRRRRRR.#',
+        '#.RR..DD...DD..EEEEE....NN.NN..NN...RRRRRRRR.#',
+        '#.RR..DD...DD..EEEEE....NN..NN.NN...RRRRRRRR.#',
+        '#.RR..DD...DD..EE.......NN...NNNN...RRRRRRRR.#',
+        '#.RR..DD..DD...EE.......NN....NNN...RRRRRRRR.#',
+        '#.RR..DDDDD....EEEEEEE..NN.....NN...RRRRRRRR.#',
+        '#.RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR.#',
+        '#.RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR.#',
+        '#O..........................................O#',
+        '##############################################'
     ];
     const palette = {
-        '#': '#0f172a',
-        'R': '#ef4444',
+        '#': '#090d16',
+        'O': '#94a3b8', // Tornillos esquineros
+        '.': '#991b1b', // Borde bisel rojo oscuro
+        'R': '#dc2626', // Fondo rojo vivo
         'D': '#ffffff',
         'E': '#ffffff',
-        'N': '#ffffff',
-        '.': '#ef4444'
+        'N': '#ffffff'
     };
-    return createPixelTexture('sign_den_large_v2', matrix, palette);
+    return createPixelTexture('sign_den_expanded_v3', matrix, palette);
 }
 
 /* ==========================================================================
@@ -273,16 +283,15 @@ export function getSignDenTexture(): Texture {
    ========================================================================== */
 
 /**
- * Plotter Chassis / Frame (110x48 px pixel art)
- * Features dual stand legs with wheels, rear roll-feed bracket, main Roland chassis,
- * front drop guide, and top cover.
+ * Plotter Chassis / Frame (204x48 px pixel art)
+ * Proporción 40-45% del ancho de taller, Roland VG2 gran formato.
  */
 export function getPlotterChassisTexture(isOffline = false): Texture {
-    const key = isOffline ? 'plotter_chassis_offline' : 'plotter_chassis_online';
+    const key = isOffline ? 'plotter_chassis_204_offline' : 'plotter_chassis_204_online';
     const cached = textureCache.get(key);
     if (isTextureValid(cached)) return cached!;
 
-    const W = 110;
+    const W = 204;
     const H = 48;
     const canvas = document.createElement('canvas');
     canvas.width = W;
@@ -291,77 +300,80 @@ export function getPlotterChassisTexture(isOffline = false): Texture {
     ctx.imageSmoothingEnabled = false;
 
     const cBody = isOffline ? '#475569' : '#1e293b';
-    const cSteel = isOffline ? '#334155' : '#334155';
     const cHighlight = isOffline ? '#64748b' : '#64748b';
     const cTrim = isOffline ? '#334155' : '#38bdf8';
     const cDark = '#090d16';
 
-    // 1. Legs & Feet with Castors (Left & Right)
-    // Left leg
+    // 1. Patas dobles reforzadas y ruedas de soporte
+    // Pata izquierda
     ctx.fillStyle = cDark;
-    ctx.fillRect(10, 24, 6, 20);
-    ctx.fillRect(6, 42, 14, 4); // foot
+    ctx.fillRect(16, 22, 8, 22);
+    ctx.fillRect(10, 40, 20, 5); // Base del pie
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(5, 44, 4, 3); // wheels
-    ctx.fillRect(17, 44, 4, 3);
+    ctx.fillRect(9, 44, 5, 4);   // Rueda izq
+    ctx.fillRect(24, 44, 5, 4);  // Rueda der
 
-    // Right leg
+    // Pata derecha
     ctx.fillStyle = cDark;
-    ctx.fillRect(W - 16, 24, 6, 20);
-    ctx.fillRect(W - 20, 42, 14, 4); // foot
+    ctx.fillRect(W - 24, 22, 8, 22);
+    ctx.fillRect(W - 30, 40, 20, 5); // Base del pie
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(W - 21, 44, 4, 3);
-    ctx.fillRect(W - 9, 44, 4, 3);
+    ctx.fillRect(W - 31, 44, 5, 4);  // Rueda izq
+    ctx.fillRect(W - 16, 44, 5, 4);  // Rueda der
 
-    // Crossbar between legs
+    // Travesaño central inferior entre patas
     ctx.fillStyle = cDark;
-    ctx.fillRect(16, 34, W - 32, 3);
+    ctx.fillRect(24, 32, W - 48, 3);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(24, 33, W - 48, 1);
 
-    // 2. Main Machine Housing
-    // Main upper box
+    // 2. Chasis Superior de la Máquina Roland
     ctx.fillStyle = cBody;
-    ctx.fillRect(4, 6, W - 8, 22);
+    ctx.fillRect(6, 4, W - 12, 22);
 
-    // Top hood highlight bevel
+    // Bisel superior de la tapa
     ctx.fillStyle = cHighlight;
-    ctx.fillRect(6, 6, W - 12, 2);
+    ctx.fillRect(8, 4, W - 16, 2);
 
-    // Front horizontal Roland color accent line
+    // Franja Roland cyan de acento
     ctx.fillStyle = cTrim;
-    ctx.fillRect(6, 9, W - 12, 2);
+    ctx.fillRect(8, 7, W - 16, 2);
 
-    // 3. Central Print Bed / Guide Bar Slot
+    // 3. Ranura central de impresión / Carro de cabezal
+    const bedLeft = 24;
+    const bedRight = W - 38;
+    const bedW = bedRight - bedLeft;
     ctx.fillStyle = '#000000';
-    ctx.fillRect(14, 13, W - 28, 12);
+    ctx.fillRect(bedLeft, 11, bedW, 14);
 
-    // Steel printhead rail guide
+    // Riel metálico del carro
     ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(14, 15, W - 28, 2);
+    ctx.fillRect(bedLeft, 13, bedW, 2);
 
-    // 4. Control Panel on Right Wing
+    // 4. Panel de Control y Pantalla LCD en ala derecha
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(W - 24, 9, 16, 16);
+    ctx.fillRect(W - 34, 7, 24, 17);
     ctx.fillStyle = isOffline ? '#1e293b' : '#0284c7';
-    ctx.fillRect(W - 22, 11, 12, 6); // LCD Screen
-    // Status button LEDs: offline = pure grays (sin luz); online = LED verde
+    ctx.fillRect(W - 32, 9, 20, 6); // Pantalla LCD
+    // LEDs de estado en el panel
     if (isOffline) {
         ctx.fillStyle = '#334155';
-        ctx.fillRect(W - 22, 19, 3, 3);
-        ctx.fillRect(W - 17, 19, 3, 3);
-        ctx.fillRect(W - 12, 19, 3, 3);
+        ctx.fillRect(W - 32, 17, 4, 4);
+        ctx.fillRect(W - 25, 17, 4, 4);
+        ctx.fillRect(W - 18, 17, 4, 4);
     } else {
-        ctx.fillStyle = '#22c55e'; // LED verde standby/operativo
-        ctx.fillRect(W - 22, 19, 3, 3);
+        ctx.fillStyle = '#22c55e'; // LED verde activo
+        ctx.fillRect(W - 32, 17, 4, 4);
         ctx.fillStyle = '#1e293b';
-        ctx.fillRect(W - 17, 19, 3, 3);
-        ctx.fillRect(W - 12, 19, 3, 3);
+        ctx.fillRect(W - 25, 17, 4, 4);
+        ctx.fillRect(W - 18, 17, 4, 4);
     }
 
-    // 5. Front Catch Basket / Collection Tray Frame
+    // 5. Bandeja de recepción de vinilo frontal (canasto de caída)
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(12, 26, W - 24, 2);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-    ctx.fillRect(16, 28, W - 32, 10);
+    ctx.fillRect(20, 24, bedW + 8, 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.fillRect(24, 26, bedW, 12);
 
     const texture = Texture.from(canvas, true);
     if (texture.source) {
@@ -395,14 +407,14 @@ export function getPlotterPrintheadTexture(): Texture {
 }
 
 /**
- * Vinyl Roll on Feed Core (Loaded on the back)
+ * Vinyl Roll on Feed Core (Bobina ancha de vinilo)
  */
 export function getPlotterVinylRollTexture(): Texture {
-    const key = 'plotter_vinyl_roll';
+    const key = 'plotter_vinyl_roll_wide_204';
     const cached = textureCache.get(key);
     if (isTextureValid(cached)) return cached!;
 
-    const W = 76;
+    const W = 146;
     const H = 8;
     const canvas = document.createElement('canvas');
     canvas.width = W;
@@ -410,7 +422,7 @@ export function getPlotterVinylRollTexture(): Texture {
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
 
-    // Roll cylinder
+    // Cuerpo de la bobina
     ctx.fillStyle = '#94a3b8';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#f8fafc';
@@ -418,10 +430,10 @@ export function getPlotterVinylRollTexture(): Texture {
     ctx.fillStyle = '#cbd5e1';
     ctx.fillRect(0, 5, W, 3);
 
-    // Roll side caps
+    // Tapas laterales de anclaje
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, 3, H);
-    ctx.fillRect(W - 3, 0, 3, H);
+    ctx.fillRect(0, 0, 4, H);
+    ctx.fillRect(W - 4, 0, 4, H);
 
     const texture = Texture.from(canvas, true);
     if (texture.source) {

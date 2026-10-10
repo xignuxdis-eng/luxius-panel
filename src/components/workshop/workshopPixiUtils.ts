@@ -81,32 +81,35 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'diseno',
             title: 'Diseño',
             description: 'Mesa de pre-prensa y validación de artes.',
-            x: 14,
-            y: 44,
+            x: 16,
+            y: 36,
             width: 86,
-            height: 66,
+            height: 72,
             color: '#8b5cf6',
             icon: '🖥️'
         }
     ];
 
-    if (maquinas.length === 0) {
+    if (maquinas.length <= 1) {
+        const m = maquinas[0];
         baseStations.push({
             id: 'plotter1',
-            title: 'Plotter',
-            description: 'Impresora Roland gran formato.',
-            x: 108,
-            y: 42,
-            width: 154,
-            height: 68,
-            color: '#22c55e',
-            icon: '🖨️'
+            title: m?.nombre && m.nombre.length <= 16 ? m.nombre : 'Plotter',
+            description: m ? `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m) - Status: ${(m.estado || 'online').toUpperCase()}` : 'Impresora Roland gran formato.',
+            x: 136,
+            y: 36,
+            width: 208,
+            height: 74,
+            color: m?.estado === 'offline' ? '#64748b' : '#22c55e',
+            icon: '🖨️',
+            maquinaId: m?.id,
+            estado: m?.estado || 'online'
         });
     } else {
-        const startX = 106;
-        const availableW = 264;
+        const startX = 114;
+        const availableW = 252;
         const count = maquinas.length;
-        const stepX = Math.min(156, Math.floor(availableW / Math.max(1, count)));
+        const stepX = Math.floor(availableW / count);
 
         maquinas.forEach((m, idx) => {
             const colors = ['#22c55e', '#06b6d4', '#ec4899', '#eab308', '#3b82f6'];
@@ -115,12 +118,12 @@ export const getPixiStations = (): StationConfig[] => {
 
             baseStations.push({
                 id: stationId,
-                title: m.nombre && m.nombre.length <= 12 ? m.nombre : (idx === 0 ? 'Plotter 1' : idx === 1 ? 'Plotter 2' : (m.nombre || 'Plotter')),
+                title: m.nombre && m.nombre.length <= 14 ? m.nombre : (idx === 0 ? 'Plotter 1' : idx === 1 ? 'Plotter 2' : (m.nombre || 'Plotter')),
                 description: `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m) - Status: ${(m.estado || 'online').toUpperCase()}`,
                 x: startX + idx * stepX,
-                y: 42,
-                width: Math.max(120, Math.min(154, stepX - 6)),
-                height: 68,
+                y: 36,
+                width: Math.max(120, stepX - 6),
+                height: 74,
                 color: m.estado === 'offline' ? '#64748b' : color,
                 icon: '🖨️',
                 maquinaId: m.id,
@@ -134,10 +137,10 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'insumos',
             title: 'Insumos',
             description: 'Tintas CMYK y bobinas en stock.',
-            x: 380,
-            y: 44,
+            x: 378,
+            y: 36,
             width: 86,
-            height: 66,
+            height: 72,
             color: '#eab308',
             icon: '🎨'
         },
@@ -145,10 +148,10 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'despacho',
             title: 'Despacho',
             description: 'Salida de paquetes y flete.',
-            x: 14,
-            y: 154,
-            width: 88,
-            height: 72,
+            x: 16,
+            y: 140,
+            width: 86,
+            height: 100,
             color: '#64748b',
             icon: '🚚'
         },
@@ -156,10 +159,10 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'empaque',
             title: 'Empaque',
             description: 'Doblado, ojalillos y embalaje.',
-            x: 110,
-            y: 154,
-            width: 98,
-            height: 72,
+            x: 114,
+            y: 140,
+            width: 120,
+            height: 100,
             color: '#a855f7',
             icon: '📦'
         },
@@ -167,10 +170,10 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'corte',
             title: 'Refilado',
             description: 'Corte, refilado y trillado.',
-            x: 216,
-            y: 154,
-            width: 98,
-            height: 72,
+            x: 246,
+            y: 140,
+            width: 120,
+            height: 100,
             color: '#ec4899',
             icon: '✂️'
         },
@@ -178,10 +181,10 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'caja',
             title: 'Caja',
             description: 'Ventas, cobros y mostrador.',
-            x: 380,
-            y: 154,
+            x: 378,
+            y: 140,
             width: 86,
-            height: 72,
+            height: 100,
             color: '#f59e0b',
             icon: '🪙'
         }

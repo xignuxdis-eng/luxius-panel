@@ -216,115 +216,149 @@ export const WorkshopDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Main Interactive Workshop Canvas */}
-            <div style={{ position: 'relative' }}>
-                <PrintManagerHUD
-                    orders={orders}
-                    onSelectOrder={(order) => setPreviewOrder(order)}
-                    onSimulateStatusChange={handleUpdateStatus}
-                />
+            {/* Main Interactive Workshop Layout */}
+            <style>{`
+                .workshop-layout-container {
+                    display: flex;
+                    flex-direction: row;
+                    gap: 16px;
+                    align-items: flex-start;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                .workshop-sidebar-column {
+                    width: 250px;
+                    flex-shrink: 0;
+                    box-sizing: border-box;
+                }
+                .workshop-map-column {
+                    flex: 1;
+                    min-width: 0;
+                    position: relative;
+                    box-sizing: border-box;
+                }
+                @media (max-width: 900px) {
+                    .workshop-layout-container {
+                        flex-direction: column;
+                    }
+                    .workshop-sidebar-column {
+                        width: 100%;
+                    }
+                }
+            `}</style>
 
-                {rendererType === 'pixi' && !pixiAsyncError ? (
-                    <WorkshopPixiErrorBoundary
-                        onCatch={(err) => {
-                            console.error('Pixi Workshop Error caught by boundary:', err);
-                            setPixiAsyncError(err.message);
-                        }}
-                        fallback={(retry) => (
-                            <div>
-                                <div style={{
-                                    backgroundColor: '#1e293b',
-                                    border: '1px solid #f59e0b',
-                                    borderRadius: '6px',
-                                    padding: '8px 12px',
-                                    marginBottom: '10px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    color: '#f8fafc',
-                                    fontSize: '12px'
-                                }}>
-                                    <span>⚠️ El motor PixiJS experimentó un reinicio. Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
-                                    <button
-                                        onClick={() => {
-                                            setPixiAsyncError(null);
-                                            retry();
-                                        }}
-                                        style={{
-                                            backgroundColor: '#38bdf8',
-                                            color: '#0f172a',
-                                            border: 'none',
-                                            padding: '4px 10px',
-                                            borderRadius: '4px',
-                                            fontWeight: 'bold',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        🔄 Reintentar Pixi HD
-                                    </button>
+            <div className="workshop-layout-container">
+                <aside className="workshop-sidebar-column">
+                    <PrintManagerHUD
+                        orders={orders}
+                        onSelectOrder={(order) => setPreviewOrder(order)}
+                        onSimulateStatusChange={handleUpdateStatus}
+                    />
+                </aside>
+
+                <main className="workshop-map-column">
+                    {rendererType === 'pixi' && !pixiAsyncError ? (
+                        <WorkshopPixiErrorBoundary
+                            onCatch={(err) => {
+                                console.error('Pixi Workshop Error caught by boundary:', err);
+                                setPixiAsyncError(err.message);
+                            }}
+                            fallback={(retry) => (
+                                <div>
+                                    <div style={{
+                                        backgroundColor: '#1e293b',
+                                        border: '1px solid #f59e0b',
+                                        borderRadius: '6px',
+                                        padding: '8px 12px',
+                                        marginBottom: '10px',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        color: '#f8fafc',
+                                        fontSize: '12px'
+                                    }}>
+                                        <span>⚠️ El motor PixiJS experimentó un reinicio. Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
+                                        <button
+                                            onClick={() => {
+                                                setPixiAsyncError(null);
+                                                retry();
+                                            }}
+                                            style={{
+                                                backgroundColor: '#38bdf8',
+                                                color: '#0f172a',
+                                                border: 'none',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            🔄 Reintentar Pixi HD
+                                        </button>
+                                    </div>
+                                    <WorkshopCanvas
+                                        orders={orders}
+                                        onSelectStation={(stationId) => setSelectedStation(stationId)}
+                                        onSelectOrder={(order) => setPreviewOrder(order)}
+                                        selectedStation={selectedStation}
+                                    />
                                 </div>
-                                <WorkshopCanvas
-                                    orders={orders}
-                                    onSelectStation={(stationId) => setSelectedStation(stationId)}
-                                    onSelectOrder={(order) => setPreviewOrder(order)}
-                                    selectedStation={selectedStation}
-                                />
+                            )}
+                        >
+                            <WorkshopCanvasPixi
+                                orders={orders}
+                                onSelectStation={(stationId) => setSelectedStation(stationId)}
+                                onSelectOrder={(order) => setPreviewOrder(order)}
+                                selectedStation={selectedStation}
+                                onError={(err) => setPixiAsyncError(err.message)}
+                            />
+                        </WorkshopPixiErrorBoundary>
+                    ) : rendererType === 'pixi' && pixiAsyncError ? (
+                        <div>
+                            <div style={{
+                                backgroundColor: '#1e293b',
+                                border: '1px solid #f59e0b',
+                                borderRadius: '6px',
+                                padding: '8px 12px',
+                                marginBottom: '10px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                color: '#f8fafc',
+                                fontSize: '12px'
+                            }}>
+                                <span>⚠️ Fallo WebGL en PixiJS ({pixiAsyncError}). Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
+                                <button
+                                    onClick={() => setPixiAsyncError(null)}
+                                    style={{
+                                        backgroundColor: '#38bdf8',
+                                        color: '#0f172a',
+                                        border: 'none',
+                                        padding: '4px 10px',
+                                        borderRadius: '4px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    🔄 Reintentar Pixi HD
+                                </button>
                             </div>
-                        )}
-                    >
-                        <WorkshopCanvasPixi
-                            orders={orders}
-                            onSelectStation={(stationId) => setSelectedStation(stationId)}
-                            onSelectOrder={(order) => setPreviewOrder(order)}
-                            selectedStation={selectedStation}
-                            onError={(err) => setPixiAsyncError(err.message)}
-                        />
-                    </WorkshopPixiErrorBoundary>
-                ) : rendererType === 'pixi' && pixiAsyncError ? (
-                    <div>
-                        <div style={{
-                            backgroundColor: '#1e293b',
-                            border: '1px solid #f59e0b',
-                            borderRadius: '6px',
-                            padding: '8px 12px',
-                            marginBottom: '10px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            color: '#f8fafc',
-                            fontSize: '12px'
-                        }}>
-                            <span>⚠️ Fallo WebGL en PixiJS ({pixiAsyncError}). Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
-                            <button
-                                onClick={() => setPixiAsyncError(null)}
-                                style={{
-                                    backgroundColor: '#38bdf8',
-                                    color: '#0f172a',
-                                    border: 'none',
-                                    padding: '4px 10px',
-                                    borderRadius: '4px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                🔄 Reintentar Pixi HD
-                            </button>
+                            <WorkshopCanvas
+                                orders={orders}
+                                onSelectStation={(stationId) => setSelectedStation(stationId)}
+                                onSelectOrder={(order) => setPreviewOrder(order)}
+                                selectedStation={selectedStation}
+                            />
                         </div>
+                    ) : (
                         <WorkshopCanvas
                             orders={orders}
                             onSelectStation={(stationId) => setSelectedStation(stationId)}
                             onSelectOrder={(order) => setPreviewOrder(order)}
                             selectedStation={selectedStation}
                         />
-                    </div>
-                ) : (
-                    <WorkshopCanvas
-                        orders={orders}
-                        onSelectStation={(stationId) => setSelectedStation(stationId)}
-                        onSelectOrder={(order) => setPreviewOrder(order)}
-                        selectedStation={selectedStation}
-                    />
-                )}
+                    )}
+                </main>
             </div>
 
             {/* Station Data Modal */}
