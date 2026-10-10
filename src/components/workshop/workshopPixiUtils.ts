@@ -196,13 +196,17 @@ export const getPixiStations = (): StationConfig[] => {
 
 export const getDynamicStations = getPixiStations;
 
-export const countOrdersForStation = (stationId: StationId, ordersList: Order[]): number => {
-    if (stationId === 'diseno') return ordersList.filter(o => o.status === 'diseno' || o.status === 'rebotado').length;
+/** Órdenes del sistema que corresponden a una estación (mismas reglas que el contador). */
+export const ordersForStation = (stationId: StationId, ordersList: Order[]): Order[] => {
+    if (stationId === 'diseno') return ordersList.filter(o => o.status === 'diseno' || o.status === 'rebotado');
     if (stationId === 'plotter1' || stationId === 'plotter2' || stationId.startsWith('maquina_')) {
-        return ordersList.filter(o => o.status === 'orden').length;
+        return ordersList.filter(o => o.status === 'orden');
     }
-    if (stationId === 'corte') return ordersList.filter(o => o.status === 'impreso' || o.status === 'post').length;
-    if (stationId === 'empaque') return ordersList.filter(o => o.status === 'completo').length;
-    if (stationId === 'despacho') return ordersList.filter(o => o.status === 'entregado').length;
-    return 0;
+    if (stationId === 'corte') return ordersList.filter(o => o.status === 'impreso' || o.status === 'post');
+    if (stationId === 'empaque') return ordersList.filter(o => o.status === 'completo');
+    if (stationId === 'despacho') return ordersList.filter(o => o.status === 'entregado');
+    return [];
 };
+
+export const countOrdersForStation = (stationId: StationId, ordersList: Order[]): number =>
+    ordersForStation(stationId, ordersList).length;

@@ -28,11 +28,31 @@ import {
 } from './workshopSprites';
 import { WorkerCrew, planErrand } from './workshopWorkers';
 import { WorkerBubbles } from './workshopBubbles';
-import { getUsuarios } from '@/data/db';
+import { getUsuarios, getMaquinas, getMateriales } from '@/data/db';
 import { createStationProps, StationProps } from './workshopStationProps';
 import WorkerSheetCard from './WorkerSheetCard';
-import { WorkshopLighting } from './workshopLighting';
-import { Camera, DEFAULT_CAMERA, clampCamera, zoomAt, MAP_W_LOGICAL, MAP_H_LOGICAL } from './workshopCamera';
+import { WorkshopLighting, workshopNow, hourOf } from './workshopLighting';
+import { Camera, DEFAULT_CAMERA, clampCamera, zoomAt, MAP_W_LOGICAL, MAP_H_LOGICAL, MAX_ZOOM } from './workshopCamera';
+import {
+    computeStationAlerts,
+    summarizeAlerts,
+    computeDaySummary,
+    computeStationStats,
+    fmtM2,
+    orderM2,
+    type StationAlert
+} from './workshopAlerts';
+import { WorkshopFx } from './workshopFx';
+import { WorkshopSky } from './workshopSky';
+import { GuestManager } from './workshopGuests';
+import { WorkshopPet, PET_NAME } from './workshopPet';
+import { WorkshopEvents } from './workshopEvents';
+import { computeLanes } from './workshopWorkers';
+import { fetchWeather, WEATHER_REFRESH_MS, type WeatherInfo } from './workshopWeather';
+import { computeAchievements, syncUnlocked, loadUnlocked, type Achievement } from './workshopAchievements';
+import StationSheetCard from './StationSheetCard';
+import AchievementsPanel from './AchievementsPanel';
+import WorkshopToolbar, { type FxToggles } from './WorkshopToolbar';
 
 export interface WorkshopCanvasPixiProps {
     orders: Order[];
@@ -55,7 +75,20 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'E-r1';
+export const BUILD_TAG = 'F-r1';
+
+/** Pizarra del día en la pared (coordenadas del mapa). */
+const BOARD = { x: 108, y: 10, w: 100, h: 23 };
+const FX_STORAGE_KEY = 'luxius_print_den_fx';
+const DEFAULT_FX: FxToggles = { pet: true, events: true, weather: true, alerts: true };
+
+const loadFxToggles = (): FxToggles => {
+    try {
+        const raw = localStorage.getItem(FX_STORAGE_KEY);
+        if (raw) return { ...DEFAULT_FX, ...JSON.parse(raw) };
+    } catch (_) {}
+    return { ...DEFAULT_FX };
+};
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -148,6 +181,38 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const tooltipContainerRef = useRef<Container | null>(null);
     const tooltipTextRef = useRef<Text | null>(null);
 
+    // Extras del Bloque F (alertas, pizarra, clima, mascota, eventos, visitas, logros...)
+    const fxRef = useRef<WorkshopFx | null>(null);
+    const skyRef = useRef<WorkshopSky | null>(null);
+    const guestsRef = useRef<GuestManager | null>(null);
+    const petRef = useRef<WorkshopPet | null>(null);
+    const eventsRef = useRef<WorkshopEvents | null>(null);
+    const alertIconsRef = useRef<Map<string, { container: Container; bg: Graphics; text: Text }>>(new Map());
+    const alertsRef = useRef<StationAlert[]>([]);
+    const alertsKeyRef = useRef('');
+    const achKeyRef = useRef('');
+    const boardRef = useRef<{ text: Text; late: Text } | null>(null);
+    const clockRef = useRef<{ hands: Graphics; minute: number; cx: number; cy: number } | null>(null);
+    const applyCameraRef = useRef<(() => void) | null>(null);
+    const camTweenRef = useRef<number | null>(null);
+    const toastTimerRef = useRef<number | null>(null);
+    const [fxToggles, setFxToggles] = useState<FxToggles>(loadFxToggles);
+    const fxToggleRef = useRef<FxToggles>(fxToggles);
+    fxToggleRef.current = fxToggles;
+    const [alerts, setAlerts] = useState<StationAlert[]>([]);
+    const [sheetStationId, setSheetStationId] = useState<string | null>(null);
+    const lastStationCloseRef = useRef<{ id: string; t: number } | null>(null);
+    const [focusedId, setFocusedId] = useState<string | null>(null);
+    const [isFs, setIsFs] = useState(false);
+    const [achOpen, setAchOpen] = useState(false);
+    const [achievements, setAchievements] = useState<Achievement[]>([]);
+    const [toast, setToast] = useState<string | null>(null);
+    const [weather, setWeather] = useState<WeatherInfo | null>(null);
+    const weatherRef = useRef<WeatherInfo | null>(null);
+    weatherRef.current = weather;
+    const onSelectStationRef = useRef(onSelectStation);
+    onSelectStationRef.current = onSelectStation;
+
     // Clic en un operario: abre la orden de su viaje actual; si no tiene viaje, la primera orden que le corresponde
     // por rol (mismas reglas del sistema viejo, WorkshopCanvas.tsx L594-603). Usa solo refs (el efecto de inicio es de una sola vez).
     const onSelectOrderRef = useRef(onSelectOrder);
@@ -191,8 +256,30 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             lastOutsideCloseRef.current = null;
             return;
         }
+        setSheetStationId(null);
         setSheetWorkerId(workerId);
     };
+
+    const showToast = (text: string) => {
+        setToast(text);
+        if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 4500);
+    };
+
+    // Clic en una estación o máquina: abre su ficha (el detalle completo se abre desde la ficha).
+    const handleStationTap = (id: string) => {
+        if (dragMovedRef.current) return;
+        audioEngine.playClick();
+        const last = lastStationCloseRef.current;
+        if (last && last.id === id && Date.now() - last.t < 600) {
+            lastStationCloseRef.current = null;
+            return;
+        }
+        setSheetWorkerId(null);
+        setSheetStationId(id);
+    };
+    const handleStationTapRef = useRef(handleStationTap);
+    handleStationTapRef.current = handleStationTap;
 
     const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
         const text = count > 0 ? `${count}` : '';
@@ -226,6 +313,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             for (const d of diffs) {
                 const errand = planErrand(d);
                 if (errand) crewRef.current?.enqueueErrand(errand);
+                // Celebración real: una orden pasó a "entregado"
+                if (d.changeType === 'status_change' && d.nextStatus === 'entregado') celebrateDelivery(d.order);
             }
         }
 
@@ -253,7 +342,85 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 textNode.parent.visible = count > 0;
             }
         });
+        // Extras del Bloque F: alertas reales, pizarra del día y logros
+        try {
+            const now = workshopNow();
+            let list: StationAlert[] = [];
+            try {
+                list = computeStationAlerts(orders, getMateriales(), getMaquinas(), getPixiStations(), now);
+            } catch (_) {}
+            const key = JSON.stringify(list);
+            if (key !== alertsKeyRef.current) {
+                alertsKeyRef.current = key;
+                setAlerts(list);
+            }
+            applyAlerts(list);
+            updateBoard(orders);
+            if (orders.length > 0) {
+                const ach = computeAchievements(orders, now, loadUnlocked()?.ids ?? []);
+                const achKey = ach.map((a) => `${a.id}:${a.unlocked ? 1 : 0}:${a.progress}`).join('|');
+                if (achKey !== achKeyRef.current) {
+                    achKeyRef.current = achKey;
+                    setAchievements(ach);
+                }
+                const fresh = syncUnlocked(ach);
+                if (fresh.length > 0) {
+                    showToast(`🏆 ¡Logro desbloqueado: ${fresh[0].title}!${fresh.length > 1 ? ` (+${fresh.length - 1} más)` : ''}`);
+                }
+            }
+        } catch (err) {
+            console.warn('[PrintDen] extras del taller:', err);
+        }
     }, [orders]);
+
+    // Alertas visibles solo si el usuario no las apagó
+    useEffect(() => {
+        applyAlerts(alertsRef.current);
+    }, [fxToggles.alerts]);
+
+    // Mascota y eventos: encendido/apagado individual (se recuerda en el navegador)
+    useEffect(() => {
+        petRef.current?.setEnabled(fxToggles.pet);
+        eventsRef.current?.setEnabled(fxToggles.events);
+        try {
+            localStorage.setItem(FX_STORAGE_KEY, JSON.stringify(fxToggles));
+        } catch (_) {}
+    }, [fxToggles]);
+
+    // Clima real (solo si está encendido); se actualiza cada 30 minutos
+    useEffect(() => {
+        if (!fxToggles.weather) {
+            setWeather(null);
+            skyRef.current?.setWeather(null);
+            return;
+        }
+        let cancelled = false;
+        const ctrl = new AbortController();
+        const load = async () => {
+            const w = await fetchWeather(ctrl.signal);
+            if (cancelled) return;
+            setWeather(w);
+            skyRef.current?.setWeather(w ? w.kind : null);
+        };
+        load();
+        const t = window.setInterval(load, WEATHER_REFRESH_MS);
+        return () => {
+            cancelled = true;
+            ctrl.abort();
+            window.clearInterval(t);
+        };
+    }, [fxToggles.weather]);
+
+    // Modo TV (pantalla completa)
+    useEffect(() => {
+        const onFs = () => setIsFs(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', onFs);
+        return () => {
+            document.removeEventListener('fullscreenchange', onFs);
+            if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+            if (camTweenRef.current) cancelAnimationFrame(camTweenRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         selectedStationRef.current = selectedStation;
@@ -357,7 +524,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const hitAreasLayer = new Container();
                     hitAreasLayer.label = 'HitAreasLayer';
 
+                    const skyLayer = new Container();
+                    skyLayer.label = 'SkyLayer';
+                    const floorFxLayer = new Container();
+                    floorFxLayer.label = 'FloorFxLayer';
+
                     worldContainer.addChild(mapLayer);
+                    worldContainer.addChild(skyLayer);
                     worldContainer.addChild(stationsLayer);
                     worldContainer.addChild(workersLayer);
                     worldContainer.addChild(particlesLayer);
@@ -379,6 +552,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     // 1. Build Refined Low-Contrast Background Map
                     buildBackgroundMap(mapLayer, VIRTUAL_W, VIRTUAL_H);
+
+                    // 1b. Cielo por las ventanas (hora real + clima real) y pizarra/reloj de pared
+                    skyRef.current = new WorkshopSky(skyLayer, [32, 396], 9);
+                    buildWallBoard(mapLayer, uiLayer);
 
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
@@ -410,6 +587,42 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             else if (errand.held === 'rollo') audioEngine.playScissorsCut();
                         }
                     });
+
+                    // 2c. Extras (Bloque F): efectos, mascota, visitas y eventos aleatorios (todo decorativo)
+                    const hallStations = getPixiStations();
+                    const hallLanes = computeLanes(hallStations);
+                    fxRef.current = new WorkshopFx(floorFxLayer, particlesLayer);
+                    guestsRef.current = new GuestManager(workersLayer, hallStations);
+                    petRef.current = new WorkshopPet(workersLayer, workerHitLayer, hallStations, {
+                        onTap: (px, py) => {
+                            fxRef.current?.hearts(px, py);
+                            showToast(`🐱 ${PET_NAME}, la gata del taller (decorativa), ronronea ♥`);
+                        }
+                    });
+                    petRef.current.setEnabled(fxToggleRef.current.pet);
+                    eventsRef.current = new WorkshopEvents({
+                        crew: () => crewRef.current,
+                        fx: () => fxRef.current,
+                        lighting: () => lightingRef.current,
+                        guests: () => guestsRef.current,
+                        floorSpot: () => ({
+                            x: Math.round(40 + Math.random() * 400),
+                            y: Math.round(hallLanes.topEdge + 10 + Math.random() * Math.max(4, hallLanes.bottomEdge - hallLanes.topEdge - 16))
+                        }),
+                        hour: () => hourOf(workshopNow())
+                    });
+                    eventsRef.current.setEnabled(fxToggleRef.current.events);
+                    skyRef.current?.setHour(hourOf(workshopNow()));
+                    skyRef.current?.setWeather(fxToggleRef.current.weather && weatherRef.current ? weatherRef.current.kind : null);
+                    applyAlerts(alertsRef.current);
+                    // Atajos para pruebas (solo en desarrollo): window.__printDen.trigger('blackout') etc.
+                    if ((import.meta as any).env?.DEV) {
+                        (window as any).__printDen = {
+                            trigger: (n: any) => eventsRef.current?.trigger(n),
+                            spawn: (k: any) => guestsRef.current?.spawn(k),
+                            celebrate: () => celebrateDelivery({ id: 0, ancho: 3, alto: 2, copias: 1 } as Order)
+                        };
+                    }
 
                     // BUILD_TAG temporal (se retira en Fase 6) - UILayer a resolución real
                     const tagContainer = new Container();
@@ -492,6 +705,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             bubblesRef.current = null;
             try { crewRef.current?.destroy(); } catch (_) {}
             crewRef.current = null;
+            try { fxRef.current?.destroy(); } catch (_) {}
+            fxRef.current = null;
+            try { petRef.current?.destroy(); } catch (_) {}
+            petRef.current = null;
+            try { guestsRef.current?.destroy(); } catch (_) {}
+            guestsRef.current = null;
+            try { eventsRef.current?.destroy(); } catch (_) {}
+            eventsRef.current = null;
+            try { skyRef.current?.destroy(); } catch (_) {}
+            skyRef.current = null;
+            alertIconsRef.current.clear();
+            boardRef.current = null;
+            clockRef.current = null;
+            applyCameraRef.current = null;
+            try {
+                if ((window as any).__printDen) delete (window as any).__printDen;
+            } catch (_) {}
 
             // Immediately clear interactive element references to prevent ticker access
             plotterCarriageSpriteRef.current = null;
@@ -542,6 +772,170 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
      * B0.2: Layout UI elements in UILayer at 1:1 screen resolution with coordinates multiplied by scale.
      * All banners have solid dark opaque background (#090d16) and crisp 1px stroke.
      */
+    /** Pizarra del día (datos reales) y reloj de pared (hora real del equipo) en la pared del fondo. */
+    const buildWallBoard = (mapLayer: Container, uiLayer: Container) => {
+        const g = new Graphics();
+        g.rect(BOARD.x - 1, BOARD.y - 1, BOARD.w + 2, BOARD.h + 2).fill({ color: 0x5b3a1e });
+        g.rect(BOARD.x, BOARD.y, BOARD.w, BOARD.h).fill({ color: 0x13241f });
+        g.rect(BOARD.x, BOARD.y + BOARD.h - 2, BOARD.w, 2).fill({ color: 0x0b1713 });
+        mapLayer.addChild(g);
+
+        const baseStyle = { fontFamily: 'monospace', fontSize: 10, fontWeight: 'bold' as const, fill: '#e2e8f0' };
+        const text = new Text({ text: '', style: { ...baseStyle } });
+        const late = new Text({ text: '', style: { ...baseStyle, fill: '#86efac' } });
+        uiLayer.addChild(text);
+        uiLayer.addChild(late);
+        boardRef.current = { text, late };
+
+        const cx = 292;
+        const cy = 20;
+        const clock = new Graphics();
+        clock.circle(cx, cy, 8.5).fill({ color: 0x5b3a1e });
+        clock.circle(cx, cy, 7.5).fill({ color: 0xf1f5f9 });
+        for (const [dx, dy] of [[0, -6], [6, 0], [0, 6], [-6, 0]]) {
+            clock.rect(cx + dx - 0.5, cy + dy - 0.5, 1, 1).fill({ color: 0x334155 });
+        }
+        mapLayer.addChild(clock);
+        const hands = new Graphics();
+        mapLayer.addChild(hands);
+        clockRef.current = { hands, minute: -1, cx, cy };
+        updateClock(true);
+        updateBoard(ordersRef.current);
+    };
+
+    const updateClock = (force = false) => {
+        const c = clockRef.current;
+        if (!c || c.hands.destroyed) return;
+        const now = workshopNow();
+        const minuteOfDay = now.getHours() * 60 + now.getMinutes();
+        if (!force && minuteOfDay === c.minute) return;
+        c.minute = minuteOfDay;
+        const hAng = (((now.getHours() % 12) + now.getMinutes() / 60) / 12) * Math.PI * 2 - Math.PI / 2;
+        const mAng = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
+        c.hands.clear();
+        c.hands.moveTo(c.cx, c.cy).lineTo(c.cx + Math.cos(hAng) * 4, c.cy + Math.sin(hAng) * 4).stroke({ width: 1, color: 0x0f172a });
+        c.hands.moveTo(c.cx, c.cy).lineTo(c.cx + Math.cos(mAng) * 6, c.cy + Math.sin(mAng) * 6).stroke({ width: 1, color: 0x0f172a });
+        c.hands.circle(c.cx, c.cy, 0.9).fill({ color: 0xdc2626 });
+    };
+
+    const updateBoard = (list: Order[]) => {
+        const b = boardRef.current;
+        if (!b || b.text.destroyed || b.late.destroyed) return;
+        const s = computeDaySummary(list, workshopNow());
+        b.text.text =
+            `📋 HOY EN EL TALLER\n` +
+            `✔ ${s.entregadasHoy} ${s.entregadasHoy === 1 ? 'entregada' : 'entregadas'}\n` +
+            `▣ ${fmtM2(s.m2Hoy)} m² producidos`;
+        if (s.atrasadas > 0) {
+            b.late.text = `⚠ ${s.atrasadas} ${s.atrasadas === 1 ? 'atrasada' : 'atrasadas'}`;
+            b.late.style.fill = '#fca5a5';
+        } else {
+            b.late.text = '✔ sin atrasos';
+            b.late.style.fill = '#86efac';
+        }
+        layoutBoard(currentScaleRef.current);
+    };
+
+    const layoutBoard = (scale: number) => {
+        const b = boardRef.current;
+        if (!b || b.text.destroyed || b.late.destroyed) return;
+        const fs = Math.min(12, Math.floor((BOARD.h * scale - 6) / 4 / 1.2));
+        const show = fs >= 7;
+        b.text.visible = show;
+        b.late.visible = show;
+        if (!show) return;
+        const lh = Math.round(fs * 1.2);
+        b.text.style.fontSize = fs;
+        b.late.style.fontSize = fs;
+        b.text.style.lineHeight = lh;
+        const x = Math.round((BOARD.x + 3) * scale);
+        const y = Math.round(BOARD.y * scale) + 3;
+        b.text.x = x;
+        b.text.y = y;
+        b.late.x = x;
+        b.late.y = y + lh * 3;
+    };
+
+    /** Muestra u oculta los íconos de alerta según las alertas reales y si el usuario las tiene encendidas. */
+    const applyAlerts = (list: StationAlert[]) => {
+        alertsRef.current = list;
+        const sum = summarizeAlerts(list);
+        alertIconsRef.current.forEach((ic, id) => {
+            if (ic.container.destroyed) return;
+            const s = sum.get(id);
+            const on = Boolean(s) && fxToggleRef.current.alerts;
+            ic.container.visible = on;
+            if (!s) return;
+            ic.bg.clear();
+            ic.bg.circle(0, 0, 10).fill({ color: s.severity === 'danger' ? 0xef4444 : 0xf59e0b });
+            ic.bg.stroke({ width: 1.5, color: 0xffffff });
+            ic.text.text = s.count > 1 ? String(s.count) : '!';
+            ic.text.style.fill = s.severity === 'danger' ? '#ffffff' : '#111827';
+        });
+    };
+
+    /** Confeti y festejo cuando una orden REAL pasa a "entregado". */
+    const celebrateDelivery = (order: Order) => {
+        const st = getPixiStations().find((s) => s.id === 'despacho');
+        if (!st) return;
+        const big = orderM2(order) >= 5;
+        fxRef.current?.confetti(st.x + st.width / 2, st.y + 24, big ? 70 : 36, st.width * 0.6);
+        crewRef.current?.announce(
+            big
+                ? ['¡Entrega grande! 🎉', '¡Eso sí que es un trabajo!', '¡Bravo, equipo! 👏']
+                : ['¡Entregada! 🎉', '¡Otra OT en manos del cliente!', '¡Buen trabajo! 👏'],
+            big ? 3 : 1,
+            'ok'
+        );
+    };
+
+    /** Atajos: acerca la cámara a una estación (o vuelve a la vista general con null). */
+    const focusStation = (id: string | null) => {
+        setFocusedId(id);
+        const v = viewSizeRef.current;
+        const base = baseScaleRef.current;
+        let target: Camera;
+        if (id === null) {
+            target = clampCamera({ ...DEFAULT_CAMERA }, v.w, v.h, base);
+        } else {
+            const st = getPixiStations().find((s) => s.id === id);
+            if (!st) return;
+            const z = Math.max(1.4, Math.min(MAX_ZOOM, Math.min(MAP_W_LOGICAL / (st.width + 36), MAP_H_LOGICAL / (st.height + 36))));
+            const total = base * z;
+            target = clampCamera(
+                { zoom: z, panX: v.w / 2 - (st.x + st.width / 2) * total, panY: v.h / 2 - (st.y + st.height / 2) * total },
+                v.w,
+                v.h,
+                base
+            );
+        }
+        const from = { ...cameraRef.current };
+        const t0 = performance.now();
+        if (camTweenRef.current) cancelAnimationFrame(camTweenRef.current);
+        const step = (now: number) => {
+            const k = Math.min(1, (now - t0) / 380);
+            const e = 1 - Math.pow(1 - k, 3);
+            cameraRef.current = {
+                zoom: from.zoom + (target.zoom - from.zoom) * e,
+                panX: from.panX + (target.panX - from.panX) * e,
+                panY: from.panY + (target.panY - from.panY) * e
+            };
+            applyCameraRef.current?.();
+            camTweenRef.current = k < 1 ? requestAnimationFrame(step) : null;
+        };
+        camTweenRef.current = requestAnimationFrame(step);
+    };
+
+    const toggleFullscreen = () => {
+        const el = containerRef.current;
+        if (!el) return;
+        if (document.fullscreenElement) {
+            document.exitFullscreen?.().catch(() => {});
+        } else {
+            el.requestFullscreen?.().catch(() => {});
+        }
+    };
+
     const layoutUI = (scale: number) => {
         currentScaleRef.current = scale;
 
@@ -589,6 +983,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             updateBadgeVisual(s.badgeBg, s.badgeCountText, countOrdersForStation(s.id, ordersRef.current));
         });
 
+        // 2b. Íconos de alerta y pizarra del día (UI a resolución real)
+        alertIconsRef.current.forEach((ic, id) => {
+            const s = stationsUIRef.current.find((u) => u.id === id);
+            if (!s || ic.container.destroyed) return;
+            ic.container.x = s.badgeContainer.x - 26;
+            ic.container.y = s.badgeContainer.y;
+        });
+        layoutBoard(scale);
+
         // 3. BUILD_TAG
         if (tagContainerRef.current && tagBgRef.current && tagTextRef.current) {
             tagContainerRef.current.x = Math.round(VIRTUAL_W * scale) - 52;
@@ -630,11 +1033,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             layoutUI(total);
         };
 
+        applyCameraRef.current = applyCamera;
+
         const updateScale = () => {
             if (!container || !canvas || !app) return;
             const containerW = container.clientWidth || 480;
             const targetW = Math.max(480, Math.floor(containerW * 0.96));
-            const maxAllowedH = Math.min(560, Math.floor(window.innerHeight * 0.62));
+            // Modo TV: usa casi todo el alto de la pantalla (deja lugar a la barra de arriba)
+            const maxAllowedH = document.fullscreenElement
+                ? Math.max(270, window.innerHeight - 110)
+                : Math.min(560, Math.floor(window.innerHeight * 0.62));
 
             const scaleByW = targetW / 480;
             const scaleByH = maxAllowedH / 270;
@@ -683,6 +1091,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             // Zoom solo con Ctrl+rueda: la rueda sola sigue desplazando la página.
             if (!e.ctrlKey) return;
             e.preventDefault();
+            setFocusedId(null);
             const { x, y } = canvasPoint(e);
             const v = viewSizeRef.current;
             cameraRef.current = zoomAt(cameraRef.current, e.deltaY < 0 ? 1.15 : 1 / 1.15, x, y, v.w, v.h, baseScaleRef.current);
@@ -712,6 +1121,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             }, 0);
         };
         const onDbl = () => {
+            setFocusedId(null);
             cameraRef.current = { ...DEFAULT_CAMERA };
             const v = viewSizeRef.current;
             cameraRef.current = clampCamera(cameraRef.current, v.w, v.h, baseScaleRef.current);
@@ -1158,9 +1568,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             });
 
             hitArea.on('pointertap', () => {
-                if (dragMovedRef.current) return; // fue un arrastre de cámara, no un clic
-                audioEngine.playClick();
-                onSelectStation(id);
+                // Abre la ficha de la estación (el detalle completo se abre desde ahí)
+                handleStationTapRef.current(id);
             });
 
             hitAreasLayer.addChild(hitArea);
@@ -1169,6 +1578,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         // ================================================================
         // HOVER TOOLTIP HUD (Pop-over on UI Layer) (B0.2: Native Resolution)
         // ================================================================
+        // Íconos de alerta sobre cada estación (se muestran/ocultan según las alertas reales)
+        alertIconsRef.current.clear();
+        stationsUIRef.current.forEach((s) => {
+            const c = new Container();
+            const bg = new Graphics();
+            const t = new Text({
+                text: '!',
+                style: new TextStyle({ fontFamily: 'monospace', fontSize: 13, fontWeight: 'bold', fill: '#111827' })
+            });
+            t.anchor.set(0.5);
+            c.addChild(bg);
+            c.addChild(t);
+            c.visible = false;
+            uiLayer.addChild(c);
+            alertIconsRef.current.set(s.id, { container: c, bg, text: t });
+        });
+
         const tooltip = new Container();
         tooltip.x = 112;
         tooltip.y = 118;
@@ -1262,9 +1688,27 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const next = bc.scale.x + (1 - bc.scale.x) * 0.18;
                     bc.scale.set(Math.abs(next - 1) < 0.01 ? 1 : next);
                 });
-                crewRef.current?.update(app.ticker.deltaMS);
+                const dtMs = app.ticker.deltaMS;
+                crewRef.current?.update(dtMs);
+                // Extras del Bloque F
+                fxRef.current?.update(dtMs);
+                petRef.current?.update(dtMs);
+                guestsRef.current?.update(dtMs, crewRef.current?.isSpeaking() ?? false);
+                eventsRef.current?.update(dtMs);
+                skyRef.current?.update(dtMs, elapsedMs);
+                if (frameCount % 120 === 0) skyRef.current?.setHour(hourOf(workshopNow()));
+                if (frameCount % 60 === 0) updateClock();
+                const pulse = 1 + 0.12 * Math.sin(elapsedMs / 260);
+                alertIconsRef.current.forEach((ic) => {
+                    if (ic.container.destroyed || !ic.container.visible) return;
+                    ic.container.scale.set(pulse);
+                });
                 if (crewRef.current && bubblesRef.current) {
-                    bubblesRef.current.sync(crewRef.current.getWorkers(), currentScaleRef.current, app.screen.width);
+                    bubblesRef.current.sync(
+                        [...crewRef.current.getWorkers(), ...(guestsRef.current?.getSnapshots() ?? [])],
+                        currentScaleRef.current,
+                        app.screen.width
+                    );
                 }
 
                 // Refresh offline state periodically (~3s)
@@ -1465,6 +1909,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 width: '100%',
                 minHeight: '420px',
                 display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
                 justifyContent: 'center',
                 alignItems: 'center',
                 backgroundColor: PALETTE.floorBase,
@@ -1474,6 +1920,24 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 boxSizing: 'border-box'
             }}
         >
+            <WorkshopToolbar
+                stations={getPixiStations().map((s) => ({ id: s.id, title: s.title, icon: s.icon }))}
+                focusedId={focusedId}
+                onFocus={focusStation}
+                isFullscreen={isFs}
+                onToggleFullscreen={toggleFullscreen}
+                fx={fxToggles}
+                onToggleFx={(k) => setFxToggles((prev) => ({ ...prev, [k]: !prev[k] }))}
+                achievementsUnlocked={achievements.filter((a) => a.unlocked).length}
+                achievementsTotal={achievements.length}
+                achievementsOpen={achOpen}
+                onToggleAchievements={() => setAchOpen((v) => !v)}
+                weatherText={
+                    weather
+                        ? `${weather.label} ${weather.tempC}°C · ${weather.place}${weather.isDefaultPlace ? ' (ubicación por defecto)' : ''}`
+                        : null
+                }
+            />
             <div ref={canvasHostRef} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
             {sheetWorkerId && (() => {
                 const snap = getWorkerSnapshot(sheetWorkerId);
@@ -1501,6 +1965,55 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     />
                 );
             })()}
+            {sheetStationId && (() => {
+                const st = getPixiStations().find((s) => s.id === sheetStationId);
+                if (!st) return null;
+                const isMachine = st.id.startsWith('plotter') || st.id.startsWith('maquina_');
+                return (
+                    <StationSheetCard
+                        station={st}
+                        stats={computeStationStats(st, orders, workshopNow())}
+                        alerts={alerts.filter((a) => a.stationId === st.id)}
+                        isMachine={isMachine}
+                        canOpenDetail={!isFs}
+                        onOpenDetail={() => {
+                            audioEngine.playClick();
+                            setSheetStationId(null);
+                            onSelectStationRef.current(st.id);
+                        }}
+                        onOpenOrder={onSelectOrderRef.current ? (o) => onSelectOrderRef.current?.(o) : undefined}
+                        onClose={() => setSheetStationId(null)}
+                        onOutsideClose={() => {
+                            lastStationCloseRef.current = { id: st.id, t: Date.now() };
+                        }}
+                    />
+                );
+            })()}
+            {achOpen && <AchievementsPanel list={achievements} onClose={() => setAchOpen(false)} />}
+            {toast && (
+                <div
+                    role="status"
+                    style={{
+                        position: 'absolute',
+                        bottom: 18,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 30,
+                        background: 'rgba(9,13,22,0.96)',
+                        border: '1px solid #c8a24a',
+                        color: '#fde68a',
+                        padding: '8px 14px',
+                        borderRadius: 8,
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                        pointerEvents: 'none'
+                    }}
+                >
+                    {toast}
+                </div>
+            )}
         </div>
     );
 };

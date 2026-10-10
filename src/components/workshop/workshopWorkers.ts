@@ -108,7 +108,7 @@ export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
     return ROLE_ALIASES[norm(rol)] ?? null;
 }
 
-export type HeldKind = 'carpeta' | 'rebotada' | 'rollo';
+export type HeldKind = 'carpeta' | 'rebotada' | 'rollo' | 'caja';
 export type BubbleTone = 'ok' | 'warn' | 'info' | 'chat' | 'think';
 /** Fase del paseo: 'rest' = en su puesto; 'out' = paseando; 'back' = volviendo por donde vino. */
 export type StrollPhase = 'rest' | 'out' | 'back';
@@ -149,6 +149,12 @@ export function planErrand(diff: {
         case 'impreso':
             // Decisión del usuario: las impresas van a despacho.
             return { role: 'impresor', stationId: 'despacho', text: `${ot} A DESPACHO`, tone: 'info', held: 'rollo', orderId };
+        case 'post':
+            // Terminada de refilar: el cortador lleva el rollo a empaque.
+            return { role: 'cortador', stationId: 'empaque', text: `${ot} A EMPAQUE`, tone: 'info', held: 'rollo', orderId };
+        case 'completo':
+            // Embalada: el empaquetador lleva la caja al despacho.
+            return { role: 'empaquetador', stationId: 'despacho', text: `${ot} LISTA PARA ENTREGAR`, tone: 'ok', held: 'caja', orderId };
         default:
             return null;
     }
@@ -334,6 +340,8 @@ interface WorkerState {
     trail: Point[];
     thoughtMs: number;
     thoughtShowMs: number;
+    /** Tiempo restante de un anuncio (celebración/evento) para apagar el globo. */
+    announceMs: number;
 }
 
 export interface CrewHooks {
@@ -491,6 +499,7 @@ export class WorkerCrew {
                 trail: [],
                 thoughtMs: 4000 + this.rng() * 6000,
                 thoughtShowMs: 0,
+                announceMs: 0,
                 hit,
                 textures,
                 container,
@@ -841,6 +850,39 @@ export class WorkerCrew {
         return this.queue.length;
     }
 
+    /** true si hay una charla, un saludo o un globo de pensamiento/charla activo (para que otros esperen su turno). */
+    isSpeaking(): boolean {
+        return this.speechActive();
+    }
+
+    /**
+     * Hace que hasta `count` operarios libres (sin viaje ni charla ni globo) digan una frase corta.
+     * Devuelve cuántos hablaron. Si hay una charla o saludo en curso no interrumpe (devuelve 0).
+     */
+    announce(texts: string[], count = 1, tone: BubbleTone = 'chat'): number {
+        if (this._destroyed || texts.length === 0 || this.chat || this.greet) return 0;
+        const free = this.workers.filter((w) => w.errand === 'none' && !w.chatting && !w.bubble);
+        for (let i = free.length - 1; i > 0; i--) {
+            const j = Math.floor(this.rng() * (i + 1));
+            [free[i], free[j]] = [free[j], free[i]];
+        }
+        let n = 0;
+        for (const w of free.slice(0, count)) {
+            const text = texts[n % texts.length];
+            w.bubble = { text, tone };
+            w.announceMs = lineDurationMs(text) + 300;
+            w.thoughtMs = nextThoughtDelayMs(this.rng);
+            n++;
+        }
+        return n;
+    }
+
+    /** Posición (pies) de un operario por su rol, o null. */
+    getPositionByRole(role: WorkerRole): Point | null {
+        const w = this.workers.find((x) => x.spec.role === role);
+        return w ? { x: w.x, y: w.y } : null;
+    }
+
     /** Pone o saca el objeto que el operario lleva en la mano (un dibujito de 8x6 px o similar). */
     private setHeld(w: WorkerState, kind: HeldKind | null) {
         if (w.held) {
@@ -849,8 +891,13 @@ export class WorkerCrew {
         }
         if (!kind || w.container.destroyed) return;
         const g = new Graphics();
+        g.clear();
         if (kind === 'rollo') {
             g.rect(0, 0, 4, 11).fill({ color: 0xf9a8d4 }).stroke({ width: 1, color: 0x9d174d });
+        } else if (kind === 'caja') {
+            // caja de cartón con cinta
+            g.rect(0, 0, 10, 8).fill({ color: 0xc08a4b }).stroke({ width: 1, color: 0x6b4423 });
+            g.rect(4, 0, 2, 8).fill({ color: 0xe5d3a1 });
         } else {
             const base = kind === 'rebotada' ? 0xef4444 : 0xfacc15;
             const edge = kind === 'rebotada' ? 0x7f1d1d : 0x854d0e;
@@ -1083,6 +1130,11 @@ export class WorkerCrew {
                 }
             } else if (w.errand === 'returning' && w.mode === 'idle') {
                 w.errand = 'none';
+            }
+
+            if (w.announceMs > 0) {
+                w.announceMs -= dt;
+                if (w.announceMs <= 0 && w.errand === 'none' && w.bubble && w.bubble.tone === 'chat' && !w.chatting) w.bubble = null;
             }
 
             this.updateIdleLife(w, dt);

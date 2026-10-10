@@ -20,6 +20,27 @@ export function ambientDarkness(hour: number): number {
     return MAX_DARKNESS;
 }
 
+/**
+ * Hora actual del taller. Para pruebas se puede forzar con
+ *   localStorage.setItem('luxius_print_den_hour', '23')   (y borrar la clave para volver a la hora real).
+ */
+export function workshopNow(): Date {
+    try {
+        const o = localStorage.getItem('luxius_print_den_hour');
+        if (o !== null && o !== '') {
+            const h = parseFloat(o);
+            if (Number.isFinite(h)) {
+                const d = new Date();
+                d.setHours(Math.floor(h), Math.round((h % 1) * 60), 0, 0);
+                return d;
+            }
+        }
+    } catch (_) {}
+    return new Date();
+}
+
+export const hourOf = (d: Date) => d.getHours() + d.getMinutes() / 60;
+
 export interface LightPoint {
     x: number;
     y: number;
@@ -38,6 +59,8 @@ export class WorkshopLighting {
     private glows = new Map<string, Graphics>();
     private lastBucket = -1;
     private darkness = 0;
+    /** Apagón decorativo (0 = luz normal, 1 = oscuridad casi total). */
+    private blackout = 0;
     private destroyed = false;
 
     constructor(private layer: Container, private w: number, private h: number, lamps: LightPoint[]) {
@@ -76,11 +99,20 @@ export class WorkshopLighting {
 
     private redraw() {
         this.overlay.clear();
-        if (this.darkness > 0.001) {
-            this.overlay.rect(0, 0, this.w, this.h).fill({ color: 0x050816, alpha: this.darkness });
+        const level = Math.max(this.darkness, this.blackout * 0.78);
+        if (level > 0.001) {
+            this.overlay.rect(0, 0, this.w, this.h).fill({ color: 0x050816, alpha: level });
         }
-        // Las lámparas se notan más de noche y casi nada de día
-        this.lamps.alpha = 0.25 + 0.75 * (this.darkness / MAX_DARKNESS);
+        // Las lámparas se notan más de noche y casi nada de día; en un apagón se apagan
+        this.lamps.alpha = (0.25 + 0.75 * (this.darkness / MAX_DARKNESS)) * (1 - this.blackout);
+    }
+
+    /** Apagón temporal (evento decorativo). */
+    setBlackout(level: number) {
+        const v = Math.max(0, Math.min(1, level));
+        if (Math.abs(v - this.blackout) < 0.001) return;
+        this.blackout = v;
+        this.redraw();
     }
 
     getDarkness(): number {
@@ -88,7 +120,7 @@ export class WorkshopLighting {
     }
 
     /** `timeMs` acumulado; `active[id]` = máquina con trabajo en cola y en línea. Se actualiza la hora cada ~30 s. */
-    update(timeMs: number, active: Record<string, boolean>, now: Date = new Date()) {
+    update(timeMs: number, active: Record<string, boolean>, now: Date = workshopNow()) {
         if (this.destroyed) return;
         const bucket = Math.floor(timeMs / 30000);
         if (bucket !== this.lastBucket) {
