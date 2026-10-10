@@ -31,6 +31,8 @@ import { WorkerBubbles } from './workshopBubbles';
 import { getUsuarios } from '@/data/db';
 import { createStationProps, StationProps } from './workshopStationProps';
 import WorkerSheetCard from './WorkerSheetCard';
+import { WorkshopLighting } from './workshopLighting';
+import { Camera, DEFAULT_CAMERA, clampCamera, zoomAt, MAP_W_LOGICAL, MAP_H_LOGICAL } from './workshopCamera';
 
 export interface WorkshopCanvasPixiProps {
     orders: Order[];
@@ -53,7 +55,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'D-r1';
+export const BUILD_TAG = 'E-r1';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -125,6 +127,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const bubblesRef = useRef<WorkerBubbles | null>(null);
     const stationsUIRef = useRef<StationUIItem[]>([]);
     const stationPropsRef = useRef<Map<string, StationProps>>(new Map());
+    // Cámara (Bloque E): zoom con Ctrl+rueda, arrastre con zoom, doble clic para restablecer
+    const cameraRef = useRef<Camera>({ ...DEFAULT_CAMERA });
+    const baseScaleRef = useRef<number>(1);
+    const viewSizeRef = useRef<{ w: number; h: number }>({ w: MAP_W_LOGICAL, h: MAP_H_LOGICAL });
+    const dragMovedRef = useRef(false);
+    const cameraCleanupRef = useRef<(() => void) | null>(null);
+    const lightingRef = useRef<WorkshopLighting | null>(null);
     const prevCountsRef = useRef<Map<string, number>>(new Map());
     const currentScaleRef = useRef<number>(1);
     const tagContainerRef = useRef<Container | null>(null);
@@ -171,6 +180,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     );
     // Clic en un operario: abre su ficha técnica (lo que hace ahora + estadísticas de fantasía).
     const handleWorkerTap = (workerId: string) => {
+        if (dragMovedRef.current) return; // arrastre de cámara
         audioEngine.playClick();
         setSheetWorkerId((prev) => (prev === workerId ? null : workerId));
     };
@@ -342,6 +352,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     worldContainer.addChild(stationsLayer);
                     worldContainer.addChild(workersLayer);
                     worldContainer.addChild(particlesLayer);
+                    // Iluminación y día/noche (Bloque E): por encima del mundo, sin recibir clics
+                    const lightLayer = new Container();
+                    lightLayer.label = 'LightLayer';
+                    worldContainer.addChild(lightLayer);
                     worldContainer.addChild(hitAreasLayer);
                     // Clic en operarios: capa por encima de las áreas de las estaciones (riesgo R5)
                     const workerHitLayer = new Container();
@@ -359,6 +373,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
+
+                    // 2a. Luces del taller (lámparas del pasillo y luz de las máquinas activas)
+                    const lighting = new WorkshopLighting(lightLayer, VIRTUAL_W, VIRTUAL_H, [
+                        { x: 70, y: 125 },
+                        { x: 175, y: 125 },
+                        { x: 285, y: 125 },
+                        { x: 390, y: 125 }
+                    ]);
+                    lighting.setPlotterSpots(
+                        plottersListRef.current.map((p) => ({
+                            id: p.id,
+                            x: p.baseX + p.plotterOffsetX,
+                            y: p.baseY + 58,
+                            w: p.plotterActualW
+                        }))
+                    );
+                    lightingRef.current = lighting;
 
                     // 2b. Operarios (Fase 3, 4.2)
                     crewRef.current = new WorkerCrew(workersLayer, getUsuarios(), getPixiStations(), {
@@ -471,6 +502,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             stationsUIRef.current = [];
             stationPropsRef.current.clear();
             prevCountsRef.current.clear();
+            try { cameraCleanupRef.current?.(); } catch (_) {}
+            cameraCleanupRef.current = null;
+            try { lightingRef.current?.destroy(); } catch (_) {}
+            lightingRef.current = null;
+            cameraRef.current = { ...DEFAULT_CAMERA };
 
             if (activeApp) {
                 try {
@@ -576,6 +612,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         let lastH = 0;
         let rafId: number | null = null;
 
+        const applyCamera = () => {
+            const cam = cameraRef.current;
+            const total = baseScaleRef.current * cam.zoom;
+            worldContainer.scale.set(total, total);
+            worldContainer.position.set(cam.panX, cam.panY);
+            uiLayer.position.set(cam.panX, cam.panY);
+            layoutUI(total);
+        };
+
         const updateScale = () => {
             if (!container || !canvas || !app) return;
             const containerW = container.clientWidth || 480;
@@ -596,14 +641,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             // Resize Pixi renderer to exact screen display pixels
             app.renderer.resize(displayW, displayH);
 
-            // Scale world elements (map, stations, particles, hit areas)
-            worldContainer.scale.set(finalScale, finalScale);
-
             // UI layer stays at 1:1 scale (native screen resolution)
             uiLayer.scale.set(1, 1);
 
-            // Re-layout UI elements with coordinates multiplied by scale
-            layoutUI(finalScale);
+            // Cámara: escala base + zoom/desplazamiento actuales (mundo escalado, UI con posiciones escaladas)
+            baseScaleRef.current = finalScale;
+            viewSizeRef.current = { w: displayW, h: displayH };
+            cameraRef.current = clampCamera(cameraRef.current, displayW, displayH, finalScale);
+            applyCamera();
 
             canvas.style.width = `${displayW}px`;
             canvas.style.height = `${displayH}px`;
@@ -619,6 +664,62 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         });
         ro.observe(container);
         updateScale();
+
+        // --- Controles de cámara ---
+        const canvasPoint = (e: { clientX: number; clientY: number }) => {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left - canvas.clientLeft, y: e.clientY - rect.top - canvas.clientTop };
+        };
+        const onWheel = (e: WheelEvent) => {
+            // Zoom solo con Ctrl+rueda: la rueda sola sigue desplazando la página.
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            const { x, y } = canvasPoint(e);
+            const v = viewSizeRef.current;
+            cameraRef.current = zoomAt(cameraRef.current, e.deltaY < 0 ? 1.15 : 1 / 1.15, x, y, v.w, v.h, baseScaleRef.current);
+            applyCamera();
+        };
+        let drag: { sx: number; sy: number; panX: number; panY: number } | null = null;
+        const onDown = (e: PointerEvent) => {
+            if (e.button !== 0) return;
+            dragMovedRef.current = false;
+            drag = { sx: e.clientX, sy: e.clientY, panX: cameraRef.current.panX, panY: cameraRef.current.panY };
+        };
+        const onMove = (e: PointerEvent) => {
+            if (!drag || cameraRef.current.zoom <= 1) return;
+            const dx = e.clientX - drag.sx;
+            const dy = e.clientY - drag.sy;
+            if (!dragMovedRef.current && Math.hypot(dx, dy) < 5) return;
+            dragMovedRef.current = true;
+            const v = viewSizeRef.current;
+            cameraRef.current = clampCamera({ ...cameraRef.current, panX: drag.panX + dx, panY: drag.panY + dy }, v.w, v.h, baseScaleRef.current);
+            applyCamera();
+        };
+        const onUp = () => {
+            drag = null;
+            // el indicador de arrastre se limpia después de que Pixi procese el clic
+            window.setTimeout(() => {
+                dragMovedRef.current = false;
+            }, 0);
+        };
+        const onDbl = () => {
+            cameraRef.current = { ...DEFAULT_CAMERA };
+            const v = viewSizeRef.current;
+            cameraRef.current = clampCamera(cameraRef.current, v.w, v.h, baseScaleRef.current);
+            applyCamera();
+        };
+        canvas.addEventListener('wheel', onWheel, { passive: false });
+        canvas.addEventListener('pointerdown', onDown);
+        canvas.addEventListener('dblclick', onDbl);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        cameraCleanupRef.current = () => {
+            canvas.removeEventListener('wheel', onWheel);
+            canvas.removeEventListener('pointerdown', onDown);
+            canvas.removeEventListener('dblclick', onDbl);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
         return ro;
     };
 
@@ -1048,6 +1149,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             });
 
             hitArea.on('pointertap', () => {
+                if (dragMovedRef.current) return; // fue un arrastre de cámara, no un clic
                 audioEngine.playClick();
                 onSelectStation(id);
             });
@@ -1311,6 +1413,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         statusLed.fill({ color: 0x22c55e }); // LED verde encendido
                     }
                 });
+
+                // Iluminación: luz cian bajo las máquinas en línea con trabajo en cola
+                if (lightingRef.current) {
+                    const active: Record<string, boolean> = {};
+                    plottersListRef.current.forEach((p, i) => {
+                        active[p.id] = Boolean(allPrintingOrders[i] || (i === 0 && allPrintingOrders[0])) && !p.isOffline;
+                    });
+                    lightingRef.current.update(elapsedMs, active);
+                }
 
                 // Update particles pool (max 40 items)
                 particlesPoolRef.current.forEach(p => {
