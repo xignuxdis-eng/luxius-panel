@@ -7,7 +7,7 @@
 //        Quienes no tienen rol de taller ocupan los puestos libres en el orden del sistema viejo.
 //  - D3: los operarios se paran en el pasillo, al borde de su estación, nunca dentro de la máquina.
 
-import { Container, Sprite } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import type { StationConfig, StationId, WorkerRole } from './types';
 import {
     CHARACTER_H,
@@ -35,7 +35,7 @@ export const ROLE_SHIRT: Record<WorkerRole, string> = {
 };
 
 /** Colores de piel del sistema viejo (WorkshopCanvas.tsx L168). */
-export const LEGACY_SKINS = ['#fca5a5', '#fdba74', '#fde047', '#fed7aa', '#cbd5e1'];
+export const LEGACY_SKINS = ['#fca5a5', '#fdba74', '#c68642', '#fed7aa', '#8d5524'];
 
 /** Estación donde trabaja cada rol. */
 export const ROLE_STATION: Record<WorkerRole, StationId> = {
@@ -107,9 +107,17 @@ export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
     return ROLE_ALIASES[norm(rol)] ?? null;
 }
 
+export type HeldKind = 'carpeta' | 'rebotada' | 'rollo';
+export type BubbleTone = 'ok' | 'warn' | 'info';
+
 export interface Errand {
     role: WorkerRole;
     stationId: StationId;
+    /** Texto del globo (D2: `OT #… EN COLA`). */
+    text?: string;
+    tone?: BubbleTone;
+    /** Objeto que lleva en la mano mientras dura el encargo. */
+    held?: HeldKind;
 }
 
 /**
@@ -118,16 +126,23 @@ export interface Errand {
  * las que desaparecen y la primera lectura no disparan nada.
  * Decisión de 4.3: el sistema viejo mandaba a puntos sueltos del mapa; aquí van a la estación equivalente.
  */
-export function planErrand(diff: { changeType: string; nextStatus?: string }): Errand | null {
+export function planErrand(diff: {
+    changeType: string;
+    nextStatus?: string;
+    order?: { id?: number; ot?: string };
+}): Errand | null {
     if (diff.changeType !== 'status_change') return null;
+    const ot = `OT #${diff.order?.ot || diff.order?.id || '?'}`;
     switch (diff.nextStatus) {
         case 'rebotado':
         case 'standby':
-            return { role: 'impresor', stationId: 'diseno' };
+            // Decisión del usuario: las rebotadas vuelven a diseño.
+            return { role: 'impresor', stationId: 'diseno', text: `${ot} REBOTADA`, tone: 'warn', held: 'rebotada' };
         case 'orden':
-            return { role: 'disenador', stationId: 'plotter1' };
+            return { role: 'disenador', stationId: 'plotter1', text: `${ot} EN COLA`, tone: 'ok', held: 'carpeta' };
         case 'impreso':
-            return { role: 'impresor', stationId: 'corte' };
+            // Decisión del usuario: las impresas van a despacho.
+            return { role: 'impresor', stationId: 'despacho', text: `${ot} A DESPACHO`, tone: 'info', held: 'rollo' };
         default:
             return null;
     }
@@ -264,6 +279,8 @@ export interface WorkerSnapshot {
     y: number;
     mode: 'idle' | 'walk';
     facing: CharacterDirection;
+    /** Globo activo (texto + tono) o null. */
+    bubble: { text: string; tone: BubbleTone } | null;
 }
 
 interface WorkerState {
@@ -278,6 +295,8 @@ interface WorkerState {
     animMs: number;
     errand: 'none' | 'going' | 'dwell' | 'returning';
     dwellMs: number;
+    bubble: { text: string; tone: BubbleTone } | null;
+    held: Graphics | null;
     textures: CharacterTextures;
     container: Container;
     sprite: Sprite;
@@ -341,6 +360,8 @@ export class WorkerCrew {
                 animMs: spec.index * 260, // desfasa el respiro entre operarios
                 errand: 'none',
                 dwellMs: 0,
+                bubble: null,
+                held: null,
                 textures,
                 container,
                 sprite
@@ -372,7 +393,8 @@ export class WorkerCrew {
             x: w.x,
             y: w.y,
             mode: w.mode,
-            facing: w.facing
+            facing: w.facing,
+            bubble: w.bubble
         }));
     }
 
@@ -422,6 +444,28 @@ export class WorkerCrew {
         return this.queue.length;
     }
 
+    /** Pone o saca el objeto que el operario lleva en la mano (un dibujito de 8x6 px o similar). */
+    private setHeld(w: WorkerState, kind: HeldKind | null) {
+        if (w.held) {
+            try { if (!w.held.destroyed) w.held.destroy(); } catch (_) {}
+            w.held = null;
+        }
+        if (!kind || w.container.destroyed) return;
+        const g = new Graphics();
+        if (kind === 'rollo') {
+            g.rect(0, 0, 4, 11).fill({ color: 0xf9a8d4 }).stroke({ width: 1, color: 0x9d174d });
+        } else {
+            const base = kind === 'rebotada' ? 0xef4444 : 0xfacc15;
+            const edge = kind === 'rebotada' ? 0x7f1d1d : 0x854d0e;
+            g.rect(0, 0, 9, 7).fill({ color: base }).stroke({ width: 1, color: edge });
+            g.rect(0, -2, 4, 2).fill({ color: edge });
+        }
+        g.x = 5;
+        g.y = kind === 'rollo' ? -17 : -13;
+        w.container.addChild(g);
+        w.held = g;
+    }
+
     private processQueue() {
         if (this.queue.length === 0) return;
         this.queue = this.queue.filter((e) => {
@@ -429,7 +473,11 @@ export class WorkerCrew {
             if (ofRole.length === 0) return false; // nadie con ese rol: se descarta
             const free = ofRole.find((w) => w.errand === 'none' && w.mode === 'idle');
             if (!free) return true; // todos ocupados: espera
-            if (this.sendTo(free.spec.id, e.stationId)) free.errand = 'going';
+            if (this.sendTo(free.spec.id, e.stationId)) {
+                free.errand = 'going';
+                free.bubble = e.text ? { text: e.text, tone: e.tone ?? 'info' } : null;
+                this.setHeld(free, e.held ?? null);
+            }
             return false;
         });
     }
@@ -477,6 +525,8 @@ export class WorkerCrew {
                 w.dwellMs -= dt;
                 if (w.dwellMs <= 0) {
                     w.errand = 'returning';
+                    w.bubble = null;
+                    this.setHeld(w, null);
                     this.startPath(w, w.home);
                 }
             } else if (w.errand === 'returning' && w.mode === 'idle') {
@@ -497,6 +547,9 @@ export class WorkerCrew {
         if (w.mode === 'walk') {
             const frame = Math.floor((w.animMs / 1000) * WALK_FPS) % 4;
             w.sprite.texture = w.textures.walk[w.facing][frame];
+        } else if (w.facing === 'down' && w.errand === 'dwell') {
+            // Trabajando en la estación (herramienta del rol)
+            w.sprite.texture = w.textures.work[Math.floor(w.animMs / 400) % 2];
         } else if (w.facing === 'down') {
             w.sprite.texture = w.textures.idle[Math.floor(w.animMs / IDLE_BREATH_MS) % 2];
         } else {

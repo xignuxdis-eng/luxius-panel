@@ -27,6 +27,7 @@ import {
     PALETTE
 } from './workshopSprites';
 import { WorkerCrew, planErrand } from './workshopWorkers';
+import { WorkerBubbles } from './workshopBubbles';
 import { getUsuarios } from '@/data/db';
 
 export interface WorkshopCanvasPixiProps {
@@ -50,7 +51,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'F3-r3';
+export const BUILD_TAG = 'F3-r4';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -119,6 +120,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     const plottersListRef = useRef<PlotterStationItem[]>([]);
     const crewRef = useRef<WorkerCrew | null>(null);
+    const bubblesRef = useRef<WorkerBubbles | null>(null);
     const stationsUIRef = useRef<StationUIItem[]>([]);
     const currentScaleRef = useRef<number>(1);
     const tagContainerRef = useRef<Container | null>(null);
@@ -342,6 +344,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     // 4. Fractional Scaling setup with native resolution UI layout (B0.2)
                     resizeObserver = setupFractionalScaling(canvas, containerRef.current, app, worldContainer, uiLayer);
 
+                    // 4b. Globos de los operarios (encima de todo en la capa de interfaz)
+                    const bubblesLayer = new Container();
+                    bubblesLayer.label = 'BubblesLayer';
+                    uiLayer.addChild(bubblesLayer);
+                    bubblesRef.current = new WorkerBubbles(bubblesLayer);
+
                     // 5. Start Plotter Render Loop Ticker
                     tickerFn = setupPlotterTicker(app);
                 }
@@ -381,6 +389,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 tickerFn = null;
             }
 
+            try { bubblesRef.current?.destroy(); } catch (_) {}
+            bubblesRef.current = null;
             try { crewRef.current?.destroy(); } catch (_) {}
             crewRef.current = null;
 
@@ -1061,6 +1071,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
             try {
                 crewRef.current?.update(app.ticker.deltaMS);
+                if (crewRef.current && bubblesRef.current) {
+                    bubblesRef.current.sync(crewRef.current.getWorkers(), currentScaleRef.current, app.screen.width);
+                }
 
                 // Refresh offline state periodically (~3s)
                 if (frameCount % 180 === 0) {
