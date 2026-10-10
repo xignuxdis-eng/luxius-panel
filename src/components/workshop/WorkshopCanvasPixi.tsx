@@ -26,6 +26,8 @@ import {
     getPlotterVinylRollTexture,
     PALETTE
 } from './workshopSprites';
+import { WorkerCrew } from './workshopWorkers';
+import { getUsuarios } from '@/data/db';
 
 export interface WorkshopCanvasPixiProps {
     orders: Order[];
@@ -48,7 +50,7 @@ interface ParticleItem {
 }
 
 // BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
-export const BUILD_TAG = 'F3-r1';
+export const BUILD_TAG = 'F3-r2';
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
@@ -115,6 +117,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     }
 
     const plottersListRef = useRef<PlotterStationItem[]>([]);
+    const crewRef = useRef<WorkerCrew | null>(null);
     const stationsUIRef = useRef<StationUIItem[]>([]);
     const currentScaleRef = useRef<number>(1);
     const tagContainerRef = useRef<Container | null>(null);
@@ -268,6 +271,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const stationsLayer = new Container();
                     stationsLayer.label = 'StationsLayer';
 
+                    const workersLayer = new Container();
+                    workersLayer.label = 'WorkersLayer';
+
                     const particlesLayer = new Container();
                     particlesLayer.label = 'ParticlesLayer';
 
@@ -276,6 +282,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     worldContainer.addChild(mapLayer);
                     worldContainer.addChild(stationsLayer);
+                    worldContainer.addChild(workersLayer);
                     worldContainer.addChild(particlesLayer);
                     worldContainer.addChild(hitAreasLayer);
 
@@ -290,6 +297,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
+
+                    // 2b. Operarios (Fase 3, 4.2)
+                    crewRef.current = new WorkerCrew(workersLayer, getUsuarios(), getPixiStations());
 
                     // BUILD_TAG temporal (se retira en Fase 6) - UILayer a resolución real
                     const tagContainer = new Container();
@@ -361,6 +371,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 } catch (_) {}
                 tickerFn = null;
             }
+
+            try { crewRef.current?.destroy(); } catch (_) {}
+            crewRef.current = null;
 
             // Immediately clear interactive element references to prevent ticker access
             plotterCarriageSpriteRef.current = null;
@@ -1038,6 +1051,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             frameCount++;
 
             try {
+                crewRef.current?.update(app.ticker.deltaMS);
+
                 // Refresh offline state periodically (~3s)
                 if (frameCount % 180 === 0) {
                     try {
