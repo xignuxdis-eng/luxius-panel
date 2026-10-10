@@ -94,7 +94,42 @@ export const BANTER_SCRIPTS: string[][] = [
     ['Este plotter tiene más precisión que un Zerg.', 'Y es mucho más amigable. Hasta da gusto verlo.'],
     ['Estoy a punto de terminar esta pasada.', 'Yo me ocupo del refilado. Equipo ganador.'],
     ['Mirá este acabado, parece de museo.', 'Ni el Louvre tiene tanta nitidez en sus obras.'],
-    ['Pocos saben imprimir como vos.', 'Y menos aún diseñar tan lindo. Somos un gran equipo.']
+    ['Pocos saben imprimir como vos.', 'Y menos aún diseñar tan lindo. Somos un gran equipo.'],
+    // --- Guardias de las capitales de WoW ---
+    ['Movete, ciudadano. Nada que ver por aquí.', 'Solo una lona perfecta. Sigan circulando.'],
+    ["Cuidado, viajero: el plotter muerde si lo apurás.", "Gracias, guardia. Voy con calma y calidad."],
+    ['¿Buscas la casa de subastas? Esto es un taller.', 'Aquí el mejor loot es una impresión sin banding.'],
+    ["Alto ahí. Documentación del pedido, por favor.", "OT en regla, guardia. Todo sellado y aprobado."],
+    ['Que la luz te guarde. Y el refilado, derecho.', 'Y que tus tintas nunca se agoten.'],
+    ['Los murlocs andan cerca del depósito otra vez.', 'Mrglgl... digo, ¡qué mal momento para el vinilo!'],
+    ['Vigilo estas calles desde hace años, y nunca vi un corte así.', 'Es que el cutter está en modo legendario.'],
+    ['¿Necesitas una ruta hacia Despacho, forastero?', 'Siempre derecho, luego a la izquierda, y sin perder el rollo.'],
+    ['Por la Alianza, qué acabado tan pulido.', 'Por la Horda, también. Hoy hay paz en el taller.'],
+    ['Mantengan la calma: es solo un pedido urgente.', 'Los urgentes son nuestra especialidad.'],
+    // --- Series y películas (Marvel, DC y más) ---
+    ['¿Viste Deadpool y Wolverine? Qué dupla.', 'Imprimen menos chistes, pero igual de buenos. ¡Gran pelí!'],
+    ['Estoy esperando la próxima de los Vengadores.', 'Ensamblados estamos: el equipo del taller no falla.'],
+    ['Los Cuatro Fantásticos tienen estilo retrofuturista.', 'Como nuestras lonas: color y detalle por todos lados.'],
+    ['Agatha All Along tiene una banda sonora tremenda.', 'Igual que el plotter a esta hora: puro ritmo.'],
+    ['Daredevil Born Again no suelta ni un minuto.', 'Ver sin ver: así imprimo yo en la madrugada.'],
+    ['Superman de Gunn me dejó de buen humor.', 'A mí Krypto me ganó el corazón. Y la lona queda divina.'],
+    ['El Pingüino fue una joyita de serie.', 'Gotham tiene mala fama, pero nuestro taller es seguro.'],
+    ['Peacemaker: ¿la viste? Música y caos puro.', 'Mejor que cualquier casco: este diseño es el protagonista.'],
+    ['Loki, la serie: múltiples líneas de tiempo.', 'Lo mismo pasa con nuestras OT: múltiples versiones.'],
+    ['Thunderbolts* juntó a lo mejor de los descartados.', 'Como los restos de vinilo: reciclados y útiles.'],
+    ['¿Viste lo nuevo de Star Wars, Andor incluido?', 'Rebeldes del taller: imprimir sin imperio de errores.'],
+    ['The Last of Us está imperdible en pantalla.', 'Como esta impresión: sobrevive a cualquier clima.'],
+    ['Arcane me dejó pensando en el arte pixelado.', 'Y en cuánta tinta se usa para tanto color.'],
+    // --- Recomendaciones útiles para el equipo y para quien mira el sistema ---
+    ['Recordá: guardá el archivo original antes de enviar a imprimir.', 'Y revisá el sangrado: dos milímetros salvan el corte.'],
+    ['Tip: calibrá el color al empezar el día.', 'Así las lonas salen iguales de la primera a la última.'],
+    ['¿Revisaste las medidas antes de imprimir?', 'Siempre. Un cero de más cuesta mucho material.'],
+    ['No te olvides de tomar agua y estirar los brazos.', 'Gracias. El taller rinde más con operarios cuidados.'],
+    ['Mirá el stock de tintas antes de arrancar un lote grande.', 'Ya lo vi en Insumos: alcanza para el turno.'],
+    ['Subí siempre la OT al sistema antes de cortar.', 'Así el cliente ve el estado en tiempo real.'],
+    ['Regla 20-20-20: cada 20 minutos, mirá lejos 20 segundos.', 'Mis ojos agradecen. Los píxeles también.'],
+    ['Si la lona se ve rara, revisá el perfil de color.', 'Casi siempre es el perfil, no la máquina.'],
+    ['Hacé una copia de respaldo del trabajo del día.', 'Ya la subí. Un buen taller nunca pierde un diseño.']
 ];
 
 /**
@@ -151,7 +186,39 @@ export const THOUGHTS: string[] = [
     'Hoy me toca ser el héroe del refilado.',
     'Un píxel a la vez, así se construyen imperios.',
     'Quién diría que el CMYK era tan épico.',
-    'Más calidad que un Mario dorado.'
+    'Más calidad que un Mario dorado.',
+    // Guardias de las capitales de WoW
+    'Mantengo el orden en el taller, ciudadano.',
+    'Sigue tu camino, viajero.',
+    'Que la luz te acompañe en el turno.',
+    'Nada que reportar: todo en calma.',
+    '¿Alguien vio mis llaves del depósito?',
+    'Esta guardia es larga, pero la lona luce genial.',
+    'Ciudadano, no corras con el rollo.',
+    'Por el honor del taller.',
+    'Un murloc sospechoso en el almacén...',
+    'Cuiden el taller, que es nuestro hogar.',
+    // Series y películas
+    'Tengo que ver lo nuevo de Marvel este finde.',
+    'Daredevil Born Again, qué ritmo.',
+    'Deadpool y Wolverine: la dupla perfecta.',
+    'El Superman de Gunn tiene mucho corazón.',
+    'Peacemaker: música y caos en partes iguales.',
+    'Mañana maratón de Loki, lo juro.',
+    'Agatha All Along, ¡qué temazo!',
+    'Los Cuatro Fantásticos tienen estilo retro.',
+    'Andor es de lo mejor de Star Wars.',
+    'Ya quiero ver la próxima de DC.',
+    // Recomendaciones útiles
+    'Tip: guardá siempre el archivo original.',
+    'Revisá el sangrado antes de imprimir.',
+    'Calibrar el color cada mañana evita problemas.',
+    'Tomar agua también es parte del trabajo.',
+    'Hacé una pausa: 20 segundos mirando lejos.',
+    'Perfil de color correcto, lona perfecta.',
+    'Antes del lote grande, chequear tintas.',
+    'Una copia de respaldo vale oro.',
+    'Subir la OT al sistema es el primer paso.'
 ];
 
 /**
@@ -180,7 +247,15 @@ export const GREETINGS: [string, string][] = [
     ['Choca esos cinco.', '¡Top-secret high five!'],
     ['A tus órdenes, Hokage.', 'Dattebayo. Nos vemos.'],
     ['¡Hola! Todo perfecto por acá.', 'Por acá también. ¡Seguimos!'],
-    ['Ding! Nivel de amistad +1.', 'Combo de saludos x2.']
+    ['Ding! Nivel de amistad +1.', 'Combo de saludos x2.'],
+    ['Movete, ciudadano.', 'Sigo mi camino, guardia.'],
+    ['Que la luz te guarde.', 'Y a vos también, amigo.'],
+    ['Alto ahí... ah, sos vos. Pasá.', 'Gracias, guardia del taller.'],
+    ['¿Necesitas indicaciones, forastero?', 'Todo bajo control, gracias.'],
+    ['Por el honor del taller.', 'Y por la calidad de impresión.'],
+    ['¿Viste la última de Marvel?', 'Todavía no. ¡Sin spoilers!'],
+    ['¿Maratón de series esta noche?', 'Obvio. Y a dormir tarde.'],
+    ['Hoy hay que revisar el sangrado.', 'Ya lo tenía anotado, jefe.']
 ];
 
 /** Elige un saludo distinto del anterior. */
