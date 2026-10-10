@@ -47,6 +47,12 @@ interface ParticleItem {
     color: number;
 }
 
+// BUILD_TAG temporal para verificar carga viva (se retira en Fase 6)
+export const BUILD_TAG = 'B0-r3';
+
+const VIRTUAL_W = 480;
+const VIRTUAL_H = 270;
+
 export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     orders,
     onSelectStation,
@@ -54,6 +60,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     selectedStation,
     onError
 }) => {
+    useEffect(() => {
+        console.log(`[PrintDen] build ${BUILD_TAG}`);
+    }, []);
+
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasHostRef = useRef<HTMLDivElement | null>(null);
     const hoveredStationRef = useRef<StationId | null>(null);
@@ -69,7 +79,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const highlightsMapRef = useRef<Map<string, Graphics>>(new Map());
     const badgesMapRef = useRef<Map<string, Text>>(new Map());
 
-    // Plotter Interactive Elements Refs (Fase 2)
+    // Plotter Interactive Elements Refs (Fase 2 & B0.2 Legibility)
     interface PlotterStationItem {
         id: StationId;
         carriage: Sprite;
@@ -83,8 +93,33 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         baseX: number;
         baseY: number;
         width: number;
+        barContainer: Container;
+        barBg: Graphics;
+        nameplate: Container;
+        nameplateBg: Graphics;
+        nameText: Text;
+        plotterOffsetX: number;
+        plotterActualW: number;
     }
+
+    interface StationUIItem {
+        id: StationId;
+        titleText: Text;
+        badgeContainer: Container;
+        badgeCountText: Text;
+        badgeBg: Graphics;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }
+
     const plottersListRef = useRef<PlotterStationItem[]>([]);
+    const stationsUIRef = useRef<StationUIItem[]>([]);
+    const currentScaleRef = useRef<number>(1);
+    const tagContainerRef = useRef<Container | null>(null);
+    const tagBgRef = useRef<Graphics | null>(null);
+    const tagTextRef = useRef<Text | null>(null);
     const plotterProgressFillRef = useRef<Graphics | null>(null);
     const plotterProgressTextRef = useRef<Text | null>(null);
     const plotterCarriageSpriteRef = useRef<Sprite | null>(null);
@@ -170,8 +205,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         let tickerFn: (() => void) | null = null;
         let activeApp: Application | null = null;
 
-        const VIRTUAL_W = 480;
-        const VIRTUAL_H = 270;
 
         const initPixi = async () => {
             const app = new Application();
@@ -197,16 +230,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                 activeApp = app;
                 appRef.current = app;
-                if (typeof window !== 'undefined') {
-                    (window as any).__PIXI_APP__ = app;
-                }
 
                 if (canvasHostRef.current) {
                     canvasHostRef.current.innerHTML = '';
                     const canvas = app.canvas;
                     canvasHostRef.current.appendChild(canvas);
 
-                    // Root scene layers
+                    // Root scene layers: World Container (scaled) + UI Layer (1:1 native screen resolution)
+                    const worldContainer = new Container();
+                    worldContainer.label = 'WorldContainer';
+
                     const mapLayer = new Container();
                     mapLayer.label = 'MapLayer';
 
@@ -219,13 +252,15 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const hitAreasLayer = new Container();
                     hitAreasLayer.label = 'HitAreasLayer';
 
+                    worldContainer.addChild(mapLayer);
+                    worldContainer.addChild(stationsLayer);
+                    worldContainer.addChild(particlesLayer);
+                    worldContainer.addChild(hitAreasLayer);
+
                     const uiLayer = new Container();
                     uiLayer.label = 'UILayer';
 
-                    app.stage.addChild(mapLayer);
-                    app.stage.addChild(stationsLayer);
-                    app.stage.addChild(particlesLayer);
-                    app.stage.addChild(hitAreasLayer);
+                    app.stage.addChild(worldContainer);
                     app.stage.addChild(uiLayer);
 
                     // 1. Build Refined Low-Contrast Background Map
@@ -234,11 +269,37 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
 
+                    // BUILD_TAG temporal (se retira en Fase 6) - UILayer a resolución real
+                    const tagContainer = new Container();
+                    const tagBg = new Graphics();
+                    tagBg.roundRect(0, 0, 48, 14, 3);
+                    tagBg.fill({ color: 0x090d16, alpha: 1.0 });
+                    tagBg.stroke({ width: 1, color: 0x334155 });
+                    tagContainer.addChild(tagBg);
+
+                    const tagText = new Text({
+                        text: BUILD_TAG,
+                        style: {
+                            fontFamily: 'monospace',
+                            fontSize: 9,
+                            fontWeight: 'bold',
+                            fill: '#38bdf8'
+                        }
+                    });
+                    tagText.x = 6;
+                    tagText.y = 1;
+                    tagContainer.addChild(tagText);
+                    uiLayer.addChild(tagContainer);
+
+                    tagContainerRef.current = tagContainer;
+                    tagBgRef.current = tagBg;
+                    tagTextRef.current = tagText;
+
                     // 3. Initialize Particle Pool
                     initParticles(particlesLayer, 18);
 
-                    // 4. Fractional Scaling setup
-                    resizeObserver = setupFractionalScaling(canvas, containerRef.current);
+                    // 4. Fractional Scaling setup with native resolution UI layout (B0.2)
+                    resizeObserver = setupFractionalScaling(canvas, containerRef.current, app, worldContainer, uiLayer);
 
                     // 5. Start Plotter Render Loop Ticker
                     tickerFn = setupPlotterTicker(app);
@@ -287,10 +348,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             plotterProgressTextRef.current = null;
             tooltipContainerRef.current = null;
             tooltipTextRef.current = null;
+            tagContainerRef.current = null;
+            tagBgRef.current = null;
+            tagTextRef.current = null;
             highlightsMapRef.current.clear();
             badgesMapRef.current.clear();
             particlesPoolRef.current = [];
             plottersListRef.current = [];
+            stationsUIRef.current = [];
 
             if (activeApp) {
                 try {
@@ -305,9 +370,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 }
                 activeApp = null;
                 appRef.current = null;
-                if (typeof window !== 'undefined') {
-                    (window as any).__PIXI_APP__ = null;
-                }
             }
 
             if (canvasHostRef.current) {
@@ -317,10 +379,79 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     }, []);
 
     /**
-     * FRACTIONAL SCALING: Fills 96% of container width, maintaining 16:9 ratio.
-     * Prevents ResizeObserver loop and layout thrashing.
+     * B0.2: Layout UI elements in UILayer at 1:1 screen resolution with coordinates multiplied by scale.
+     * All banners have solid dark opaque background (#090d16) and crisp 1px stroke.
      */
-    const setupFractionalScaling = (canvas: HTMLCanvasElement, container: HTMLDivElement | null): ResizeObserver | null => {
+    const layoutUI = (scale: number) => {
+        currentScaleRef.current = scale;
+
+        // 1. Layout Plotters UI (Status Bar & Nameplate)
+        plottersListRef.current.forEach((p) => {
+            const barW = Math.round((p.plotterActualW - 24) * scale);
+            const barH = 20; // 20px real screen pixels
+            p.barContainer.x = Math.round((p.baseX + p.plotterOffsetX + 12) * scale);
+            p.barContainer.y = Math.round((p.baseY + 11) * scale);
+
+            p.barBg.clear();
+            p.barBg.roundRect(0, 0, barW, barH, 3);
+            p.barBg.fill({ color: 0x090d16, alpha: 1.0 }); // Fondo oscuro sólido opaco
+            p.barBg.stroke({ width: 1, color: 0x334155 }); // Borde nítido
+
+            p.progressText.style.fontSize = 11;
+            p.progressText.x = Math.floor(barW / 2);
+            p.progressText.y = Math.floor(barH / 2);
+
+            // Nameplate
+            p.nameplate.x = Math.round((p.baseX + p.plotterOffsetX + 12) * scale);
+            p.nameplate.y = Math.round((p.baseY + 0) * scale);
+            p.nameplateBg.clear();
+            p.nameplateBg.roundRect(0, 0, 84, 18, 3);
+            p.nameplateBg.fill({ color: 0x090d16, alpha: 1.0 });
+            p.nameplateBg.stroke({ width: 1, color: 0x06b6d4 });
+            p.nameText.style.fontSize = 11;
+            p.nameText.x = 6;
+            p.nameText.y = 2;
+        });
+
+        // 2. Layout Station Titles & Badges
+        stationsUIRef.current.forEach((s) => {
+            const isPlotter = s.id === 'plotter1' || s.id === 'plotter2' || s.id.startsWith('maquina_');
+            if (!isPlotter) {
+                s.titleText.x = Math.round((s.x + 6) * scale);
+                s.titleText.y = Math.round((s.y + 2) * scale);
+                s.titleText.style.fontSize = 11;
+            }
+
+            s.badgeContainer.x = Math.round((s.x + s.width - 10) * scale);
+            s.badgeContainer.y = Math.round((s.y + 8) * scale);
+        });
+
+        // 3. BUILD_TAG
+        if (tagContainerRef.current && tagBgRef.current && tagTextRef.current) {
+            tagContainerRef.current.x = Math.round(VIRTUAL_W * scale) - 52;
+            tagContainerRef.current.y = Math.round(VIRTUAL_H * scale) - 18;
+            tagBgRef.current.clear();
+            tagBgRef.current.roundRect(0, 0, 48, 14, 3);
+            tagBgRef.current.fill({ color: 0x090d16, alpha: 1.0 });
+            tagBgRef.current.stroke({ width: 1, color: 0x334155 });
+            tagTextRef.current.style.fontSize = 9;
+            tagTextRef.current.x = 6;
+            tagTextRef.current.y = 1;
+        }
+    };
+
+    /**
+     * FRACTIONAL SCALING & B0.2 LEGIBILITY:
+     * Resizes Pixi renderer to exact screen display pixels.
+     * Scales worldContainer by finalScale, while keeping UILayer at 1:1 scale with crisp fonts.
+     */
+    const setupFractionalScaling = (
+        canvas: HTMLCanvasElement,
+        container: HTMLDivElement | null,
+        app: Application,
+        worldContainer: Container,
+        uiLayer: Container
+    ): ResizeObserver | null => {
         if (!container || !canvas) return null;
 
         let lastW = 0;
@@ -328,7 +459,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         let rafId: number | null = null;
 
         const updateScale = () => {
-            if (!container || !canvas) return;
+            if (!container || !canvas || !app) return;
             const containerW = container.clientWidth || 480;
             const targetW = Math.max(480, Math.floor(containerW * 0.96));
             const maxAllowedH = Math.min(560, Math.floor(window.innerHeight * 0.62));
@@ -344,9 +475,20 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             lastW = displayW;
             lastH = displayH;
 
+            // Resize Pixi renderer to exact screen display pixels
+            app.renderer.resize(displayW, displayH);
+
+            // Scale world elements (map, stations, particles, hit areas)
+            worldContainer.scale.set(finalScale, finalScale);
+
+            // UI layer stays at 1:1 scale (native screen resolution)
+            uiLayer.scale.set(1, 1);
+
+            // Re-layout UI elements with coordinates multiplied by scale
+            layoutUI(finalScale);
+
             canvas.style.width = `${displayW}px`;
             canvas.style.height = `${displayH}px`;
-            canvas.style.imageRendering = 'pixelated';
             canvas.style.display = 'block';
             canvas.style.boxShadow = '0 12px 36px rgba(0, 0, 0, 0.7)';
             canvas.style.border = '2px solid #1e293b';
@@ -485,11 +627,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         uiLayer: Container
     ) => {
         const stations = getPixiStations();
+        stationsUIRef.current = [];
+        plottersListRef.current = [];
 
         stations.forEach(station => {
             const { id, x, y, width, height, title, icon, color } = station;
 
-            // Visual Container
+            // Visual Container (Platforms, machines, chassis, vinyl)
             const visualContainer = new Container();
             visualContainer.x = x;
             visualContainer.y = y;
@@ -506,16 +650,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 baseGfx.stroke({ width: 1.5, color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
                 visualContainer.addChild(baseGfx);
 
-                // Title Bar
+                // Title Bar Header Platform Background
                 const headerGfx = new Graphics();
                 headerGfx.rect(0, 0, width, 14);
                 headerGfx.fill({ color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
                 visualContainer.addChild(headerGfx);
 
-                // Station Title Text (Concise: "Diseño", "Insumos", etc.)
+                // Station Title Text in UILayer (B0.2: Native resolution 11-12px)
                 const titleStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: 'bold',
                     fill: '#ffffff'
                 });
@@ -523,9 +667,43 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     text: `${icon} ${title}`,
                     style: titleStyle
                 });
-                titleText.x = 4;
-                titleText.y = 1;
-                visualContainer.addChild(titleText);
+                uiLayer.addChild(titleText);
+
+                // Notification Badge (Counter) in UILayer (B0.2)
+                const badgeContainer = new Container();
+                const badgeBg = new Graphics();
+                badgeBg.circle(0, 0, 8.5);
+                badgeBg.fill({ color: 0xef4444 });
+                badgeBg.stroke({ width: 1.5, color: 0xffffff });
+                badgeContainer.addChild(badgeBg);
+
+                const badgeStyle = new TextStyle({
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                    fill: '#ffffff'
+                });
+                const badgeCountText = new Text({ text: '', style: badgeStyle });
+                badgeCountText.anchor.set(0.5);
+                badgeContainer.addChild(badgeCountText);
+                badgesMapRef.current.set(id, badgeCountText);
+
+                const count = countOrdersForStation(id, ordersRef.current);
+                badgeCountText.text = count > 0 ? `${count}` : '';
+                badgeContainer.visible = count > 0;
+                uiLayer.addChild(badgeContainer);
+
+                stationsUIRef.current.push({
+                    id,
+                    titleText,
+                    badgeContainer,
+                    badgeCountText,
+                    badgeBg,
+                    x,
+                    y,
+                    width,
+                    height
+                });
             }
 
             // Selection / Hover Highlight Frame
@@ -533,31 +711,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             visualContainer.addChild(highlightGfx);
             highlightsMapRef.current.set(id, highlightGfx);
 
-            // Notification Badge (Counter)
-            const badgeContainer = new Container();
-            const badgeBg = new Graphics();
-            badgeBg.circle(0, 0, 7.5);
-            badgeBg.fill({ color: 0xef4444 });
-            badgeBg.stroke({ width: 1, color: 0xffffff });
-            badgeContainer.addChild(badgeBg);
-
-            const badgeStyle = new TextStyle({
-                fontFamily: 'monospace',
-                fontSize: 8,
-                fontWeight: 'bold',
-                fill: '#ffffff'
-            });
-            const badgeCountText = new Text({ text: '', style: badgeStyle });
-            badgeCountText.anchor.set(0.5);
-            badgeContainer.addChild(badgeCountText);
-            badgesMapRef.current.set(id, badgeCountText);
-
-            const count = countOrdersForStation(id, ordersRef.current);
-            badgeCountText.text = count > 0 ? `${count}` : '';
-            badgeContainer.visible = count > 0;
-            visualContainer.addChild(badgeContainer);
-
-            // ================================================================
             // ================================================================
             // FASE 2: DETAILED GRAND FORMAT PLOTTER STATION (Sin marco de tarjeta)
             // ================================================================
@@ -571,41 +724,30 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 plotterOffsetX = Math.floor((width - plotterActualW) / 2);
                 plotterOffsetY = 26;
 
-                // 1. Cartel con el nombre "Plotter" bien arriba (sin pisar el cartel de abajo ni el círculo rojo)
+                // 1. Cartel con el nombre "Plotter" en UILayer (B0.2: Native resolution, fondo oscuro opaco)
                 const nameplate = new Container();
                 const nameplateBg = new Graphics();
-                nameplateBg.roundRect(0, 0, 72, 10, 2);
+                nameplateBg.roundRect(0, 0, 84, 18, 3);
                 nameplateBg.fill({ color: 0x090d16, alpha: 1.0 }); // fondo oscuro sólido
-                nameplateBg.stroke({ width: 1, color: isOffline ? 0x64748b : 0x38bdf8 });
+                nameplateBg.stroke({ width: 1, color: isOffline ? 0x64748b : 0x06b6d4 });
                 nameplate.addChild(nameplateBg);
 
                 const nameStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 7,
+                    fontSize: 11,
                     fontWeight: 'bold',
                     fill: isOffline ? '#94a3b8' : '#ffffff'
                 });
                 const nameText = new Text({ text: `${icon} ${title}`, style: nameStyle });
-                nameText.x = 4;
-                nameText.y = 1;
+                nameText.x = 6;
+                nameText.y = 2;
                 nameplate.addChild(nameText);
-                nameplate.x = plotterOffsetX + 12;
-                nameplate.y = 0;
-                visualContainer.addChild(nameplate);
+                uiLayer.addChild(nameplate);
 
-                // 2. Badge posicionado en la esquina superior derecha (bien lejos del cartel de nombre)
-                badgeContainer.x = plotterOffsetX + plotterActualW - 14;
-                badgeContainer.y = 5;
-
-                // 3. Cartel con el texto "SIGUIENTE EN COLA" separado 6px por encima del chasis
-                // Base del cartel = y: 20. Top del chasis = y: 26. Separación = exactamente 6 px.
+                // 2. Cartel con el texto "SIGUIENTE EN COLA" en UILayer (B0.2: Native resolution, fondo oscuro opaco, borde nítido)
                 const barContainer = new Container();
-                const barWidth = plotterActualW - 24;
-                barContainer.x = plotterOffsetX + 12;
-                barContainer.y = 11;
-
                 const barBg = new Graphics();
-                barBg.roundRect(0, 0, barWidth, 10, 2);
+                barBg.roundRect(0, 0, 200, 20, 3);
                 barBg.fill({ color: 0x090d16, alpha: 1.0 }); // Fondo oscuro sólido
                 barBg.stroke({ width: 1, color: 0x334155 });
                 barContainer.addChild(barBg);
@@ -616,18 +758,41 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                 const progressStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 6.5,
+                    fontSize: 11,
                     fontWeight: 'bold',
-                    fill: '#f8fafc',
-                    stroke: { color: '#090d16', width: 2 }
+                    fill: '#f8fafc'
                 });
                 const progressText = new Text({ text: isOffline ? 'OFFLINE' : 'STANDBY (LISTO)', style: progressStyle });
-                progressText.x = barWidth / 2;
-                progressText.y = 4.5;
                 progressText.anchor.set(0.5);
                 barContainer.addChild(progressText);
+                uiLayer.addChild(barContainer);
 
-                visualContainer.addChild(barContainer);
+                plotterProgressFillRef.current = barFill;
+                plotterProgressTextRef.current = progressText;
+
+                // Badge contador para plotter en UILayer (B0.2)
+                const plotterBadgeContainer = new Container();
+                const plotterBadgeBg = new Graphics();
+                plotterBadgeBg.circle(0, 0, 8.5);
+                plotterBadgeBg.fill({ color: 0xef4444 });
+                plotterBadgeBg.stroke({ width: 1.5, color: 0xffffff });
+                plotterBadgeContainer.addChild(plotterBadgeBg);
+
+                const plotterBadgeStyle = new TextStyle({
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                    fill: '#ffffff'
+                });
+                const plotterBadgeCountText = new Text({ text: '', style: plotterBadgeStyle });
+                plotterBadgeCountText.anchor.set(0.5);
+                plotterBadgeContainer.addChild(plotterBadgeCountText);
+                badgesMapRef.current.set(id, plotterBadgeCountText);
+
+                const pCount = countOrdersForStation(id, ordersRef.current);
+                plotterBadgeCountText.text = pCount > 0 ? `${pCount}` : '';
+                plotterBadgeContainer.visible = pCount > 0;
+                uiLayer.addChild(plotterBadgeContainer);
 
                 // 4. Bobina de vinilo trasera ancha
                 const rollSprite = new Sprite(getPlotterVinylRollTexture());
@@ -681,7 +846,26 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     maquinaId: station.maquinaId,
                     baseX: x,
                     baseY: y,
-                    width: plotterActualW
+                    width: plotterActualW,
+                    barContainer,
+                    barBg,
+                    nameplate,
+                    nameplateBg,
+                    nameText,
+                    plotterOffsetX,
+                    plotterActualW
+                });
+
+                stationsUIRef.current.push({
+                    id,
+                    titleText: nameText,
+                    badgeContainer: plotterBadgeContainer,
+                    badgeCountText: plotterBadgeCountText,
+                    badgeBg: plotterBadgeBg,
+                    x: x + plotterOffsetX,
+                    y,
+                    width: plotterActualW,
+                    height
                 });
 
                 if (id === 'plotter1') {
@@ -691,9 +875,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     plotterProgressFillRef.current = barFill;
                     plotterProgressTextRef.current = progressText;
                 }
-            } else {
-                badgeContainer.x = width - 8;
-                badgeContainer.y = -2;
             }
 
             stationsLayer.addChild(visualContainer);
@@ -753,7 +934,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         });
 
         // ================================================================
-        // HOVER TOOLTIP HUD (Pop-over on UI Layer)
+        // HOVER TOOLTIP HUD (Pop-over on UI Layer) (B0.2: Native Resolution)
         // ================================================================
         const tooltip = new Container();
         tooltip.x = 112;
@@ -761,20 +942,20 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         tooltip.visible = false;
 
         const tipBg = new Graphics();
-        tipBg.rect(0, 0, 150, 48);
-        tipBg.fill({ color: 0x0f172a, alpha: 0.95 });
+        tipBg.roundRect(0, 0, 240, 72, 4);
+        tipBg.fill({ color: 0x090d16, alpha: 1.0 }); // Fondo oscuro sólido opaco
         tipBg.stroke({ width: 1, color: 0x38bdf8 });
         tooltip.addChild(tipBg);
 
         const tipStyle = new TextStyle({
             fontFamily: 'monospace',
-            fontSize: 7,
+            fontSize: 11,
             fill: '#f8fafc',
-            lineHeight: 9
+            lineHeight: 14
         });
         const tipText = new Text({ text: '', style: tipStyle });
-        tipText.x = 6;
-        tipText.y = 4;
+        tipText.x = 8;
+        tipText.y = 6;
         tooltip.addChild(tipText);
 
         tooltipContainerRef.current = tooltip;
@@ -783,7 +964,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     };
 
     /**
-     * Updates Plotter Tooltip HUD with real active order data
+     * Updates Plotter Tooltip HUD with real active order data (B0.2: Coordinates scaled)
      */
     const updatePlotterTooltip = (stationId: StationId = 'plotter1') => {
         if (!tooltipTextRef.current || !tooltipContainerRef.current) return;
@@ -793,8 +974,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         const title = station?.title || 'Plotter';
 
         if (station) {
-            tooltipContainerRef.current.x = Math.max(10, Math.min(270, station.x + 20));
-            tooltipContainerRef.current.y = station.y + station.height + 4;
+            tooltipContainerRef.current.x = Math.round(Math.max(10, Math.min(270, station.x + 20)) * currentScaleRef.current);
+            tooltipContainerRef.current.y = Math.round((station.y + station.height + 4) * currentScaleRef.current);
         }
 
         if (isOffline) {
@@ -862,8 +1043,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         return;
                     }
 
-                    const railMinX = 32;
-                    const railRange = plotterW - 74;
+                    const railMinX = plotter.plotterOffsetX + 32;
+                    const railRange = plotter.plotterActualW - 74;
 
                     // Distribute orders: plotter 0 takes first, plotter 1 takes second, or standby
                     const assignedOrder = allPrintingOrders[pIdx] || (pIdx === 0 ? allPrintingOrders[0] : undefined);
@@ -872,7 +1053,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     if (isPlotterPrinting && assignedOrder) {
                         // 1. Carriage sweep
-                        const sweepSpeed = 0.06;
+                        const sweepSpeed = 0.05;
                         const cosVal = Math.cos((frameCount + pIdx * 30) * sweepSpeed);
                         const sweepRatio = (Math.sin((frameCount + pIdx * 30) * sweepSpeed) + 1) / 2;
 
@@ -931,18 +1112,17 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         // que se encuentra "en cola" de espera para impresión en máquina, no un estado de impresión en tiempo real.
                         // No se calculan porcentajes ni progresos simulados hasta contar con telemetría directa de hardware.
                         // 4. Barra de actividad indeterminada animada con fondo oscuro sólido (sin números ni porcentajes inventados)
-                        const barWidth = plotterW - 24;
+                        const barWidth = Math.round((plotter.plotterActualW - 24) * currentScaleRef.current);
+                        const barH = 20;
                         barFill.clear();
-                        barFill.roundRect(0, 0, barWidth, 10, 2);
-                        barFill.fill({ color: 0x090d16, alpha: 1.0 });
 
                         // Haz de luz en la base de la barra como línea fina de actividad (no tapa el texto)
                         const beamW = Math.floor(barWidth * 0.35);
-                        const beamOffset = ((frameCount * 1.5 + pIdx * 25) % (barWidth + beamW)) - beamW;
+                        const beamOffset = ((frameCount * 2.5 + pIdx * 25) % (barWidth + beamW)) - beamW;
                         const beamStart = Math.max(0, beamOffset);
                         const beamEnd = Math.min(barWidth, beamOffset + beamW);
                         if (beamEnd > beamStart) {
-                            barFill.roundRect(beamStart, 7.5, beamEnd - beamStart, 2, 1);
+                            barFill.roundRect(beamStart, barH - 3, beamEnd - beamStart, 2, 1);
                             barFill.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.85 });
                         }
                         barFill.alpha += (1 - barFill.alpha) * 0.08;
@@ -1035,6 +1215,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             }}
         >
             <div ref={canvasHostRef} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} />
+            {/* BUILD_TAG temporal (se retira en Fase 6) */}
+            <div style={{
+                position: 'absolute',
+                bottom: '8px',
+                right: '8px',
+                backgroundColor: '#090d16',
+                border: '1px solid #334155',
+                color: '#38bdf8',
+                fontSize: '9px',
+                fontFamily: 'monospace',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                zIndex: 20,
+                pointerEvents: 'none'
+            }}>
+                {BUILD_TAG}
+            </div>
         </div>
     );
 };
