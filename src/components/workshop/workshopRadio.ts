@@ -4,6 +4,7 @@
 // (los navegadores no permiten sonido hasta que el usuario toca algo) y respeta el silencio general del taller.
 
 import { audioEngine } from './AudioEngine';
+import { getAudioContext, audioOut } from './workshopAudioBus';
 
 export interface RadioStation {
     name: string;
@@ -81,7 +82,7 @@ class WorkshopRadio {
         try {
             if (!this.ctx) {
                 const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-                if (Ctx) this.ctx = new Ctx();
+                if (Ctx) this.ctx = getAudioContext();
             }
             if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
         } catch (_) {}
@@ -125,7 +126,7 @@ class WorkshopRadio {
             gain.gain.setValueAtTime(vol, now);
             gain.gain.exponentialRampToValueAtTime(0.0008, now + dur);
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(audioOut(ctx));
             osc.start(now);
             osc.stop(now + dur + 0.02);
         } catch (_) {}

@@ -3,7 +3,7 @@
 // usuario y si los botones "Voces" / "Interfaz" de la barra estan en ON.
 
 import { ROLE_VOICES, VOICE_OVERRIDES, VOICE_SPREAD, VOICE_SETTINGS, VOICE_GREETINGS, UI_SOUNDS, type VoiceProfile } from './content/voices';
-import { getAudioContext } from './workshopAnimalSound';
+import { getAudioContext, audioOut } from './workshopAudioBus';
 import type { WorkerRole } from './types';
 
 function hash01(s: string): number {
@@ -41,7 +41,7 @@ function blip(c: AudioContext, t0: number, freq: number, dur: number, vol: numbe
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(c.destination);
+    o.connect(g).connect(audioOut(c));
     o.start(t0);
     o.stop(t0 + dur + 0.02);
 }

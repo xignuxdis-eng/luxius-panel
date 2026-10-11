@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './FloatingAlarm.css'
+import { getAudioContext, audioOut } from '../workshop/workshopAudioBus'
+import { ALARM_LEVEL } from '../workshop/content/audio'
 
 const STORAGE_KEY = 'luxius-alarm-state'
 
@@ -57,33 +59,27 @@ export default function FloatingAlarm() {
 
     // Play alarm sound and show notification
     const triggerAlarm = useCallback(() => {
-        // Play a beep sound (using Web Audio API)
+        // Pitidos suaves por el bus de audio compartido (volumen general + limitador, ver workshopAudioBus.ts / content/audio.ts)
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-            const oscillator = audioContext.createOscillator()
-            const gainNode = audioContext.createGain()
-
-            oscillator.connect(gainNode)
-            gainNode.connect(audioContext.destination)
-
-            oscillator.frequency.value = 800
-            oscillator.type = 'sine'
-            gainNode.gain.value = 0.3
-
-            oscillator.start()
-
-            // Beep pattern
-            let beepCount = 0
-            const beepInterval = setInterval(() => {
-                beepCount++
-                if (beepCount >= 6) {
-                    clearInterval(beepInterval)
-                    oscillator.stop()
-                    audioContext.close()
-                } else {
-                    gainNode.gain.value = beepCount % 2 === 0 ? 0.3 : 0
+            const ac = getAudioContext()
+            if (ac) {
+                const out = audioOut(ac)
+                const now = ac.currentTime
+                for (let i = 0; i < 4; i++) {
+                    const t = now + i * 0.5
+                    const osc = ac.createOscillator()
+                    const g = ac.createGain()
+                    osc.type = 'sine'
+                    osc.frequency.value = 660
+                    g.gain.setValueAtTime(0.0001, t)
+                    g.gain.exponentialRampToValueAtTime(ALARM_LEVEL, t + 0.03)
+                    g.gain.setValueAtTime(ALARM_LEVEL, t + 0.22)
+                    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3)
+                    osc.connect(g).connect(out)
+                    osc.start(t)
+                    osc.stop(t + 0.32)
                 }
-            }, 300)
+            }
         } catch (e) {
             console.log('Audio not supported')
         }

@@ -1,4 +1,7 @@
 // AudioEngine.ts - Synthesized & Original Video Ambient Sound Engine for XignuX Print Den
+import { getAudioContext, audioOut } from './workshopAudioBus';
+import { SFX_LEVELS } from './content/audio';
+
 class AudioEngine {
     private ctx: AudioContext | null = null;
     private isMuted: boolean = false;
@@ -9,7 +12,7 @@ class AudioEngine {
         if (!this.ctx) {
             const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
             if (AudioCtx) {
-                this.ctx = new AudioCtx();
+                this.ctx = getAudioContext(); // contexto compartido (workshopAudioBus.ts)
             }
         }
         if (this.ctx && this.ctx.state === 'suspended') {
@@ -75,11 +78,11 @@ class AudioEngine {
             osc.frequency.setValueAtTime(220, this.ctx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.15);
 
-            gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+            gain.gain.setValueAtTime(SFX_LEVELS.printSweep, this.ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
 
             osc.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(audioOut(this.ctx));
 
             osc.start();
             osc.stop(this.ctx.currentTime + 0.15);
@@ -108,12 +111,12 @@ class AudioEngine {
             filter.frequency.value = 3000;
 
             const gain = this.ctx.createGain();
-            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+            gain.gain.setValueAtTime(SFX_LEVELS.scissors, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
 
             noise.connect(filter);
             filter.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(audioOut(this.ctx));
 
             noise.start();
         } catch (e) { }
@@ -130,16 +133,16 @@ class AudioEngine {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
 
-            osc.type = 'square';
+            osc.type = 'triangle'; // más suave que la onda cuadrada (antes sonaba chillón)
             osc.frequency.setValueAtTime(440, now);
             osc.frequency.setValueAtTime(880, now + 0.1);
             osc.frequency.setValueAtTime(440, now + 0.2);
 
-            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.setValueAtTime(SFX_LEVELS.bounceWarning, now);
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
             osc.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(audioOut(this.ctx));
 
             osc.start(now);
             osc.stop(now + 0.35);
@@ -164,11 +167,11 @@ class AudioEngine {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, now + idx * 0.08);
 
-                gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+                gain.gain.setValueAtTime(SFX_LEVELS.orderComplete, now + idx * 0.08);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
 
                 osc.connect(gain);
-                gain.connect(this.ctx.destination);
+                gain.connect(audioOut(this.ctx));
 
                 osc.start(now + idx * 0.08);
                 osc.stop(now + idx * 0.08 + 0.3);
@@ -190,11 +193,11 @@ class AudioEngine {
             osc.frequency.setValueAtTime(600, this.ctx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.04);
 
-            gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+            gain.gain.setValueAtTime(SFX_LEVELS.click, this.ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
 
             osc.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(audioOut(this.ctx));
 
             osc.start();
             osc.stop(this.ctx.currentTime + 0.04);

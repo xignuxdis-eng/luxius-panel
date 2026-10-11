@@ -30,21 +30,10 @@ export type PetSound =
           whine?: boolean;
       };
 
-let ctx: AudioContext | null = null;
+import { getAudioContext as busCtx, audioOut } from './workshopAudioBus';
+import { ANIMAL_TRIM } from './content/audio';
 
-function getCtx(): AudioContext | null {
-    try {
-        if (!ctx) {
-            const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
-            if (!AC) return null;
-            ctx = new AC();
-        }
-        if (ctx && ctx.state === 'suspended') void ctx.resume();
-        return ctx;
-    } catch (_) {
-        return null;
-    }
-}
+const getCtx = (): AudioContext | null => busCtx();
 
 /** Una nota con barrido de frecuencia (maullido / ladrido / quejido). */
 function tone(c: AudioContext, t0: number, dur: number, f0: number, f1: number, type: OscillatorType, vol: number, vibrato = 0) {
@@ -63,9 +52,9 @@ function tone(c: AudioContext, t0: number, dur: number, f0: number, f1: number, 
         lfo.stop(t0 + dur + 0.05);
     }
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(0.03, dur / 3));
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * ANIMAL_TRIM), t0 + Math.min(0.03, dur / 3));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(c.destination);
+    o.connect(g).connect(audioOut(c));
     o.start(t0);
     o.stop(t0 + dur + 0.05);
 }
@@ -82,8 +71,8 @@ function noise(c: AudioContext, t0: number, dur: number, freq: number, vol: numb
     f.type = 'bandpass';
     f.frequency.value = freq;
     const g = c.createGain();
-    g.gain.value = vol;
-    s.connect(f).connect(g).connect(c.destination);
+    g.gain.value = vol * ANIMAL_TRIM;
+    s.connect(f).connect(g).connect(audioOut(c));
     s.start(t0);
 }
 
