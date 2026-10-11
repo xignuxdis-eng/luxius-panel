@@ -47,6 +47,7 @@ import { WorkshopSky } from './workshopSky';
 import { GuestManager } from './workshopGuests';
 import { PetManager, type PetProfile } from './workshopPet';
 import { playAnimalSound } from './workshopAnimalSound';
+import { WORKSHOP_CONFIG, DEFAULT_FX as BASE_DEFAULT_FX } from './content/config';
 import PetSheetCard from './PetSheetCard';
 import WallPanel from './WallPanel';
 import { WorkshopEvents } from './workshopEvents';
@@ -81,9 +82,9 @@ interface ParticleItem {
 export const BUILD_TAG = 'F-r1';
 
 /** Pizarra del día en la pared (coordenadas del mapa). */
-const BOARD = { x: 108, y: 10, w: 100, h: 23 };
+const BOARD = WORKSHOP_CONFIG.board;
 const FX_STORAGE_KEY = 'luxius_print_den_fx';
-const DEFAULT_FX: FxToggles = { pet: true, events: true, weather: true, alerts: true, petSound: true, sndAmbient: true, sndMachines: true, sndAlerts: true, sndAchv: true };
+const DEFAULT_FX: FxToggles = { ...BASE_DEFAULT_FX };
 
 const loadFxToggles = (): FxToggles => {
     try {
@@ -307,7 +308,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     // Clic en una mascota: suena su sonido, se deja (o no) acariciar y se abre su ficha de fantasía.
     const handlePetTap = (profile: PetProfile, px: number, py: number, petted: boolean) => {
         if (dragMovedRef.current) return;
-        if (fxToggleRef.current.petSound) playAnimalSound(profile.id);
+        if (fxToggleRef.current.petSound) playAnimalSound(profile.sound);
         if (petted) fxRef.current?.hearts(px, py);
         else showToast(`${profile.emoji} ${profile.name} no se dejó acariciar esta vez 💨`);
         const last = lastPetCloseRef.current;
@@ -614,7 +615,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     buildBackgroundMap(mapLayer, VIRTUAL_W, VIRTUAL_H);
 
                     // 1b. Cielo por las ventanas (hora real + clima real) y pizarra/reloj de pared
-                    skyRef.current = new WorkshopSky(skyLayer, [32, 396], 9);
+                    skyRef.current = new WorkshopSky(skyLayer, WORKSHOP_CONFIG.windows.xs, WORKSHOP_CONFIG.windows.y);
                     buildWallBoard(mapLayer, uiLayer, workerHitLayer);
 
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
@@ -847,8 +848,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         uiLayer.addChild(late);
         boardRef.current = { text, late };
 
-        const cx = 292;
-        const cy = 20;
+        const cx = WORKSHOP_CONFIG.clock.cx;
+        const cy = WORKSHOP_CONFIG.clock.cy;
         const clock = new Graphics();
         clock.circle(cx, cy, 8.5).fill({ color: 0x5b3a1e });
         clock.circle(cx, cy, 7.5).fill({ color: 0xf1f5f9 });
@@ -2008,7 +2009,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 onOpenPet={(id) => {
                     const prof = petRef.current?.getPet(id)?.profile;
                     if (!prof) return;
-                    if (fxToggleRef.current.petSound) playAnimalSound(prof.id);
+                    if (fxToggleRef.current.petSound) playAnimalSound(prof.sound);
                     setSheetWorkerId(null);
                     setSheetStationId(null);
                     setWallPanel(null);
@@ -2079,7 +2080,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         profile={pet.profile}
                         getActivity={() => pet.getActivity()}
                         soundOn={fxToggles.petSound}
-                        onPlaySound={() => playAnimalSound(pet.profile.id)}
+                        onPlaySound={() => playAnimalSound(pet.profile.sound)}
                         onClose={() => setSheetPetId(null)}
                         onOutsideClose={() => {
                             lastPetCloseRef.current = { id: pet.profile.id, t: Date.now() };

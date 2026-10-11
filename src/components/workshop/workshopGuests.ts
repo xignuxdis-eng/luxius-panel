@@ -14,57 +14,11 @@ import {
 import { lineDurationMs } from './workshopBanter';
 import { computeLanes, getStandPoint, planPath, MAP_W, type BubbleTone, type Lanes, type Point, type WorkerSnapshot } from './workshopWorkers';
 
-export type GuestKind = 'repartidor' | 'tecnico' | 'guardia';
+import { GUEST_KINDS, type GuestKind, type GuestKindConfig } from './content/guests';
+export type { GuestKind };
 
-interface KindConfig {
-    name: string;
-    shirt: string;
-    skin: string;
-    hair: string;
-    speed: number; // px/s
-    tone: BubbleTone;
-    stayMs: number;
-    lines: string[];
-}
-
-const KIND: Record<GuestKind, KindConfig> = {
-    repartidor: {
-        name: 'Repartidor (visita)',
-        shirt: '#f97316',
-        skin: '#fdba74',
-        hair: '#1f2937',
-        speed: 30,
-        tone: 'info',
-        stayMs: 9000,
-        lines: ['¡Paquete para el taller! 📦', 'Firmá acá, por favor.', '¡Qué lindos esos impresos! Chau, chau.']
-    },
-    tecnico: {
-        name: 'Técnico de plotter (visita)',
-        shirt: '#64748b',
-        skin: '#c68642',
-        hair: '#111827',
-        speed: 28,
-        tone: 'info',
-        stayMs: 11000,
-        lines: ['Vengo a revisar el plotter 🔧', 'Cabezales limpios, todo en orden.', 'Con estos cuidados, imprimen de maravilla.']
-    },
-    guardia: {
-        name: 'Guardia nocturno (visita)',
-        shirt: '#1e3a8a',
-        skin: '#fed7aa',
-        hair: '#374151',
-        speed: 20,
-        tone: 'info',
-        stayMs: 5000,
-        lines: [
-            'Todo tranquilo en el Den... por ahora.',
-            'Ronda nocturna: sin novedades.',
-            '¡Por el honor del taller! 🛡️',
-            'Alto ahí, viajero... ah, no, es un vinilo.',
-            'Que la luz de las lámparas guíe sus impresiones.'
-        ]
-    }
-};
+type KindConfig = GuestKindConfig;
+const KIND = GUEST_KINDS;
 
 type Phase = 'in' | 'stay' | 'out' | 'patrol' | 'pause';
 

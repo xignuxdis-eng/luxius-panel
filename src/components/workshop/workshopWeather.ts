@@ -17,9 +17,11 @@ export interface WeatherInfo {
     fetchedAt: number;
 }
 
-const DEFAULT_GEO = { lat: -31.4201, lon: -64.1888, name: 'Córdoba' };
+import { WORKSHOP_CONFIG } from './content/config';
+
+const DEFAULT_GEO = WORKSHOP_CONFIG.weather.defaultGeo;
 const GEO_KEY = 'luxius_print_den_geo';
-export const WEATHER_REFRESH_MS = 30 * 60 * 1000;
+export const WEATHER_REFRESH_MS = WORKSHOP_CONFIG.weather.refreshMs;
 
 export function weatherKindFromCode(code: number): WeatherKind {
     if (code === 0) return 'clear';

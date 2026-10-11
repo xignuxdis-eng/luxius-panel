@@ -12,10 +12,15 @@ export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'repartido
 
 export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'repartidor', 'tecnico'];
 
-const BLACKOUT_LINES = ['¡Se fue la luz! 🔦', '¿Alguien tocó el térmico?', 'Tranquilos, tranquilos...'];
-const BLACKOUT_BACK = ['¡Volvió la luz! 💡', 'Menos mal, no se perdió ningún archivo.'];
-const COFFEE_LINES = ['¡Mi café! ☕', 'Cuidado: piso mojado.', 'Alguien traiga el secador...'];
-const HAPPY_LINES = ['¡Hora feliz en el Den! 🎶', '¡Música, maestro! 🎵', 'Y encima los impresos salen bárbaros.'];
+import { EVENT_TEXTS } from './content/texts';
+import { WORKSHOP_CONFIG, randomIn } from './content/config';
+
+const BLACKOUT_LINES = EVENT_TEXTS.blackout;
+const BLACKOUT_BACK = EVENT_TEXTS.blackoutBack;
+const COFFEE_LINES = EVENT_TEXTS.coffee;
+const HAPPY_LINES = EVENT_TEXTS.happyHour;
+const BLACKOUT_DARK_MS = WORKSHOP_CONFIG.events.blackout.darkUntilMs;
+const BLACKOUT_END_MS = WORKSHOP_CONFIG.events.blackout.endMs;
 
 /** Pausa entre eventos (ms). En modo rápido de pruebas: localStorage 'luxius_print_den_events_fast' = '1'. */
 function nextDelayMs(rng: () => number): number {
@@ -23,7 +28,7 @@ function nextDelayMs(rng: () => number): number {
     try {
         fast = localStorage.getItem('luxius_print_den_events_fast') === '1';
     } catch (_) {}
-    return fast ? 5000 + rng() * 4000 : 55000 + rng() * 65000;
+    return randomIn(fast ? WORKSHOP_CONFIG.events.intervalFastMs : WORKSHOP_CONFIG.events.intervalMs, rng);
 }
 
 export interface EventDeps {
@@ -111,7 +116,7 @@ export class WorkshopEvents {
             const g = this.deps.guests();
             if (g) {
                 const h = this.deps.hour();
-                const night = h >= 22 || h < 6;
+                const night = h >= WORKSHOP_CONFIG.events.nightGuard.fromHour || h < WORKSHOP_CONFIG.events.nightGuard.toHour;
                 if (this.enabled && night && !g.has('guardia')) g.spawn('guardia');
                 else if ((!night || !this.enabled) && g.has('guardia')) g.dismiss('guardia');
             }
@@ -126,21 +131,21 @@ export class WorkshopEvents {
                 // 0-0.4 s: parpadea; 0.4-3.6 s: oscuro; 3.6-4.4 s: parpadea al volver
                 let level = 0;
                 if (r.t < 400) level = Math.floor(r.t / 100) % 2 === 0 ? 0.5 : 0;
-                else if (r.t < 3600) level = 1;
-                else if (r.t < 4400) level = Math.floor((r.t - 3600) / 100) % 2 === 0 ? 0.6 : 0.1;
+                else if (r.t < BLACKOUT_DARK_MS) level = 1;
+                else if (r.t < BLACKOUT_END_MS) level = Math.floor((r.t - BLACKOUT_DARK_MS) / 100) % 2 === 0 ? 0.6 : 0.1;
                 this.deps.lighting()?.setBlackout(level);
-                if (r.step === 0 && r.t >= 3600) {
+                if (r.step === 0 && r.t >= BLACKOUT_DARK_MS) {
                     r.step = 1;
                     this.deps.crew()?.announce(BLACKOUT_BACK, 1, 'ok');
                 }
-                if (r.t >= 4400) {
+                if (r.t >= BLACKOUT_END_MS) {
                     this.deps.lighting()?.setBlackout(0);
                     this.deps.onPowerBack?.();
                     this.running = null;
                     this.timer = nextDelayMs(this.rng);
                 }
             } else if (r.name === 'coffee') {
-                if (r.t >= 6000) {
+                if (r.t >= WORKSHOP_CONFIG.events.coffeeMs) {
                     this.running = null;
                     this.timer = nextDelayMs(this.rng);
                 }
@@ -155,7 +160,7 @@ export class WorkshopEvents {
                     const spot2 = this.deps.floorSpot();
                     fx.notes(spot2.x, spot2.y - 8, 1);
                 }
-                if (r.t >= 11000) {
+                if (r.t >= WORKSHOP_CONFIG.events.happyHourMs) {
                     this.running = null;
                     this.timer = nextDelayMs(this.rng);
                 }

@@ -1,7 +1,34 @@
 // workshopAnimalSound.ts - Sonidos característicos de las mascotas del Print Den (sintetizados con WebAudio).
-// No usa archivos de audio. Solo suena cuando el usuario hace clic (gesto del usuario) y si el botón "Animales" está en ON.
+// No usa archivos de audio: cada mascota describe su voz con DATOS (ver `PetSound` y content/pets.ts), así que
+// agregar una mascota nueva no requiere tocar este archivo. Solo suena cuando el usuario hace clic (gesto del
+// usuario) y si el botón "Animales" está en ON.
 
-export type AnimalVoice = 'frijol' | 'jaina' | 'muchi' | 'teo' | 'borry';
+/** Receta de voz de una mascota (todo en datos, editable en content/pets.ts). */
+export type PetSound =
+    | {
+          type: 'meow';
+          /** Tono base en Hz (≈500 grave, ≈700 agudo). */
+          pitch: number;
+          /** Duración relativa (1 = maullido normal). */
+          length?: number;
+          /** true = más suave. */
+          soft?: boolean;
+      }
+    | {
+          type: 'bark';
+          pitch: number;
+          /** Cantidad de ladridos seguidos. */
+          count: number;
+          /** Segundos entre ladridos. */
+          gap?: number;
+          /** Duración de cada ladrido en segundos. */
+          dur?: number;
+          vol?: number;
+          /** Termina con un resoplido. */
+          snort?: boolean;
+          /** Termina con un quejidito. */
+          whine?: boolean;
+      };
 
 let ctx: AudioContext | null = null;
 
@@ -65,33 +92,24 @@ const bark = (c: AudioContext, t: number, f: number, dur: number, vol: number) =
     noise(c, t, dur, f * 3, vol * 0.8);
 };
 
-/** Reproduce la voz del animal. */
-export function playAnimalSound(voice: AnimalVoice) {
+/** Reproduce la voz descrita por la receta. */
+export function playAnimalSound(sound: PetSound) {
     const c = getCtx();
     if (!c) return;
     const t = c.currentTime + 0.02;
-    switch (voice) {
-        case 'frijol': // maullido tranquilo, medio
-            tone(c, t, 0.55, 520, 880, 'triangle', 0.16, 14);
-            tone(c, t + 0.5, 0.35, 880, 480, 'triangle', 0.14, 10);
-            break;
-        case 'jaina': // maullido corto y suave, más agudo
-            tone(c, t, 0.3, 700, 1050, 'sine', 0.13, 8);
-            tone(c, t + 0.28, 0.25, 1050, 620, 'sine', 0.11, 6);
-            break;
-        case 'muchi': // ladridos rápidos y agudos (inquieto)
-            bark(c, t, 620, 0.09, 0.14);
-            bark(c, t + 0.14, 650, 0.09, 0.14);
-            bark(c, t + 0.28, 600, 0.1, 0.13);
-            break;
-        case 'teo': // "guau" grave y resoplido (regordete)
-            bark(c, t, 210, 0.26, 0.2);
-            noise(c, t + 0.34, 0.18, 700, 0.06);
-            break;
-        case 'borry': // ladrido medio + quejidito
-            bark(c, t, 380, 0.16, 0.16);
-            bark(c, t + 0.24, 360, 0.16, 0.14);
-            tone(c, t + 0.5, 0.3, 500, 780, 'sine', 0.07, 10);
-            break;
+    if (sound.type === 'meow') {
+        const len = sound.length ?? 1;
+        const vol = sound.soft ? 0.12 : 0.16;
+        const p = sound.pitch;
+        tone(c, t, 0.55 * len, p, p * 1.7, sound.soft ? 'sine' : 'triangle', vol, 12);
+        tone(c, t + 0.5 * len, 0.35 * len, p * 1.7, p * 0.92, sound.soft ? 'sine' : 'triangle', vol * 0.9, 8);
+        return;
     }
+    const dur = sound.dur ?? 0.12;
+    const gap = sound.gap ?? 0.16;
+    const vol = sound.vol ?? 0.15;
+    for (let i = 0; i < sound.count; i++) bark(c, t + i * gap, sound.pitch * (1 + (i % 2) * 0.04), dur, vol);
+    const end = t + (sound.count - 1) * gap + dur;
+    if (sound.snort) noise(c, end + 0.08, 0.18, 700, 0.06);
+    if (sound.whine) tone(c, end + 0.1, 0.3, 500, 780, 'sine', 0.07, 10);
 }
