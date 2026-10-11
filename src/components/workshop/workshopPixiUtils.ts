@@ -175,32 +175,35 @@ export const getPixiStations = (): StationConfig[] => {
             description: 'Doblado, ojalillos y embalaje.',
             x: 114,
             y: 140,
-            width: 120,
-            height: 100,
+            width: 96,
+            height: 84,
             color: '#a855f7',
-            icon: '📦'
+            icon: '📦',
+            propsScale: 0.8
         },
         {
             id: 'corte',
             title: 'Refilado',
             description: 'Corte, refilado y trillado.',
-            x: 246,
+            x: 232,
             y: 140,
-            width: 120,
-            height: 100,
+            width: 84,
+            height: 75,
             color: '#ec4899',
-            icon: '✂️'
+            icon: '✂️',
+            propsScale: 0.7
         },
         {
             id: 'caja',
             title: 'Caja',
             description: 'Ventas, cobros y mostrador.',
-            x: 378,
+            x: 398,
             y: 140,
-            width: 86,
-            height: 100,
+            width: 64,
+            height: 79,
             color: '#f59e0b',
-            icon: '🪙'
+            icon: '🪙',
+            propsScale: 0.75
         }
     );
 
