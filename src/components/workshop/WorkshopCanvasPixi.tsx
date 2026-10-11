@@ -254,6 +254,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     wallPanelRef.current = wallPanel;
     const lastStationCloseRef = useRef<{ id: string; t: number } | null>(null);
     const [focusedId, setFocusedId] = useState<string | null>(null);
+    const focusedRef = useRef<string | null>(null);
+    focusedRef.current = focusedId;
     const [isFs, setIsFs] = useState(false);
     // Radio del taller (0 = apagada). Siempre arranca apagada: el navegador no deja sonar hasta que el usuario toca algo.
     const [radio, setRadio] = useState(0);
@@ -1356,7 +1358,19 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             cameraRef.current = clampCamera({ ...cameraRef.current, panX: drag.panX + dx, panY: drag.panY + dy }, v.w, v.h, baseScaleRef.current);
             applyCamera();
         };
-        const onUp = () => {
+        const onUp = (e: PointerEvent) => {
+            // Clic (sin arrastrar) sobre el canvas pero fuera del sector enfocado: se restaura la vista general
+            const fid = focusedRef.current;
+            if (fid && e.target === canvas && !dragMovedRef.current && drag) {
+                const st = getPixiStations().find((s) => s.id === fid);
+                const { x, y } = canvasPoint(e);
+                const c = cameraRef.current;
+                const total = baseScaleRef.current * c.zoom;
+                const mx = (x - c.panX) / total;
+                const my = (y - c.panY) / total;
+                const inside = !!st && mx >= st.x && mx <= st.x + st.width && my >= st.y && my <= st.y + st.height;
+                if (!inside) focusStation(null);
+            }
             drag = null;
             // el indicador de arrastre se limpia después de que Pixi procese el clic
             window.setTimeout(() => {
