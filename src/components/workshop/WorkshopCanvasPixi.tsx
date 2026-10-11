@@ -28,6 +28,7 @@ import {
 } from './workshopSprites';
 import { WorkerCrew, planErrand } from './workshopWorkers';
 import { WorkerBubbles } from './workshopBubbles';
+import { playVoice, playUiSound, resolveVoice, randomGreeting } from './workshopVoice';
 import { getUsuarios, getMaquinas, getMateriales } from '@/data/db';
 import { createStationProps, StationProps } from './workshopStationProps';
 import WorkerSheetCard from './WorkerSheetCard';
@@ -271,6 +272,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const handleWorkerTap = (workerId: string) => {
         if (dragMovedRef.current) return; // arrastre de cámara
         audioEngine.playClick();
+        // Voz del operario: dice lo que muestra su globo o un saludo corto (estilo consola)
+        if (fxToggleRef.current.sndVoices) {
+            const snap = getWorkerSnapshot(workerId);
+            if (snap) {
+                const speech = snap.bubble && snap.bubble.tone !== 'think' ? snap.bubble.text : randomGreeting();
+                playVoice(resolveVoice(snap.role, snap.name, snap.id), speech, true);
+            }
+        }
         // Si la ficha de este mismo operario acaba de cerrarse por el clic fuera, el clic en el operario no la reabre
         const last = lastOutsideCloseRef.current;
         if (last && last.id === workerId && Date.now() - last.t < 600) {
@@ -339,6 +348,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     };
     const handleWallTapRef = useRef(handleWallTap);
     handleWallTapRef.current = handleWallTap;
+
+    // Tilín de interfaz: sube al abrir una ficha/panel y baja al cerrarlo (botón "Interfaz" de la barra)
+    const uiOpenKeyRef = useRef('');
+    useEffect(() => {
+        const key = [sheetWorkerId, sheetStationId, sheetPetId, wallPanel, achOpen ? 'ach' : ''].filter(Boolean).join('|');
+        const prev = uiOpenKeyRef.current;
+        uiOpenKeyRef.current = key;
+        if (key === prev || !fxToggleRef.current.sndUi) return;
+        playUiSound(key ? 'open' : 'close');
+    }, [sheetWorkerId, sheetStationId, sheetPetId, wallPanel, achOpen]);
     handleStationTapRef.current = handleStationTap;
 
     const updateBadgeVisual = (badgeBg: Graphics, textNode: Text, count: number) => {
@@ -726,7 +745,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const bubblesLayer = new Container();
                     bubblesLayer.label = 'BubblesLayer';
                     uiLayer.addChild(bubblesLayer);
-                    bubblesRef.current = new WorkerBubbles(bubblesLayer);
+                    bubblesRef.current = new WorkerBubbles(bubblesLayer, (w, text) => {
+                        if (fxToggleRef.current.sndVoices) playVoice(resolveVoice(w.role, w.name, w.id), text);
+                    });
 
                     // 5. Start Plotter Render Loop Ticker
                     tickerFn = setupPlotterTicker(app);

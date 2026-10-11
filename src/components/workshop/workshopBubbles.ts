@@ -59,7 +59,8 @@ export class WorkerBubbles {
         wordWrapWidth: WRAP_PX
     });
 
-    constructor(layer: Container) {
+    /** onSpeak se llama cuando un personaje muestra una frase nueva en su globo (los pensamientos no cuentan). */
+    constructor(layer: Container, private onSpeak?: (w: WorkerSnapshot, text: string) => void) {
         this.layer = layer;
     }
 
@@ -92,6 +93,7 @@ export class WorkerBubbles {
 
             if (item.text !== w.bubble.text || item.tone !== w.bubble.tone) {
                 const isThink = w.bubble.tone === 'think';
+                if (!isThink && w.bubble.text && w.bubble.text !== item.text) this.onSpeak?.(w, w.bubble.text);
                 item.text = w.bubble.text;
                 item.tone = w.bubble.tone;
                 item.label.style = isThink ? this.thinkStyle : this.style;

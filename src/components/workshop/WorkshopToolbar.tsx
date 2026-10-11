@@ -14,6 +14,8 @@ export interface FxToggles {
     sndMachines: boolean;
     sndAlerts: boolean;
     sndAchv: boolean;
+    sndVoices: boolean;
+    sndUi: boolean;
 }
 
 export interface ToolbarStation {
@@ -63,7 +65,9 @@ const FX_LABEL: Record<keyof FxToggles, { icon: string; label: string; title: st
     sndAmbient: { icon: '🎵', label: 'Ambiente', title: 'Sonido de fondo del taller' },
     sndMachines: { icon: '🖨️', label: 'Máquinas', title: 'Sonido de la impresora y de la tijera de corte' },
     sndAlerts: { icon: '🚨', label: 'Avisos', title: 'Sonido de aviso cuando una orden rebota' },
-    sndAchv: { icon: '🎉', label: 'Festejos', title: 'Sonido al entregar una orden y al desbloquear un logro' }
+    sndAchv: { icon: '🎉', label: 'Festejos', title: 'Sonido al entregar una orden y al desbloquear un logro' },
+    sndVoices: { icon: '🗣️', label: 'Voces', title: 'Voces de los operarios al hablar o al hacerles clic (sintetizadas, estilo consola)' },
+    sndUi: { icon: '🔔', label: 'Interfaz', title: 'Tilín al abrir y cerrar fichas y paneles' }
 };
 
 export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({

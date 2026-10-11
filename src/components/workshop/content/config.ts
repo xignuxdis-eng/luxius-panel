@@ -12,7 +12,9 @@ export const DEFAULT_FX = {
     sndAmbient: true,
     sndMachines: true,
     sndAlerts: true,
-    sndAchv: true
+    sndAchv: true,
+    sndVoices: true,
+    sndUi: true
 };
 
 export const WORKSHOP_CONFIG = {

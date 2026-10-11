@@ -113,3 +113,8 @@ export function playAnimalSound(sound: PetSound) {
     if (sound.snort) noise(c, end + 0.08, 0.18, 700, 0.06);
     if (sound.whine) tone(c, end + 0.1, 0.3, 500, 780, 'sine', 0.07, 10);
 }
+
+/** Contexto de audio compartido (lo usan tambien las voces y los sonidos de interfaz). */
+export function getAudioContext(): AudioContext | null {
+    return getCtx();
+}

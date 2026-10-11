@@ -52,3 +52,7 @@ Colores de camisa por rol, piel y colores del sprite procedural: `content/charac
 ## Tablon de Xana (consejos)
 Los consejos viven en `content/xanaTips.ts` (array `XANA_TIPS`). Para agregar uno: sumar un objeto con `id` unico, `category` (ver `XANA_CATEGORIES`), `title`, `text` y opcional `link`. Las categorias tambien se editan ahi. Son consejos curados a mano, no datos del sistema.
 
+
+## Voces de los personajes y sonidos de interfaz
+Todo se edita en `content/voices.ts` (sin archivos de audio, se sintetiza en el navegador): el timbre y tono base de cada rol (`ROLE_VOICES`), ajustes por operario con su nombre en minusculas (`VOICE_OVERRIDES`), cuanto varia el tono entre operarios (`VOICE_SPREAD`), los saludos al hacer clic (`VOICE_GREETINGS`) y los tilines de abrir/cerrar fichas (`UI_SOUNDS`). Se activan con los botones Voces e Interfaz de la barra. El motor esta en `workshopVoice.ts`.
+
