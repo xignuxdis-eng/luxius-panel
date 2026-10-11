@@ -32,6 +32,7 @@ export interface CharacterLook {
     /** Peinado y accesorio (sutiles diferencias entre operarios). Ver content/characters.ts. */
     hairStyle?: HairStyle;
     accessory?: Accessory;
+    gender?: 'f' | 'm';
     role: WorkerRole;
     /** Clave de la hoja PNG de reemplazo (por defecto el rol). Ver content/sprites.ts. */
     sheetKey?: string;
@@ -113,17 +114,17 @@ export function buildCharacterPalette(look: CharacterLook): Record<string, strin
 }
 
 /** Rasgos del personaje que se está dibujando (los fija buildCharacterMatrix; el dibujo es síncrono). */
-let curTraits: { hairStyle?: HairStyle; accessory?: Accessory } = {};
+let curTraits: { hairStyle?: HairStyle; accessory?: Accessory; gender?: 'f' | 'm' } = {};
 
 /** Peinado y accesorio de frente (o de espalda). Se aplica sobre la cabeza base. */
 function decorateFront(g: Grid, back: boolean, bob: number) {
-    const { hairStyle: hs, accessory: ac } = curTraits;
+    const { hairStyle: hs, accessory: ac, gender } = curTraits;
     if (hs === 'tuft') rect(g, 7, 1 + bob, 8, 1 + bob, 'H');
     if (hs === 'long') {
-        rect(g, 4, 3 + bob, 4, 8 + bob, 'H');
-        rect(g, 11, 3 + bob, 11, 8 + bob, 'H');
-        if (back) rect(g, 6, 8 + bob, 9, 8 + bob, 'H');
-        else rect(g, 5, 7 + bob, 5, 8 + bob, 'H'), rect(g, 10, 7 + bob, 10, 8 + bob, 'H');
+        rect(g, 4, 3 + bob, 4, 9 + bob, 'H');
+        rect(g, 11, 3 + bob, 11, 9 + bob, 'H');
+        if (back) rect(g, 5, 8 + bob, 10, 9 + bob, 'H');
+        else rect(g, 5, 7 + bob, 5, 9 + bob, 'H'), rect(g, 10, 7 + bob, 10, 9 + bob, 'H');
     }
     if (hs === 'cap') {
         rect(g, 6, 2 + bob, 9, 2 + bob, 'C');
@@ -137,33 +138,41 @@ function decorateFront(g: Grid, back: boolean, bob: number) {
     if (ac === 'glasses') {
         put(g, 5, 5 + bob, 'G'), put(g, 7, 5 + bob, 'G'), put(g, 8, 5 + bob, 'G'), put(g, 10, 5 + bob, 'G');
     }
-    if (ac === 'beard') {
-        rect(g, 5, 6 + bob, 5, 6 + bob, 'D');
-        rect(g, 10, 6 + bob, 10, 6 + bob, 'D');
-        rect(g, 6, 7 + bob, 9, 7 + bob, 'D');
-        rect(g, 7, 8 + bob, 8, 8 + bob, 'D');
+    // Personajes femeninos no llevan barba ni bigote
+    if (gender !== 'f') {
+        if (ac === 'beard') {
+            rect(g, 5, 6 + bob, 5, 6 + bob, 'D');
+            rect(g, 10, 6 + bob, 10, 6 + bob, 'D');
+            rect(g, 6, 7 + bob, 9, 7 + bob, 'D');
+            rect(g, 7, 8 + bob, 8, 8 + bob, 'D');
+        }
+        if (ac === 'mustache') rect(g, 7, 6 + bob, 8, 6 + bob, 'D');
     }
-    if (ac === 'mustache') rect(g, 7, 6 + bob, 8, 6 + bob, 'D');
-    if (ac === 'headband') rect(g, 5, 3 + bob, 10, 3 + bob, 'W');
+    if (ac === 'headband') {
+        rect(g, 5, 3 + bob, 10, 3 + bob, 'W');
+        if (gender === 'f') put(g, 10, 2 + bob, 'W'); // lazo sutil
+    }
 }
 
 /** Peinado y accesorio de perfil (mirando a la derecha). */
 function decorateSide(g: Grid, bob: number) {
-    const { hairStyle: hs, accessory: ac } = curTraits;
+    const { hairStyle: hs, accessory: ac, gender } = curTraits;
     if (hs === 'tuft') rect(g, 6, 1 + bob, 7, 1 + bob, 'H');
-    if (hs === 'long') rect(g, 4, 4 + bob, 6, 8 + bob, 'H');
+    if (hs === 'long') rect(g, 4, 4 + bob, 6, 9 + bob, 'H');
     if (hs === 'cap') {
         rect(g, 5, 2 + bob, 9, 3 + bob, 'C');
         rect(g, 10, 3 + bob, 10, 3 + bob, 'C');
         rect(g, 9, 4 + bob, 11, 4 + bob, 'K');
     }
     if (ac === 'glasses') put(g, 8, 5 + bob, 'G'), put(g, 10, 5 + bob, 'G');
-    if (ac === 'beard') {
-        rect(g, 7, 7 + bob, 9, 7 + bob, 'D');
-        put(g, 10, 6 + bob, 'D');
-        put(g, 8, 8 + bob, 'D');
+    if (gender !== 'f') {
+        if (ac === 'beard') {
+            rect(g, 7, 7 + bob, 9, 7 + bob, 'D');
+            put(g, 10, 6 + bob, 'D');
+            put(g, 8, 8 + bob, 'D');
+        }
+        if (ac === 'mustache') put(g, 10, 6 + bob, 'D');
     }
-    if (ac === 'mustache') put(g, 10, 6 + bob, 'D');
     if (ac === 'headband') rect(g, 5, 3 + bob, 10, 3 + bob, 'W');
 }
 
@@ -192,10 +201,19 @@ function drawBodyFront(g: Grid, variant: WalkVariant, back: boolean, bob: number
         rect(g, 5, 5 + bob, 10, 6 + bob, 'S');
         put(g, 6, 5 + bob, 'E');
         put(g, 9, 5 + bob, 'E');
+        if (curTraits.gender === 'f') {
+            put(g, 5, 4 + bob, 'E');
+            put(g, 10, 4 + bob, 'E');
+            put(g, 5, 6 + bob, 's');
+            put(g, 10, 6 + bob, 's');
+        }
         rect(g, 6, 7 + bob, 9, 7 + bob, 'S');
     } else {
         rect(g, 6, 2 + bob, 9, 2 + bob, 'H');
         rect(g, 5, 3 + bob, 10, 7 + bob, 'H');
+        if (curTraits.gender === 'f') {
+            rect(g, 4, 4 + bob, 11, 7 + bob, 'H');
+        }
     }
     rect(g, 7, 8 + bob, 8, 8 + bob, 's');
     decorateFront(g, back, bob);
@@ -287,7 +305,7 @@ function drawWork(g: Grid, role: WorkerRole, frame: 0 | 1) {
 }
 
 /** Genera la matriz de caracteres (24 filas de 16 columnas) de una pose. Función pura, sin Pixi. */
-export function buildCharacterMatrix(pose: CharacterPose, traits: { hairStyle?: HairStyle; accessory?: Accessory } = {}): string[] {
+export function buildCharacterMatrix(pose: CharacterPose, traits: { hairStyle?: HairStyle; accessory?: Accessory; gender?: 'f' | 'm' } = {}): string[] {
     curTraits = traits;
     const g = blank();
 
@@ -313,7 +331,7 @@ export function buildCharacterMatrix(pose: CharacterPose, traits: { hairStyle?: 
 }
 
 const lookKey = (look: CharacterLook) =>
-    `${look.role}_${look.shirtColor}_${look.skinColor}_${look.hairColor || 'def'}_${look.hairStyle || 'short'}_${look.accessory || 'none'}`.replace(/[^a-zA-Z0-9_]/g, '');
+    `${look.role}_${look.shirtColor}_${look.skinColor}_${look.hairColor || 'def'}_${look.hairStyle || 'short'}_${look.accessory || 'none'}_${look.gender || 'm'}`.replace(/[^a-zA-Z0-9_]/g, '');
 
 /** Sombra elíptica compartida (14x5 px, negro semitransparente). Se coloca bajo los pies del operario. */
 export function getCharacterShadowTexture(): Texture {
@@ -358,7 +376,7 @@ export function getCharacterTextures(look: CharacterLook): CharacterTextures {
     const key = lookKey(look);
     const palette = buildCharacterPalette(look);
     const tex = (name: string, pose: CharacterPose) =>
-        createPixelTexture(`char_${key}_${name}`, buildCharacterMatrix(pose, { hairStyle: look.hairStyle, accessory: look.accessory }), palette);
+        createPixelTexture(`char_${key}_${name}`, buildCharacterMatrix(pose, { hairStyle: look.hairStyle, accessory: look.accessory, gender: look.gender }), palette);
 
     const walk = {} as Record<CharacterDirection, Texture[]>;
     for (const dir of CHARACTER_DIRECTIONS) {

@@ -32,10 +32,18 @@ export interface LookTraits {
     hairColor: string;
     hairStyle: HairStyle;
     accessory: Accessory;
+    gender?: 'f' | 'm';
 }
 
-/** Rasgos fijos para operarios concretos. Clave: nombre en minúsculas. Ejemplo: 'ana': { hairStyle: 'long', accessory: 'glasses' } */
-export const LOOK_OVERRIDES: Record<string, Partial<LookTraits>> = {};
+/** Rasgos fijos para operarios concretos. Clave: nombre en minúsculas. */
+export const LOOK_OVERRIDES: Record<string, Partial<LookTraits>> = {
+    curushi: {
+        gender: 'f',
+        hairStyle: 'long',
+        hairColor: '#4a2818',
+        accessory: 'headband'
+    }
+};
 
 /** Hash estable de un texto (para que cada operario tenga siempre los mismos rasgos). */
 function hashStr(s: string): number {
@@ -53,10 +61,18 @@ export function pickTraits(id: string, name?: string): LookTraits {
     const base: LookTraits = {
         hairColor: HAIR_COLORS[h % HAIR_COLORS.length],
         hairStyle: HAIR_STYLES[(h >>> 5) % HAIR_STYLES.length],
-        accessory: ACCESSORIES[(h >>> 9) % ACCESSORIES.length]
+        accessory: ACCESSORIES[(h >>> 9) % ACCESSORIES.length],
+        gender: 'm'
     };
-    const ov = name ? LOOK_OVERRIDES[name.trim().toLowerCase()] : undefined;
-    return ov ? { ...base, ...ov } : base;
+    const key = (name || '').trim().toLowerCase();
+    const idKey = (id || '').trim().toLowerCase();
+    const matchKey = Object.keys(LOOK_OVERRIDES).find(k => key.includes(k) || idKey.includes(k));
+    const ov = matchKey ? LOOK_OVERRIDES[matchKey] : undefined;
+    const res = ov ? { ...base, ...ov } : base;
+    if (res.gender === 'f' && (res.accessory === 'beard' || res.accessory === 'mustache')) {
+        res.accessory = 'headband';
+    }
+    return res;
 }
 
 /** Colores fijos del sprite procedural (la camisa, la piel y el pelo vienen de cada operario). */

@@ -18,7 +18,10 @@ function hash01(s: string): number {
 /** Voz final de un personaje: la del rol + sus ajustes propios + una variacion estable calculada de su id. */
 export function resolveVoice(role: WorkerRole, name: string, id: string): VoiceProfile {
     const base = ROLE_VOICES[role] ?? ROLE_VOICES.empaquetador;
-    const override = VOICE_OVERRIDES[name.trim().toLowerCase()] ?? VOICE_OVERRIDES[id] ?? {};
+    const key = (name || '').trim().toLowerCase();
+    const idKey = (id || '').trim().toLowerCase();
+    const matchKey = Object.keys(VOICE_OVERRIDES).find(k => key.includes(k) || idKey.includes(k));
+    const override = (matchKey ? VOICE_OVERRIDES[matchKey] : undefined) ?? VOICE_OVERRIDES[id] ?? {};
     const v = { ...base, ...override };
     const r = hash01(id) * 2 - 1; // -1..1, siempre igual para el mismo operario
     const r2 = hash01(id + '#') * 2 - 1;

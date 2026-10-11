@@ -70,6 +70,7 @@ export interface WorkerSpec {
     hairColor?: string;
     hairStyle?: HairStyle;
     accessory?: Accessory;
+    gender?: 'f' | 'm';
     speedPxPerSec: number;
     /** Posición dentro del equipo (define el carril del pasillo y el color de piel). */
     index: number;
@@ -320,6 +321,7 @@ export interface WorkerSnapshot {
     hairColor?: string;
     hairStyle?: HairStyle;
     accessory?: Accessory;
+    gender?: 'f' | 'm';
     /** Texto del globo de encargo (p. ej. `OT #123 EN COLA`) si lo hay. */
     errandText: string | null;
 }
@@ -487,7 +489,8 @@ export class WorkerCrew {
                 skinColor: spec.skinColor,
                 hairColor: spec.hairColor,
                 hairStyle: spec.hairStyle,
-                accessory: spec.accessory
+                accessory: spec.accessory,
+                gender: spec.gender
             });
 
             const container = new Container();
@@ -589,6 +592,7 @@ export class WorkerCrew {
             hairColor: w.spec.hairColor,
             hairStyle: w.spec.hairStyle,
             accessory: w.spec.accessory,
+            gender: w.spec.gender,
             errandText: w.errand !== 'none' && w.bubble ? w.bubble.text : null
         }));
     }

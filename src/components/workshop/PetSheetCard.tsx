@@ -105,7 +105,9 @@ export const PetSheetCard: React.FC<PetSheetCardProps> = ({ profile, getActivity
                     <div style={{ color: '#c4b5fd' }}>
                         {profile.title} · Nivel {profile.level}
                     </div>
-                    <div style={{ color: '#8b7fb0', fontSize: 11 }}>Mascota del taller · {profile.species === 'gato' ? 'Felino' : 'Canino'}</div>
+                    <div style={{ color: '#8b7fb0', fontSize: 11 }}>
+                        Mascota del taller · {profile.gender === 'f' ? (profile.species === 'gato' ? 'Gata' : 'Perra') : (profile.species === 'gato' ? 'Gato' : 'Perro')}
+                    </div>
                 </div>
             </div>
 

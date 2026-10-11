@@ -1269,6 +1269,15 @@ const DEFAULT_USUARIOS: Usuario[] = [
         habilitado: true
     },
     {
+        id: 7,
+        nombre: "Curushi (Diseño)",
+        username: "curushi",
+        email: "curushi@luxius.com",
+        rol: "artista",
+        role: "artista",
+        habilitado: true
+    },
+    {
         id: 830011,
         nombre: "Carlos Flores",
         username: "carlos",
@@ -1280,7 +1289,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
 ];
 
 export function getUsuarios(): Usuario[] {
-    const versionKey = 'luxius_db_users_v7';
+    const versionKey = 'luxius_db_users_v8';
     const sessionItemsJson = localStorage.getItem(SESSION_USUARIOS_KEY);
     let sessionItems: Usuario[] = [];
 
@@ -1299,7 +1308,7 @@ export function getUsuarios(): Usuario[] {
         localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
     }
 
-    if (localStorage.getItem(versionKey) !== 'v7') {
+    if (localStorage.getItem(versionKey) !== 'v8') {
         const sessionIds = new Set(sessionItems.map(u => u.id));
         const sessionUsernames = new Set(sessionItems.map(u => (u.username || '').toLowerCase()));
 
@@ -1309,7 +1318,7 @@ export function getUsuarios(): Usuario[] {
             }
         }
         localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
-        localStorage.setItem(versionKey, 'v7');
+        localStorage.setItem(versionKey, 'v8');
     }
 
     if (sessionItems.length > 0) {

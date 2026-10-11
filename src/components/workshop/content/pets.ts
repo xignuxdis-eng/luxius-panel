@@ -29,6 +29,7 @@ export interface PetProfile {
     id: string;
     name: string;
     species: 'gato' | 'perro';
+    gender?: 'f' | 'm';
     emoji: string;
     /** Título estilo WoW para la ficha. */
     title: string;
@@ -69,6 +70,7 @@ export const PET_PROFILES: PetProfile[] = [
         id: 'frijol',
         name: 'Frijol',
         species: 'gato',
+        gender: 'f',
         emoji: '🐈‍⬛',
         title: 'Gata Negra de Guardia',
         level: 7,
@@ -99,6 +101,7 @@ export const PET_PROFILES: PetProfile[] = [
         id: 'jaina',
         name: 'Jaina',
         species: 'gato',
+        gender: 'f',
         emoji: '🐈',
         title: 'Gata Gris Serena',
         level: 9,
@@ -129,6 +132,7 @@ export const PET_PROFILES: PetProfile[] = [
         id: 'muchi',
         name: 'Muchi',
         species: 'perro',
+        gender: 'm',
         emoji: '🐕‍🦺',
         title: 'Torbellino Negro',
         level: 4,
@@ -160,6 +164,7 @@ export const PET_PROFILES: PetProfile[] = [
         id: 'teo',
         name: 'Teo',
         species: 'perro',
+        gender: 'm',
         emoji: '🐕',
         title: 'Guardián de la Panza',
         level: 10,
@@ -192,6 +197,7 @@ export const PET_PROFILES: PetProfile[] = [
         id: 'borry',
         name: 'Borry',
         species: 'perro',
+        gender: 'm',
         emoji: '🐕',
         title: 'Rascador Errante',
         level: 6,

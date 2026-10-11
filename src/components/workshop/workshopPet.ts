@@ -176,7 +176,7 @@ export class WorkshopPet {
             case 'scratch':
                 return 'Rascándose las pulgas';
             default:
-                return this.profile.species === 'gato' ? 'Sentada, mirando todo' : 'Sentado, atento';
+                return (this.profile.gender === 'f' || this.profile.species === 'gato') ? 'Sentada, mirando todo' : 'Sentado, atento';
         }
     }
 

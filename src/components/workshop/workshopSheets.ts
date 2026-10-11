@@ -158,8 +158,24 @@ const PROFILES: Record<WorkerRole, RoleProfile> = {
     }
 };
 
+function feminize(text: string): string {
+    return text
+        .replace(/\bMago Arcano\b/g, 'Maga Arcana')
+        .replace(/\bHechicero\b/g, 'Hechicera')
+        .replace(/\bSeñor\b/g, 'Señora')
+        .replace(/\bArchimago\b/g, 'Archimaga')
+        .replace(/\bMaestro\b/g, 'Maestra')
+        .replace(/\bDomador\b/g, 'Domadora')
+        .replace(/\bGuardián\b/g, 'Guardiana')
+        .replace(/\bPícaro\b/g, 'Pícara')
+        .replace(/\bPaladín\b/g, 'Paladinesa')
+        .replace(/\bCaballero\b/g, 'Dama')
+        .replace(/\bRey\b/g, 'Reina')
+        .replace(/\bVerdugo\b/g, 'Verduga');
+}
+
 /** Fichas de ejemplo para pruebas y para mostrar en pantalla. Siempre la misma ficha para el mismo operario. */
-export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 'role'>): WorkerSheet {
+export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 'role'> & { gender?: 'f' | 'm' }): WorkerSheet {
     const profile = PROFILES[snapshot.role];
     const seed = hashString(`${snapshot.id}|${snapshot.name}|${snapshot.role}`);
     const rnd = seeded(seed);
@@ -182,9 +198,15 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
     const rarity: WorkerSheet['rarity'] = avg >= 78 ? 'Legendario' : avg >= 68 ? 'Épico' : 'Raro';
     const rarityColor = rarity === 'Legendario' ? '#ff8000' : rarity === 'Épico' ? '#a335ee' : '#0070dd';
 
+    const rawClassName = profile.className;
+    const rawTitle = pick(profile.titles, 1)[0];
+
+    const className = snapshot.gender === 'f' ? feminize(rawClassName) : rawClassName;
+    const title = snapshot.gender === 'f' ? feminize(rawTitle) : rawTitle;
+
     return {
-        className: profile.className,
-        title: pick(profile.titles, 1)[0],
+        className,
+        title,
         level,
         rarity,
         rarityColor,
@@ -197,7 +219,7 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
 }
 
 /** Qué está haciendo el operario ahora mismo, en texto (datos reales del movimiento del taller). */
-export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean }): string {
+export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm' }): string {
     const station: Record<WorkerRole, string> = {
         disenador: 'Diseño',
         impresor: 'el Plotter',
@@ -206,14 +228,14 @@ export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' |
     };
     if (w.errand === 'going') return `Llevando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
     if (w.errand === 'dwell') return `Entregando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
-    if (w.errand === 'returning') return 'Volviendo a su puesto con la tarea cumplida';
-    if (w.chatting) return 'Charlando con un compañero';
+    if (w.errand === 'returning') return `Volviendo a su puesto con la tarea cumplida`;
+    if (w.chatting) return w.gender === 'f' ? 'Charlando con un compañero o compañera' : 'Charlando con un compañero';
     if (w.onBreak) return 'De descanso en Refrigerios (café, algo rico y a pensar un rato)';
     if (w.visiting) return 'Trabajando un rato en otra estación';
     if (w.stroll === 'out') return 'Dando una vuelta por el taller';
     if (w.stroll === 'back') return 'Volviendo a su puesto';
     if (w.mode === 'walk') return 'Caminando por el taller';
-    return `En su puesto de ${station[w.role]}, atento a nuevas órdenes`;
+    return `En su puesto de ${station[w.role]}, ${w.gender === 'f' ? 'atenta' : 'atento'} a nuevas órdenes`;
 }
 
 export const ROLE_LABEL: Record<WorkerRole, string> = {
@@ -222,3 +244,17 @@ export const ROLE_LABEL: Record<WorkerRole, string> = {
     cortador: 'Cortador',
     empaquetador: 'Empaquetador'
 };
+
+export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm'): string {
+    if (gender === 'f') {
+        const femaleLabels: Record<WorkerRole, string> = {
+            disenador: 'Diseñadora',
+            impresor: 'Impresora',
+            cortador: 'Cortadora',
+            empaquetador: 'Empaquetadora'
+        };
+        return femaleLabels[role];
+    }
+    return ROLE_LABEL[role];
+}
+

@@ -12,6 +12,7 @@ export interface WorkerPortraitProps {
     hairColor?: string;
     hairStyle?: HairStyle;
     accessory?: Accessory;
+    gender?: 'f' | 'm';
     size?: number;
     name?: string;
 }
@@ -29,7 +30,7 @@ const mix = (hex: string, t: number) => {
 
 let uidCounter = 0;
 
-export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirtColor, hairColor, hairStyle = 'short', accessory = 'none', size = 56, name }) => {
+export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirtColor, hairColor, hairStyle = 'short', accessory = 'none', gender = 'm', size = 56, name }) => {
     const uid = React.useMemo(() => `wp-${++uidCounter}`, []);
     const hair = hairColor || CHARACTER_PALETTE.hairDefault;
     const hairDark = mix(hair, -0.3);
@@ -68,8 +69,8 @@ export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirt
             {/* cara */}
             <rect x="13" y="12" width="22" height="22" rx="8" fill={`url(#${uid}-skin)`} />
             {/* mejillas */}
-            <ellipse cx="17.5" cy="27" rx="2.2" ry="1.4" fill="#f87171" opacity={0.28} />
-            <ellipse cx="30.5" cy="27" rx="2.2" ry="1.4" fill="#f87171" opacity={0.28} />
+            <ellipse cx="17.5" cy="27" rx={gender === 'f' ? 3.0 : 2.2} ry={gender === 'f' ? 1.8 : 1.4} fill={gender === 'f' ? '#f472b6' : '#f87171'} opacity={gender === 'f' ? 0.45 : 0.28} />
+            <ellipse cx="30.5" cy="27" rx={gender === 'f' ? 3.0 : 2.2} ry={gender === 'f' ? 1.8 : 1.4} fill={gender === 'f' ? '#f472b6' : '#f87171'} opacity={gender === 'f' ? 0.45 : 0.28} />
 
             {/* pelo */}
             {hairStyle !== 'cap' && (
@@ -93,7 +94,12 @@ export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirt
                     <circle cx="24" cy="7.5" r="1.4" fill={mix(shirtColor, -0.45)} />
                 </>
             )}
-            {accessory === 'headband' && <rect x="12" y="15" width="24" height="3.2" rx="1" fill={CHARACTER_PALETTE.headband} />}
+            {accessory === 'headband' && (
+                <>
+                    <rect x="12" y="15" width="24" height="3.2" rx="1" fill={CHARACTER_PALETTE.headband} />
+                    {gender === 'f' && <circle cx="34" cy="14" r="2.2" fill={CHARACTER_PALETTE.headband} />}
+                </>
+            )}
 
             {/* ojos */}
             <ellipse cx="19" cy="24" rx="2.4" ry="2.8" fill="#f8fafc" />
@@ -102,6 +108,17 @@ export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirt
             <circle cx="29.3" cy="24.3" r="1.6" fill={CHARACTER_PALETTE.eye} />
             <circle cx="19.8" cy="23.6" r="0.55" fill="#ffffff" />
             <circle cx="29.8" cy="23.6" r="0.55" fill="#ffffff" />
+
+            {/* pestañas femeninas */}
+            {gender === 'f' && (
+                <>
+                    <path d="M16 22 Q18.5 20.8 21.5 22.4" stroke={hairDark} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+                    <path d="M26.5 22.4 Q29.5 20.8 32 22" stroke={hairDark} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+                    <line x1="21.5" y1="22.4" x2="22.8" y2="21" stroke={hairDark} strokeWidth="1.2" strokeLinecap="round" />
+                    <line x1="26.5" y1="22.4" x2="25.2" y2="21" stroke={hairDark} strokeWidth="1.2" strokeLinecap="round" />
+                </>
+            )}
+
             {/* cejas */}
             <rect x="16.5" y="20" width="5" height="1.3" rx="0.6" fill={hairDark} />
             <rect x="26.5" y="20" width="5" height="1.3" rx="0.6" fill={hairDark} />
@@ -119,8 +136,8 @@ export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirt
                     <line x1="32.8" y1="23.5" x2="35.5" y2="22.5" />
                 </g>
             )}
-            {accessory === 'mustache' && <path d="M19 30 Q21.5 28.2 24 29.8 Q26.5 28.2 29 30 Q26 31.8 24 30.8 Q22 31.8 19 30 Z" fill={beard} />}
-            {accessory === 'beard' && (
+            {gender !== 'f' && accessory === 'mustache' && <path d="M19 30 Q21.5 28.2 24 29.8 Q26.5 28.2 29 30 Q26 31.8 24 30.8 Q22 31.8 19 30 Z" fill={beard} />}
+            {gender !== 'f' && accessory === 'beard' && (
                 <>
                     <path d="M13 26 Q14 36 24 37 Q34 36 35 26 L33 28 Q31 33 24 33 Q17 33 15 28 Z" fill={beard} />
                     <path d="M19 30 Q21.5 28.5 24 30 Q26.5 28.5 29 30 Q27 31.5 24 31 Q21 31.5 19 30 Z" fill={beard} />

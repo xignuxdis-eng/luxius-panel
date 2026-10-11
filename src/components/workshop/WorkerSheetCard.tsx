@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkerSnapshot } from './workshopWorkers';
-import { ROLE_LABEL, buildWorkerSheet, describeActivity } from './workshopSheets';
+import { ROLE_LABEL, getRoleLabel, buildWorkerSheet, describeActivity } from './workshopSheets';
 import { WorkerPortrait } from './WorkerPortrait';
 
 export interface WorkerSheetCardProps {
@@ -80,7 +80,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
         return () => window.clearInterval(t);
     }, [workerId, getSnapshot]);
 
-    const sheet = useMemo(() => (snap ? buildWorkerSheet(snap) : null), [snap?.id, snap?.name, snap?.role]);
+    const sheet = useMemo(() => (snap ? buildWorkerSheet(snap) : null), [snap?.id, snap?.name, snap?.role, snap?.gender]);
 
     if (!snap || !sheet) return null;
 
@@ -122,6 +122,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                         hairColor={snap.hairColor}
                         hairStyle={snap.hairStyle}
                         accessory={snap.accessory}
+                        gender={snap.gender}
                         size={52}
                         name={snap.name}
                     />
@@ -140,7 +141,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                     {sheet.rarity}
                 </span>
                 <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 4, padding: '1px 6px' }}>
-                    Rol: {ROLE_LABEL[snap.role]}
+                    Rol: {getRoleLabel(snap.role, snap.gender)}
                     {snap.roleFromUser ? '' : ' (asignado)'}
                 </span>
             </div>
