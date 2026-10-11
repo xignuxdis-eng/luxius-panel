@@ -124,6 +124,8 @@ const drawStationGlow = (gfx: Graphics, x: number, y: number, w: number, h: numb
 
 const VIRTUAL_W = 480;
 const VIRTUAL_H = 270;
+/** Escala con la que se dibuja cada plotter (ver WORKSHOP_CONFIG.plotterScale). */
+const PS_PLOT = WORKSHOP_CONFIG.plotterScale;
 
 export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     orders,
@@ -700,9 +702,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     lighting.setPlotterSpots(
                         plottersListRef.current.map((p) => ({
                             id: p.id,
-                            x: p.baseX + p.plotterOffsetX,
-                            y: p.baseY + 58,
-                            w: p.plotterActualW
+                            x: p.baseX + p.plotterOffsetX * PS_PLOT,
+                            y: p.baseY + 58 * PS_PLOT,
+                            w: p.plotterActualW * PS_PLOT
                         }))
                     );
                     // De noche cada sector se ilumina con una luz cálida
@@ -1133,10 +1135,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
         // 1. Layout Plotters UI (Status Bar & Nameplate)
         plottersListRef.current.forEach((p) => {
-            const barW = Math.round((p.plotterActualW - 24) * scale);
+            const barW = Math.round((p.plotterActualW - 24) * PS_PLOT * scale);
             const barH = 22; // 22px real screen pixels
-            p.barContainer.x = Math.round((p.baseX + p.plotterOffsetX + 12) * scale);
-            p.barContainer.y = Math.round((p.baseY + 11) * scale);
+            p.barContainer.x = Math.round((p.baseX + (p.plotterOffsetX + 12) * PS_PLOT) * scale);
+            p.barContainer.y = Math.round((p.baseY + 11 * PS_PLOT) * scale);
 
             p.barBg.clear();
             p.barBg.roundRect(0, 0, barW, barH, 3);
@@ -1148,7 +1150,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             p.progressText.y = Math.floor(barH / 2);
 
             // Nameplate
-            p.nameplate.x = Math.round((p.baseX + p.plotterOffsetX + 12) * scale);
+            p.nameplate.x = Math.round((p.baseX + (p.plotterOffsetX + 12) * PS_PLOT) * scale);
             p.nameplate.y = Math.round((p.baseY + 0) * scale);
             p.nameplateBg.clear();
             p.nameplateBg.roundRect(0, 0, 104, 22, 3);
@@ -1474,8 +1476,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             const visualContainer = new Container();
             visualContainer.x = x;
             visualContainer.y = y;
-            (visualContainer as any)._stationW = width;
-            (visualContainer as any)._stationH = height;
+            // Los plotters se dibujan en su tamaño original dentro de un contenedor reducido (PS_PLOT)
+            const psV = id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_') ? PS_PLOT : 1;
+            visualContainer.scale.set(psV);
+            (visualContainer as any)._stationW = width / psV;
+            (visualContainer as any)._stationH = height / psV;
 
             const isPlotter = id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_');
 
@@ -1565,8 +1570,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
             if (isPlotter) {
                 const isOffline = station.estado === 'offline';
-                plotterActualW = Math.min(204, width - 4);
-                plotterOffsetX = Math.floor((width - plotterActualW) / 2);
+                plotterActualW = Math.min(204, width / psV - 4);
+                plotterOffsetX = Math.floor((width / psV - plotterActualW) / 2);
                 plotterOffsetY = 26;
 
                 // 1. Cartel con el nombre "Plotter" en UILayer (B0.2: Native resolution, fondo oscuro opaco)
@@ -1704,9 +1709,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     badgeContainer: plotterBadgeContainer,
                     badgeCountText: plotterBadgeCountText,
                     badgeBg: plotterBadgeBg,
-                    x: x + plotterOffsetX,
+                    x: x + plotterOffsetX * PS_PLOT,
                     y,
-                    width: plotterActualW,
+                    width: plotterActualW * PS_PLOT,
                     height
                 });
 
@@ -2024,7 +2029,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         // que se encuentra "en cola" de espera para impresión en máquina, no un estado de impresión en tiempo real.
                         // No se calculan porcentajes ni progresos simulados hasta contar con telemetría directa de hardware.
                         // 4. Barra de actividad indeterminada animada con fondo oscuro sólido (sin números ni porcentajes inventados)
-                        const barWidth = Math.round((plotter.plotterActualW - 24) * currentScaleRef.current);
+                        const barWidth = Math.round((plotter.plotterActualW - 24) * PS_PLOT * currentScaleRef.current);
                         const barH = 20;
                         barFill.clear();
 
@@ -2053,7 +2058,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                         // 6. Destellos diminutos sobre el cabezal de impresión
                         if (frameCount % 4 === 0) {
-                            emitParticle(plotter.baseX + carriage.x + 6, plotter.baseY + carriage.y + 6, isVip);
+                            emitParticle(plotter.baseX + (carriage.x + 6) * PS_PLOT, plotter.baseY + (carriage.y + 6) * PS_PLOT, isVip);
                         }
                     } else if (isOffline) {
                         // Offline: grises, sin luz ni movimiento, carriage quieto en posición de reposo

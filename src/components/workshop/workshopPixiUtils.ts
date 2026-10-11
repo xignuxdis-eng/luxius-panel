@@ -4,6 +4,7 @@
 import { Order, OrderStatus } from '@/types/orden';
 import { StationId, StationConfig } from './types';
 import { getMaquinas } from '@/data/db';
+import { WORKSHOP_CONFIG } from './content/config';
 
 export interface OrderStateSnapshot {
     [orderId: number]: OrderStatus;
@@ -110,10 +111,10 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'plotter1',
             title: m?.nombre && m.nombre.length <= 16 ? m.nombre : 'Plotter',
             description: m ? `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m) - Status: ${(m.estado || 'online').toUpperCase()}` : 'Impresora Roland gran formato.',
-            x: 136,
+            x: 240 - Math.round(104 * WORKSHOP_CONFIG.plotterScale),
             y: 36,
-            width: 208,
-            height: 74,
+            width: Math.round(208 * WORKSHOP_CONFIG.plotterScale),
+            height: Math.round(74 * WORKSHOP_CONFIG.plotterScale),
             color: m?.estado === 'offline' ? '#64748b' : '#22c55e',
             icon: '🖨️',
             maquinaId: m?.id,
@@ -136,8 +137,8 @@ export const getPixiStations = (): StationConfig[] => {
                 description: `${m.tipo || 'Impresora'} (${m.anchoMaximo || 1.6}m) - Status: ${(m.estado || 'online').toUpperCase()}`,
                 x: startX + idx * stepX,
                 y: 36,
-                width: Math.max(120, stepX - 6),
-                height: 74,
+                width: Math.max(100, stepX - 6),
+                height: Math.round(74 * WORKSHOP_CONFIG.plotterScale),
                 color: m.estado === 'offline' ? '#64748b' : color,
                 icon: '🖨️',
                 maquinaId: m.id,
