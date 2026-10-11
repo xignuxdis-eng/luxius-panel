@@ -149,6 +149,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     // Refs for real-time synchronization
     const ordersRef = useRef<Order[]>(orders);
+    const printingOrdersRef = useRef<Order[]>(orders.filter(o => o.status === 'orden'));
     const selectedStationRef = useRef<StationId | null>(selectedStation);
     const prevOrdersSnapshotRef = useRef<OrderStateSnapshot>({});
     const pendingDiffsRef = useRef<OrderDiff[]>([]);
@@ -433,6 +434,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     // Update synced refs
     useEffect(() => {
         ordersRef.current = orders;
+        printingOrdersRef.current = orders.filter(o => o.status === 'orden');
 
         // Compute diffs against previous snapshot
         const { diffs, nextSnapshot } = diffOrders(prevOrdersSnapshotRef.current, orders);
@@ -619,7 +621,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 await app.init({
                     width: VIRTUAL_W,
                     height: VIRTUAL_H,
-                    resolution: window.devicePixelRatio || 1,
+                    resolution: Math.min(window.devicePixelRatio || 1, 2),
                     autoDensity: true,
                     roundPixels: true,
                     backgroundColor: 0x090714,
@@ -2026,7 +2028,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     } catch (_) {}
                 }
 
-                const allPrintingOrders = ordersRef.current.filter(o => o.status === 'orden');
+                const allPrintingOrders = printingOrdersRef.current;
 
                 plottersListRef.current.forEach((plotter, pIdx) => {
                     const { carriage, sheet, glow, barFill, progressText, statusLed, isOffline, width: plotterW } = plotter;

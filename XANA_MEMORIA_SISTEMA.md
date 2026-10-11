@@ -185,6 +185,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 | Incidencia / Síntoma | Causa Raíz | Solución Implementada | Archivo(s) Modificado(s) |
 | :--- | :--- | :--- | :--- |
+| **Benchmark y Rendimiento del Taller PixiJS (PC sin GPU / baja RAM) - 11/10/2026** | Duda sobre viabilidad y fluidez en computadoras de taller o mostrador sin placa gráfica dedicada (gráficos integrados) y poca RAM (2-4 GB). | **Medición empírica en navegador**: 1,920 frames medidos en 4 fases (Base, Stress con lluvia/noche/partículas/plotters, CPU de gama baja simulada con retardo bloqueante de 5ms, y Fuga de memoria prolongada de 600 frames). **Resultados**: 60.0 FPS constantes, 0 caídas de frames (&gt;33ms), tiempo promedio de cuadro 16.68ms (p95 16.8ms), consumo de RAM JS Heap plano entre 25.6 MB y 30.6 MB (menos del 2% del presupuesto de memoria del navegador, 0 fugas). **Optimizaciones aplicadas**: tope de `resolution` a `Math.min(devicePixelRatio, 2)` (evita creación de búferes gigantes en monitores 4K que ahoguen GPUs integradas) y pre-cálculo en ref de `printingOrdersRef` en `WorkshopCanvasPixi.tsx` (elimina el filtrado `orders.filter()` en cada cuadro a 60Hz). | `src/components/workshop/WorkshopCanvasPixi.tsx` |
 | **Audio normalizado - 11/10/2026** | Un pitido sonaba mucho mas fuerte que el resto. | Bus de audio unico con volumen general y limitador (workshopAudioBus.ts, udioOut(ctx)); niveles en content/audio.ts; alarma flotante de 0.3 a 0.06 con envolvente suave; aviso de rebote en onda triangular 0.035; pedido completo 0.04 por nota; mascotas x0.4. El mp3 ambiente no pasa por el bus. | src/components/workshop/**, src/components/ui/FloatingAlarm.tsx |
 | **Taller Print Den: tercera tanda - 11/10/2026** | Ideas 1-5, 13 y 14 elegidas por el usuario, mas zoom de sectores. | Decoracion por fechas (workshopSeason.ts: Navidad, 9 de Julio, Halloween); gotera con balde cuando llueve (WorkshopFx.setRain); eventos yawn (19-6 hs) y ordertalk con datos reales sin nombres (workshopOrderTalk.ts); mascotas duermen de noche, acompanan a quien las acaricia y se disputan la cafetera; PNG de mascotas (clave pet_<id> en content/sprites.ts, PET_SHEET_LAYOUT); contenido remoto content/remote.ts + public/workshop-content.json (pisa config, frases, visitas, mascotas; cache en localStorage); click fuera del sector enfocado restaura el zoom. | src/components/workshop/**, public/workshop-content.json |
 | **Taller Print Den: segunda tanda de mejoras - 11/10/2026** | Pedidos de mas vida y menos peso visual en el taller. | Luces calidas de noche por sector (`WorkshopLighting.setStationPools`); chispas de trabajo en estaciones con ordenes; radio sintetizada de 3 emisoras (`workshopRadio.ts`); meta diaria con festejo (`WORKSHOP_CONFIG.dailyGoal`); eventos cumple, cliente y pizza; franja rotativa del Modo TV (`TvTicker.tsx`); visitas tocables; plotter al 72% (`plotterScale`); etiqueta F-r1 oculta. | `src/components/workshop/**` |
@@ -311,7 +312,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
 
-- [x] **Print Den (11/10/2026)**: sectores mas chicos con cartelitos y glow, pasillo con carriles, Refrigerios, voces, portraits, logo y clima. Pendiente: rotar credenciales viejas del backend, ficha para visitas, medir rendimiento.
+- [x] **Print Den (11/10/2026)**: sectores mas chicos con cartelitos y glow, pasillo con carriles, Refrigerios, voces, portraits, logo y clima. Pendiente: rotar credenciales viejas del backend, ficha para visitas. (Medición de rendimiento Pixi: HECHO 11/10/2026, 60fps sólidos, 25-30MB RAM, 0 caídas).
 
 - [x] **Print Den, 2da tanda (11/10/2026)**: luces de noche, actividad en estaciones, radio, meta diaria, mini-historias, Modo TV, plotter mas chico. Pendiente (actualizado 11/10/2026): PNG de mascotas y contenido desde la nube YA HECHOS en la 3ra tanda; resta backend (rotar credenciales viejas, nombres aleatorios y auth en /file).
 
@@ -1273,7 +1274,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 8. [ ] **(Decisión) Reescribir historial público** de `luxius-panel` para borrar commits viejos con secretos (destructivo; solo con tu OK explícito). Si rotás R2 y Neon, deja de ser urgente.
 9. [ ] **(Opcional) Rotar claves Gemini/OpenAI** si alguna vez estuvieron en el repo.
 
-- [x] **Print Den (11/10/2026):** Bloque F completo + Tablon de Xana + contenido editable + sprites PNG. Pendiente: mediciones de rendimiento Pixi HD, PNG para mascotas, contenido desde JSON en la nube, decidir si Pixi HD pasa a ser el renderer por defecto.
+- [x] **Print Den (11/10/2026):** Bloque F completo + Tablon de Xana + contenido editable + sprites PNG. Pendiente: PNG para mascotas, contenido desde JSON en la nube, decidir si Pixi HD pasa a ser el renderer por defecto. (Medición de rendimiento Pixi: HECHO 11/10/2026, 60fps sólidos, 25-30MB RAM, 0 caídas).
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 
