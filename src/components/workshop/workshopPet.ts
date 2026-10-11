@@ -5,12 +5,15 @@
 // Pasean por el taller sin atravesar estaciones, se sientan, duermen (o se rascan las pulgas) y los operarios
 // a veces las acarician; algunas se dejan más que otras. Al hacerles clic suena su sonido característico.
 
-import { Container, Graphics, Rectangle } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { StationConfig } from './types';
 import { MAP_W, computeLanes, isWalkable, type Lanes, type Point, type WorkerCrew } from './workshopWorkers';
 
 import { PET_PROFILES, type PetProfile, type PetStat } from './content/pets';
 import { WORKSHOP_CONFIG, randomIn } from './content/config';
+import { PET_SHEET_LAYOUT } from './content/sprites';
+import { getCharacterSheet } from './workshopSpriteOverrides';
+import { workshopNow, hourOf } from './workshopLighting';
 export { PET_PROFILES };
 export type { PetProfile, PetStat };
 
@@ -18,6 +21,12 @@ type PetState = 'sit' | 'walk' | 'sleep' | 'scratch';
 
 const DARK = 0x1f2937;
 const MARGIN = 2;
+
+/** De noche (21 a 6 hs, hora del taller) las mascotas duermen. */
+export const isPetNight = (): boolean => {
+    const h = hourOf(workshopNow());
+    return h >= 21 || h < 6;
+};
 const MAX_Y = 262;
 
 export interface PetHooks {
@@ -25,6 +34,8 @@ export interface PetHooks {
     onTap?: (profile: PetProfile, x: number, y: number, petted: boolean) => void;
     /** Un operario la acarició con éxito. */
     onWorkerPet?: (profile: PetProfile, x: number, y: number) => void;
+    /** Dos mascotas querían el lugar junto a la cafetera: `winner` llegó primero, `loser` se quedó al lado. */
+    onCoffeeSpat?: (winner: PetProfile, loser: PetProfile, x: number, y: number) => void;
 }
 
 /** Graphics que ignora el color de relleno: sirve para dibujar la silueta (contorno) del sprite. */
@@ -72,6 +83,12 @@ export class WorkshopPet {
     private leaving = false;
     private destroyed = false;
     private workerCooldownMs = 0;
+    /** Sprite PNG de reemplazo (content/sprites.ts, clave 'pet_<id>'); si existe, reemplaza al dibujo por código. */
+    private sprite: Sprite | null = null;
+    private frames: Texture[] = [];
+    /** Al llegar al destino de goTo(): se sienta (y avisa). */
+    private arriveSit = false;
+    private arriveCb: (() => void) | null = null;
     private rng: () => number;
 
     constructor(
@@ -109,6 +126,16 @@ export class WorkshopPet {
             }
         }
         this.container.addChild(this.body);
+        const sheet = getCharacterSheet(`pet_${profile.id}`);
+        if (sheet) {
+            const { frameW, frameH, poses } = PET_SHEET_LAYOUT;
+            this.frames = poses.map((_, i) => new Texture({ source: sheet.source, frame: new Rectangle(i * frameW, 0, frameW, frameH) }));
+            this.sprite = new Sprite(this.frames[0]);
+            this.sprite.anchor.set(0.5, 1);
+            this.sprite.eventMode = 'none';
+            this.outlines.forEach((o) => (o.visible = false));
+            this.container.addChild(this.sprite);
+        }
         this.container.addChild(this.zz);
         layer.addChild(this.container);
 
@@ -237,6 +264,36 @@ export class WorkshopPet {
         return false;
     }
 
+    /** Camina hasta un punto y se sienta ahí (si hay camino). `onArrive` se llama al llegar. Devuelve false si no pudo. */
+    goTo(target: Point, onArrive?: () => void): boolean {
+        if (this.destroyed || !this.visible || this.leaving) return false;
+        const from: Point = { x: this.x, y: this.y };
+        const tos: Point[] = [target, { x: target.x, y: target.y + 6 }, { x: target.x, y: target.y + 12 }, { x: target.x, y: target.y - 6 }];
+        for (const to of tos) {
+            if (to.y > MAX_Y || !isWalkable(to, this.stations, MARGIN)) continue;
+            const cands: Point[][] = [[{ x: from.x, y: to.y }, to], [{ x: to.x, y: from.y }, to]];
+            for (const gx of this.gapXs) cands.push([{ x: gx, y: from.y }, { x: gx, y: to.y }, to]);
+            for (const cand of cands) {
+                const clean = cand.filter((p, i) => Math.hypot(p.x - (i === 0 ? from.x : cand[i - 1].x), p.y - (i === 0 ? from.y : cand[i - 1].y)) > 0.01);
+                if (clean.length === 0 || !this.pathClear(from, clean)) continue;
+                this.path = clean;
+                this.setState('walk', 0);
+                this.arriveSit = true;
+                this.arriveCb = onArrive ?? null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    isSleeping(): boolean {
+        return this.visible && this.state === 'sleep';
+    }
+
+    isWalking(): boolean {
+        return this.visible && this.state === 'walk';
+    }
+
     private tap() {
         if (!this.enabled || !this.visible || this.destroyed) return;
         const petted = this.rng() < this.profile.petChance;
@@ -257,6 +314,10 @@ export class WorkshopPet {
     }
 
     private setState(s: PetState, timerMs: number) {
+        if (s === 'walk') {
+            this.arriveSit = false;
+            this.arriveCb = null;
+        }
         this.state = s;
         this.timerMs = timerMs;
         this.lastPose = '';
@@ -453,6 +514,14 @@ export class WorkshopPet {
     }
 
     private drawPose(pose: string) {
+        if (this.sprite) {
+            const idx = PET_SHEET_LAYOUT.poses.indexOf(pose as never);
+            this.sprite.texture = this.frames[idx >= 0 ? idx : 0];
+            this.shadow.clear();
+            this.shadow.ellipse(0, 0, this.profile.chubby ? 8 : 6, 1.6).fill({ color: 0x000000, alpha: 0.28 });
+            this.body.clear();
+            return;
+        }
         const sh = this.shadow;
         sh.clear();
         const w = this.profile.chubby ? 8 : 6;
@@ -538,17 +607,29 @@ export class WorkshopPet {
                     this.applyVisibility();
                     return;
                 }
-                const pr = this.profile;
-                const roll = this.rng();
-                const restMs = pr.rest[0] + this.rng() * (pr.rest[1] - pr.rest[0]);
-                if (roll < pr.sleepChance) this.setState('sleep', 15000 + this.rng() * 20000);
-                else if (roll < pr.sleepChance + pr.scratchChance) this.setState('scratch', 2500 + this.rng() * 3000);
-                else this.setState('sit', restMs);
+                if (this.arriveSit) {
+                    // Llegó adonde quería ir (junto a un operario o a la cafetera): se sienta un buen rato
+                    const cb = this.arriveCb;
+                    this.arriveSit = false;
+                    this.arriveCb = null;
+                    this.setState('sit', 14000 + this.rng() * 12000);
+                    cb?.();
+                } else {
+                    const pr = this.profile;
+                    const roll = this.rng();
+                    const restMs = pr.rest[0] + this.rng() * (pr.rest[1] - pr.rest[0]);
+                    const sleepP = isPetNight() ? Math.max(pr.sleepChance, 0.9) : pr.sleepChance;
+                    if (roll < sleepP) this.setState('sleep', 15000 + this.rng() * 20000);
+                    else if (roll < sleepP + pr.scratchChance) this.setState('scratch', 2500 + this.rng() * 3000);
+                    else this.setState('sit', restMs);
+                }
             }
         } else {
             this.timerMs -= dt;
             if (this.timerMs <= 0) {
-                if (!this.planLeg()) this.setState('sit', 2000 + this.rng() * 3000);
+                // De noche, al despertar o terminar de estar sentadas, vuelven a dormirse casi siempre
+                if (isPetNight() && this.rng() < (this.state === 'sleep' ? 0.85 : 0.7)) this.setState('sleep', 20000 + this.rng() * 20000);
+                else if (!this.planLeg()) this.setState('sit', 2000 + this.rng() * 3000);
             }
         }
         this.sync();
@@ -586,6 +667,10 @@ export class PetManager {
     private phaseMs = 0;
     private pendingEnters: { pet: WorkshopPet; delayMs: number }[] = [];
     private nextLeaveMs = 0;
+    /** Lugar junto a la cafetera (zona de Refrigerios) y quién lo ocupa ahora. */
+    private coffeeSpot: Point | null = null;
+    private coffeeHolder: WorkshopPet | null = null;
+    private coffeeMs = 40000;
     private careMs: number = WORKSHOP_CONFIG.pets.careCheckMs;
     private enabled = true;
 
@@ -593,7 +678,7 @@ export class PetManager {
         layer: Container,
         hitLayer: Container | undefined,
         stations: StationConfig[],
-        hooks: PetHooks = {},
+        private hooks: PetHooks = {},
         private rng: () => number = Math.random
     ) {
         this.pets = PET_PROFILES.map((p) => new WorkshopPet(p, layer, hitLayer, stations, hooks, rng));
@@ -609,6 +694,35 @@ export class PetManager {
 
     getPet(id: string): WorkshopPet | undefined {
         return this.pets.find((p) => p.profile.id === id);
+    }
+
+    /** Lugar junto a la cafetera (frente a Refrigerios) donde las mascotas se disputan sentarse. */
+    setCoffeeSpot(p: Point | null) {
+        this.coffeeSpot = p;
+    }
+
+    /** Una o dos mascotas despiertas van a sentarse junto a la cafetera; la que llega segunda se queda al lado. */
+    private coffeeRun() {
+        if (!this.coffeeSpot || isPetNight()) return;
+        const spot = this.coffeeSpot;
+        const free = this.pets.filter((p) => p.isVisible() && !p.isLeaving() && !p.isSleeping());
+        for (let i = free.length - 1; i > 0; i--) {
+            const j = Math.floor(this.rng() * (i + 1));
+            [free[i], free[j]] = [free[j], free[i]];
+        }
+        const goers = free.slice(0, free.length > 1 && this.rng() < 0.75 ? 2 : 1);
+        for (const pet of goers) {
+            pet.goTo(spot, () => {
+                const h = this.coffeeHolder;
+                if (h && h !== pet && h.isVisible() && !h.isLeaving() && !h.isWalking()) {
+                    // Ya había alguien: se acomoda al lado
+                    pet.goTo({ x: spot.x + 12, y: spot.y });
+                    this.hooks.onCoffeeSpat?.(h.profile, pet.profile, spot.x, spot.y - 10);
+                } else {
+                    this.coffeeHolder = pet;
+                }
+            });
+        }
     }
 
     visiblePets(): WorkshopPet[] {
@@ -636,6 +750,14 @@ export class PetManager {
         if (!this.enabled) return;
         const dt = Math.max(0, Math.min(dtMs, 100));
         this.pets.forEach((p) => p.update(dt));
+
+        // Cafetera: de vez en cuando alguna va a sentarse ahí (y a veces se pelean el lugar)
+        this.coffeeMs -= dt;
+        if (this.coffeeMs <= 0) {
+            this.coffeeMs = 45000 + this.rng() * 50000;
+            this.coffeeRun();
+        }
+        if (this.coffeeHolder && (!this.coffeeHolder.isVisible() || this.coffeeHolder.isLeaving() || this.coffeeHolder.isWalking())) this.coffeeHolder = null;
 
         if (this.phase === 'normal') {
             this.rotateMs -= dt;
@@ -677,7 +799,11 @@ export class PetManager {
             for (const pet of this.pets) {
                 if (!pet.isVisible() || pet.isLeaving()) continue;
                 const pp = pet.getPosition();
-                if (spots.some((s) => Math.hypot(s.x - pp.x, s.y - pp.y) < WORKSHOP_CONFIG.pets.careRadius)) pet.tryPetByWorker();
+                if (spots.some((s) => Math.hypot(s.x - pp.x, s.y - pp.y) < WORKSHOP_CONFIG.pets.careRadius)) {
+                    // Si se dejó acariciar, a veces se queda sentada junto a quien la acarició
+                    const near = spots.find((s) => Math.hypot(s.x - pp.x, s.y - pp.y) < WORKSHOP_CONFIG.pets.careRadius);
+                    if (pet.tryPetByWorker() && near && this.rng() < 0.45) pet.goTo({ x: near.x + (this.rng() < 0.5 ? -9 : 9), y: near.y });
+                }
             }
         }
     }

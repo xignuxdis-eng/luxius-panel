@@ -46,7 +46,7 @@ Todo se dibuja por codigo por defecto; para reemplazar con PNG propios: copiar e
 | Operarios | `characters`: disenador, impresor, cortador, empaquetador, default, guest_repartidor, guest_tecnico | Hoja de 64x120 px: 4 columnas x 5 filas de cuadros 16x24 (filas: abajo, arriba, izquierda, derecha, respiro+trabajo). Detalle en CHARACTER_SHEET_LAYOUT |
 | Objetos de estacion (escritorio, estanteria, mesa de corte...) | `stationProps`: diseno, insumos, corte, empaque, despacho, caja | Imagen estatica: pierde animaciones y pilas de cajas |
 
-Colores de camisa por rol, piel y colores del sprite procedural: `content/characters.ts`. Las mascotas se dibujan por codigo con los colores de su perfil (`content/pets.ts`); soporte de PNG para mascotas queda como mejora futura.
+Colores de camisa por rol, piel y colores del sprite procedural: `content/characters.ts`. Las mascotas se dibujan por codigo con los colores de su perfil (`content/pets.ts`); para PNG propios de mascotas ver la seccion "Novedades 11/10/2026" mas abajo.
 
 
 ## Tablon de Xana (consejos)
@@ -67,3 +67,12 @@ Todo se edita en `content/voices.ts` (sin archivos de audio, se sintetiza en el 
 - Los sectores no tienen recuadro ni barra de color: solo un cartelito con el nombre y un resplandor del color del sector al pasar el mouse. computeLanes devuelve `rows` (carriles del pasillo) y cada operario usa uno distinto.
 
 - Nuevos: workshopRadio.ts (melodias como datos), TvTicker.tsx (franja del Modo TV), config.dailyGoal / activity / tv, visitas cliente y pizzero (content/guests.ts), evento birthday (content/texts.ts), WorkshopLighting.setStationPools (luces de noche).
+
+## Novedades 11/10/2026 (temporadas, gotera, charla con datos, mascotas con personalidad, PNG de mascotas, contenido desde la nube)
+- **Temporadas** (workshopSeason.ts): diciembre = guirnalda; 5 al 12 de julio = banderines celestes y blancos; 20 al 31 de octubre = zapallos de Halloween. Fechas en WORKSHOP_CONFIG.seasons. Probar sin esperar: `localStorage.setItem('luxius_print_den_season','navidad'|'julio'|'halloween'|'none')`.
+- **Gotera** (WorkshopFx.setRain): con lluvia o tormenta reales (y Clima encendido) aparece un balde con goteo y alguien lo comenta. Posicion en WORKSHOP_CONFIG.rainLeak. Probar: `localStorage.setItem('luxius_print_den_rain','1')` (y quitarlo para apagar).
+- **Operario con sueno**: evento yawn, solo de 19 a 6 hs. Frases en EVENT_TEXTS.yawn. (No hay guardia nocturno: se quito a pedido.)
+- **Charla con datos reales**: evento ordertalk (workshopOrderTalk.ts): cola, atrasadas, m2 del dia y antiguedad de la orden mas vieja. Plantillas en ORDER_TALK (content/texts.ts). Nunca nombra clientes.
+- **Mascotas con personalidad** (workshopPet.ts): de noche (21 a 6 hs) duermen mas y mas tiempo; si se dejan acariciar a veces se quedan sentadas junto al operario; de vez en cuando van a la cafetera y, si coinciden dos, la segunda se acomoda al lado y aparece un aviso (onCoffeeSpat).
+- **PNG de mascotas**: en content/sprites.ts, dentro de characters, clave pet_<id> (ej. pet_frijol: spriteUrl('frijol.png')). Hoja de 96x16 px: 6 cuadros de 16x16 mirando a la derecha: sit, walk0, walk1, sleep, scratch0, scratch1 (PET_SHEET_LAYOUT). Sin contorno automatico.
+- **Contenido desde la nube** (content/remote.ts + public/workshop-content.json): al abrir el taller se lee ese JSON y pisa config, frases, visitas, mascotas (por id), camisas por rol y rasgos por nombre; lo que falta queda de fabrica; claves o tipos desconocidos se ignoran. La ultima version buena se guarda en el navegador y se aplica al instante la proxima vez (por eso los valores que se leen al arrancar, como el tamano del plotter, se ven a la segunda recarga). Otra direccion: `localStorage 'luxius_print_den_content_url'`. Para editar sin recompilar en produccion hay que reemplazar el archivo publicado workshop-content.json.

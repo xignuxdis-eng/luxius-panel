@@ -67,7 +67,17 @@ export const WORKSHOP_CONFIG = {
     activity: { intervalMs: 650 },
 
     /** Modo TV (pantalla completa): cuánto dura cada tarjeta del resumen que rota. */
-    tv: { slideMs: 9000 }
+    tv: { slideMs: 9000 },
+
+    /** Decoración por fechas (workshopSeason.ts): mes (1-12) y días. Navidad va desde `from` hasta fin de mes. */
+    seasons: {
+        navidad: { month: 12, from: 1, to: 31 },
+        julio: { month: 7, from: 5, to: 12 },
+        halloween: { month: 10, from: 20, to: 31 }
+    },
+
+    /** Gotera de lluvia: dónde queda el balde (x) y cuánto bajo el borde superior del pasillo (y). */
+    rainLeak: { x: 64, yOffset: 12 }
 };
 
 /** Elige un valor al azar dentro de un rango [min, max]. */

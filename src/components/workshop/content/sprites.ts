@@ -50,6 +50,8 @@ export const SPRITE_OVERRIDES = {
      * Ejemplo:  disenador: spriteUrl('operario-diseno.png'),
      */
     characters: {} as Record<string, string>,
+    // Mascotas: también van en `characters`, con la clave 'pet_<id>' (ej. 'pet_frijol'). Ver PET_SHEET_LAYOUT.
+    // Ejemplo:  pet_frijol: spriteUrl('frijol.png'),
 
     /**
      * Objetos de las estaciones (escritorio, estantería, mesa de corte, etc.): una imagen estática por estación
@@ -75,4 +77,16 @@ export const CHARACTER_SHEET_LAYOUT = {
     idleBreathCol: 1,
     workRow: 4,
     workCols: [2, 3] as [number, number]
+};
+
+/**
+ * Hoja de una mascota (clave 'pet_<id>' en `characters`; los id están en content/pets.ts): UNA fila de cuadros de 16×16 px
+ * (hoja de 96×16 px), dibujados MIRANDO A LA DERECHA y con los pies abajo en el centro del cuadro. Orden de los cuadros:
+ *   0 sit (sentada) · 1 walk0 · 2 walk1 (caminando) · 3 sleep (dormida) · 4 scratch0 · 5 scratch1 (rascándose)
+ * Con un PNG propio se usa tal cual (sin contorno automático); la sombra del piso se mantiene.
+ */
+export const PET_SHEET_LAYOUT = {
+    frameW: 16,
+    frameH: 16,
+    poses: ['sit', 'walk0', 'walk1', 'sleep', 'scratch0', 'scratch1'] as string[]
 };

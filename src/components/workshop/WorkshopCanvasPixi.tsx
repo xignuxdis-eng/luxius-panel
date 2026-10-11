@@ -4,6 +4,8 @@
 // and the COMPLETE PLOTTER with moving carriage, unrolling vinyl, live progress bar, particles, and hover tooltip.
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+// Debe ir primero: aplica el contenido editable desde la nube (content/remote.ts) antes de que otros módulos lean sus valores
+import './content/remote';
 import { Application, Container, Graphics, Sprite, Text, TextStyle, Rectangle } from 'pixi.js';
 import { Order } from '@/types/orden';
 import { StationId } from './types';
@@ -47,6 +49,9 @@ import {
     type StationAlert
 } from './workshopAlerts';
 import { WorkshopFx } from './workshopFx';
+import { currentSeason, buildSeasonDecor } from './workshopSeason';
+import { orderTalkLine } from './workshopOrderTalk';
+import { EVENT_TEXTS } from './content/texts';
 import { WorkshopSky } from './workshopSky';
 import { GuestManager } from './workshopGuests';
 import { PetManager, type PetProfile } from './workshopPet';
@@ -221,6 +226,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     // Extras del Bloque F (alertas, pizarra, clima, mascota, eventos, visitas, logros...)
     const fxRef = useRef<WorkshopFx | null>(null);
+    const rainOnRef = useRef(false);
     const skyRef = useRef<WorkshopSky | null>(null);
     const guestsRef = useRef<GuestManager | null>(null);
     const petRef = useRef<PetManager | null>(null);
@@ -519,6 +525,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         if (!fxToggles.weather) {
             setWeather(null);
             skyRef.current?.setWeather(null);
+            applyRain(null, false);
             return;
         }
         let cancelled = false;
@@ -528,6 +535,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             if (cancelled) return;
             setWeather(w);
             skyRef.current?.setWeather(w ? w.kind : null);
+            applyRain(w ? w.kind : null, true);
         };
         load();
         const t = window.setInterval(load, WEATHER_REFRESH_MS);
@@ -688,6 +696,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     // 1b. Cielo por las ventanas (hora real + clima real) y pizarra/reloj de pared
                     skyRef.current = new WorkshopSky(skyLayer, WORKSHOP_CONFIG.windows.xs, WORKSHOP_CONFIG.windows.y);
                     buildWallBoard(mapLayer, uiLayer, workerHitLayer);
+                    // Decoración por fechas (Navidad, 9 de Julio, Halloween): vacía si hoy no corresponde ninguna
+                    mapLayer.addChild(buildSeasonDecor(currentSeason(workshopNow()), VIRTUAL_W));
 
                     // 2. Build Stations with Full Animated Plotter (Fase 2)
                     buildStations(stationsLayer, hitAreasLayer, particlesLayer, uiLayer);
@@ -738,9 +748,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     };
                     petRef.current = new PetManager(workersLayer, workerHitLayer, hallStations, {
                         onWorkerPet: (_p, px, py) => fxRef.current?.hearts(px, py),
+                        onCoffeeSpat: (winner, loser) => showToast(`${loser.name} quiso el lugar de ${winner.name} junto a la cafetera ☕`),
                         onTap: (profile, px, py, petted) => handlePetTap(profile, px, py, petted)
                     });
                     petRef.current.setEnabled(fxToggleRef.current.pet);
+                    {
+                        const br = hallStations.find((s) => s.id === 'refrigerios');
+                        petRef.current.setCoffeeSpot(br ? { x: Math.round(br.x + br.width / 2), y: Math.round(br.y + br.height + 10) } : null);
+                    }
                     eventsRef.current = new WorkshopEvents({
                         crew: () => crewRef.current,
                         fx: () => fxRef.current,
@@ -751,6 +766,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             y: Math.round(hallLanes.topEdge + 10 + Math.random() * Math.max(4, hallLanes.bottomEdge - hallLanes.topEdge - 16))
                         }),
                         onPowerBack: () => petRef.current?.reunion(),
+                        orderLine: () => orderTalkLine(ordersRef.current, workshopNow()),
                         breakSpot: () => {
                             const br = getPixiStations().find((s) => s.id === 'refrigerios');
                             return br ? { x: Math.round(br.x + br.width / 2), y: Math.round(br.y + br.height + 10) } : null;
@@ -759,6 +775,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     eventsRef.current.setEnabled(fxToggleRef.current.events);
                     skyRef.current?.setHour(hourOf(workshopNow()));
                     skyRef.current?.setWeather(fxToggleRef.current.weather && weatherRef.current ? weatherRef.current.kind : null);
+                    rainOnRef.current = false;
+                    applyRain(weatherRef.current ? weatherRef.current.kind : null, false);
                     applyAlerts(alertsRef.current);
                     // Atajos para pruebas (solo en desarrollo): window.__printDen.trigger('blackout') etc.
                     if ((import.meta as any).env?.DEV) {
@@ -1030,6 +1048,30 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         b.text.y = y;
         b.late.x = x;
         b.late.y = y + lh * 2;
+    };
+
+    /**
+     * Gotera decorativa: cuando el clima real es lluvia o tormenta (y el clima está encendido) aparece un balde con goteo
+     * y alguien lo comenta. Para probar sin lluvia real: localStorage 'luxius_print_den_rain' = '1'.
+     */
+    const applyRain = (kind: string | null, announce: boolean) => {
+        const fx = fxRef.current;
+        if (!fx) return;
+        let forced = false;
+        try {
+            forced = localStorage.getItem('luxius_print_den_rain') === '1';
+        } catch (_) {}
+        const on = forced || (fxToggleRef.current.weather && (kind === 'rain' || kind === 'storm'));
+        if (on === rainOnRef.current) return;
+        rainOnRef.current = on;
+        if (on) {
+            const lanes = computeLanes(getPixiStations());
+            fx.setRain(true, WORKSHOP_CONFIG.rainLeak.x, Math.round(lanes.topEdge + WORKSHOP_CONFIG.rainLeak.yOffset));
+            if (announce) crewRef.current?.announce(EVENT_TEXTS.rainBucket, 1, 'warn');
+        } else {
+            fx.setRain(false);
+            if (announce) crewRef.current?.announce(EVENT_TEXTS.rainStop, 1, 'ok');
+        }
     };
 
     /** Muestra u oculta los íconos de alerta según las alertas reales y si el usuario las tiene encendidas. */

@@ -8,20 +8,29 @@ import type { WorkshopLighting } from './workshopLighting';
 import type { GuestManager } from './workshopGuests';
 import type { WorkerCrew, Point } from './workshopWorkers';
 
-export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'birthday' | 'repartidor' | 'tecnico' | 'cliente' | 'pizzero';
+export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'birthday' | 'repartidor' | 'tecnico' | 'cliente' | 'pizzero' | 'yawn' | 'ordertalk';
 
-export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'birthday', 'repartidor', 'tecnico', 'cliente', 'pizzero'];
+export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'birthday', 'repartidor', 'tecnico', 'cliente', 'pizzero', 'yawn', 'ordertalk'];
 
 import { EVENT_TEXTS } from './content/texts';
 import { WORKSHOP_CONFIG, randomIn } from './content/config';
+import { workshopNow, hourOf } from './workshopLighting';
 
+// Se leen de EVENT_TEXTS / WORKSHOP_CONFIG en el momento de usarlos, así los cambios remotos (content/remote.ts) se notan sin recargar.
 const BLACKOUT_LINES = EVENT_TEXTS.blackout;
 const BLACKOUT_BACK = EVENT_TEXTS.blackoutBack;
 const COFFEE_LINES = EVENT_TEXTS.coffee;
 const HAPPY_LINES = EVENT_TEXTS.happyHour;
 const BIRTHDAY_LINES = EVENT_TEXTS.birthday;
-const BLACKOUT_DARK_MS = WORKSHOP_CONFIG.events.blackout.darkUntilMs;
-const BLACKOUT_END_MS = WORKSHOP_CONFIG.events.blackout.endMs;
+const YAWN_LINES = EVENT_TEXTS.yawn;
+const blackoutDarkMs = () => WORKSHOP_CONFIG.events.blackout.darkUntilMs;
+const blackoutEndMs = () => WORKSHOP_CONFIG.events.blackout.endMs;
+
+/** Final del día: de 19 a 6 hs (hora del taller). */
+const isLateHour = () => {
+    const h = hourOf(workshopNow());
+    return h >= 19 || h < 6;
+};
 
 /** Pausa entre eventos (ms). En modo rápido de pruebas: localStorage 'luxius_print_den_events_fast' = '1'. */
 function nextDelayMs(rng: () => number): number {
@@ -43,6 +52,8 @@ export interface EventDeps {
     onPowerBack?: () => void;
     /** Lugar frente a la zona de Refrigerios (para la torta de cumpleaños). */
     breakSpot?: () => Point | null;
+    /** Una frase con datos reales del día (sin nombres de clientes), o null si no hay datos. */
+    orderLine?: () => string | null;
 }
 
 interface Running {
@@ -93,6 +104,15 @@ export class WorkshopEvents {
             if (ok && name === 'pizzero') crew?.announce(['¡Llegó la pizza! 🍕'], 1, 'ok');
             return ok;
         }
+        if (name === 'yawn') {
+            if (!isLateHour() || !crew) return false;
+            return crew.announce(YAWN_LINES, 1, 'chat') > 0;
+        }
+        if (name === 'ordertalk') {
+            const line = this.deps.orderLine?.() ?? null;
+            if (!line || !crew) return false;
+            return crew.announce([line], 1, 'info') > 0;
+        }
         this.running = { name, t: 0, done: false, step: 0 };
         if (name === 'coffee') {
             const spot = this.deps.floorSpot();
@@ -128,14 +148,14 @@ export class WorkshopEvents {
                 // 0-0.4 s: parpadea; 0.4-3.6 s: oscuro; 3.6-4.4 s: parpadea al volver
                 let level = 0;
                 if (r.t < 400) level = Math.floor(r.t / 100) % 2 === 0 ? 0.5 : 0;
-                else if (r.t < BLACKOUT_DARK_MS) level = 1;
-                else if (r.t < BLACKOUT_END_MS) level = Math.floor((r.t - BLACKOUT_DARK_MS) / 100) % 2 === 0 ? 0.6 : 0.1;
+                else if (r.t < blackoutDarkMs()) level = 1;
+                else if (r.t < blackoutEndMs()) level = Math.floor((r.t - blackoutDarkMs()) / 100) % 2 === 0 ? 0.6 : 0.1;
                 this.deps.lighting()?.setBlackout(level);
-                if (r.step === 0 && r.t >= BLACKOUT_DARK_MS) {
+                if (r.step === 0 && r.t >= blackoutDarkMs()) {
                     r.step = 1;
                     this.deps.crew()?.announce(BLACKOUT_BACK, 1, 'ok');
                 }
-                if (r.t >= BLACKOUT_END_MS) {
+                if (r.t >= blackoutEndMs()) {
                     this.deps.lighting()?.setBlackout(0);
                     this.deps.onPowerBack?.();
                     this.running = null;

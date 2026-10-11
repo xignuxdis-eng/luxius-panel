@@ -34,6 +34,8 @@ export class WorkshopFx {
     private puddles: Puddle[] = [];
     private destroyed = false;
     private rng: () => number = Math.random;
+    /** Gotera de lluvia: balde en el piso + gotas que caen (decorativo). */
+    private rain: { bucket: Graphics; x: number; y: number; dripMs: number } | null = null;
 
     /** `floorLayer`: debajo de los operarios (manchas). `topLayer`: por encima (partículas). */
     constructor(private floorLayer: Container, private topLayer: Container) {
@@ -128,8 +130,43 @@ export class WorkshopFx {
         this.puddles.push({ g, life: 0, max: ttlMs });
     }
 
+    /** Enciende o apaga la gotera: un balde en (x, y) y gotitas que caen dentro. */
+    setRain(on: boolean, x = 0, y = 0) {
+        if (this.destroyed) return;
+        if (!on) {
+            if (this.rain) {
+                try {
+                    if (!this.rain.bucket.destroyed) this.rain.bucket.destroy();
+                } catch (_) {}
+                this.rain = null;
+            }
+            return;
+        }
+        if (this.rain) return;
+        const g = new Graphics();
+        g.ellipse(0, 0, 6, 2).fill({ color: 0x000000, alpha: 0.25 });
+        g.rect(-4, -7, 8, 7).fill({ color: 0x64748b });
+        g.rect(-4, -7, 8, 1).fill({ color: 0x94a3b8 });
+        g.rect(-3, -6, 6, 1).fill({ color: 0x38bdf8 });
+        g.rect(-4, -4, 8, 1).fill({ color: 0x475569 });
+        g.x = x;
+        g.y = y;
+        g.eventMode = 'none';
+        this.floorLayer.addChild(g);
+        this.rain = { bucket: g, x, y, dripMs: 400 };
+    }
+
     update(dtMs: number) {
         if (this.destroyed) return;
+        if (this.rain) {
+            this.rain.dripMs -= dtMs;
+            if (this.rain.dripMs <= 0) {
+                this.rain.dripMs = 700 + this.rng() * 900;
+                const g = new Graphics();
+                g.rect(0, 0, 1, 2).fill({ color: 0x7dd3fc });
+                this.add('spark', g, this.rain.x + (this.rng() - 0.5) * 2, this.rain.y - 34, 0, 0.5, 0.06, 24);
+            }
+        }
         const f = dtMs / 16.67;
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
@@ -164,6 +201,12 @@ export class WorkshopFx {
 
     destroy() {
         this.destroyed = true;
+        if (this.rain) {
+            try {
+                if (!this.rain.bucket.destroyed) this.rain.bucket.destroy();
+            } catch (_) {}
+            this.rain = null;
+        }
         for (const p of this.particles) {
             try {
                 if (!p.g.destroyed) p.g.destroy();
