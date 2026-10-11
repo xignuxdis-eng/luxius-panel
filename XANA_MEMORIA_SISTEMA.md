@@ -291,9 +291,9 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 - [x] **Print Den (11/10/2026)**: sectores mas chicos con cartelitos y glow, pasillo con carriles, Refrigerios, voces, portraits, logo y clima. Pendiente: rotar credenciales viejas del backend, ficha para visitas, medir rendimiento.
 
-- [x] **Print Den, 2da tanda (11/10/2026)**: luces de noche, actividad en estaciones, radio, meta diaria, mini-historias, Modo TV, plotter mas chico. Pendiente: PNG para mascotas, contenido desde la nube, backend (rotar credenciales viejas, nombres aleatorios y auth en /file).
+- [x] **Print Den, 2da tanda (11/10/2026)**: luces de noche, actividad en estaciones, radio, meta diaria, mini-historias, Modo TV, plotter mas chico. Pendiente (actualizado 11/10/2026): PNG de mascotas y contenido desde la nube YA HECHOS en la 3ra tanda; resta backend (rotar credenciales viejas, nombres aleatorios y auth en /file).
 
-- [x] **Print Den, 3ra tanda (11/10/2026)**: temporadas, gotera, bostezo, charla con datos, mascotas con personalidad, PNG de mascotas, contenido desde la nube, zoom que se restaura al hacer click fuera. Pendiente: alertas de vencimiento, resumen de turno para WhatsApp, vista de cola por plotter, ranking de equipo, backend (rotar credenciales viejas, nombres aleatorios y auth en /file), revision visual de gotera/temporadas/bostezo (no verificados con captura).
+- [x] **Print Den, 3ra tanda (11/10/2026)**: temporadas, gotera, bostezo, charla con datos, mascotas con personalidad, PNG de mascotas, contenido desde la nube, zoom que se restaura al hacer click fuera. Pendiente (ideas sin implementar): alertas de vencimiento, resumen de turno para WhatsApp, vista de cola por plotter, ranking de equipo, backend (rotar credenciales viejas, nombres aleatorios y auth en /file), revision visual de gotera/temporadas/bostezo (no verificados con captura).
 
 - [x] **Audio normalizado (11/10/2026)**: todo el sonido sintetizado pasa por un bus con limitador y niveles centralizados en content/audio.ts. Pendiente: evaluar el volumen del mp3 ambiente (0.35) y del reproductor de medios, que no pasan por el bus.
 
