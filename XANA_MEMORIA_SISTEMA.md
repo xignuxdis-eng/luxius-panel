@@ -251,6 +251,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - Cartel DEN V2.0 (taller pixel art)**: el cartel `sign_den` del taller (`workshopSprites.ts`) ahora dice "DEN V2.0" (evolución del print anterior); sprite ensanchado de 46 a 56 px y reposicionado en `WorkshopCanvasPixi.tsx` (x=212) para mantenerlo centrado.
+
 ## 7. 🚀 Guía Rápida para Continuar en Cualquier Otro IDE / Máquina
 
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:

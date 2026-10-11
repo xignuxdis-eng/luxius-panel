@@ -1431,7 +1431,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
         // Cartel "DEN" ampliado, centrado en la pared superior sobre el plotter
         const denSign = new Sprite(texSignDen);
-        denSign.x = 217;
+        denSign.x = 212;
         denSign.y = 9;
         layer.addChild(denSign);
 

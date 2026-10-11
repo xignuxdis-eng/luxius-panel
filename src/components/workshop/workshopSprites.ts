@@ -313,8 +313,8 @@ export function getSignDenTexture(): Texture {
     return withOverride('sign_den', buildSignDenTexture);
 }
 function buildSignDenTexture(): Texture {
-    // Cartel "DEN" ampliado (46x16 px) estilo placa industrial de esmalte rojo y tornillos
-    const matrix = [
+    // Cartel "DEN V2.0" (56x16 px) estilo placa industrial de esmalte rojo y tornillos
+    const base = [
         '##############################################',
         '#O..........................................O#',
         '#.RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR.#',
@@ -332,6 +332,25 @@ function buildSignDenTexture(): Texture {
         '#O..........................................O#',
         '##############################################'
     ];
+    // Ensanchar 10px (insertar antes del borde derecho) para alojar "V2.0"
+    const matrix = base.map((r, i) => {
+        const fill = i === 0 || i === 15 ? '#' : (i === 1 || i === 14 ? '.' : 'R');
+        const head = r.slice(0, r.length - 2);
+        const tail = r.slice(r.length - 2);
+        return head + fill.repeat(10) + tail;
+    });
+    // Texto V2.0 (fuente 3x5) en filas 6-10, columnas 37..49
+    const glyphs = ['101 111 0 111', '101 001 0 101', '101 111 0 101', '101 100 0 101', '010 111 1 111'];
+    glyphs.forEach((g, gi) => {
+        const row = matrix[6 + gi].split('');
+        // V(3) gap 2(3) gap .(1) gap 0(3)
+        const parts = g.split(' ');
+        const line = parts[0] + '0' + parts[1] + '0' + parts[2] + '0' + parts[3];
+        for (let k = 0; k < line.length; k++) {
+            row[37 + k] = line[k] === '1' ? 'N' : 'R';
+        }
+        matrix[6 + gi] = row.join('');
+    });
     const palette = {
         '#': '#090d16',
         'O': '#94a3b8', // Tornillos esquineros
@@ -341,7 +360,7 @@ function buildSignDenTexture(): Texture {
         'E': '#ffffff',
         'N': '#ffffff'
     };
-    return createPixelTexture('sign_den_expanded_v3', matrix, palette);
+    return createPixelTexture('sign_den_v2_0', matrix, palette);
 }
 
 /* ==========================================================================
