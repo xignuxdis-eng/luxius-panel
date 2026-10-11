@@ -8,6 +8,8 @@ import { Application, Container, Graphics, Sprite, Text, TextStyle, Rectangle } 
 import { Order } from '@/types/orden';
 import { StationId } from './types';
 import { audioEngine } from './AudioEngine';
+import { workshopRadio } from './workshopRadio';
+import TvTicker from './TvTicker';
 import {
     diffOrders,
     getPixiStations,
@@ -245,6 +247,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const lastStationCloseRef = useRef<{ id: string; t: number } | null>(null);
     const [focusedId, setFocusedId] = useState<string | null>(null);
     const [isFs, setIsFs] = useState(false);
+    // Radio del taller (0 = apagada). Siempre arranca apagada: el navegador no deja sonar hasta que el usuario toca algo.
+    const [radio, setRadio] = useState(0);
+    const radioRef = useRef(0);
+    radioRef.current = radio;
+    const radioNotesMsRef = useRef(0);
+    const activityMsRef = useRef(0);
+    // Meta del día: se festeja solo cuando se cruza la meta durante la sesión (no al cargar la página)
+    const goalReadyRef = useRef(false);
+    const goalPrevRef = useRef(0);
+    useEffect(() => () => workshopRadio.off(), []);
     const [achOpen, setAchOpen] = useState(false);
     const [achievements, setAchievements] = useState<Achievement[]>([]);
     const [toast, setToast] = useState<string | null>(null);
@@ -680,10 +692,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     // 2a. Luces del taller (lámparas del pasillo y luz de las máquinas activas)
                     const lighting = new WorkshopLighting(lightLayer, VIRTUAL_W, VIRTUAL_H, [
-                        { x: 70, y: 125 },
-                        { x: 175, y: 125 },
-                        { x: 285, y: 125 },
-                        { x: 390, y: 125 }
+                        { x: 70, y: 137 },
+                        { x: 175, y: 137 },
+                        { x: 285, y: 137 },
+                        { x: 390, y: 137 }
                     ]);
                     lighting.setPlotterSpots(
                         plottersListRef.current.map((p) => ({
@@ -692,6 +704,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             y: p.baseY + 58,
                             w: p.plotterActualW
                         }))
+                    );
+                    // De noche cada sector se ilumina con una luz cálida
+                    lighting.setStationPools(
+                        getPixiStations()
+                            .filter((s) => !(s.id === 'plotter1' || s.id === 'plotter2' || s.id.startsWith('maquina_')))
+                            .map((s) => ({ x: s.x, y: s.y, w: s.width, h: s.height }))
                     );
                     lightingRef.current = lighting;
 
@@ -730,7 +748,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             x: Math.round(40 + Math.random() * 400),
                             y: Math.round(hallLanes.topEdge + 10 + Math.random() * Math.max(4, hallLanes.bottomEdge - hallLanes.topEdge - 16))
                         }),
-                        onPowerBack: () => petRef.current?.reunion()
+                        onPowerBack: () => petRef.current?.reunion(),
+                        breakSpot: () => {
+                            const br = getPixiStations().find((s) => s.id === 'refrigerios');
+                            return br ? { x: Math.round(br.x + br.width / 2), y: Math.round(br.y + br.height + 10) } : null;
+                        }
                     });
                     eventsRef.current.setEnabled(fxToggleRef.current.events);
                     skyRef.current?.setHour(hourOf(workshopNow()));
@@ -766,6 +788,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     tagText.x = 6;
                     tagText.y = 1;
                     tagContainer.addChild(tagText);
+                    tagContainer.visible = false; // etiqueta de prueba oculta (ya no se muestra en producción)
                     uiLayer.addChild(tagContainer);
 
                     tagContainerRef.current = tagContainer;
@@ -964,8 +987,18 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         const b = boardRef.current;
         if (!b || b.text.destroyed || b.late.destroyed) return;
         const s = computeDaySummary(list, workshopNow());
+        const goal = WORKSHOP_CONFIG.dailyGoal.deliveries;
+        if (!goalReadyRef.current) {
+            if (list.length > 0) {
+                goalReadyRef.current = true;
+                goalPrevRef.current = s.entregadasHoy;
+            }
+        } else {
+            if (goalPrevRef.current < goal && s.entregadasHoy >= goal) celebrateGoal();
+            goalPrevRef.current = s.entregadasHoy;
+        }
         b.text.text =
-            `✔ ${s.entregadasHoy} ${s.entregadasHoy === 1 ? 'entregada' : 'entregadas'}\n` +
+            `✔ ${s.entregadasHoy}/${goal} ${s.entregadasHoy === 1 ? 'entregada' : 'entregadas'}\n` +
             `▣ ${fmtM2(s.m2Hoy)} m² producidos`;
         if (s.atrasadas > 0) {
             b.late.text = `⚠ ${s.atrasadas} ${s.atrasadas === 1 ? 'atrasada' : 'atrasadas'}`;
@@ -1013,6 +1046,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             ic.text.text = s.count > 1 ? String(s.count) : '!';
             ic.text.style.fill = s.severity === 'danger' ? '#ffffff' : '#111827';
         });
+    };
+
+    /** Festejo grande al cumplir la meta del día (una sola vez por día): confeti en varios sectores y las mascotas se juntan. */
+    const celebrateGoal = () => {
+        const day = workshopNow().toDateString();
+        try {
+            if (localStorage.getItem('luxius_print_den_goal_day') === day) return;
+            localStorage.setItem('luxius_print_den_goal_day', day);
+        } catch (_) {}
+        if (fxToggleRef.current.sndAchv) audioEngine.playOrderComplete();
+        for (const id of ['despacho', 'caja', 'empaque', 'corte']) {
+            const st = getPixiStations().find((s) => s.id === id);
+            if (st) fxRef.current?.confetti(st.x + st.width / 2, st.y + 10, 50, st.width * 0.8);
+        }
+        crewRef.current?.announce(['¡META DEL DÍA CUMPLIDA! 🏆', '¡Qué equipazo! 🎉', '¡Lo logramos, a festejar!'], 3, 'ok');
+        petRef.current?.reunion();
+        showToast(`🏆 ¡Meta del día cumplida: ${WORKSHOP_CONFIG.dailyGoal.deliveries} entregas!`);
     };
 
     /** Confeti y festejo cuando una orden REAL pasa a "entregado". */
@@ -1843,6 +1893,25 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 petRef.current?.update(dtMs, crewRef.current);
                 guestsRef.current?.update(dtMs, crewRef.current?.isSpeaking() ?? false);
                 eventsRef.current?.update(dtMs);
+                // Actividad visible: chispas y recortes en los sectores con órdenes reales; notas si suena la radio
+                activityMsRef.current += dtMs;
+                if (activityMsRef.current >= WORKSHOP_CONFIG.activity.intervalMs) {
+                    activityMsRef.current = 0;
+                    const colors: Record<string, number> = { diseno: 0x38bdf8, corte: 0xf9a8d4, empaque: 0xd6a96a, despacho: 0x94a3b8, caja: 0xfacc15 };
+                    stationsUIRef.current.forEach((s) => {
+                        const c = colors[s.id];
+                        if (c === undefined || (prevCountsRef.current.get(s.id) ?? 0) <= 0) return;
+                        fxRef.current?.work(s.x + s.width / 2, s.y + s.height * 0.5, c);
+                    });
+                }
+                if (radioRef.current > 0) {
+                    radioNotesMsRef.current += dtMs;
+                    if (radioNotesMsRef.current >= 1800) {
+                        radioNotesMsRef.current = 0;
+                        const br = stationsUIRef.current.find((s) => s.id === 'refrigerios');
+                        if (br) fxRef.current?.notes(br.x + br.width / 2, br.y + 8, 1);
+                    }
+                }
                 skyRef.current?.update(dtMs, elapsedMs);
                 if (frameCount % 120 === 0) skyRef.current?.setHour(hourOf(workshopNow()));
                 if (frameCount % 60 === 0) updateClock();
@@ -2081,6 +2150,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 achievementsOpen={achOpen}
                 onToggleAchievements={() => setAchOpen((v) => !v)}
                 pets={visiblePets}
+                radio={radio}
+                onRadio={() => {
+                    audioEngine.playClick();
+                    setRadio(workshopRadio.next());
+                }}
                 onOpenPet={(id) => {
                     const prof = petRef.current?.getPet(id)?.profile;
                     if (!prof) return;
@@ -2184,6 +2258,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 />
             )}
             {achOpen && <AchievementsPanel list={achievements} onClose={() => setAchOpen(false)} />}
+            {isFs && (
+                <TvTicker
+                    orders={orders}
+                    getNow={workshopNow}
+                    weatherText={fxToggles.weather && weather ? `${weather.label} ${weather.tempC}°C · ${weather.place}` : null}
+                />
+            )}
             {toast && (
                 <div
                     role="status"

@@ -3,6 +3,7 @@
 
 import { PetPortrait } from './PetPortrait';
 import React from 'react';
+import { RADIO_STATIONS } from './workshopRadio';
 
 export interface FxToggles {
     pet: boolean;
@@ -40,6 +41,9 @@ export interface WorkshopToolbarProps {
     /** Mascotas que están ahora en el taller (clic = abrir su ficha). */
     pets?: { id: string; name: string; emoji: string }[];
     onOpenPet?: (id: string) => void;
+    /** Radio del taller: 0 = apagada, 1..N = emisora. */
+    radio?: number;
+    onRadio?: () => void;
 }
 
 const chip = (active: boolean, accent = '#38bdf8'): React.CSSProperties => ({
@@ -84,7 +88,9 @@ export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
     onToggleAchievements,
     weatherText,
     pets = [],
-    onOpenPet
+    onOpenPet,
+    radio = 0,
+    onRadio
 }) => (
     <div
         id="workshop-toolbar"
@@ -111,6 +117,17 @@ export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
         <button type="button" style={chip(isFullscreen, '#22c55e')} onClick={onToggleFullscreen} title="Modo TV / pantalla completa (Esc para salir)">
             {isFullscreen ? '🗗 Salir de pantalla completa' : '📺 Modo TV'}
         </button>
+        {onRadio && (
+            <button
+                type="button"
+                style={chip(radio > 0, '#f472b6')}
+                onClick={onRadio}
+                title="Radio del taller (sintetizada): tocá para cambiar de emisora o apagarla"
+                aria-pressed={radio > 0}
+            >
+                📻 Radio: {radio > 0 ? `${RADIO_STATIONS[radio - 1].emoji} ${RADIO_STATIONS[radio - 1].name}` : 'apagada'}
+            </button>
+        )}
         <span style={{ width: 1, height: 18, background: '#1e293b', margin: '0 2px' }} />
         {(Object.keys(FX_LABEL) as Array<keyof FxToggles>).map((k) => (
             <button key={k} type="button" style={chip(fx[k], '#a78bfa')} onClick={() => onToggleFx(k)} title={FX_LABEL[k].title} aria-pressed={fx[k]}>

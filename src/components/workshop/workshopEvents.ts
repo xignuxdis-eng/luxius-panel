@@ -8,9 +8,9 @@ import type { WorkshopLighting } from './workshopLighting';
 import type { GuestManager } from './workshopGuests';
 import type { WorkerCrew, Point } from './workshopWorkers';
 
-export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'repartidor' | 'tecnico';
+export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'birthday' | 'repartidor' | 'tecnico' | 'cliente' | 'pizzero';
 
-export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'repartidor', 'tecnico'];
+export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'birthday', 'repartidor', 'tecnico', 'cliente', 'pizzero'];
 
 import { EVENT_TEXTS } from './content/texts';
 import { WORKSHOP_CONFIG, randomIn } from './content/config';
@@ -19,6 +19,7 @@ const BLACKOUT_LINES = EVENT_TEXTS.blackout;
 const BLACKOUT_BACK = EVENT_TEXTS.blackoutBack;
 const COFFEE_LINES = EVENT_TEXTS.coffee;
 const HAPPY_LINES = EVENT_TEXTS.happyHour;
+const BIRTHDAY_LINES = EVENT_TEXTS.birthday;
 const BLACKOUT_DARK_MS = WORKSHOP_CONFIG.events.blackout.darkUntilMs;
 const BLACKOUT_END_MS = WORKSHOP_CONFIG.events.blackout.endMs;
 
@@ -40,6 +41,8 @@ export interface EventDeps {
     floorSpot: () => Point;
     /** Se llama cuando vuelve la luz después de un apagón (las mascotas se juntan). */
     onPowerBack?: () => void;
+    /** Lugar frente a la zona de Refrigerios (para la torta de cumpleaños). */
+    breakSpot?: () => Point | null;
 }
 
 interface Running {
@@ -67,6 +70,8 @@ export class WorkshopEvents {
             this.stopRunning();
             this.deps.guests()?.dismiss('repartidor');
             this.deps.guests()?.dismiss('tecnico');
+            this.deps.guests()?.dismiss('cliente');
+            this.deps.guests()?.dismiss('pizzero');
         }
     }
 
@@ -83,8 +88,9 @@ export class WorkshopEvents {
     trigger(name: WorkshopEventName): boolean {
         if (this.destroyed || this.running) return false;
         const crew = this.deps.crew();
-        if (name === 'repartidor' || name === 'tecnico') {
+        if (name === 'repartidor' || name === 'tecnico' || name === 'cliente' || name === 'pizzero') {
             const ok = this.deps.guests()?.spawn(name) ?? false;
+            if (ok && name === 'pizzero') crew?.announce(['¡Llegó la pizza! 🍕'], 1, 'ok');
             return ok;
         }
         this.running = { name, t: 0, done: false, step: 0 };
@@ -93,6 +99,14 @@ export class WorkshopEvents {
             this.running.spot = spot;
             this.deps.fx()?.spill(spot.x, spot.y);
             crew?.announce(COFFEE_LINES, 1, 'warn');
+        } else if (name === 'birthday') {
+            const spot = this.deps.breakSpot?.() ?? this.deps.floorSpot();
+            this.running.spot = spot;
+            const names = crew ? crew.getWorkers().map((w) => w.name) : [];
+            const who = names.length ? names[Math.floor(this.rng() * names.length)] : 'el equipo';
+            this.deps.fx()?.cake(spot.x, spot.y, WORKSHOP_CONFIG.events.birthdayMs);
+            this.deps.fx()?.confetti(spot.x, spot.y - 6, 40, 30);
+            crew?.announce([`¡Feliz cumple, ${who}! 🎂`, ...BIRTHDAY_LINES], 2, 'ok');
         } else if (name === 'happyhour') {
             crew?.announce(HAPPY_LINES, 2);
             this.notesMs = 0;
@@ -129,6 +143,17 @@ export class WorkshopEvents {
                 }
             } else if (r.name === 'coffee') {
                 if (r.t >= WORKSHOP_CONFIG.events.coffeeMs) {
+                    this.running = null;
+                    this.timer = nextDelayMs(this.rng);
+                }
+            } else if (r.name === 'birthday') {
+                this.notesMs -= dtMs;
+                if (this.notesMs <= 0 && fx && r.spot) {
+                    this.notesMs = 700;
+                    fx.notes(r.spot.x, r.spot.y - 12, 1);
+                    fx.confetti(r.spot.x, r.spot.y - 8, 6, 24);
+                }
+                if (r.t >= WORKSHOP_CONFIG.events.birthdayMs) {
                     this.running = null;
                     this.timer = nextDelayMs(this.rng);
                 }

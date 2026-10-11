@@ -56,6 +56,8 @@ export interface PlotterLightSpot {
 export class WorkshopLighting {
     private overlay = new Graphics();
     private lamps = new Graphics();
+    /** Charcos de luz cálida sobre cada estación: se encienden al caer la noche. */
+    private pools = new Graphics();
     private glows = new Map<string, Graphics>();
     private lastBucket = -1;
     private darkness = 0;
@@ -78,6 +80,23 @@ export class WorkshopLighting {
             this.lamps.rect(l.x - 2, l.y - 1, 4, 2).fill({ color: 0xfff7d6, alpha: 0.9 });
         }
         this.layer.addChild(this.lamps);
+        this.redraw();
+    }
+
+    /** Dibuja un charco de luz cálida sobre cada estación (coordenadas del mapa). Solo se ve de noche. */
+    setStationPools(spots: { x: number; y: number; w: number; h: number }[]) {
+        this.pools.clear();
+        this.pools.eventMode = 'none';
+        this.pools.blendMode = 'add';
+        for (const s of spots) {
+            const cx = s.x + s.w / 2;
+            const cy = s.y + s.h * 0.55;
+            for (let i = 0; i < 6; i++) {
+                const k = 1 - i / 6;
+                this.pools.ellipse(cx, cy, (s.w * 0.75 + 10) * k, (s.h * 0.6 + 8) * k).fill({ color: 0xffd08a, alpha: 0.03 });
+            }
+        }
+        if (!this.pools.parent) this.layer.addChild(this.pools);
         this.redraw();
     }
 
@@ -105,6 +124,7 @@ export class WorkshopLighting {
         }
         // Las lámparas se notan más de noche y casi nada de día; en un apagón se apagan
         this.lamps.alpha = (0.25 + 0.75 * (this.darkness / MAX_DARKNESS)) * (1 - this.blackout);
+        this.pools.alpha = Math.min(1, (this.darkness / MAX_DARKNESS) * 1.4) * (1 - this.blackout);
     }
 
     /** Apagón temporal (evento decorativo). */

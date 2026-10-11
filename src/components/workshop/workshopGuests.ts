@@ -137,6 +137,8 @@ export class GuestManager {
 
     private targetStation(kind: GuestKind): StationConfig | undefined {
         if (kind === 'repartidor') return this.stations.find((s) => s.id === 'despacho');
+        if (kind === 'cliente') return this.stations.find((s) => s.id === 'caja');
+        if (kind === 'pizzero') return this.stations.find((s) => s.id === 'refrigerios');
         return this.stations.find((s) => s.id.startsWith('plotter') || s.id.startsWith('maquina_'));
     }
 

@@ -65,3 +65,5 @@ Todo se edita en `content/voices.ts` (sin archivos de audio, se sintetiza en el 
 - propsScale en StationConfig reduce los dibujos de una estacion (Diseno e Insumos usan 0.5); con los botones de la barra se hace zoom a cada una.
 
 - Los sectores no tienen recuadro ni barra de color: solo un cartelito con el nombre y un resplandor del color del sector al pasar el mouse. computeLanes devuelve `rows` (carriles del pasillo) y cada operario usa uno distinto.
+
+- Nuevos: workshopRadio.ts (melodias como datos), TvTicker.tsx (franja del Modo TV), config.dailyGoal / activity / tv, visitas cliente y pizzero (content/guests.ts), evento birthday (content/texts.ts), WorkshopLighting.setStationPools (luces de noche).

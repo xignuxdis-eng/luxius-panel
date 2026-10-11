@@ -7,7 +7,7 @@ import { Container, Graphics } from 'pixi.js';
 const MAX_PARTICLES = 160;
 const CONFETTI_COLORS = [0xef4444, 0xf59e0b, 0xfacc15, 0x22c55e, 0x38bdf8, 0xa855f7, 0xec4899, 0xffffff];
 
-type Kind = 'confetti' | 'heart' | 'note';
+type Kind = 'confetti' | 'heart' | 'note' | 'spark';
 
 interface Particle {
     g: Graphics;
@@ -91,6 +91,29 @@ export class WorkshopFx {
         }
     }
 
+    /** Recortes y chispitas que salen de una estación con trabajo real en curso (1 o 2 píxeles). */
+    work(x: number, y: number, color: number) {
+        const g = new Graphics();
+        const sz = this.rng() < 0.5 ? 1 : 2;
+        g.rect(0, 0, sz, sz).fill({ color });
+        this.add('spark', g, x + (this.rng() - 0.5) * 14, y, (this.rng() - 0.5) * 0.3, -0.25 - this.rng() * 0.25, 0.008, 36 + Math.floor(this.rng() * 24));
+    }
+
+    /** Torta de cumpleaños en el piso (se retira sola). */
+    cake(x: number, y: number, ttlMs = 12000) {
+        if (this.destroyed || this.puddles.length >= 6) return;
+        const g = new Graphics();
+        g.rect(-5, -4, 10, 5).fill({ color: 0xf9a8d4 });
+        g.rect(-5, -4, 10, 2).fill({ color: 0xffffff });
+        g.rect(-5, 1, 10, 1).fill({ color: 0x92400e });
+        g.rect(-3, -8, 1, 4).rect(0, -8, 1, 4).rect(3, -8, 1, 4).fill({ color: 0x38bdf8 });
+        g.rect(-3, -9, 1, 1).rect(0, -9, 1, 1).rect(3, -9, 1, 1).fill({ color: 0xfacc15 });
+        g.x = x;
+        g.y = y;
+        g.eventMode = 'none';
+        this.floorLayer.addChild(g);
+        this.puddles.push({ g, life: 0, max: ttlMs });
+    }
     /** Mancha en el piso (café derramado) que se seca y desaparece. */
     spill(x: number, y: number, ttlMs = 22000) {
         if (this.destroyed || this.puddles.length >= 6) return;

@@ -5,5 +5,6 @@ export const EVENT_TEXTS = {
     blackout: ['¡Se fue la luz! 🔦', '¿Alguien tocó el térmico?', 'Tranquilos, tranquilos...'],
     blackoutBack: ['¡Volvió la luz! 💡', 'Menos mal, no se perdió ningún archivo.'],
     coffee: ['¡Mi café! ☕', 'Cuidado: piso mojado.', 'Alguien traiga el secador...'],
-    happyHour: ['¡Hora feliz en el Den! 🎶', '¡Música, maestro! 🎵', 'Y encima los impresos salen bárbaros.']
+    happyHour: ['¡Hora feliz en el Den! 🎶', '¡Música, maestro! 🎵', 'Y encima los impresos salen bárbaros.'],
+    birthday: ['¡Que cumplas muchos más! 🎉', '¡A soplar las velitas! 🕯️', '¡Torta para todo el equipo!']
 };

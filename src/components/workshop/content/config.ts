@@ -52,9 +52,20 @@ export const WORKSHOP_CONFIG = {
         intervalFastMs: [5000, 9000] as [number, number],
         coffeeMs: 6000,
         happyHourMs: 11000,
+        /** Cumpleaños: cuánto dura la torta en el piso. */
+        birthdayMs: 12000,
         /** Apagón: duración total y momentos (ms desde el inicio). */
         blackout: { darkUntilMs: 3600, endMs: 4400 }
-    }
+    },
+
+    /** Meta del día: cantidad de órdenes entregadas hoy que dispara el festejo grande (una vez por día). */
+    dailyGoal: { deliveries: 8 },
+
+    /** Actividad visible en las estaciones que tienen órdenes (cada cuánto sale una chispa o un recorte, en ms). */
+    activity: { intervalMs: 650 },
+
+    /** Modo TV (pantalla completa): cuánto dura cada tarjeta del resumen que rota. */
+    tv: { slideMs: 9000 }
 };
 
 /** Elige un valor al azar dentro de un rango [min, max]. */
