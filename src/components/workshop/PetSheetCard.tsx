@@ -1,6 +1,7 @@
 // PetSheetCard.tsx - Ficha técnica de una mascota del Print Den (estilo WoW). TODO es de fantasía/decorativo.
 // Se cierra con la X, con Escape o con un clic fuera. Muestra lo que está haciendo ahora y permite oír su sonido.
 
+import { PetPortrait } from './PetPortrait';
 import React, { useEffect, useRef, useState } from 'react';
 import type { PetProfile } from './workshopPet';
 
@@ -97,7 +98,7 @@ export const PetSheetCard: React.FC<PetSheetCardProps> = ({ profile, getActivity
                         background: '#120d22'
                     }}
                 >
-                    {profile.emoji}
+                    <PetPortrait profile={profile} size={36} />
                 </div>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ color: '#f5f3ff', fontWeight: 800, fontSize: 16 }}>{profile.name}</div>

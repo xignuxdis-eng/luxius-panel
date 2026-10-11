@@ -56,7 +56,7 @@ export const WorkshopDashboard: React.FC = () => {
     const [isMuted, setIsMuted] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
     const [rendererType, setRendererType] = useState<'legacy' | 'pixi'>(() => {
-        return (localStorage.getItem('luxius_print_den_renderer') as 'legacy' | 'pixi') || 'legacy';
+        return (localStorage.getItem('luxius_print_den_renderer') as 'legacy' | 'pixi') || 'pixi';
     });
     const [pixiAsyncError, setPixiAsyncError] = useState<string | null>(null);
 

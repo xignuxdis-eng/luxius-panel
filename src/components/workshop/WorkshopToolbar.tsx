@@ -1,6 +1,7 @@
 // WorkshopToolbar.tsx - Barra del Print Den (Bloque F12/F13): atajos a cada estación, logros, modo TV
 // y botones para encender/apagar por separado las extras decorativas (mascota, eventos, clima, alertas).
 
+import { PetPortrait } from './PetPortrait';
 import React from 'react';
 
 export interface FxToggles {
@@ -115,7 +116,7 @@ export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
         {fx.pet &&
             pets.map((p) => (
                 <button key={p.id} type="button" style={chip(false, '#c084fc')} onClick={() => onOpenPet?.(p.id)} title={`Ver la ficha de ${p.name}`}>
-                    {p.emoji} {p.name}
+                    <PetPortrait id={p.id} size={16} /> {p.name}
                 </button>
             ))}
         {fx.weather && weatherText && (
