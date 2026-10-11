@@ -63,3 +63,5 @@ Todo se edita en `content/voices.ts` (sin archivos de audio, se sintetiza en el 
 ### Refrigerios (zona de descanso) y escala de estaciones
 - Estacion efrigerios (heladera, cafetera, cocina) definida en workshopPixiUtils.ts y dibujada en workshopStationProps.ts (uildBreakRoom). Los operarios libres la visitan de vez en cuando (BREAK_CHANCE en workshopWorkers.ts): piensan frases de descanso y, si coinciden dos, charlan. Las frases se editan en workshopBanter.ts (BREAK_THOUGHTS, BREAK_CHATS).
 - propsScale en StationConfig reduce los dibujos de una estacion (Diseno e Insumos usan 0.5); con los botones de la barra se hace zoom a cada una.
+
+- Los sectores no tienen recuadro ni barra de color: solo un cartelito con el nombre y un resplandor del color del sector al pasar el mouse. computeLanes devuelve `rows` (carriles del pasillo) y cada operario usa uno distinto.

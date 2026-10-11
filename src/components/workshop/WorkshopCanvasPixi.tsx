@@ -95,15 +95,29 @@ const loadFxToggles = (): FxToggles => {
         if (raw) {
             const saved = { ...DEFAULT_FX, ...JSON.parse(raw) };
             // Migración única: un valor viejo guardado como apagado dejaba el clima sin verse. Se enciende una vez y después se respeta lo que elija cada usuario.
-            if (!localStorage.getItem('luxius_print_den_weather_v2')) {
-                localStorage.setItem('luxius_print_den_weather_v2', '1');
+            if (!localStorage.getItem('luxius_print_den_weather_v4')) {
+                localStorage.setItem('luxius_print_den_weather_v4', '1');
                 saved.weather = true;
+                // Se guarda ya mismo: React puede ejecutar este inicializador dos veces y la segunda no debe pisar el cambio
+                localStorage.setItem(FX_STORAGE_KEY, JSON.stringify(saved));
             }
             return saved;
         }
-        localStorage.setItem('luxius_print_den_weather_v2', '1');
+        localStorage.setItem('luxius_print_den_weather_v4', '1');
     } catch (_) {}
     return { ...DEFAULT_FX };
+};
+
+/** Resplandor suave alrededor de un sector (capas concéntricas cada vez más transparentes). */
+const drawStationGlow = (gfx: Graphics, x: number, y: number, w: number, h: number, color: number, radius = 3) => {
+    gfx.roundRect(x, y, w, h, radius).fill({ color, alpha: 0.07 });
+    for (let i = 0; i < 5; i++) {
+        gfx.roundRect(x - i * 1.3, y - i * 1.3, w + i * 2.6, h + i * 2.6, radius + i).stroke({
+            width: 1.6,
+            color,
+            alpha: 0.4 * (1 - i / 5)
+        });
+    }
 };
 
 const VIRTUAL_W = 480;
@@ -169,6 +183,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         y: number;
         width: number;
         height: number;
+        /** Fondo del cartelito del sector (solo estaciones que no son plotter). */
+        signBg?: Graphics;
+        /** Color del sector (para el borde del cartelito). */
+        colorNum?: number;
     }
 
     const plottersListRef = useRef<PlotterStationItem[]>([]);
@@ -541,14 +559,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     }
                     gfx.stroke({ width: 2, color: 0x38bdf8 });
                 } else if (isHovered) {
+                    const glowColor = (gfx as any)._glowColor ?? 0xf59e0b;
                     if (isPlotter) {
                         const plotterW = Math.min(204, boundsW - 4);
                         const offX = Math.floor((boundsW - plotterW) / 2);
-                        gfx.roundRect(offX - 2, 24, plotterW + 4, 50, 4);
+                        drawStationGlow(gfx, offX - 2, 24, plotterW + 4, 50, glowColor, 4);
                     } else {
-                        gfx.rect(-1, -1, boundsW + 2, boundsH + 2);
+                        drawStationGlow(gfx, 0, 0, boundsW, boundsH, glowColor);
                     }
-                    gfx.stroke({ width: 1.5, color: 0xf59e0b });
                 }
             } catch (_) {}
         });
@@ -1090,9 +1108,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         stationsUIRef.current.forEach((s) => {
             const isPlotter = s.id === 'plotter1' || s.id === 'plotter2' || s.id.startsWith('maquina_');
             if (!isPlotter) {
-                s.titleText.x = Math.round((s.x + 8) * scale);
-                s.titleText.y = Math.round((s.y + 3) * scale);
                 s.titleText.style.fontSize = 13;
+                // Cartelito centrado arriba del sector, con fondo oscuro y borde del color del sector
+                s.titleText.x = Math.round((s.x + s.width / 2) * scale - s.titleText.width / 2);
+                s.titleText.y = Math.round((s.y + 3) * scale);
+                if (s.signBg && !s.signBg.destroyed) {
+                    s.signBg.clear();
+                    s.signBg.roundRect(s.titleText.x - 5, s.titleText.y - 2, s.titleText.width + 10, s.titleText.height + 4, 3);
+                    s.signBg.fill({ color: 0x0b1020, alpha: 0.82 });
+                    s.signBg.stroke({ width: 1, color: s.colorNum ?? 0x334155, alpha: 0.9 });
+                }
                 s.badgeContainer.x = Math.round((s.x + s.width - 12) * scale);
                 s.badgeContainer.y = Math.round((s.y + 10) * scale);
             } else {
@@ -1311,9 +1336,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
         // C. Líneas de Guía de Seguridad sutiles en el pasillo entre estaciones (y: 110 a y: 140)
         const guideGfx = new Graphics();
-        guideGfx.rect(16, 118, mapW - 32, 2);
+        guideGfx.rect(16, 126, mapW - 32, 2);
         guideGfx.fill({ color: 0x334155, alpha: 0.6 });
-        guideGfx.rect(16, 132, mapW - 32, 2);
+        guideGfx.rect(16, 150, mapW - 32, 2);
         guideGfx.fill({ color: 0x334155, alpha: 0.6 });
         layer.addChild(guideGfx);
     };
@@ -1400,18 +1425,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             const isPlotter = id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_');
 
             if (!isPlotter) {
-                // Base Floor Platform for normal workshop stations
-                const baseGfx = new Graphics();
-                baseGfx.rect(0.5, 0.5, width - 1, height - 1);
-                baseGfx.fill({ color: 0x161c24, alpha: 0.96 });
-                baseGfx.stroke({ width: 1.5, color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
-                visualContainer.addChild(baseGfx);
-
-                // Title Bar Header Platform Background
-                const headerGfx = new Graphics();
-                headerGfx.rect(0, 0, width, 16);
-                headerGfx.fill({ color: parseInt(color.replace('#', '0x'), 16) || 0x334155 });
-                visualContainer.addChild(headerGfx);
+                // Sin plataforma ni barra de color: solo un cartelito con el nombre (se dibuja en la capa UI)
+                const colorNum = parseInt(color.replace('#', '0x'), 16) || 0x334155;
+                const signBg = new Graphics();
+                uiLayer.addChild(signBg);
 
                 // Station Title Text in UILayer (B0.2: Native resolution 13px)
                 const titleStyle = new TextStyle({
@@ -1456,7 +1473,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     x,
                     y,
                     width,
-                    height
+                    height,
+                    signBg,
+                    colorNum
                 });
             }
 
@@ -1480,6 +1499,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             const highlightGfx = new Graphics();
             visualContainer.addChild(highlightGfx);
             highlightsMapRef.current.set(id, highlightGfx);
+            (highlightGfx as any)._glowColor = parseInt(color.replace('#', '0x'), 16) || 0xf59e0b;
 
             // ================================================================
             // FASE 2: DETAILED GRAND FORMAT PLOTTER STATION (Sin marco de tarjeta)
@@ -1660,11 +1680,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 hoveredStationRef.current = id;
                 highlightGfx.clear();
                 if (isPlotter) {
-                    highlightGfx.roundRect(plotterOffsetX - 2, plotterOffsetY - 2, plotterActualW + 4, 50, 4);
-                    highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
+                    drawStationGlow(highlightGfx, plotterOffsetX - 2, plotterOffsetY - 2, plotterActualW + 4, 50, (highlightGfx as any)._glowColor, 4);
                 } else {
-                    highlightGfx.rect(-1, -1, width + 2, height + 2);
-                    highlightGfx.stroke({ width: 1.5, color: 0xf59e0b });
+                    drawStationGlow(highlightGfx, 0, 0, width, height, (highlightGfx as any)._glowColor);
                 }
 
                 // If hovering Plotter, display rich Hover HUD Tooltip inside canvas

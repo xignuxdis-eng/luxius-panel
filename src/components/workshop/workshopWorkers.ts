@@ -223,6 +223,8 @@ export interface Lanes {
     /** Borde inferior de la fila de arriba y borde superior de la fila de abajo. */
     topEdge: number;
     bottomEdge: number;
+    /** Carriles repartidos a lo ancho del pasillo (de arriba hacia abajo); cada operario usa uno distinto. */
+    rows: number[];
 }
 
 /** Calcula los carriles del pasillo entre la fila superior y la inferior de estaciones. */
@@ -232,7 +234,12 @@ export function computeLanes(stations: StationConfig[]): Lanes {
     const topEdge = top.length ? Math.max(...top.map((s) => s.y + s.height)) : 110;
     const bottomEdge = bottom.length ? Math.min(...bottom.map((s) => s.y)) : 140;
     const low = bottomEdge - 6;
-    return { low, high: low - 8, topEdge, bottomEdge };
+    // Carriles parejos entre el borde de la fila de arriba y el de abajo (3 a 5 según el ancho del pasillo)
+    const first = topEdge + 8;
+    const span = Math.max(0, low - first);
+    const n = Math.max(2, Math.min(5, Math.floor(span / 10) + 1));
+    const rows = Array.from({ length: n }, (_, i) => Math.round(first + (span * i) / (n - 1)));
+    return { low, high: low - 8, topEdge, bottomEdge, rows };
 }
 
 /** Un punto (los pies del operario) es transitable si está dentro del mapa y fuera de toda estación. */
@@ -252,7 +259,9 @@ export function getStandPoint(station: StationConfig, laneY: number, dupOffsetX:
     const cx = station.x + station.width / 2 + dupOffsetX;
     const x = Math.max(14, Math.min(MAP_W - 14, Math.round(cx)));
     const facing: CharacterDirection = station.y + station.height <= lanes.topEdge + 1 ? 'up' : 'down';
-    return { x, y: laneY, facing };
+    // Frente a la fila de abajo se para cerca de la estación (no a 40 px) aunque el pasillo sea ancho
+    const y = facing === 'down' ? Math.max(laneY, lanes.bottomEdge - 20) : laneY;
+    return { x, y, facing };
 }
 
 /** Ruta en dos tramos: primero cambia de carril (vertical), luego avanza (horizontal). Sin tramos de largo cero. */
@@ -449,7 +458,7 @@ export class WorkerCrew {
 
         for (const spec of buildCrewSpecs(users)) {
             const station = this.findStationForRole(spec.role);
-            const laneY = spec.index % 2 === 0 ? this.lanes.low : this.lanes.high;
+            const laneY = this.lanes.rows[spec.index % this.lanes.rows.length];
             const home = station
                 ? getStandPoint(station, laneY, spec.dupOffsetX, this.lanes)
                 : { x: 60 + spec.index * 90, y: laneY, facing: 'down' as CharacterDirection };
@@ -575,7 +584,7 @@ export class WorkerCrew {
         const w = this.workers.find((x) => x.spec.id === workerId);
         const station = this.stations.find((s) => s.id === stationId);
         if (!w || !station || this._destroyed) return false;
-        const laneY = w.spec.index % 2 === 0 ? this.lanes.low : this.lanes.high;
+        const laneY = this.lanes.rows[w.spec.index % this.lanes.rows.length];
         const target = getStandPoint(station, laneY, w.spec.dupOffsetX, this.lanes);
         this.startPath(w, target);
         return true;
@@ -691,7 +700,7 @@ export class WorkerCrew {
         const brk = this.stations.find((s) => s.id === BREAK_STATION_ID);
         if (brk && this.rng() < BREAK_CHANCE) {
             const taken = this.workers.filter((o) => o !== w && o.onBreak).length;
-            const laneY = taken % 2 === 0 ? this.lanes.low : this.lanes.high;
+            const laneY = this.lanes.rows[(taken + 1) % this.lanes.rows.length];
             const stand = getStandPoint(brk, laneY, [0, -11, 11, -20][taken % 4], this.lanes);
             if (Math.hypot(stand.x - from.x, stand.y - from.y) >= 12 && this.tryLegTo(w, stand, stand.facing)) {
                 w.visiting = true;
@@ -702,7 +711,7 @@ export class WorkerCrew {
         if (this.stations.length > 0 && this.rng() < STATION_VISIT_CHANCE) {
             for (let tries = 0; tries < 6; tries++) {
                 const st = this.stations[Math.floor(this.rng() * this.stations.length)];
-                const laneY = this.rng() < 0.5 ? this.lanes.low : this.lanes.high;
+                const laneY = this.lanes.rows[Math.floor(this.rng() * this.lanes.rows.length)];
                 const stand = getStandPoint(st, laneY, 0, this.lanes);
                 if (Math.hypot(stand.x - from.x, stand.y - from.y) < 12) continue;
                 if (this.tryLegTo(w, stand, stand.facing)) {

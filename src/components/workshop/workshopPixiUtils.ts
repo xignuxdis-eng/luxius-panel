@@ -94,12 +94,13 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'refrigerios',
             title: 'Refrigerios',
             description: 'Zona de descanso: heladera, cafetera y cocina para una pausa.',
-            x: 68,
+            x: 70,
             y: 36,
-            width: 62,
-            height: 72,
+            width: 52,
+            height: 60,
             color: '#14b8a6',
-            icon: '☕'
+            icon: '☕',
+            propsScale: 0.82
         }
     ];
 
@@ -163,47 +164,48 @@ export const getPixiStations = (): StationConfig[] => {
             title: 'Despacho',
             description: 'Salida de paquetes y flete.',
             x: 16,
-            y: 140,
-            width: 86,
-            height: 100,
+            y: 166,
+            width: 64,
+            height: 72,
             color: '#64748b',
-            icon: '🚚'
+            icon: '🚚',
+            propsScale: 0.72
         },
         {
             id: 'empaque',
             title: 'Empaque',
             description: 'Doblado, ojalillos y embalaje.',
-            x: 114,
-            y: 140,
-            width: 96,
-            height: 84,
+            x: 118,
+            y: 170,
+            width: 78,
+            height: 68,
             color: '#a855f7',
             icon: '📦',
-            propsScale: 0.8
+            propsScale: 0.64
         },
         {
             id: 'corte',
             title: 'Refilado',
             description: 'Corte, refilado y trillado.',
-            x: 232,
-            y: 140,
-            width: 84,
-            height: 75,
+            x: 238,
+            y: 164,
+            width: 70,
+            height: 62,
             color: '#ec4899',
             icon: '✂️',
-            propsScale: 0.7
+            propsScale: 0.58
         },
         {
             id: 'caja',
             title: 'Caja',
             description: 'Ventas, cobros y mostrador.',
-            x: 398,
-            y: 140,
-            width: 64,
-            height: 79,
+            x: 404,
+            y: 168,
+            width: 52,
+            height: 64,
             color: '#f59e0b',
             icon: '🪙',
-            propsScale: 0.75
+            propsScale: 0.6
         }
     );
 
