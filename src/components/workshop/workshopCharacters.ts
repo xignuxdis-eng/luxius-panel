@@ -6,8 +6,11 @@
 // Presupuesto de texturas por operario: 3 variantes x 4 direcciones (caminata) + 1 (respiro) + 2 (trabajo) = 15.
 // Con 4 operarios son 60 + 1 sombra compartida.
 
-import { Texture } from 'pixi.js';
+import { Texture, Rectangle } from 'pixi.js';
 import { createPixelTexture } from './workshopSprites';
+import { getCharacterSheet } from './workshopSpriteOverrides';
+import { CHARACTER_PALETTE } from './content/characters';
+import { CHARACTER_SHEET_LAYOUT } from './content/sprites';
 import type { WorkerRole } from './types';
 
 export const CHARACTER_W = 16;
@@ -26,6 +29,8 @@ export interface CharacterLook {
     skinColor: string;
     hairColor?: string;
     role: WorkerRole;
+    /** Clave de la hoja PNG de reemplazo (por defecto el rol). Ver content/sprites.ts. */
+    sheetKey?: string;
 }
 
 export type CharacterPose =
@@ -76,23 +81,24 @@ function darken(hex: string, factor: number): string {
  *  a metal claro · b azul pantalla · c cian tinta · r rojo mango · g gris hoja · n cartón · y cinta
  */
 export function buildCharacterPalette(look: CharacterLook): Record<string, string> {
+    const P = CHARACTER_PALETTE;
     return {
-        H: look.hairColor || '#3b2a20',
+        H: look.hairColor || P.hairDefault,
         S: look.skinColor,
         s: darken(look.skinColor, 0.8),
-        E: '#0f172a',
+        E: P.eye,
         T: look.shirtColor,
         t: darken(look.shirtColor, 0.7),
-        P: '#334155',
-        p: '#1e293b',
-        B: '#0f172a',
-        a: '#e2e8f0',
-        b: '#38bdf8',
-        c: '#06b6d4',
-        r: '#ef4444',
-        g: '#cbd5e1',
-        n: '#a16207',
-        y: '#fde68a'
+        P: P.pants,
+        p: P.pantsDark,
+        B: P.shoe,
+        a: P.metalLight,
+        b: P.screenBlue,
+        c: P.ink,
+        r: P.handleRed,
+        g: P.blade,
+        n: P.cardboard,
+        y: P.tape
     };
 }
 
@@ -253,8 +259,34 @@ export function getCharacterShadowTexture(): Texture {
     return createPixelTexture('char_shadow', matrix, { k: 'rgba(0,0,0,0.35)' });
 }
 
+const sheetCache = new Map<string, CharacterTextures>();
+
+/** Corta una hoja PNG de operario en cuadros (ver CHARACTER_SHEET_LAYOUT en content/sprites.ts). */
+function texturesFromSheet(sheetKey: string, sheet: Texture): CharacterTextures {
+    const cached = sheetCache.get(sheetKey);
+    if (cached && !cached.idle[0].destroyed) return cached;
+    const L = CHARACTER_SHEET_LAYOUT;
+    const frame = (col: number, row: number) =>
+        new Texture({ source: sheet.source, frame: new Rectangle(col * CHARACTER_W, row * CHARACTER_H, CHARACTER_W, CHARACTER_H) });
+    const walk = {} as Record<CharacterDirection, Texture[]>;
+    for (const dir of CHARACTER_DIRECTIONS) {
+        walk[dir] = Array.from({ length: L.walkCols }, (_, c) => frame(c, L.walkRows[dir]));
+    }
+    const result: CharacterTextures = {
+        walk,
+        idle: [walk.down[0], frame(L.idleBreathCol, L.idleRow)],
+        work: [frame(L.workCols[0], L.workRow), frame(L.workCols[1], L.workRow)]
+    };
+    sheetCache.set(sheetKey, result);
+    return result;
+}
+
 /** Obtiene (y crea si hace falta) todas las texturas de un operario. Usa la cache de workshopSprites. */
 export function getCharacterTextures(look: CharacterLook): CharacterTextures {
+    // Hoja PNG propia (por rol o visita); si no hay, la hoja 'default' (salvo visitas); si no, el dibujo procedural
+    const sheetKey = look.sheetKey ?? look.role;
+    const sheet = getCharacterSheet(sheetKey) ?? (look.sheetKey ? null : getCharacterSheet('default'));
+    if (sheet) return texturesFromSheet(getCharacterSheet(sheetKey) ? sheetKey : 'default', sheet);
     const key = lookKey(look);
     const palette = buildCharacterPalette(look);
     const tex = (name: string, pose: CharacterPose) =>

@@ -3,6 +3,7 @@
 // Architecture is 100% prepared to swap or supplement textures with external PNG spritesheets later.
 
 import { Texture } from 'pixi.js';
+import { withOverride } from './workshopSpriteOverrides';
 
 export interface PixelArtDef {
     matrix: string[];
@@ -144,6 +145,9 @@ export const PALETTE = {
    TEXTURE BUILDERS: Large Concrete Slabs (32x32 px) - Low Contrast
    ========================================================================== */
 export function getTileLargeConcreteA(): Texture {
+    return withOverride('tile_concrete_a', buildTileLargeConcreteA);
+}
+function buildTileLargeConcreteA(): Texture {
     const rowTop = 'G' + 'A'.repeat(30) + 'G';
     const rowMid = 'G' + 'B'.repeat(30) + 'G';
     const rowAlt = 'G' + 'A'.repeat(15) + 'B'.repeat(15) + 'G';
@@ -164,6 +168,9 @@ export function getTileLargeConcreteA(): Texture {
 }
 
 export function getTileLargeConcreteB(): Texture {
+    return withOverride('tile_concrete_b', buildTileLargeConcreteB);
+}
+function buildTileLargeConcreteB(): Texture {
     const rowTop = 'G' + 'B'.repeat(30) + 'G';
     const rowMid = 'G' + 'C'.repeat(30) + 'G';
     const rowAlt = 'G' + 'C'.repeat(10) + 'B'.repeat(20) + 'G';
@@ -187,6 +194,9 @@ export function getTileLargeConcreteB(): Texture {
    TEXTURE BUILDERS: Wall, Windows & Signs
    ========================================================================== */
 export function getWallTileTexture(): Texture {
+    return withOverride('wall_tile', buildWallTileTexture);
+}
+function buildWallTileTexture(): Texture {
     const matrix = [
         'LLLLLLLLLLLLLLLL',
         'MMMMMMMMMMMMMMMM',
@@ -216,6 +226,9 @@ export function getWallTileTexture(): Texture {
 }
 
 export function getWindowTexture(): Texture {
+    return withOverride('window', buildWindowTexture);
+}
+function buildWindowTexture(): Texture {
     // Ventana industrial ampliada (52x18 px) con marco metálico y 4 paneles translúcidos
     const matrix = [
         'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
@@ -245,6 +258,9 @@ export function getWindowTexture(): Texture {
 }
 
 export function getSignDenTexture(): Texture {
+    return withOverride('sign_den', buildSignDenTexture);
+}
+function buildSignDenTexture(): Texture {
     // Cartel "DEN" ampliado (46x16 px) estilo placa industrial de esmalte rojo y tornillos
     const matrix = [
         '##############################################',
@@ -285,6 +301,9 @@ export function getSignDenTexture(): Texture {
  * Proporción 40-45% del ancho de taller, Roland VG2 gran formato.
  */
 export function getPlotterChassisTexture(isOffline = false): Texture {
+    return withOverride(isOffline ? 'plotter_chassis_offline' : 'plotter_chassis', () => buildPlotterChassisTexture(isOffline));
+}
+function buildPlotterChassisTexture(isOffline = false): Texture {
     const key = isOffline ? 'plotter_chassis_204_offline' : 'plotter_chassis_204_online';
     const cached = textureCache.get(key);
     if (isTextureValid(cached)) return cached!;
@@ -385,6 +404,9 @@ export function getPlotterChassisTexture(isOffline = false): Texture {
  * Printhead Carriage (Carro de cabezales móvil)
  */
 export function getPlotterPrintheadTexture(): Texture {
+    return withOverride('plotter_printhead', buildPlotterPrintheadTexture);
+}
+function buildPlotterPrintheadTexture(): Texture {
     const matrix = [
         '..KKKKKKKK..',
         '.KCCCCCCCCK.',
@@ -408,6 +430,9 @@ export function getPlotterPrintheadTexture(): Texture {
  * Vinyl Roll on Feed Core (Bobina ancha de vinilo)
  */
 export function getPlotterVinylRollTexture(): Texture {
+    return withOverride('plotter_vinyl_roll', buildPlotterVinylRollTexture);
+}
+function buildPlotterVinylRollTexture(): Texture {
     const key = 'plotter_vinyl_roll_wide_204';
     const cached = textureCache.get(key);
     if (isTextureValid(cached)) return cached!;

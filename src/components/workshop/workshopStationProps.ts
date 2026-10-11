@@ -9,7 +9,8 @@
 //  - Las animaciones son decorativas (resplandor, cuchilla, luz de aviso) y no afirman ningún dato del sistema.
 //  - Las coordenadas son relativas a la esquina de la estación; el título ocupa los primeros 16 px.
 
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
+import { getStationImage } from './workshopSpriteOverrides';
 
 export interface StationProps {
     container: Container;
@@ -585,8 +586,24 @@ function buildCashier(w: number, _h: number): StationProps {
     };
 }
 
+/** Props de una estación hechos con una imagen PNG (content/sprites.ts): estática, sin animaciones ni pilas de cajas. */
+function buildImageProps(id: string, width: number, height: number): StationProps | null {
+    const img = getStationImage(id);
+    if (!img) return null;
+    const container = new Container();
+    const sprite = new Sprite(img.tex);
+    sprite.x = img.def.x ?? 0;
+    sprite.y = img.def.y ?? 16;
+    sprite.width = img.def.w ?? width;
+    sprite.height = img.def.h ?? Math.max(1, height - 16);
+    container.addChild(sprite);
+    return { container, update: () => {}, setCount: () => {} };
+}
+
 /** Props de la estación, o null si no tiene (el plotter tiene su propio dibujo aprobado). */
 export function createStationProps(id: string, width: number, height: number): StationProps | null {
+    const image = buildImageProps(id, width, height);
+    if (image) return image;
     switch (id) {
         case 'diseno':
             return buildDesign(width, height);

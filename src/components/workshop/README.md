@@ -35,3 +35,16 @@ Todo lo que se puede cambiar **sin tocar lógica** vive en la carpeta [`content/
 - Mover más contenido a `content/` (logros, banter) y permitir cargarlo desde un JSON editable en la nube.
 - Nuevo tipo de visita: agregar bloque en `content/guests.ts` y dispararlo desde `workshopEvents.ts`.
 - Nuevo toggle de extra: sumarlo en `DEFAULT_FX` (`content/config.ts`) y en `FX_LABEL` (`WorkshopToolbar.tsx`).
+
+## Cambiar sprites (operarios, plotter, estaciones)
+Todo se dibuja por codigo por defecto; para reemplazar con PNG propios: copiar el archivo a `public/workshop-sprites/` y agregar una linea en `content/sprites.ts` (hay ejemplos comentados). Si falta el archivo o falla, se usa el dibujo original y se avisa en consola.
+
+| Que | Clave en content/sprites.ts | Notas |
+|---|---|---|
+| Plotter (cuerpo, desconectado, cabezal, rollo) | `textures`: plotter_chassis, plotter_chassis_offline, plotter_printhead, plotter_vinyl_roll | Mismo tamano que el original (la consola avisa si no coincide) |
+| Cartel DEN, ventana, baldosas de pared y piso | `textures`: sign_den, window, wall_tile, tile_concrete_a, tile_concrete_b | Idem |
+| Operarios | `characters`: disenador, impresor, cortador, empaquetador, default, guest_repartidor, guest_tecnico, guest_guardia | Hoja de 64x120 px: 4 columnas x 5 filas de cuadros 16x24 (filas: abajo, arriba, izquierda, derecha, respiro+trabajo). Detalle en CHARACTER_SHEET_LAYOUT |
+| Objetos de estacion (escritorio, estanteria, mesa de corte...) | `stationProps`: diseno, insumos, corte, empaque, despacho, caja | Imagen estatica: pierde animaciones y pilas de cajas |
+
+Colores de camisa por rol, piel y colores del sprite procedural: `content/characters.ts`. Las mascotas se dibujan por codigo con los colores de su perfil (`content/pets.ts`); soporte de PNG para mascotas queda como mejora futura.
+

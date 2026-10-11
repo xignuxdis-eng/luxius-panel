@@ -70,7 +70,7 @@ export class GuestManager {
         if (this.destroyed || this.has(kind)) return false;
         const cfg = KIND[kind];
         const laneY = this.lanes.low;
-        const textures = getCharacterTextures({ role: 'empaquetador', shirtColor: cfg.shirt, skinColor: cfg.skin, hairColor: cfg.hair });
+        const textures = getCharacterTextures({ role: 'empaquetador', sheetKey: `guest_${kind}`, shirtColor: cfg.shirt, skinColor: cfg.skin, hairColor: cfg.hair });
 
         const container = new Container();
         container.label = `Guest:${kind}`;

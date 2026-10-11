@@ -48,6 +48,7 @@ import { GuestManager } from './workshopGuests';
 import { PetManager, type PetProfile } from './workshopPet';
 import { playAnimalSound } from './workshopAnimalSound';
 import { WORKSHOP_CONFIG, DEFAULT_FX as BASE_DEFAULT_FX } from './content/config';
+import { preloadSpriteOverrides } from './workshopSpriteOverrides';
 import PetSheetCard from './PetSheetCard';
 import WallPanel from './WallPanel';
 import { WorkshopEvents } from './workshopEvents';
@@ -610,6 +611,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                     app.stage.addChild(worldContainer);
                     app.stage.addChild(uiLayer);
+
+                    // 0. Imágenes PNG de reemplazo (content/sprites.ts); si no hay ninguna configurada, no hace nada
+                    await preloadSpriteOverrides();
+                    if (isCancelled) return;
 
                     // 1. Build Refined Low-Contrast Background Map
                     buildBackgroundMap(mapLayer, VIRTUAL_W, VIRTUAL_H);

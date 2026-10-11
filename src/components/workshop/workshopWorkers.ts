@@ -28,15 +28,9 @@ export const ERRAND_DWELL_MS = 3000;
 /** Orden de roles del sistema viejo (WorkshopCanvas.tsx L161-166), usado como respaldo. */
 export const LEGACY_ROLE_ORDER: WorkerRole[] = ['disenador', 'impresor', 'cortador', 'empaquetador'];
 
-export const ROLE_SHIRT: Record<WorkerRole, string> = {
-    disenador: '#8b5cf6',
-    impresor: '#22c55e',
-    cortador: '#ec4899',
-    empaquetador: '#0284c7'
-};
-
-/** Colores de piel del sistema viejo (WorkshopCanvas.tsx L168). */
-export const LEGACY_SKINS = ['#fca5a5', '#fdba74', '#c68642', '#fed7aa', '#8d5524'];
+import { ROLE_SHIRT, LEGACY_SKINS } from './content/characters';
+// Colores de camisa por rol y tonos de piel: se editan en content/characters.ts
+export { ROLE_SHIRT, LEGACY_SKINS };
 
 /** Estación donde trabaja cada rol. */
 export const ROLE_STATION: Record<WorkerRole, StationId> = {
