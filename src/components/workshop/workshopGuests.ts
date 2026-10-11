@@ -3,7 +3,7 @@
 // caminan por el pasillo, se quedan un rato en una estación diciendo sus frases y se van. No participan de las
 // charlas ni de los encargos de los operarios, y solo hablan cuando nadie más está hablando.
 
-import { Container, Sprite } from 'pixi.js';
+import { Container, Rectangle, Sprite } from 'pixi.js';
 import type { StationConfig } from './types';
 import {
     getCharacterShadowTexture,
@@ -52,6 +52,8 @@ export class GuestManager {
     private lanes: Lanes;
     private destroyed = false;
     private seq = 0;
+    /** Se llama al tocar a una visita (la ficha es un aviso corto: son personajes decorativos). */
+    onTap?: (info: { kind: GuestKind; name: string; text: string }) => void;
 
     constructor(private layer: Container, private stations: StationConfig[], private rng: () => number = Math.random) {
         this.lanes = computeLanes(stations);
@@ -74,7 +76,9 @@ export class GuestManager {
 
         const container = new Container();
         container.label = `Guest:${kind}`;
-        container.eventMode = 'none';
+        container.eventMode = 'static';
+        container.cursor = 'pointer';
+        container.hitArea = new Rectangle(-8, -28, 16, 30);
         const shadow = new Sprite(getCharacterShadowTexture());
         shadow.anchor.set(0.5, 0.5);
         shadow.y = -1;
@@ -116,6 +120,10 @@ export class GuestManager {
         g.path = planPath({ x: g.x, y: g.y }, { x: stand.x, y: stand.y });
         g.arriveFacing = stand.facing;
         this.guests.push(g);
+        container.on('pointertap', () => {
+            const text = g.bubble?.text ?? cfg.lines[Math.floor(this.rng() * cfg.lines.length)];
+            this.onTap?.({ kind, name: cfg.name, text });
+        });
         this.sync(g);
         return true;
     }

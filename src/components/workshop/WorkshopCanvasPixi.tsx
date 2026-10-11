@@ -711,6 +711,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const hallLanes = computeLanes(hallStations);
                     fxRef.current = new WorkshopFx(floorFxLayer, particlesLayer);
                     guestsRef.current = new GuestManager(workersLayer, hallStations);
+                    guestsRef.current.onTap = ({ name, text }) => {
+                        if (dragMovedRef.current) return;
+                        audioEngine.playClick();
+                        showToast(`${name}: «${text}»`);
+                    };
                     petRef.current = new PetManager(workersLayer, workerHitLayer, hallStations, {
                         onWorkerPet: (_p, px, py) => fxRef.current?.hearts(px, py),
                         onTap: (profile, px, py, petted) => handlePetTap(profile, px, py, petted)
