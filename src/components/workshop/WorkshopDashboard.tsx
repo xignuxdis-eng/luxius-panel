@@ -5,6 +5,7 @@ import { Order, OrderStatus } from '@/types/orden';
 import { WorkshopCanvas } from './WorkshopCanvas';
 import { WorkshopCanvasPixi } from './WorkshopCanvasPixi';
 import { PrintManagerHUD } from './PrintManagerHUD';
+import { XanaBoard } from './XanaBoard';
 import { StationModal } from './StationModal';
 import { StationId } from './types';
 import { audioEngine } from './AudioEngine';
@@ -248,12 +249,13 @@ export const WorkshopDashboard: React.FC = () => {
             `}</style>
 
             <div className="workshop-layout-container">
-                <aside className="workshop-sidebar-column">
+                <aside className="workshop-sidebar-column" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <PrintManagerHUD
                         orders={orders}
                         onSelectOrder={(order) => setPreviewOrder(order)}
                         onSimulateStatusChange={handleUpdateStatus}
                     />
+                    <XanaBoard />
                 </aside>
 
                 <main className="workshop-map-column">

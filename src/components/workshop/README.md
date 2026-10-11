@@ -48,3 +48,7 @@ Todo se dibuja por codigo por defecto; para reemplazar con PNG propios: copiar e
 
 Colores de camisa por rol, piel y colores del sprite procedural: `content/characters.ts`. Las mascotas se dibujan por codigo con los colores de su perfil (`content/pets.ts`); soporte de PNG para mascotas queda como mejora futura.
 
+
+## Tablon de Xana (consejos)
+Los consejos viven en `content/xanaTips.ts` (array `XANA_TIPS`). Para agregar uno: sumar un objeto con `id` unico, `category` (ver `XANA_CATEGORIES`), `title`, `text` y opcional `link`. Las categorias tambien se editan ahi. Son consejos curados a mano, no datos del sistema.
+
