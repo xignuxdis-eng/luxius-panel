@@ -73,7 +73,13 @@ export const WORKSHOP_CONFIG = {
     seasons: {
         navidad: { month: 12, from: 1, to: 31 },
         julio: { month: 7, from: 5, to: 12 },
-        halloween: { month: 10, from: 20, to: 31 }
+        halloween: { month: 10, from: 20, to: 31 },
+        // Fechas patrias argentinas
+        malvinas: { month: 4, from: 1, to: 3 }, //       2 de abril: Veteranos y Caídos en Malvinas
+        mayo: { month: 5, from: 18, to: 25 }, //         25 de mayo: Revolución de Mayo
+        bandera: { month: 6, from: 14, to: 20 }, //      20 de junio: Día de la Bandera
+        sanmartin: { month: 8, from: 12, to: 17 }, //    17 de agosto: Paso a la Inmortalidad del Gral. San Martín
+        tradicion: { month: 11, from: 6, to: 10 } //     10 de noviembre: Día de la Tradición
     },
 
     /** Gotera de lluvia: dónde queda el balde (x) y cuánto bajo el borde superior del pasillo (y). */

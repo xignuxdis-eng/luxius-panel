@@ -251,6 +251,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - Temporadas patrias argentinas**: `workshopSeason.ts` suma 5 temporadas con decoracion alegorica dibujada en Pixi: malvinas (1-3 abr: banderas + cartelitos de las islas con lazo de luto), mayo (18-25 may: escarapelas), bandera (14-20 jun: dos banderas con Sol de Mayo), sanmartin (12-17 ago: coronas de laurel con sable corbo) y tradicion (6-10 nov: mates y sombreros gauchos). Fechas editables en `content/config.ts`. Probar: localStorage `luxius_print_den_season` = malvinas|mayo|bandera|sanmartin|tradicion|none. Verificado con render de prueba (las 8 temporadas se dibujan sin tapar el cartel). Pendiente: ver en el taller real y evaluar otras fechas (ej. 20 nov Soberania).
+
 - **11/10/2026 - ErgoDesign: contraste modo claro**: en `styles/index.css` (`[data-theme='light']`) se oscurecen --accent (#c2410c), --secondary, --success, --warning y --danger porque como texto sobre fondo claro daban 2.05 a 3.76:1 y ahora dan >= 4.6:1 (WCAG AA). El modo oscuro ya cumplia (>= 6.2:1) y no se toco. Efecto visible: el naranja de marca se ve mas oscuro/quemado en modo claro. Revisar visualmente.
 
 - **11/10/2026 - ErgoDesign: acciones de lote**: la fila maestra de lote en `Entrada.tsx` pasa de 5 botones a un boton de descarga + menu ••• (Nesting, Reporte PDF, Cambiar estado, Papelera), igual que las ordenes sueltas. Se verifico que las 6 columnas y las 2 acciones + menu de ordenes sueltas ya estaban hechas. Punto de retorno previo: tag `v1.1.0-pre-entrada-ergo` y rama `backup/pre-entrada-ergo`. Pendiente de ErgoDesign: tokens semanticos dual-theme.
