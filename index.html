@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="description" content="Luxius - Sistema de Gestión de Impresión Premium" />
+
+    <!-- PWA — Fase 4 (02/10/2026) -->
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#1a1b1e" />
+    <link rel="apple-touch-icon" href="./assets/xignux_logo-CLqbwOLo.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Luxius" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script>
+        // Conditional pixel font loading — Fase 3 Performance (02/10/2026)
+        // Only load ~150KB of pixel fonts if theme is actually 'pixel'
+        if (localStorage.getItem('theme') === 'pixel') {
+            var l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = 'https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap';
+            document.head.appendChild(l);
+        }
+    </script>
+    <title>Luxius | Gestión de Impresión</title>
+  <script type="module" crossorigin src="./assets/index-Cs1uzS8M-1791685794610.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/vendor-core-BkkfFQ9v-1791685794610.js">
+  <link rel="modulepreload" crossorigin href="./assets/vendor-icons-B5LbwCP3-1791685794610.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-CzwRKOjx.css">
+</head>
+
+<body>
+    <div id="root"></div>
+    <script>
+        // Pre-warm backend on page load to eliminate Render cold-start latency
+        try {
+            var apiUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                ? 'http://localhost:5000/api/health'
+                : 'https://luxius-backend.onrender.com/api/health';
+            fetch(apiUrl, { method: 'GET', mode: 'no-cors' }).catch(function(){});
+        } catch(e) {}
+    </script>
+    <script>
+        // Service Worker registration — Fase 4 PWA (02/10/2026)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(function(reg) {
+                        console.log('[SW] Registered:', reg.scope);
+                    })
+                    .catch(function(err) {
+                        console.warn('[SW] Registration failed:', err);
+                    });
+            });
+        }
+    </script>
+</body>
+
+</html>
