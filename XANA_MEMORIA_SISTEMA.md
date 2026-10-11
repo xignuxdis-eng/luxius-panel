@@ -1,4 +1,10 @@
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
+---
+
+- [ ] **Integracion nesting -> VersaWorks 4.x (PENDIENTE, investigacion completa 11/10/2026)**: todo lo aprendido de los archivos `.rvw`, el hot folder, el nest real y las restricciones del navegador esta en `docs/roland/VERSAWORKS_4_NOTAS.md` (muestras reales en `docs/roland/muestras/`, generador de PDF de prueba en `docs/roland/generar_pdfs_prueba.cjs`). Resumen: el `.rvw` es XML pero NO guarda posiciones de piezas, asi que no se puede generar un nest editable en el RIP; opciones: (1) PDF anidado propio a tamano real o (2) auto-nest de la cola de VW. Antes de codear: crear carpeta propia de hot folder fuera de Program Files y probar el auto-nest.
+
+---
+# 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
 > **Última Actualización:** 09/10/2026 01:10 (Auditoría Ergonómica Integral, Rollback Point v1.0.0-baseline, Upgrade de Versión a v1.1.0 y Roadmap de Refinamiento UX/UI ErgoDesign)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
