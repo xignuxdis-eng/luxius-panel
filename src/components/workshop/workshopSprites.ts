@@ -254,6 +254,61 @@ function buildWindowTexture(): Texture {
     return createPixelTexture('window_industrial_large_v4', matrix, palette);
 }
 
+/** Logo de XignuX en pixel art (placa de 24x24 px): pastilla azul marino en diagonal con salpicaduras de tinta CMYK. */
+export function getLogoXignuxTexture(): Texture {
+    return withOverride('logo_xignux', buildLogoXignuxTexture);
+}
+function buildLogoXignuxTexture(): Texture {
+    const S = 24;
+    const dist = (x: number, y: number, ax: number, ay: number, bx: number, by: number) => {
+        const dx = bx - ax, dy = by - ay;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+        return Math.hypot(x - (ax + t * dx), y - (ay + t * dy));
+    };
+    // Salpicaduras: [centro x, centro y, radio, letra] (coordenadas dentro de la placa)
+    const blobs: Array<[number, number, number, string]> = [
+        [7.5, 8, 3.6, 'C'], [5.5, 6, 1.6, 'C'], [4, 10.5, 0.9, 'C'], [9, 4.5, 0.8, 'C'],
+        [17, 6, 3, 'Y'], [19.5, 4, 1.6, 'Y'], [15, 3.5, 1.1, 'Y'], [20, 8.5, 0.9, 'Y'],
+        [16.5, 16.5, 3.6, 'M'], [19, 14, 1.4, 'M'], [14, 19.5, 1.2, 'M'], [20, 18.5, 0.9, 'M'],
+        [7, 16.5, 3, 'B'], [4.5, 18, 1.4, 'B'], [9.5, 20, 1.1, 'B'], [3.8, 14, 0.8, 'B']
+    ];
+    const matrix: string[] = [];
+    for (let y = 0; y < S; y++) {
+        let row = '';
+        for (let x = 0; x < S; x++) {
+            const px = x + 0.5, py = y + 0.5;
+            let c = 'p'; // fondo de la placa
+            if (x === 0 || y === 0 || x === S - 1 || y === S - 1) c = 'f';
+            else if ((x === 1 || y === 1 || x === S - 2 || y === S - 2)) c = 'q';
+            // salpicaduras
+            for (const [bx, by, r, ch] of blobs) {
+                if (Math.hypot(px - bx, py - by) <= r) c = ch;
+            }
+            // pastilla diagonal (de abajo a la izquierda hacia arriba a la derecha)
+            const d = dist(px, py, 7.5, 16.5, 16.5, 7.5);
+            if (d <= 3.4) {
+                const side = (px - 7.5) + (py - 16.5);
+                c = d > 2.1 && side < 0 ? 'h' : d > 2.6 && side > 0 ? 'k' : 'N';
+            }
+            row += c;
+        }
+        matrix.push(row);
+    }
+    const palette = {
+        'f': '#475569', // borde
+        'q': '#1e293b',
+        'p': '#e8eef7', // fondo claro para que resalten los colores
+        'N': '#0f1b3d', // pastilla
+        'h': '#3b4f86', // brillo de la pastilla
+        'k': '#070d22', // sombra de la pastilla
+        'C': '#06b6d4',
+        'Y': '#fbbf24',
+        'M': '#ec4899',
+        'B': '#2563eb'
+    };
+    return createPixelTexture('logo_xignux_v1', matrix, palette);
+}
+
 export function getSignDenTexture(): Texture {
     return withOverride('sign_den', buildSignDenTexture);
 }

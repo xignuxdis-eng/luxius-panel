@@ -21,6 +21,7 @@ import {
     getWallTileTexture,
     getWindowTexture,
     getSignDenTexture,
+    getLogoXignuxTexture,
     getPlotterChassisTexture,
     getPlotterPrintheadTexture,
     getPlotterVinylRollTexture,
@@ -882,6 +883,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             clock.rect(cx + dx - 0.5, cy + dy - 0.5, 1, 1).fill({ color: 0x334155 });
         }
         mapLayer.addChild(clock);
+        // Logo de XignuX en pixel art, a la derecha del reloj (decorativo, sin clics)
+        const logoSprite = new Sprite(getLogoXignuxTexture());
+        logoSprite.x = cx + 18;
+        logoSprite.y = 9;
+        logoSprite.eventMode = 'none';
+        mapLayer.addChild(logoSprite);
         const hands = new Graphics();
         mapLayer.addChild(hands);
         clockRef.current = { hands, minute: -1, cx, cy };

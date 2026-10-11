@@ -20,6 +20,7 @@ export type TextureName =
     | 'plotter_printhead' //        cabezal que se mueve
     | 'plotter_vinyl_roll' //       rollo de vinilo
     | 'sign_den' //                 cartel "DEN"
+    | 'logo_xignux' //              logo de XignuX junto al reloj (24x24)
     | 'window' //                   ventana
     | 'wall_tile' //                baldosa de la pared
     | 'tile_concrete_a' //          baldosa del piso A
