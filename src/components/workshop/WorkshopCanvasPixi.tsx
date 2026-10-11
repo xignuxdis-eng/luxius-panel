@@ -1262,7 +1262,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         }
 
         // 2 Grandes Ventanas Industriales Translúcidas ampliadas sobre la pared
-        const windowPositions = [32, 396];
+        const windowPositions = WORKSHOP_CONFIG.windows.xs;
         windowPositions.forEach(wx => {
             const winSprite = new Sprite(texWindow);
             winSprite.x = wx;

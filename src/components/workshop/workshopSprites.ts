@@ -229,32 +229,29 @@ export function getWindowTexture(): Texture {
     return withOverride('window', buildWindowTexture);
 }
 function buildWindowTexture(): Texture {
-    // Ventana industrial ampliada (52x18 px) con marco metálico y 4 paneles translúcidos
-    const matrix = [
-        'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGLLLLLLLLGGGGW',
-        'FGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW',
-        'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW'
-    ];
+    // Ventana industrial grande (64x24 px): marco metálico y 3 paneles amplios para que se note el cielo
+    const W = 64, H = 24;
+    const paneStarts = [3, 23, 43];
+    const matrix: string[] = [];
+    for (let y = 0; y < H; y++) {
+        let row = '';
+        for (let x = 0; x < W; x++) {
+            let c = 'G';
+            if (y === 0 || x === 0) c = 'F';
+            else if (y === H - 1 || x === W - 1) c = 'W';
+            else if (y >= 3 && y <= 20 && paneStarts.some((s) => x >= s && x < s + 18)) c = 'L';
+            else if (y === 21 || y === 22) c = 'F'; // alféizar
+            row += c;
+        }
+        matrix.push(row);
+    }
     const palette = {
         'F': '#475569',
         'W': '#1e293b',
         'G': '#0f172a',
         'L': '#38bdf8'
     };
-    return createPixelTexture('window_industrial_large_v3', matrix, palette);
+    return createPixelTexture('window_industrial_large_v4', matrix, palette);
 }
 
 export function getSignDenTexture(): Texture {

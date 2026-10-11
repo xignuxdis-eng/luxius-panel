@@ -6,15 +6,12 @@
 import { Container, Graphics } from 'pixi.js';
 import type { WeatherKind } from './workshopWeather';
 
-const WIN_W = 52;
-const WIN_H = 16;
-/** Vidrios de la textura de la ventana (4 columnas x 2 filas de paneles). */
-const PANE_COLS = [3, 15, 27, 39];
-const PANE_ROWS: Array<[number, number]> = [
-    [2, 5],
-    [8, 6]
-];
-const PANE_W = 8;
+const WIN_W = 64;
+const WIN_H = 24;
+/** Vidrios de la textura de la ventana (3 paneles grandes en una fila). */
+const PANE_COLS = [3, 23, 43];
+const PANE_ROWS: Array<[number, number]> = [[3, 18]];
+const PANE_W = 18;
 
 export type TimeOfDay = 'day' | 'dusk' | 'night';
 
@@ -82,65 +79,66 @@ export class WorkshopSky {
 
             // cielo base
             let base = 0x7dd3fc;
-            let alpha = 0.6;
+            let alpha = 0.88;
             if (tod === 'dusk') {
                 base = h < 12 ? 0xfdba74 : 0xfb923c;
-                alpha = 0.6;
+                alpha = 0.88;
             } else if (tod === 'night') {
                 base = 0x0b1030;
-                alpha = 0.92;
+                alpha = 0.96;
             }
             if (overcast && tod === 'day') {
                 base = this.weather === 'storm' ? 0x475569 : 0x94a3b8;
-                alpha = 0.8;
+                alpha = 0.92;
             }
             g.rect(0, 0, WIN_W, WIN_H).fill({ color: base, alpha });
-            if (tod === 'dusk') g.rect(0, WIN_H - 6, WIN_W, 6).fill({ color: 0xa855f7, alpha: 0.25 });
+            if (tod === 'day' && !overcast) g.rect(0, WIN_H - 7, WIN_W, 7).fill({ color: 0xe0f2fe, alpha: 0.4 });
+            if (tod === 'dusk') g.rect(0, WIN_H - 9, WIN_W, 9).fill({ color: 0xa855f7, alpha: 0.3 });
 
             // sol
             if (tod !== 'night' && !overcast) {
                 const frac = Math.max(0, Math.min(1, (h - 6) / 14));
-                const sx = 6 + frac * (WIN_W - 12);
-                const sy = 11 - Math.sin(frac * Math.PI) * 7;
-                g.circle(sx, sy, 5).fill({ color: 0xfde68a, alpha: 0.3 });
-                g.circle(sx, sy, 2.4).fill({ color: 0xfde047 });
+                const sx = 8 + frac * (WIN_W - 16);
+                const sy = 17 - Math.sin(frac * Math.PI) * 11;
+                g.circle(sx, sy, 8).fill({ color: 0xfde68a, alpha: 0.28 });
+                g.circle(sx, sy, 3.8).fill({ color: 0xfde047 });
             }
 
             // luna y estrellas
             if (tod === 'night') {
                 if (!overcast || this.weather === 'cloudy') {
-                    for (let i = 0; i < 9; i++) {
+                    for (let i = 0; i < 18; i++) {
                         const sx = (i * 19 + 7) % WIN_W;
-                        const sy = (i * 7 + 2) % (WIN_H - 3);
+                        const sy = (i * 7 + 2) % (WIN_H - 4);
                         const tw = 0.5 + 0.5 * Math.sin(t / 500 + i * 1.7);
                         g.rect(sx, sy, 1, 1).fill({ color: 0xffffff, alpha: 0.35 + 0.55 * tw });
                     }
-                    g.circle(40, 5, 3).fill({ color: 0xfef3c7 });
-                    g.circle(41.6, 4.2, 2.7).fill({ color: 0x0b1030 });
+                    g.circle(50, 7, 4.5).fill({ color: 0xfef3c7 });
+                    g.circle(52, 6, 4).fill({ color: 0x0b1030 });
                 }
             }
 
             // nubes
             if (overcast) {
                 const col = tod === 'night' ? 0x64748b : this.weather === 'storm' ? 0x334155 : 0xf1f5f9;
-                for (let i = 0; i < 3; i++) {
-                    const cx = ((t * 0.004 + i * 22) % (WIN_W + 24)) - 12;
-                    g.ellipse(cx, 3 + (i % 2) * 3, 8, 2.6).fill({ color: col, alpha: 0.88 });
-                    g.ellipse(cx + 4, 2 + (i % 2) * 3, 5, 2.2).fill({ color: col, alpha: 0.88 });
+                for (let i = 0; i < 4; i++) {
+                    const cx = ((t * 0.004 + i * 24) % (WIN_W + 30)) - 15;
+                    g.ellipse(cx, 5 + (i % 2) * 5, 11, 3.6).fill({ color: col, alpha: 0.9 });
+                    g.ellipse(cx + 6, 3.5 + (i % 2) * 5, 7, 3).fill({ color: col, alpha: 0.9 });
                 }
             }
 
             // precipitación
             if (this.weather === 'rain' || this.weather === 'storm') {
-                for (let i = 0; i < 14; i++) {
+                for (let i = 0; i < 24; i++) {
                     const px = (i * 5.3 + 1) % WIN_W;
-                    const py = ((t * 0.07 + i * 7.3) % 20) - 3;
+                    const py = ((t * 0.07 + i * 7.3) % 30) - 3;
                     g.rect(Math.round(px), Math.round(py), 1, 3).fill({ color: 0xbae6fd, alpha: 0.9 });
                 }
             } else if (this.weather === 'snow') {
-                for (let i = 0; i < 12; i++) {
+                for (let i = 0; i < 20; i++) {
                     const px = (i * 6.1 + Math.sin(t / 700 + i) * 2 + WIN_W) % WIN_W;
-                    const py = ((t * 0.018 + i * 5.1) % 18) - 2;
+                    const py = ((t * 0.018 + i * 5.1) % 27) - 2;
                     g.rect(Math.round(px), Math.round(py), 1, 1).fill({ color: 0xffffff });
                 }
             } else if (this.weather === 'fog') {

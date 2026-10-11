@@ -23,7 +23,7 @@ export const WORKSHOP_CONFIG = {
     /** Reloj de pared (centro y radio, en coordenadas del mapa). */
     clock: { cx: 292, cy: 20 },
     /** Ventanas con cielo: posiciones X (izquierda de cada vidrio) e Y. */
-    windows: { xs: [32, 396], y: 9 },
+    windows: { xs: [32, 400], y: 9 },
 
     weather: {
         /** Ubicación por defecto: Córdoba (donde está el taller). Se puede cambiar por usuario en localStorage 'luxius_print_den_geo'. */
