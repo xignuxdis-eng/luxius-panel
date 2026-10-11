@@ -54,8 +54,8 @@ export const XanaBoard: React.FC = () => {
         return () => clearInterval(t);
     }, [paused, pos, list.length]);
 
-    const chip = (key: Filter, label: string, color: string) => (
-        <button key={key} onClick={() => setFilter(key)} title={label}
+    const chip = (key: Filter, label: string, color: string, titleText?: string) => (
+        <button key={key} onClick={() => setFilter(key)} title={titleText || label}
             style={{
                 background: filter === key ? color : '#0f172a', color: filter === key ? '#000' : '#cbd5e1',
                 border: '2px solid #000', padding: '2px 5px', fontSize: 10, cursor: 'pointer',
@@ -70,14 +70,43 @@ export const XanaBoard: React.FC = () => {
         }}>
             <header style={{
                 background: 'linear-gradient(90deg,#a78bfa,#f472b6)', color: '#0b0620', padding: '6px 8px',
-                borderBottom: '3px solid #000', fontSize: 12, fontWeight: 700, letterSpacing: 1
-            }}>✨ TABLÓN DE XANA</header>
+                borderBottom: '3px solid #000', fontSize: 12, fontWeight: 700, letterSpacing: 1,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+                <span>✨ TABLÓN DE XANA</span>
+                <span style={{ fontSize: 10, fontWeight: 600, background: 'rgba(0,0,0,0.25)', padding: '1px 6px', borderRadius: 3 }}>
+                    {filter === 'all' ? `${XANA_TIPS.length} consejos` : `${list.length} de ${XANA_TIPS.length}`}
+                </span>
+            </header>
 
             <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
                 style={{ padding: 8, borderBottom: '2px solid #000', background: '#1e293b', minHeight: 170 }}>
                 {tip && cat ? (
                     <>
-                        <div style={{ fontSize: 10, color: cat.color, marginBottom: 4 }}>{cat.icon} {cat.label.toUpperCase()} · {pos + 1}/{list.length}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <div style={{ fontSize: 10, color: cat.color, fontWeight: 700 }}>
+                                {cat.icon} {cat.label.toUpperCase()} · {pos + 1}/{list.length}
+                            </div>
+                            {filter !== 'all' && (
+                                <button
+                                    onClick={() => setFilter('all')}
+                                    title="Quitar filtro y ver los 55 consejos"
+                                    style={{
+                                        background: '#38bdf8',
+                                        color: '#04131f',
+                                        border: '1px solid #000',
+                                        borderRadius: 3,
+                                        fontSize: 9,
+                                        fontWeight: 'bold',
+                                        padding: '1px 6px',
+                                        cursor: 'pointer',
+                                        fontFamily: 'inherit'
+                                    }}
+                                >
+                                    Ver todos ({XANA_TIPS.length})
+                                </button>
+                            )}
+                        </div>
                         <div style={{ opacity: fade ? 1 : 0, transform: fade ? 'translateY(0)' : 'translateY(-6px)', transition: 'opacity .22s, transform .22s' }}>
                             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{tip.title}</div>
                             <div style={{ fontSize: 11, lineHeight: 1.45, color: '#cbd5e1' }}>{tip.text}</div>
@@ -96,17 +125,48 @@ export const XanaBoard: React.FC = () => {
                         </div>
                     </>
                 ) : (
-                    <div style={{ fontSize: 11, color: '#94a3b8', padding: 6 }}>Todavía no guardaste consejos. Tocá ☆ en un consejo para guardarlo.</div>
+                    <div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', padding: 6 }}>
+                            {filter === 'favs'
+                                ? 'Todavía no guardaste consejos. Tocá ☆ en un consejo para guardarlo como favorito.'
+                                : 'No hay consejos en esta categoría.'}
+                        </div>
+                        {filter !== 'all' && (
+                            <button
+                                onClick={() => setFilter('all')}
+                                style={{
+                                    marginTop: 8,
+                                    background: '#38bdf8',
+                                    color: '#04131f',
+                                    border: '1px solid #000',
+                                    padding: '4px 8px',
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold',
+                                    borderRadius: 3
+                                }}
+                            >
+                                ⬅️ Volver a ver todos ({XANA_TIPS.length} consejos)
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, padding: 6, borderBottom: '2px solid #000' }}>
-                {chip('all', 'Todo', '#e2e8f0')}
-                {chip('favs', `⭐ ${favs.length}`, '#fbbf24')}
-                {(Object.keys(XANA_CATEGORIES) as XanaCategory[]).map(k => chip(k, XANA_CATEGORIES[k].icon, XANA_CATEGORIES[k].color))}
+                {chip('all', `Todo (${XANA_TIPS.length})`, '#e2e8f0', `Ver los ${XANA_TIPS.length} consejos completos`)}
+                {chip('favs', `⭐ ${favs.length}`, '#fbbf24', `Consejos favoritos guardados (${favs.length})`)}
+                {(Object.keys(XANA_CATEGORIES) as XanaCategory[]).map(k => {
+                    const cInfo = XANA_CATEGORIES[k];
+                    const count = XANA_TIPS.filter(t => t.category === k).length;
+                    return chip(k, `${cInfo.icon} ${count}`, cInfo.color, `${cInfo.icon} ${cInfo.label} (${count} consejos)`);
+                })}
             </div>
-            <footer style={{ fontSize: 9, color: '#64748b', padding: '4px 8px', borderTop: '2px solid #000' }}>
-                Selección curada por el equipo · no son datos del sistema
+            <footer style={{ fontSize: 9, color: '#64748b', padding: '4px 8px', borderTop: '2px solid #000', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Selección curada ({XANA_TIPS.length} consejos en 8 temas)</span>
+                {filter !== 'all' && (
+                    <span style={{ color: '#38bdf8' }}>Filtro: {filter === 'favs' ? 'Favoritos' : XANA_CATEGORIES[filter]?.label}</span>
+                )}
             </footer>
         </section>
     );
