@@ -1066,13 +1066,39 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         const on = forced || (fxToggleRef.current.weather && (kind === 'rain' || kind === 'storm'));
         if (on === rainOnRef.current) return;
         rainOnRef.current = on;
+        const lanes = computeLanes(getPixiStations());
+        const lx = WORKSHOP_CONFIG.rainLeak.x;
+        const ly = Math.round(lanes.topEdge + WORKSHOP_CONFIG.rainLeak.yOffset);
+        // El operario se para al lado del balde (si no hay operarios, el balde aparece/desaparece solo)
+        const stand = { x: lx + 9, y: ly, facing: 'left' as const };
         if (on) {
-            const lanes = computeLanes(getPixiStations());
-            fx.setRain(true, WORKSHOP_CONFIG.rainLeak.x, Math.round(lanes.topEdge + WORKSHOP_CONFIG.rainLeak.yOffset));
+            fx.setRain(true, lx, ly, false);
             if (announce) crewRef.current?.announce(EVENT_TEXTS.rainBucket, 1, 'warn');
+            const queued = announce && crewRef.current?.requestChore({
+                point: stand,
+                held: 'balde',
+                text: EVENT_TEXTS.rainBucketGo,
+                tone: 'warn',
+                onArrive: () => {
+                    fxRef.current?.setBucket(true, lx, ly);
+                    return null;
+                }
+            });
+            if (!queued) fx.setBucket(true, lx, ly);
         } else {
-            fx.setRain(false);
+            fx.setRain(false, 0, 0, false);
             if (announce) crewRef.current?.announce(EVENT_TEXTS.rainStop, 1, 'ok');
+            const queued = announce && crewRef.current?.requestChore({
+                point: stand,
+                held: null,
+                text: EVENT_TEXTS.rainBucketTake,
+                tone: 'ok',
+                onArrive: () => {
+                    fxRef.current?.setBucket(false);
+                    return 'balde';
+                }
+            });
+            if (!queued) fx.setBucket(false);
         }
     };
 

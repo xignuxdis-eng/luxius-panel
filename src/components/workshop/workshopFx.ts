@@ -34,8 +34,9 @@ export class WorkshopFx {
     private puddles: Puddle[] = [];
     private destroyed = false;
     private rng: () => number = Math.random;
-    /** Gotera de lluvia: balde en el piso + gotas que caen (decorativo). */
-    private rain: { bucket: Graphics; x: number; y: number; dripMs: number } | null = null;
+    /** Gotera de lluvia: gotas que caen (decorativo). El balde es independiente: lo colocan y retiran los operarios. */
+    private rain: { x: number; y: number; dripMs: number } | null = null;
+    private bucket: Graphics | null = null;
 
     /** `floorLayer`: debajo de los operarios (manchas). `topLayer`: por encima (partículas). */
     constructor(private floorLayer: Container, private topLayer: Container) {
@@ -130,19 +131,34 @@ export class WorkshopFx {
         this.puddles.push({ g, life: 0, max: ttlMs });
     }
 
-    /** Enciende o apaga la gotera: un balde en (x, y) y gotitas que caen dentro. */
-    setRain(on: boolean, x = 0, y = 0) {
+    /**
+     * Enciende o apaga el goteo de la gotera en (x, y). Con `withBucket` (por defecto) también pone o saca el balde
+     * de inmediato; con `false` el balde lo maneja `setBucket` (para que un operario lo coloque o lo retire).
+     */
+    setRain(on: boolean, x = 0, y = 0, withBucket = true) {
         if (this.destroyed) return;
         if (!on) {
-            if (this.rain) {
+            this.rain = null;
+            if (withBucket) this.setBucket(false);
+            return;
+        }
+        if (!this.rain) this.rain = { x, y, dripMs: 400 };
+        if (withBucket) this.setBucket(true, x, y);
+    }
+
+    /** Pone o saca el balde del piso en (x, y). */
+    setBucket(on: boolean, x = 0, y = 0) {
+        if (this.destroyed) return;
+        if (!on) {
+            if (this.bucket) {
                 try {
-                    if (!this.rain.bucket.destroyed) this.rain.bucket.destroy();
+                    if (!this.bucket.destroyed) this.bucket.destroy();
                 } catch (_) {}
-                this.rain = null;
+                this.bucket = null;
             }
             return;
         }
-        if (this.rain) return;
+        if (this.bucket) return;
         const g = new Graphics();
         g.ellipse(0, 0, 6, 2).fill({ color: 0x000000, alpha: 0.25 });
         g.rect(-4, -7, 8, 7).fill({ color: 0x64748b });
@@ -153,7 +169,7 @@ export class WorkshopFx {
         g.y = y;
         g.eventMode = 'none';
         this.floorLayer.addChild(g);
-        this.rain = { bucket: g, x, y, dripMs: 400 };
+        this.bucket = g;
     }
 
     update(dtMs: number) {
@@ -200,13 +216,9 @@ export class WorkshopFx {
     }
 
     destroy() {
+        this.rain = null;
+        this.setBucket(false);
         this.destroyed = true;
-        if (this.rain) {
-            try {
-                if (!this.rain.bucket.destroyed) this.rain.bucket.destroy();
-            } catch (_) {}
-            this.rain = null;
-        }
         for (const p of this.particles) {
             try {
                 if (!p.g.destroyed) p.g.destroy();

@@ -12,7 +12,11 @@ export const EVENT_TEXTS = {
     /** Cuando llueve y aparece una gotera con su balde. */
     rainBucket: ['¡Gotera! Traigan un balde 🪣', 'Otra vez la gotera del techo...', 'Plic, plic, plic... 💧'],
     /** Salida de la lluvia fuerte. */
-    rainStop: ['Ya paró la lluvia ☀️', 'Listo, se terminó la gotera.']
+    rainStop: ['Ya paró la lluvia ☀️', 'Listo, se terminó la gotera.'],
+    /** El operario que lleva el balde hasta la gotera. */
+    rainBucketGo: 'Ya llevo el balde 🪣',
+    /** El operario que retira el balde cuando deja de llover. */
+    rainBucketTake: 'Guardo el balde 🪣'
 };
 
 /**

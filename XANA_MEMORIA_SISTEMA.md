@@ -251,6 +251,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - Gotera con operario y balde**: al empezar a llover un operario libre camina con un balde hasta la gotera y lo coloca (el goteo arranca antes); al parar la lluvia otro/el mismo lo retira y se lo lleva. Nuevo `WorkerCrew.requestChore()` (tareas a un punto arbitrario, en orden), `HeldKind` 'balde', `WorkshopFx.setBucket()` separado de `setRain()`. Sin operarios, el balde aparece/desaparece solo. Probar: localStorage `luxius_print_den_rain`='1'. Pendiente: verificacion visual (requiere login), medir rendimiento y verificar temporadas con `luxius_print_den_season`.
+
 - **11/10/2026 - Cartel DEN V2.0 (taller pixel art)**: el cartel `sign_den` del taller (`workshopSprites.ts`) ahora dice "DEN V2.0" (evolución del print anterior); sprite ensanchado de 46 a 56 px y reposicionado en `WorkshopCanvasPixi.tsx` (x=212) para mantenerlo centrado.
 
 ## 7. 🚀 Guía Rápida para Continuar en Cualquier Otro IDE / Máquina

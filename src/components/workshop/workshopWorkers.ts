@@ -107,7 +107,7 @@ export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
     return ROLE_ALIASES[norm(rol)] ?? null;
 }
 
-export type HeldKind = 'carpeta' | 'rebotada' | 'rollo' | 'caja';
+export type HeldKind = 'carpeta' | 'rebotada' | 'rollo' | 'caja' | 'balde';
 export type BubbleTone = 'ok' | 'warn' | 'info' | 'chat' | 'think';
 /** Fase del paseo: 'rest' = en su puesto; 'out' = paseando; 'back' = volviendo por donde vino. */
 export type StrollPhase = 'rest' | 'out' | 'back';
@@ -360,6 +360,23 @@ interface WorkerState {
     thoughtShowMs: number;
     /** Tiempo restante de un anuncio (celebración/evento) para apagar el globo. */
     announceMs: number;
+    /** Tarea puntual en curso (ver `Chore`): se ejecuta al llegar al punto. */
+    choreArrive?: () => HeldKind | null | void;
+    /** true si el objeto de la mano de la tarea se conserva durante la vuelta al puesto. */
+    choreKeep?: boolean;
+}
+
+/** Tarea puntual en un punto cualquiera del pasillo (p. ej. colocar o retirar el balde de la gotera). */
+export interface Chore {
+    point: StandPoint;
+    /** Objeto que lleva mientras va hacia el punto. */
+    held?: HeldKind | null;
+    text?: string;
+    tone?: BubbleTone;
+    /**
+     * Se llama al llegar. Si devuelve un objeto, lo lleva en la mano de vuelta; si devuelve null, lo suelta.
+     */
+    onArrive: () => HeldKind | null | void;
 }
 
 export interface CrewHooks {
@@ -428,6 +445,7 @@ export class WorkerCrew {
     private lanes: Lanes;
     private _destroyed = false;
     private queue: Errand[] = [];
+    private chores: Chore[] = [];
     private hooks?: CrewHooks;
     private chat: ChatState | null = null;
     private chatTimerMs = FIRST_CHAT_DELAY_MS;
@@ -898,6 +916,36 @@ export class WorkerCrew {
         while (this.queue.length > MAX_ERRAND_QUEUE) this.queue.shift();
     }
 
+    /**
+     * Pide que un operario libre vaya a `chore.point`. Se ejecutan de a una y en orden.
+     * Devuelve false si no hay operarios (quien llama debe resolver el efecto por su cuenta).
+     */
+    requestChore(chore: Chore): boolean {
+        if (this._destroyed || this.workers.length === 0) return false;
+        this.chores.push(chore);
+        while (this.chores.length > 6) this.chores.shift();
+        return true;
+    }
+
+    private processChores() {
+        if (this.chores.length === 0) return;
+        // En orden: no arranca otra mientras alguien todavía va a cumplir una.
+        if (this.workers.some((w) => w.choreArrive)) return;
+        const isFree = (w: WorkerState) => w.errand === 'none' && (w.mode === 'idle' || w.chatting || w.stroll !== 'rest');
+        const free = this.workers.find((w) => isFree(w) && !w.chatting) ?? this.workers.find(isFree);
+        if (!free) return;
+        const c = this.chores.shift()!;
+        if (free.chatting) this.abortChat(free);
+        free.errand = 'going';
+        free.bubble = c.text ? { text: c.text, tone: c.tone ?? 'warn' } : null;
+        this.setHeld(free, c.held ?? null);
+        free.errandOrderId = null;
+        free.choreArrive = c.onArrive;
+        free.choreKeep = false;
+        free.thoughtMs = nextThoughtDelayMs(this.rng);
+        this.startPath(free, c.point);
+    }
+
     getQueueLength(): number {
         return this.queue.length;
     }
@@ -950,6 +998,11 @@ export class WorkerCrew {
             // caja de cartón con cinta
             g.rect(0, 0, 10, 8).fill({ color: 0xc08a4b }).stroke({ width: 1, color: 0x6b4423 });
             g.rect(4, 0, 2, 8).fill({ color: 0xe5d3a1 });
+        } else if (kind === 'balde') {
+            // balde de metal con agua
+            g.rect(0, 0, 8, 7).fill({ color: 0x64748b }).stroke({ width: 1, color: 0x334155 });
+            g.rect(1, 1, 6, 1).fill({ color: 0x38bdf8 });
+            g.rect(1, -3, 6, 1).fill({ color: 0x94a3b8 });
         } else {
             const base = kind === 'rebotada' ? 0xef4444 : 0xfacc15;
             const edge = kind === 'rebotada' ? 0x7f1d1d : 0x854d0e;
@@ -1130,6 +1183,7 @@ export class WorkerCrew {
         if (this._destroyed) return;
         const dt = Math.max(0, Math.min(deltaMS, MAX_DELTA_MS));
         this.processQueue();
+        this.processChores();
         this.updateChat(dt);
         this.updateGreet(dt);
 
@@ -1171,17 +1225,33 @@ export class WorkerCrew {
             if (w.errand === 'going' && w.mode === 'idle') {
                 w.errand = 'dwell';
                 w.dwellMs = ERRAND_DWELL_MS;
+                if (w.choreArrive) {
+                    const cb = w.choreArrive;
+                    w.choreArrive = undefined;
+                    w.dwellMs = 1400;
+                    try {
+                        const h = cb();
+                        if (h !== undefined) {
+                            this.setHeld(w, h);
+                            w.choreKeep = h !== null;
+                        }
+                    } catch (_) {}
+                }
             } else if (w.errand === 'dwell') {
                 w.dwellMs -= dt;
                 if (w.dwellMs <= 0) {
                     w.errand = 'returning';
                     w.bubble = null;
                     w.errandOrderId = null;
-                    this.setHeld(w, null);
+                    if (!w.choreKeep) this.setHeld(w, null);
                     this.startPath(w, w.home);
                 }
             } else if (w.errand === 'returning' && w.mode === 'idle') {
                 w.errand = 'none';
+                if (w.choreKeep) {
+                    w.choreKeep = false;
+                    this.setHeld(w, null);
+                }
             }
 
             if (w.announceMs > 0) {
