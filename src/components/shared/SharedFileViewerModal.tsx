@@ -317,7 +317,17 @@ export default function SharedFileViewerModal({
                                                             fallbackDiv.className = 'universal-preview-fallback'
                                                             fallbackDiv.style.padding = '20px'
                                                             fallbackDiv.style.textAlign = 'center'
-                                                            fallbackDiv.innerHTML = `<div style="font-size: 2.5rem; margin-bottom: 8px;">🖼️</div><div style="font-size: 0.85rem; color: #94a3b8; word-break: break-all;">${originalName}</div>`
+                                                            const iconDiv = document.createElement('div')
+                                                            iconDiv.style.fontSize = '2.5rem'
+                                                            iconDiv.style.marginBottom = '8px'
+                                                            iconDiv.textContent = '🖼️'
+                                                            const nameDiv = document.createElement('div')
+                                                            nameDiv.style.fontSize = '0.85rem'
+                                                            nameDiv.style.color = '#94a3b8'
+                                                            nameDiv.style.wordBreak = 'break-all'
+                                                            nameDiv.textContent = String(originalName)
+                                                            fallbackDiv.appendChild(iconDiv)
+                                                            fallbackDiv.appendChild(nameDiv)
                                                             parent.appendChild(fallbackDiv)
                                                         }
                                                     }
