@@ -334,12 +334,22 @@ export class WorkshopPet {
         const ears = (hx: number, hy: number) => {
             g.rect(hx, hy - 2, 1, 2).rect(hx + 3, hy - 2, 1, 2).fill({ color: SHADE });
         };
+        // Rasgos individuales (content/pets.ts): collar y marcas. Todo cae dentro de la silueta, el contorno no cambia.
+        const mk = (m: string) => !!p.markings?.includes(m as never);
+        const MARK = p.markColor ?? 0xf8fafc;
+        const collar = (x: number, y: number, w: number) => {
+            if (p.collar !== undefined) g.rect(x, y, w, 1).fill({ color: p.collar });
+        };
         if (pose === 'sit') {
             g.rect(-4, -5, 5, 5).fill({ color: BODY });
             g.rect(-4, -2, 5, 2).fill({ color: BELLY });
             g.rect(-3, -4, 1, 2).rect(-1, -5, 1, 2).fill({ color: SHADE });
             g.rect(0, -8, 5, 4).fill({ color: BODY });
             ears(0, -8);
+            if (mk('tabby')) g.rect(1, -8, 1, 1).rect(3, -8, 1, 1).rect(-4, -4, 1, 1).rect(-2, -3, 1, 1).fill({ color: SHADE });
+            if (mk('blaze')) g.rect(2, -8, 1, 2).fill({ color: MARK });
+            if (mk('chest')) g.rect(0, -3, 1, 2).fill({ color: MARK });
+            collar(0, -5, 5);
             g.rect(3, -7, 1, 1).fill({ color: p.eye });
             g.rect(5, -6, 1, 1).fill({ color: p.nose });
             g.rect(-7, -1, 3, 1).rect(-7, -4, 1, 3).fill({ color: SHADE });
@@ -350,6 +360,10 @@ export class WorkshopPet {
             g.rect(-3, -5, 1, 2).rect(0, -5, 1, 2).fill({ color: SHADE });
             g.rect(3, -8, 4, 4).fill({ color: BODY });
             ears(3, -8);
+            if (mk('tabby')) g.rect(4, -8, 1, 1).rect(6, -8, 1, 1).rect(-5, -5, 1, 1).rect(2, -5, 1, 1).fill({ color: SHADE });
+            if (mk('blaze')) g.rect(5, -8, 1, 2).fill({ color: MARK });
+            if (mk('chest')) g.rect(2, -4, 1, 1).fill({ color: MARK });
+            collar(3, -5, 4);
             g.rect(6, -7, 1, 1).fill({ color: p.eye });
             g.rect(7, -6, 1, 1).fill({ color: p.nose });
             g.rect(-5 + step, -2, 1, 2).rect(-2 - step, -2, 1, 2).rect(0 + step, -2, 1, 2).rect(2 - step, -2, 1, 2).fill({ color: SHADE });
@@ -361,6 +375,9 @@ export class WorkshopPet {
             g.rect(-3, -3, 1, 2).rect(0, -3, 1, 2).fill({ color: SHADE });
             g.rect(2, -4, 4, 3).fill({ color: BODY });
             g.rect(2, -5, 1, 1).rect(5, -5, 1, 1).fill({ color: SHADE });
+            if (mk('tabby')) g.rect(-4, -4, 1, 1).rect(-2, -2, 1, 1).rect(3, -4, 1, 1).fill({ color: SHADE });
+            if (mk('blaze')) g.rect(3, -4, 1, 1).fill({ color: MARK });
+            collar(2, -2, 4);
             g.rect(4, -3, 1, 1).fill({ color: p.eye === 0xfacc15 ? 0x6b7280 : DARK });
             g.rect(-6, -2, 2, 1).fill({ color: SHADE });
         }
@@ -373,7 +390,13 @@ export class WorkshopPet {
         const S = p.shade;
         const L = p.belly;
         const w = p.chubby ? 2 : 0; // los regordetes son más anchos
+        const mk = (m: string) => !!p.markings?.includes(m as never);
+        const MARK = p.markColor ?? 0xf8fafc;
+        const collar = (x: number, y: number, cw: number) => {
+            if (p.collar !== undefined) g.rect(x, y, cw, 1).fill({ color: p.collar });
+        };
         const eyes = (ex: number, ey: number) => {
+            if (mk('eyePatch')) g.rect(ex - 1, ey - 1, 3, 3).fill({ color: MARK });
             if (p.bulgyEyes) {
                 g.rect(ex - 1, ey - 1, 3, 3).fill({ color: 0xffffff });
                 g.rect(ex, ey, 1, 1).fill({ color: 0x111111 });
@@ -391,8 +414,12 @@ export class WorkshopPet {
             g.rect(1, -11, 2, 3).fill({ color: S }); // oreja caída
             g.rect(6, -9, 3, 3).fill({ color: L });
             g.rect(8, -9, 1, 1).fill({ color: p.nose });
+            if (mk('blaze')) g.rect(5, -11, 1, 2).fill({ color: MARK });
+            if (mk('chest')) g.rect(0, -5, 2, 2).fill({ color: MARK });
+            collar(1, -7, 5);
             eyes(4, -10);
             g.rect(0, -4, 1, 4).fill({ color: S });
+            if (mk('socks')) g.rect(0, -1, 1, 1).fill({ color: MARK });
             if (pose === 'scratch0') g.rect(-2 - w, -2, 4, 1).fill({ color: S });
             if (pose === 'scratch1') g.rect(-1 - w, -6, 3, 1).rect(1, -7, 1, 1).fill({ color: S });
         } else if (pose === 'walk0' || pose === 'walk1') {
@@ -403,8 +430,12 @@ export class WorkshopPet {
             g.rect(4, -11, 2, 3).fill({ color: S });
             g.rect(8, -9, 3, 3).fill({ color: L });
             g.rect(10, -9, 1, 1).fill({ color: p.nose });
+            if (mk('blaze')) g.rect(8, -11, 1, 2).fill({ color: MARK });
+            if (mk('chest')) g.rect(2, -6, 2, 2).fill({ color: MARK });
+            collar(4, -7, 4);
             eyes(7, -10);
             g.rect(-7 + step - w, -3, 1, 3).rect(-4 - step - w, -3, 1, 3).rect(0 + step, -3, 1, 3).rect(3 - step, -3, 1, 3).fill({ color: S });
+            if (mk('socks')) g.rect(-7 + step - w, -1, 1, 1).rect(-4 - step - w, -1, 1, 1).rect(0 + step, -1, 1, 1).rect(3 - step, -1, 1, 1).fill({ color: MARK });
             g.rect(-9 - w, -9 + (wag ? 0 : 1), 2, 1).fill({ color: S });
         } else {
             // durmiendo
@@ -414,6 +445,8 @@ export class WorkshopPet {
             g.rect(4, -5, 2, 2).fill({ color: S });
             g.rect(8, -3, 2, 2).fill({ color: L });
             g.rect(9, -3, 1, 1).fill({ color: p.nose });
+            if (mk('blaze')) g.rect(7, -5, 1, 1).fill({ color: MARK });
+            collar(4, -2, 4);
             g.rect(6, -4, 1, 1).fill({ color: DARK });
             g.rect(-8 - w, -2, 2, 1).fill({ color: S });
         }

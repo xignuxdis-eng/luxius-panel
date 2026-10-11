@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkerSnapshot } from './workshopWorkers';
 import { ROLE_LABEL, buildWorkerSheet, describeActivity } from './workshopSheets';
+import { WorkerPortrait } from './WorkerPortrait';
 
 export interface WorkerSheetCardProps {
     workerId: string;
@@ -106,15 +107,25 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div
                     style={{
-                        width: 44,
-                        height: 44,
+                        width: 56,
+                        height: 56,
                         borderRadius: 6,
+                        overflow: 'hidden',
                         border: `2px solid ${sheet.rarityColor}`,
-                        background: `radial-gradient(circle at 50% 35%, ${snap.skinColor} 0 28%, ${snap.shirtColor} 29% 100%)`,
                         boxShadow: `0 0 10px ${sheet.rarityColor}88`,
                         flexShrink: 0
                     }}
-                />
+                >
+                    <WorkerPortrait
+                        skinColor={snap.skinColor}
+                        shirtColor={snap.shirtColor}
+                        hairColor={snap.hairColor}
+                        hairStyle={snap.hairStyle}
+                        accessory={snap.accessory}
+                        size={52}
+                        name={snap.name}
+                    />
+                </div>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ color: sheet.rarityColor, fontWeight: 800, fontSize: 15, wordBreak: 'break-word' }}>{snap.name}</div>
                     <div style={{ color: '#ffd100' }}>{sheet.title}</div>

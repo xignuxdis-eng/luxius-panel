@@ -28,7 +28,8 @@ export const ERRAND_DWELL_MS = 3000;
 /** Orden de roles del sistema viejo (WorkshopCanvas.tsx L161-166), usado como respaldo. */
 export const LEGACY_ROLE_ORDER: WorkerRole[] = ['disenador', 'impresor', 'cortador', 'empaquetador'];
 
-import { ROLE_SHIRT, LEGACY_SKINS } from './content/characters';
+import { ROLE_SHIRT, LEGACY_SKINS, pickTraits } from './content/characters';
+import type { HairStyle, Accessory } from './content/characters';
 // Colores de camisa por rol y tonos de piel: se editan en content/characters.ts
 export { ROLE_SHIRT, LEGACY_SKINS };
 
@@ -65,6 +66,10 @@ export interface WorkerSpec {
     roleFromUser: boolean;
     shirtColor: string;
     skinColor: string;
+    /** Rasgos individuales (pelo, peinado, accesorio). Ver content/characters.ts. */
+    hairColor?: string;
+    hairStyle?: HairStyle;
+    accessory?: Accessory;
     speedPxPerSec: number;
     /** Posición dentro del equipo (define el carril del pasillo y el color de piel). */
     index: number;
@@ -189,13 +194,16 @@ export function buildCrewSpecs(users: WorkerUser[]): WorkerSpec[] {
     return entries.map((e, index) => {
         const dup = perRoleCount[e.role] ?? 0;
         perRoleCount[e.role] = dup + 1;
+        const id = `w-${e.u.id}`;
+        const name = e.u.nombre || e.u.username || `Operario ${index + 1}`;
         return {
-            id: `w-${e.u.id}`,
-            name: e.u.nombre || e.u.username || `Operario ${index + 1}`,
+            id,
+            name,
             role: e.role,
             roleFromUser: e.fromUser,
             shirtColor: ROLE_SHIRT[e.role],
             skinColor: LEGACY_SKINS[index % LEGACY_SKINS.length],
+            ...pickTraits(id, name),
             speedPxPerSec: legacySpeedToPxPerSec(2.1 + index * 0.1),
             index,
             dupOffsetX: DUP_OFFSETS[dup % DUP_OFFSETS.length]
@@ -298,6 +306,9 @@ export interface WorkerSnapshot {
     roleFromUser: boolean;
     shirtColor: string;
     skinColor: string;
+    hairColor?: string;
+    hairStyle?: HairStyle;
+    accessory?: Accessory;
     /** Texto del globo de encargo (p. ej. `OT #123 EN COLA`) si lo hay. */
     errandText: string | null;
 }
@@ -439,7 +450,10 @@ export class WorkerCrew {
             const textures = getCharacterTextures({
                 role: spec.role,
                 shirtColor: spec.shirtColor,
-                skinColor: spec.skinColor
+                skinColor: spec.skinColor,
+                hairColor: spec.hairColor,
+                hairStyle: spec.hairStyle,
+                accessory: spec.accessory
             });
 
             const container = new Container();
@@ -536,6 +550,9 @@ export class WorkerCrew {
             roleFromUser: w.spec.roleFromUser,
             shirtColor: w.spec.shirtColor,
             skinColor: w.spec.skinColor,
+            hairColor: w.spec.hairColor,
+            hairStyle: w.spec.hairStyle,
+            accessory: w.spec.accessory,
             errandText: w.errand !== 'none' && w.bubble ? w.bubble.text : null
         }));
     }

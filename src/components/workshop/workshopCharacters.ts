@@ -10,6 +10,7 @@ import { Texture, Rectangle } from 'pixi.js';
 import { createPixelTexture } from './workshopSprites';
 import { getCharacterSheet } from './workshopSpriteOverrides';
 import { CHARACTER_PALETTE } from './content/characters';
+import type { HairStyle, Accessory } from './content/characters';
 import { CHARACTER_SHEET_LAYOUT } from './content/sprites';
 import type { WorkerRole } from './types';
 
@@ -28,6 +29,9 @@ export interface CharacterLook {
     shirtColor: string;
     skinColor: string;
     hairColor?: string;
+    /** Peinado y accesorio (sutiles diferencias entre operarios). Ver content/characters.ts. */
+    hairStyle?: HairStyle;
+    accessory?: Accessory;
     role: WorkerRole;
     /** Clave de la hoja PNG de reemplazo (por defecto el rol). Ver content/sprites.ts. */
     sheetKey?: string;
@@ -79,11 +83,17 @@ function darken(hex: string, factor: number): string {
  *  H pelo · S piel · s piel oscura · E ojo · T camisa · t camisa oscura
  *  P pantalón · p pantalón oscuro · B zapato
  *  a metal claro · b azul pantalla · c cian tinta · r rojo mango · g gris hoja · n cartón · y cinta
+ *  C gorra · K visera · G anteojos · D barba/bigote · W vincha
  */
 export function buildCharacterPalette(look: CharacterLook): Record<string, string> {
     const P = CHARACTER_PALETTE;
     return {
         H: look.hairColor || P.hairDefault,
+        D: darken(look.hairColor || P.hairDefault, 0.8),
+        C: darken(look.shirtColor, 0.85),
+        K: darken(look.shirtColor, 0.55),
+        G: P.glasses,
+        W: P.headband,
         S: look.skinColor,
         s: darken(look.skinColor, 0.8),
         E: P.eye,
@@ -100,6 +110,61 @@ export function buildCharacterPalette(look: CharacterLook): Record<string, strin
         n: P.cardboard,
         y: P.tape
     };
+}
+
+/** Rasgos del personaje que se está dibujando (los fija buildCharacterMatrix; el dibujo es síncrono). */
+let curTraits: { hairStyle?: HairStyle; accessory?: Accessory } = {};
+
+/** Peinado y accesorio de frente (o de espalda). Se aplica sobre la cabeza base. */
+function decorateFront(g: Grid, back: boolean, bob: number) {
+    const { hairStyle: hs, accessory: ac } = curTraits;
+    if (hs === 'tuft') rect(g, 7, 1 + bob, 8, 1 + bob, 'H');
+    if (hs === 'long') {
+        rect(g, 4, 3 + bob, 4, 8 + bob, 'H');
+        rect(g, 11, 3 + bob, 11, 8 + bob, 'H');
+        if (back) rect(g, 6, 8 + bob, 9, 8 + bob, 'H');
+        else rect(g, 5, 7 + bob, 5, 8 + bob, 'H'), rect(g, 10, 7 + bob, 10, 8 + bob, 'H');
+    }
+    if (hs === 'cap') {
+        rect(g, 6, 2 + bob, 9, 2 + bob, 'C');
+        rect(g, 5, 3 + bob, 10, 3 + bob, 'C');
+        if (!back) rect(g, 5, 4 + bob, 10, 4 + bob, 'K');
+    }
+    if (back) {
+        if (ac === 'headband') rect(g, 5, 3 + bob, 10, 3 + bob, 'W');
+        return;
+    }
+    if (ac === 'glasses') {
+        put(g, 5, 5 + bob, 'G'), put(g, 7, 5 + bob, 'G'), put(g, 8, 5 + bob, 'G'), put(g, 10, 5 + bob, 'G');
+    }
+    if (ac === 'beard') {
+        rect(g, 5, 6 + bob, 5, 6 + bob, 'D');
+        rect(g, 10, 6 + bob, 10, 6 + bob, 'D');
+        rect(g, 6, 7 + bob, 9, 7 + bob, 'D');
+        rect(g, 7, 8 + bob, 8, 8 + bob, 'D');
+    }
+    if (ac === 'mustache') rect(g, 7, 6 + bob, 8, 6 + bob, 'D');
+    if (ac === 'headband') rect(g, 5, 3 + bob, 10, 3 + bob, 'W');
+}
+
+/** Peinado y accesorio de perfil (mirando a la derecha). */
+function decorateSide(g: Grid, bob: number) {
+    const { hairStyle: hs, accessory: ac } = curTraits;
+    if (hs === 'tuft') rect(g, 6, 1 + bob, 7, 1 + bob, 'H');
+    if (hs === 'long') rect(g, 4, 4 + bob, 6, 8 + bob, 'H');
+    if (hs === 'cap') {
+        rect(g, 5, 2 + bob, 9, 3 + bob, 'C');
+        rect(g, 10, 3 + bob, 10, 3 + bob, 'C');
+        rect(g, 9, 4 + bob, 11, 4 + bob, 'K');
+    }
+    if (ac === 'glasses') put(g, 8, 5 + bob, 'G'), put(g, 10, 5 + bob, 'G');
+    if (ac === 'beard') {
+        rect(g, 7, 7 + bob, 9, 7 + bob, 'D');
+        put(g, 10, 6 + bob, 'D');
+        put(g, 8, 8 + bob, 'D');
+    }
+    if (ac === 'mustache') put(g, 10, 6 + bob, 'D');
+    if (ac === 'headband') rect(g, 5, 3 + bob, 10, 3 + bob, 'W');
 }
 
 /** Piernas vistas de frente o de espalda. El pie "levantado" queda 1 px más arriba. */
@@ -133,6 +198,7 @@ function drawBodyFront(g: Grid, variant: WalkVariant, back: boolean, bob: number
         rect(g, 5, 3 + bob, 10, 7 + bob, 'H');
     }
     rect(g, 7, 8 + bob, 8, 8 + bob, 's');
+    decorateFront(g, back, bob);
 
     // Torso
     rect(g, 4, 9 + bob, 11, 14 + bob, 'T');
@@ -162,6 +228,7 @@ function drawSideRight(g: Grid, variant: WalkVariant, bob: number) {
     rect(g, 7, 6 + bob, 10, 6 + bob, 'S');
     rect(g, 7, 7 + bob, 9, 7 + bob, 'S');
     rect(g, 7, 8 + bob, 8, 8 + bob, 's');
+    decorateSide(g, bob);
 
     // Torso de perfil
     rect(g, 5, 9 + bob, 10, 14 + bob, 'T');
@@ -220,7 +287,8 @@ function drawWork(g: Grid, role: WorkerRole, frame: 0 | 1) {
 }
 
 /** Genera la matriz de caracteres (24 filas de 16 columnas) de una pose. Función pura, sin Pixi. */
-export function buildCharacterMatrix(pose: CharacterPose): string[] {
+export function buildCharacterMatrix(pose: CharacterPose, traits: { hairStyle?: HairStyle; accessory?: Accessory } = {}): string[] {
+    curTraits = traits;
     const g = blank();
 
     if (pose.kind === 'walk') {
@@ -245,7 +313,7 @@ export function buildCharacterMatrix(pose: CharacterPose): string[] {
 }
 
 const lookKey = (look: CharacterLook) =>
-    `${look.role}_${look.shirtColor}_${look.skinColor}_${look.hairColor || 'def'}`.replace(/[^a-zA-Z0-9_]/g, '');
+    `${look.role}_${look.shirtColor}_${look.skinColor}_${look.hairColor || 'def'}_${look.hairStyle || 'short'}_${look.accessory || 'none'}`.replace(/[^a-zA-Z0-9_]/g, '');
 
 /** Sombra elíptica compartida (14x5 px, negro semitransparente). Se coloca bajo los pies del operario. */
 export function getCharacterShadowTexture(): Texture {
@@ -290,7 +358,7 @@ export function getCharacterTextures(look: CharacterLook): CharacterTextures {
     const key = lookKey(look);
     const palette = buildCharacterPalette(look);
     const tex = (name: string, pose: CharacterPose) =>
-        createPixelTexture(`char_${key}_${name}`, buildCharacterMatrix(pose), palette);
+        createPixelTexture(`char_${key}_${name}`, buildCharacterMatrix(pose, { hairStyle: look.hairStyle, accessory: look.accessory }), palette);
 
     const walk = {} as Record<CharacterDirection, Texture[]>;
     for (const dir of CHARACTER_DIRECTIONS) {

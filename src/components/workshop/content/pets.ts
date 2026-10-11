@@ -10,6 +10,9 @@
 //      `farWalker` (prefiere recorridos largos).
 //   4. `sound`: su voz (ver `PetSound` en workshopAnimalSound.ts): maullido ('meow') o ladrido ('bark').
 //   5. `stats`, `strengths`, `weaknesses`: texto y números de la ficha. Son de FANTASÍA (decorativos).
+//   6. Rasgos individuales (opcionales, afectan sprite y retrato): `collar` (color del collar o pañuelo),
+//      `markings` (lista de marcas: 'blaze' mancha en la frente, 'chest' pecho claro, 'eyePatch' parche en el
+//      ojo, 'socks' patitas claras, 'tabby' rayas) y `markColor` (color de las marcas; por defecto blanco).
 // El `id` debe ser único y sin espacios.
 
 import type { PetSound } from '../workshopAnimalSound';
@@ -19,6 +22,8 @@ export interface PetStat {
     value: number;
     color: string;
 }
+
+export type PetMarking = 'blaze' | 'chest' | 'eyePatch' | 'socks' | 'tabby';
 
 export interface PetProfile {
     id: string;
@@ -37,6 +42,12 @@ export interface PetProfile {
     bulgyEyes?: boolean;
     /** Contorno claro de 1px para distinguirla del fondo. Por defecto es automatico en pelajes oscuros; un color (0xRRGGBB) lo fuerza y `false` lo desactiva. */
     outline?: number | false;
+    /** Color del collar / pañuelo (0xRRGGBB). Sin valor, no lleva. */
+    collar?: number;
+    /** Marcas del pelaje que la hacen única. */
+    markings?: PetMarking[];
+    /** Color de las marcas (por defecto blanco). */
+    markColor?: number;
     /** Velocidad al caminar (px/s del mapa). */
     speed: number;
     /** Pausa entre paseos [min, max] en ms. */
@@ -66,6 +77,8 @@ export const PET_PROFILES: PetProfile[] = [
         belly: 0x3c3c48,
         eye: 0xfacc15,
         nose: 0xfda4af,
+        collar: 0xa855f7,
+        markings: ['chest'],
         speed: 14,
         rest: [3000, 8000],
         sleepChance: 0.4,
@@ -94,6 +107,8 @@ export const PET_PROFILES: PetProfile[] = [
         belly: 0xd1d5db,
         eye: 0x34d399,
         nose: 0xfda4af,
+        collar: 0x14b8a6,
+        markings: ['tabby'],
         speed: 12,
         rest: [4000, 10000],
         sleepChance: 0.5,
@@ -122,6 +137,8 @@ export const PET_PROFILES: PetProfile[] = [
         belly: 0x3a3a45,
         eye: 0xf8fafc,
         nose: 0x52525b,
+        collar: 0xef4444,
+        markings: ['socks'],
         speed: 32,
         rest: [500, 1800],
         sleepChance: 0.04,
@@ -151,6 +168,8 @@ export const PET_PROFILES: PetProfile[] = [
         belly: 0x3a3a45,
         eye: 0xf8fafc,
         nose: 0x52525b,
+        collar: 0x22c55e,
+        markings: ['blaze'],
         chubby: true,
         bulgyEyes: true,
         speed: 10,
@@ -181,6 +200,9 @@ export const PET_PROFILES: PetProfile[] = [
         belly: 0xc79a6a,
         eye: 0x1f2937,
         nose: 0x1f2937,
+        collar: 0xfacc15,
+        markings: ['eyePatch'],
+        markColor: 0xf3e2c4,
         speed: 22,
         rest: [1200, 4000],
         sleepChance: 0.12,

@@ -56,3 +56,6 @@ Los consejos viven en `content/xanaTips.ts` (array `XANA_TIPS`). Para agregar un
 ## Voces de los personajes y sonidos de interfaz
 Todo se edita en `content/voices.ts` (sin archivos de audio, se sintetiza en el navegador): el timbre y tono base de cada rol (`ROLE_VOICES`), ajustes por operario con su nombre en minusculas (`VOICE_OVERRIDES`), cuanto varia el tono entre operarios (`VOICE_SPREAD`), los saludos al hacer clic (`VOICE_GREETINGS`) y los tilines de abrir/cerrar fichas (`UI_SOUNDS`). Se activan con los botones Voces e Interfaz de la barra. El motor esta en `workshopVoice.ts`.
 
+### Rasgos individuales (retratos y personajes)
+- **Mascotas**: en content/pets.ts cada perfil puede tener collar (color), markings (laze, chest, eyePatch, socks, 	abby) y markColor. Se ven en el sprite y en el retrato (PetPortrait.tsx).
+- **Operarios**: content/characters.ts reparte color de pelo, peinado (short, 	uft, long, cap) y accesorio (glasses, eard, headband, mustache) de forma estable segun el id. Para forzar los de alguien, usar LOOK_OVERRIDES por nombre en minusculas. El retrato de la ficha es WorkerPortrait.tsx. Si hay hoja PNG para el rol, el PNG manda en el sprite.
