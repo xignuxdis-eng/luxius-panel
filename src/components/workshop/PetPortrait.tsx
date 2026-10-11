@@ -29,7 +29,7 @@ export const PetPortrait: React.FC<{ profile?: PetProfile; id?: string; size?: n
     const mk = (m: string) => !!p.markings?.includes(m as never);
     const mark = hex(p.markColor ?? 0xf8fafc);
     const lum = 0.299 * ((p.body >> 16) & 255) + 0.587 * ((p.body >> 8) & 255) + 0.114 * (p.body & 255);
-    const edge = p.outline === false ? undefined : typeof p.outline === 'number' ? hex(p.outline) : lum < 70 ? '#cbd5e1' : undefined; // mismo criterio que el sprite del taller
+    const edge = p.outline === false ? undefined : typeof p.outline === 'number' ? hex(p.outline) : lum < 70 ? '#5f6f86' : undefined; // mismo criterio que el sprite del taller
     const sp = edge ? { stroke: edge, strokeWidth: 1 } : {};
     const eyeR = p.bulgyEyes ? 4 : 3;
     const eyeBg = p.bulgyEyes ? '#f8fafc' : eye;
