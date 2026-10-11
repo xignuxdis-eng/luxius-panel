@@ -179,6 +179,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 | Incidencia / Síntoma | Causa Raíz | Solución Implementada | Archivo(s) Modificado(s) |
 | :--- | :--- | :--- | :--- |
+| **Taller Print Den: mejoras de diseno y recorrido - 11/10/2026** | Pedidos de pulido del taller: mascotas oscuras poco visibles, voces, portraits, ventanas, logo, sectores grandes, pasillo poco usado, clima apagado. | Contorno suave en mascotas oscuras; voces y sonidos de interfaz; portraits detallados con rasgos propios; ventanas grandes; logo XignuX pixel art junto al reloj; zona Refrigerios con descansos; sectores mas chicos (`propsScale`) sin recuadros, con cartelito y resplandor al pasar el mouse; pasillo con carriles (`Lanes.rows`) que usan los operarios; se quito el guardia azul; clima: migracion unica a ON (flag `luxius_print_den_weather_v4`, segura ante StrictMode). | `src/components/workshop/**` |
 | **Auditoria de seguridad frontend - 11/10/2026** | Revision de dependencias, secretos y patrones peligrosos. `npm audit --omit=dev`: 0 vulnerabilidades; sin claves/tokens/.env en el repo. Hallazgo: `innerHTML` con nombre de archivo en el visor (posible XSS). | Se reemplazo por `createElement` + `textContent`. Pendiente: revisar el backend (`luXius-Backend`: CORS, rate limit, validacion de subidas), token en localStorage y CSP. | `src/components/shared/SharedFileViewerModal.tsx` |
 | **Taller XignuX Print Den: ampliacion (Bloque F) - 11/10/2026** | Pedido de mas vida y contenido en el taller interactivo. | Alertas y fichas por estacion, cajas OT llevadas por operarios, pizarra y reloj clicables, eventos, dia/noche, clima Cordoba, 5 mascotas (Frijol, Jaina, Muchi, Teo, Borry) con rotacion, visitas, modo TV, logros, botones de sonido individuales, sprites reemplazables por PNG y Tablon de Xana (consejos curados). Contenido editable como datos en `workshop/content/` (ver `workshop/README.md`). Renderer por defecto sigue Canvas 2D (`luxius_print_den_renderer`=legacy); Pixi HD es opcional. | `src/components/workshop/**` |
 | **Carga de orden se congelaba / pantalla trabada** | `ReferenceError: bestCost is not defined` en JavaScript al calcular precio/bobina. La variable no estaba declarada con `let`. | Se inicializó `let bestCost = Infinity;` en el motor de cálculo. | `src/utils/pricingCalculator.ts` |
@@ -284,6 +285,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 ## 8. 🗺️ Plan de Mejoras Vigente (Roadmap Técnico) y Estado
 
 > Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
+
+- [x] **Print Den (11/10/2026)**: sectores mas chicos con cartelitos y glow, pasillo con carriles, Refrigerios, voces, portraits, logo y clima. Pendiente: rotar credenciales viejas del backend, ficha para visitas, medir rendimiento.
 
 ### Fase ErgoDesign & Dual-Theme v1.1.0: Refinamiento UX/UI de Taller (09/10/2026 - En Curso)
 - [x] **Punto de Rollback Seguro**: Tag Git `v1.0.0-baseline` y rama `backup/pre-ergonomics-upgrade` creados y pusheados a GitHub.
