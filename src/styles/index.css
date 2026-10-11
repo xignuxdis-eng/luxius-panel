@@ -96,6 +96,16 @@
     --text-secondary: #334155;
     --text-muted: #64748b;
 
+    /* Colores de estado y marca calibrados para texto sobre fondo claro (WCAG AA >= 4.5:1; el original no llegaba: 2.05 a 3.76) */
+    --accent: #c2410c;
+    --accent-glow: rgba(194, 65, 12, 0.25);
+    --accent-light: rgba(194, 65, 12, 0.08);
+    --border-focus: rgba(194, 65, 12, 0.5);
+    --secondary: #2563eb;
+    --success: #047857;
+    --warning: #b45309;
+    --danger: #dc2626;
+
     --border: rgba(0, 0, 0, 0.1);
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);

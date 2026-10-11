@@ -251,6 +251,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - ErgoDesign: contraste modo claro**: en `styles/index.css` (`[data-theme='light']`) se oscurecen --accent (#c2410c), --secondary, --success, --warning y --danger porque como texto sobre fondo claro daban 2.05 a 3.76:1 y ahora dan >= 4.6:1 (WCAG AA). El modo oscuro ya cumplia (>= 6.2:1) y no se toco. Efecto visible: el naranja de marca se ve mas oscuro/quemado en modo claro. Revisar visualmente.
+
 - **11/10/2026 - ErgoDesign: acciones de lote**: la fila maestra de lote en `Entrada.tsx` pasa de 5 botones a un boton de descarga + menu ••• (Nesting, Reporte PDF, Cambiar estado, Papelera), igual que las ordenes sueltas. Se verifico que las 6 columnas y las 2 acciones + menu de ordenes sueltas ya estaban hechas. Punto de retorno previo: tag `v1.1.0-pre-entrada-ergo` y rama `backup/pre-entrada-ergo`. Pendiente de ErgoDesign: tokens semanticos dual-theme.
 
 - **11/10/2026 - Gotera con operario y balde**: al empezar a llover un operario libre camina con un balde hasta la gotera y lo coloca (el goteo arranca antes); al parar la lluvia otro/el mismo lo retira y se lo lleva. Nuevo `WorkerCrew.requestChore()` (tareas a un punto arbitrario, en orden), `HeldKind` 'balde', `WorkshopFx.setBucket()` separado de `setRain()`. Sin operarios, el balde aparece/desaparece solo. Probar: localStorage `luxius_print_den_rain`='1'. Pendiente: verificacion visual (requiere login), medir rendimiento y verificar temporadas con `luxius_print_den_season`.
@@ -311,7 +313,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Acciones Racionales y Menú Contextual**: Reducción de 8 botones a 2 acciones clave (`👁️` y `📥`) + menú desplegable `•••`.
 - [x] **Barra de Lotes Flotante (Floating Dock)**: Dock centrado inferior para operaciones masivas accesible en cualquier scroll.
 - [x] **Sidebar Colapsable (Focus Mode)**: Modo compacto a 64px para maximizar espacio de trabajo en pantallas de producción.
-- [ ] **Tokens Semánticos Dual-Theme**: Calibración de contraste editorial para Modo Claro (zinc/papel técnico) y profundidad en capas para Modo Oscuro (grafito satinado).
+- [x] **Tokens Semánticos Dual-Theme**: Calibración de contraste editorial para Modo Claro (zinc/papel técnico) y profundidad en capas para Modo Oscuro (grafito satinado).
 
 ### Fase 1: Higiene del repositorio y Sincronización de Base de Datos (22-25/09/2026)
 - [x] Cerrar trabajo pendiente del logo SVG liviano en `generatePdfBudget.ts` y `generatePdfClientReport.ts`.
