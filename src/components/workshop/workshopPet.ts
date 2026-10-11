@@ -27,9 +27,31 @@ export interface PetHooks {
     onWorkerPet?: (profile: PetProfile, x: number, y: number) => void;
 }
 
+/** Graphics que ignora el color de relleno: sirve para dibujar la silueta (contorno) del sprite. */
+class SilhouetteGraphics extends Graphics {
+    constructor(private silhouetteColor: number) {
+        super();
+    }
+    fill(style?: any): this {
+        return super.fill({ ...(typeof style === 'object' && style ? style : {}), color: this.silhouetteColor, alpha: 1 });
+    }
+}
+
+/** Color de contorno de una mascota: `profile.outline` si se define (false = sin contorno); si no, automatico para pelajes oscuros. */
+function outlineColorFor(p: PetProfile): number | null {
+    if (p.outline === false) return null;
+    if (typeof p.outline === 'number') return p.outline;
+    const r = (p.body >> 16) & 255, g = (p.body >> 8) & 255, b = p.body & 255;
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    return lum < 70 ? 0xcbd5e1 : null;
+}
+
 export class WorkshopPet {
     private container = new Container();
     private body = new Graphics();
+    private shadow = new Graphics();
+    private outlines: SilhouetteGraphics[] = [];
+    private cur: Graphics = this.body;
     private zz = new Graphics();
     private hit: Container | null = null;
     private stations: StationConfig[];
@@ -75,6 +97,17 @@ export class WorkshopPet {
         this.container.label = `Pet:${profile.name}`;
         this.container.eventMode = 'none';
         this.container.visible = false;
+        this.container.addChild(this.shadow);
+        const oc = outlineColorFor(profile);
+        if (oc !== null) {
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                const o = new SilhouetteGraphics(oc);
+                o.x = dx;
+                o.y = dy;
+                this.outlines.push(o);
+                this.container.addChild(o);
+            }
+        }
         this.container.addChild(this.body);
         this.container.addChild(this.zz);
         layer.addChild(this.container);
@@ -293,7 +326,7 @@ export class WorkshopPet {
     /* ------------------------------ Dibujo ------------------------------ */
 
     private drawCat(pose: string) {
-        const g = this.body;
+        const g = this.cur;
         const p = this.profile;
         const BODY = p.body;
         const SHADE = p.shade;
@@ -334,7 +367,7 @@ export class WorkshopPet {
     }
 
     private drawDog(pose: string) {
-        const g = this.body;
+        const g = this.cur;
         const p = this.profile;
         const B = p.body;
         const S = p.shade;
@@ -387,12 +420,20 @@ export class WorkshopPet {
     }
 
     private drawPose(pose: string) {
-        const g = this.body;
-        g.clear();
+        const sh = this.shadow;
+        sh.clear();
         const w = this.profile.chubby ? 8 : 6;
-        g.ellipse(0, 0, w, 1.6).fill({ color: 0x000000, alpha: 0.28 });
-        if (this.profile.species === 'gato') this.drawCat(pose);
-        else this.drawDog(pose);
+        sh.ellipse(0, 0, w, 1.6).fill({ color: 0x000000, alpha: 0.28 });
+        const draw = () => (this.profile.species === 'gato' ? this.drawCat(pose) : this.drawDog(pose));
+        // Contorno: la misma silueta, de un solo color, corrida 1px en cada direccion (queda debajo del sprite)
+        for (const o of this.outlines) {
+            o.clear();
+            this.cur = o;
+            draw();
+        }
+        this.body.clear();
+        this.cur = this.body;
+        draw();
     }
 
     private drawZz(t: number) {

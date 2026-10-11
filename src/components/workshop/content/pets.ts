@@ -35,6 +35,8 @@ export interface PetProfile {
     nose: number;
     chubby?: boolean;
     bulgyEyes?: boolean;
+    /** Contorno claro de 1px para distinguirla del fondo. Por defecto es automatico en pelajes oscuros; un color (0xRRGGBB) lo fuerza y `false` lo desactiva. */
+    outline?: number | false;
     /** Velocidad al caminar (px/s del mapa). */
     speed: number;
     /** Pausa entre paseos [min, max] en ms. */
