@@ -9,6 +9,10 @@ export interface FxToggles {
     weather: boolean;
     alerts: boolean;
     petSound: boolean;
+    sndAmbient: boolean;
+    sndMachines: boolean;
+    sndAlerts: boolean;
+    sndAchv: boolean;
 }
 
 export interface ToolbarStation {
@@ -54,7 +58,11 @@ const FX_LABEL: Record<keyof FxToggles, { icon: string; label: string; title: st
     events: { icon: '🎲', label: 'Eventos', title: 'Eventos y visitas aleatorias (decorativas): apagón, café, hora feliz, repartidor, técnico, guardia nocturno' },
     weather: { icon: '🌦️', label: 'Clima', title: 'Clima real por las ventanas (Open-Meteo)' },
     alerts: { icon: '🔔', label: 'Alertas', title: 'Íconos de alerta sobre las estaciones (stock bajo, máquina offline, atrasos)' },
-    petSound: { icon: '🔊', label: 'Animales', title: 'Sonido de las mascotas al hacer clic en ellas' }
+    petSound: { icon: '🔊', label: 'Animales', title: 'Sonido de las mascotas al hacer clic en ellas' },
+    sndAmbient: { icon: '🎵', label: 'Ambiente', title: 'Sonido de fondo del taller' },
+    sndMachines: { icon: '🖨️', label: 'Máquinas', title: 'Sonido de la impresora y de la tijera de corte' },
+    sndAlerts: { icon: '🚨', label: 'Avisos', title: 'Sonido de aviso cuando una orden rebota' },
+    sndAchv: { icon: '🎉', label: 'Festejos', title: 'Sonido al entregar una orden y al desbloquear un logro' }
 };
 
 export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({

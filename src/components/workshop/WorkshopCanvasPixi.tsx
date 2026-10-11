@@ -83,7 +83,7 @@ export const BUILD_TAG = 'F-r1';
 /** Pizarra del día en la pared (coordenadas del mapa). */
 const BOARD = { x: 108, y: 10, w: 100, h: 23 };
 const FX_STORAGE_KEY = 'luxius_print_den_fx';
-const DEFAULT_FX: FxToggles = { pet: true, events: true, weather: true, alerts: true, petSound: true };
+const DEFAULT_FX: FxToggles = { pet: true, events: true, weather: true, alerts: true, petSound: true, sndAmbient: true, sndMachines: true, sndAlerts: true, sndAchv: true };
 
 const loadFxToggles = (): FxToggles => {
     try {
@@ -423,6 +423,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 }
                 const fresh = syncUnlocked(ach);
                 if (fresh.length > 0) {
+                    if (fxToggleRef.current.sndAchv) audioEngine.playOrderComplete();
                     showToast(`🏆 ¡Logro desbloqueado: ${fresh[0].title}!${fresh.length > 1 ? ` (+${fresh.length - 1} más)` : ''}`);
                 }
             }
@@ -519,11 +520,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     // Audio Ambient
     useEffect(() => {
+        if (!fxToggles.sndAmbient) return;
         audioEngine.startAmbient();
         return () => {
             audioEngine.stopAmbient();
         };
-    }, []);
+    }, [fxToggles.sndAmbient]);
 
     // Main PixiJS Application Setup
     useEffect(() => {
@@ -641,8 +643,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         onWorkerTap: (workerId) => handleWorkerTap(workerId),
                         // Sonidos: una sola vez por viaje que realmente empieza (nunca en cada actualización)
                         onErrandStart: (errand) => {
-                            if (errand.held === 'rebotada') audioEngine.playBounceWarning();
-                            else if (errand.held === 'rollo') audioEngine.playScissorsCut();
+                            if (errand.held === 'rebotada') { if (fxToggleRef.current.sndAlerts) audioEngine.playBounceWarning(); }
+                            else if (errand.held === 'rollo') { if (fxToggleRef.current.sndMachines) audioEngine.playScissorsCut(); }
                         }
                     });
 
@@ -945,6 +947,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     /** Confeti y festejo cuando una orden REAL pasa a "entregado". */
     const celebrateDelivery = (order: Order) => {
+        if (fxToggleRef.current.sndAchv) audioEngine.playOrderComplete();
         const st = getPixiStations().find((s) => s.id === 'despacho');
         if (!st) return;
         const big = orderM2(order) >= 5;
@@ -1820,7 +1823,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                         // Audio sweep trigger on new stroke pass with 2.5s cooldown
                         if (pIdx === 0 && cosVal >= 0 && prevSweepCos < 0 && Date.now() - lastSweepSoundTime > 2500) {
-                            audioEngine.playPrintSweep();
+                            if (fxToggleRef.current.sndMachines) audioEngine.playPrintSweep();
                             lastSweepSoundTime = Date.now();
                         }
                         if (pIdx === 0) prevSweepCos = cosVal;
