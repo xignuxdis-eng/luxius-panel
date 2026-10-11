@@ -179,6 +179,7 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 | Incidencia / Síntoma | Causa Raíz | Solución Implementada | Archivo(s) Modificado(s) |
 | :--- | :--- | :--- | :--- |
+| **Taller XignuX Print Den: ampliacion (Bloque F) - 11/10/2026** | Pedido de mas vida y contenido en el taller interactivo. | Alertas y fichas por estacion, cajas OT llevadas por operarios, pizarra y reloj clicables, eventos, dia/noche, clima Cordoba, 5 mascotas (Frijol, Jaina, Muchi, Teo, Borry) con rotacion, visitas, modo TV, logros, botones de sonido individuales, sprites reemplazables por PNG y Tablon de Xana (consejos curados). Contenido editable como datos en `workshop/content/` (ver `workshop/README.md`). Renderer por defecto sigue Canvas 2D (`luxius_print_den_renderer`=legacy); Pixi HD es opcional. | `src/components/workshop/**` |
 | **Carga de orden se congelaba / pantalla trabada** | `ReferenceError: bestCost is not defined` en JavaScript al calcular precio/bobina. La variable no estaba declarada con `let`. | Se inicializó `let bestCost = Infinity;` en el motor de cálculo. | `src/utils/pricingCalculator.ts` |
 | **Error 401 en consola al abrir modal de nueva orden** | Peticiones a `/api/servicios` y `/api/vendedores` no enviaban header `Authorization: Bearer <token>`. | Se agregó interceptor de token JWT guardado en `localStorage`. | `src/pages/Entrada/NuevoPedidoModal.tsx` |
 | **PDFs salían cortados o miniaturas fuera de la hoja** | El CSS de impresión forzaba `height: 297mm !important` en `@media print`, cortando todo a una sola hoja A4; la grilla de miniaturas no tenía reglas de salto. | Se cambió a `height: auto`, `overflow: visible` y reglas `page-break-inside: avoid` en cada tarjeta de miniatura. | `src/utils/generatePdfBudget.ts`<br>`src/utils/presupuestoPdf.ts` |
@@ -1236,6 +1237,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 7. [ ] **(Opcional) Portal de clientes**: decidir si los clientes van a entrar al panel; si sí, asignarles `clientId` y contraseña desde Sistema → Usuarios (P0.4).
 8. [ ] **(Decisión) Reescribir historial público** de `luxius-panel` para borrar commits viejos con secretos (destructivo; solo con tu OK explícito). Si rotás R2 y Neon, deja de ser urgente.
 9. [ ] **(Opcional) Rotar claves Gemini/OpenAI** si alguna vez estuvieron en el repo.
+
+- [x] **Print Den (11/10/2026):** Bloque F completo + Tablon de Xana + contenido editable + sprites PNG. Pendiente: mediciones de rendimiento Pixi HD, PNG para mascotas, contenido desde JSON en la nube, decidir si Pixi HD pasa a ser el renderer por defecto.
 
 ## 9. 📦 Pipeline R2 → Google Drive (`scripts/sync_r2_to_drive.py`)
 
