@@ -251,6 +251,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - ErgoDesign: acciones de lote**: la fila maestra de lote en `Entrada.tsx` pasa de 5 botones a un boton de descarga + menu ••• (Nesting, Reporte PDF, Cambiar estado, Papelera), igual que las ordenes sueltas. Se verifico que las 6 columnas y las 2 acciones + menu de ordenes sueltas ya estaban hechas. Punto de retorno previo: tag `v1.1.0-pre-entrada-ergo` y rama `backup/pre-entrada-ergo`. Pendiente de ErgoDesign: tokens semanticos dual-theme.
+
 - **11/10/2026 - Gotera con operario y balde**: al empezar a llover un operario libre camina con un balde hasta la gotera y lo coloca (el goteo arranca antes); al parar la lluvia otro/el mismo lo retira y se lo lleva. Nuevo `WorkerCrew.requestChore()` (tareas a un punto arbitrario, en orden), `HeldKind` 'balde', `WorkshopFx.setBucket()` separado de `setRain()`. Sin operarios, el balde aparece/desaparece solo. Probar: localStorage `luxius_print_den_rain`='1'. Pendiente: verificacion visual (requiere login), medir rendimiento y verificar temporadas con `luxius_print_den_season`.
 
 - **11/10/2026 - Cartel DEN V2.0 (taller pixel art)**: el cartel `sign_den` del taller (`workshopSprites.ts`) ahora dice "DEN V2.0" (evolución del print anterior); sprite ensanchado de 46 a 56 px y reposicionado en `WorkshopCanvasPixi.tsx` (x=212) para mantenerlo centrado.
@@ -305,8 +307,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 - [x] **Punto de Rollback Seguro**: Tag Git `v1.0.0-baseline` y rama `backup/pre-ergonomics-upgrade` creados y pusheados a GitHub.
 - [x] **Upgrade de Versión a v1.1.0**: Bumping en `package.json`, `vite.config.ts` (generador de `version.json`), `db.ts`, `Login.tsx` y `Sidebar.tsx`.
 - [x] **Auditoría Ergonómica y Diagnóstico de Doble Interfaz**: Mapeo completo de fricciones de scroll horizontal, fatiga motriz y contrastes WCAG en modo claro/oscuro.
-- [ ] **Arquitectura de Celdas Compuestas (Fin del Scroll Horizontal)**: Consolidación de 14 columnas a 6 bloques maestros en `Entrada.tsx`.
-- [ ] **Acciones Racionales y Menú Contextual**: Reducción de 8 botones a 2 acciones clave (`👁️` y `📥`) + menú desplegable `•••`.
+- [x] **Arquitectura de Celdas Compuestas (Fin del Scroll Horizontal)** (verificado 11/10/2026: ya estaba en 6 bloques): Consolidación de 14 columnas a 6 bloques maestros en `Entrada.tsx`.
+- [x] **Acciones Racionales y Menú Contextual**: Reducción de 8 botones a 2 acciones clave (`👁️` y `📥`) + menú desplegable `•••`.
 - [x] **Barra de Lotes Flotante (Floating Dock)**: Dock centrado inferior para operaciones masivas accesible en cualquier scroll.
 - [x] **Sidebar Colapsable (Focus Mode)**: Modo compacto a 64px para maximizar espacio de trabajo en pantallas de producción.
 - [ ] **Tokens Semánticos Dual-Theme**: Calibración de contraste editorial para Modo Claro (zinc/papel técnico) y profundidad en capas para Modo Oscuro (grafito satinado).

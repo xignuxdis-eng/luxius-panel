@@ -1574,64 +1574,77 @@ export default function Entrada() {
                                                         >
                                                             <span style={{ pointerEvents: 'none' }}>📥</span>
                                                         </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleOpenNestingModal(item.orders, item.batchName);
-                                                            }}
-                                                            title="Abrir Nesting Studio 2D para este Lote"
-                                                            style={{ background: 'rgba(56, 189, 248, 0.25)', border: '1px solid rgba(56, 189, 248, 0.6)' }}
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>📐</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const clientObj = allClientes.find(c => String(c.id) === String(item.primaryOrder.clientId));
-                                                                generatePdfClientReport(item.orders, {
-                                                                    clienteNombre: item.primaryOrder.clienteNombre,
-                                                                    clienteEmpresa: clientObj?.empresa,
-                                                                    clienteTelefono: clientObj?.telefono,
-                                                                    clienteEmail: clientObj?.email
-                                                                });
-                                                            }}
-                                                            title="Exportar Reporte PDF del Lote para el Cliente"
-                                                            style={{ background: 'rgba(37, 99, 235, 0.25)', border: '1px solid rgba(37, 99, 235, 0.6)' }}
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>📄</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-icon-action"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setStatusOrder(item.primaryOrder);
-                                                                setStatusBatchOrders(item.orders);
-                                                                setIsStatusModalOpen(true);
-                                                            }}
-                                                            title="Cambiar Estado al Lote"
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>⚙️</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-icon-action btn-danger-action"
-                                                            onClick={async (e) => {
-                                                                e.stopPropagation();
-                                                                if (confirm(`¿Mover las ${item.orders.length} órdenes del lote "${item.batchName}" a la papelera?`)) {
-                                                                    for (const o of item.orders) {
-                                                                        await handleSoftDeleteOrder(o);
-                                                                    }
-                                                                }
-                                                            }}
-                                                            title="Enviar todo el Lote a Papelera"
-                                                        >
-                                                            <span style={{ pointerEvents: 'none' }}>🗑️</span>
-                                                        </button>
+                                                        <div className="action-menu-container">
+                                                            <button
+                                                                type="button"
+                                                                className={`btn-icon-action action-menu-trigger ${actionMenuOrderId === `batch:${item.batchId}` ? 'active' : ''}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const bid = `batch:${item.batchId}`;
+                                                                    setActionMenuOrderId(prev => prev === bid ? null : bid);
+                                                                }}
+                                                                title="Más opciones del lote"
+                                                            >
+                                                                <span style={{ pointerEvents: 'none', letterSpacing: '-1px', fontWeight: 900 }}>•••</span>
+                                                            </button>
+                                                            {actionMenuOrderId === `batch:${item.batchId}` && (
+                                                                <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            handleOpenNestingModal(item.orders, item.batchName);
+                                                                        }}
+                                                                    >
+                                                                        <span>📐</span> Nesting Studio 2D
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            const clientObj = allClientes.find(c => String(c.id) === String(item.primaryOrder.clientId));
+                                                                            generatePdfClientReport(item.orders, {
+                                                                                clienteNombre: item.primaryOrder.clienteNombre,
+                                                                                clienteEmpresa: clientObj?.empresa,
+                                                                                clienteTelefono: clientObj?.telefono,
+                                                                                clienteEmail: clientObj?.email
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <span>📄</span> Reporte PDF para el cliente
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            setStatusOrder(item.primaryOrder);
+                                                                            setStatusBatchOrders(item.orders);
+                                                                            setIsStatusModalOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <span>⚙️</span> Cambiar estado del lote
+                                                                    </button>
+                                                                    <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item danger"
+                                                                        onClick={async () => {
+                                                                            setActionMenuOrderId(null);
+                                                                            if (confirm(`¿Mover las ${item.orders.length} órdenes del lote "${item.batchName}" a la papelera?`)) {
+                                                                                for (const o of item.orders) {
+                                                                                    await handleSoftDeleteOrder(o);
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <span>🗑️</span> Enviar lote a Papelera
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
