@@ -59,3 +59,7 @@ Todo se edita en `content/voices.ts` (sin archivos de audio, se sintetiza en el 
 ### Rasgos individuales (retratos y personajes)
 - **Mascotas**: en content/pets.ts cada perfil puede tener collar (color), markings (laze, chest, eyePatch, socks, 	abby) y markColor. Se ven en el sprite y en el retrato (PetPortrait.tsx).
 - **Operarios**: content/characters.ts reparte color de pelo, peinado (short, 	uft, long, cap) y accesorio (glasses, eard, headband, mustache) de forma estable segun el id. Para forzar los de alguien, usar LOOK_OVERRIDES por nombre en minusculas. El retrato de la ficha es WorkerPortrait.tsx. Si hay hoja PNG para el rol, el PNG manda en el sprite.
+
+### Refrigerios (zona de descanso) y escala de estaciones
+- Estacion efrigerios (heladera, cafetera, cocina) definida en workshopPixiUtils.ts y dibujada en workshopStationProps.ts (uildBreakRoom). Los operarios libres la visitan de vez en cuando (BREAK_CHANCE en workshopWorkers.ts): piensan frases de descanso y, si coinciden dos, charlan. Las frases se editan en workshopBanter.ts (BREAK_THOUGHTS, BREAK_CHATS).
+- propsScale en StationConfig reduce los dibujos de una estacion (Diseno e Insumos usan 0.5); con los botones de la barra se hace zoom a cada una.

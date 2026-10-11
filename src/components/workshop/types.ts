@@ -17,6 +17,8 @@ export interface StationConfig {
     icon: string;
     maquinaId?: number;
     estado?: string;
+    /** Escala de los dibujos (muebles/objetos) de la estación; 1 por defecto. Con 0.5 ocupan la mitad (se ven con zoom). */
+    propsScale?: number;
 }
 
 export interface WorkshopWorker {

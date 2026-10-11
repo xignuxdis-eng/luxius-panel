@@ -16,7 +16,7 @@ import {
     type CharacterDirection,
     type CharacterTextures
 } from './workshopCharacters';
-import { BANTER_SCRIPTS, GREETINGS, THOUGHTS, lineDurationMs, nextBanterDelayMs, nextThoughtDelayMs, pickBanterIndex, pickGreetingIndex, pickThoughtIndex } from './workshopBanter';
+import { BANTER_SCRIPTS, BREAK_CHATS, BREAK_THOUGHTS, GREETINGS, THOUGHTS, lineDurationMs, nextBanterDelayMs, nextThoughtDelayMs, pickBanterIndex, pickGreetingIndex, pickThoughtIndex } from './workshopBanter';
 
 export const MAP_W = 480;
 export const MAX_WORKERS = 4;
@@ -303,6 +303,8 @@ export interface WorkerSnapshot {
     chatting: boolean;
     /** true mientras trabaja un rato en una estación durante el paseo. */
     visiting: boolean;
+    /** true si está de descanso en la zona de Refrigerios. */
+    onBreak?: boolean;
     roleFromUser: boolean;
     shirtColor: string;
     skinColor: string;
@@ -337,6 +339,8 @@ interface WorkerState {
     hit: Container | null;
     /** true mientras el paseante está parado trabajando en una estación (pose de trabajo). */
     visiting: boolean;
+    /** true si el paseo actual es una pausa en Refrigerios (sin pose de trabajo; piensa y charla). */
+    onBreak: boolean;
     /** Paseo de los operarios sin tareas. `trail` = puntos recorridos desde el puesto (para volver por el mismo camino). */
     stroll: StrollPhase;
     strollTimerMs: number;
@@ -377,6 +381,9 @@ const STROLL_MARGIN = 2;
 const STROLL_MAX_Y = 264;
 /** Probabilidad de que un tramo del paseo termine trabajando un rato en una estación. */
 const STATION_VISIT_CHANCE = 0.5;
+/** Zona de descanso (heladera, cafetera y cocina): id de la estación y probabilidad de que un tramo del paseo sea una pausa allí. */
+const BREAK_STATION_ID = 'refrigerios';
+const BREAK_CHANCE = 0.3;
 /** Probabilidad de saludarse al cruzarse (no siempre). */
 const GREET_CHANCE = 0.4;
 /** Distancia máxima (px) para considerar que dos operarios se cruzaron. */
@@ -501,6 +508,7 @@ export class WorkerCrew {
                 chatting: false,
                 stroll: 'rest',
                 visiting: false,
+                onBreak: false,
                 strollTimerMs: 3000 + this.rng() * 6000,
                 strollLegs: 0,
                 strollPauseMs: -1,
@@ -547,6 +555,7 @@ export class WorkerCrew {
             errand: w.errand,
             chatting: w.chatting,
             visiting: w.visiting && w.stroll === 'out' && w.mode === 'idle',
+            onBreak: w.onBreak && w.visiting && w.stroll === 'out' && w.mode === 'idle',
             roleFromUser: w.spec.roleFromUser,
             shirtColor: w.spec.shirtColor,
             skinColor: w.spec.skinColor,
@@ -592,6 +601,7 @@ export class WorkerCrew {
         w.trail = [];
         w.stroll = 'rest';
         w.visiting = false;
+        w.onBreak = false;
         w.strollPauseMs = -1;
         w.strollLegs = 0;
         w.path = [...points, ...planPath(end, target)];
@@ -676,6 +686,19 @@ export class WorkerCrew {
     private planStrollLeg(w: WorkerState): boolean {
         const from: Point = { x: w.x, y: w.y };
         w.visiting = false;
+        w.onBreak = false;
+        // De vez en cuando, una pausa en la zona de Refrigerios (cada uno ocupa un lugar distinto frente a ella)
+        const brk = this.stations.find((s) => s.id === BREAK_STATION_ID);
+        if (brk && this.rng() < BREAK_CHANCE) {
+            const taken = this.workers.filter((o) => o !== w && o.onBreak).length;
+            const laneY = taken % 2 === 0 ? this.lanes.low : this.lanes.high;
+            const stand = getStandPoint(brk, laneY, [0, -11, 11, -20][taken % 4], this.lanes);
+            if (Math.hypot(stand.x - from.x, stand.y - from.y) >= 12 && this.tryLegTo(w, stand, stand.facing)) {
+                w.visiting = true;
+                w.onBreak = true;
+                return true;
+            }
+        }
         if (this.stations.length > 0 && this.rng() < STATION_VISIT_CHANCE) {
             for (let tries = 0; tries < 6; tries++) {
                 const st = this.stations[Math.floor(this.rng() * this.stations.length)];
@@ -684,6 +707,7 @@ export class WorkerCrew {
                 if (Math.hypot(stand.x - from.x, stand.y - from.y) < 12) continue;
                 if (this.tryLegTo(w, stand, stand.facing)) {
                     w.visiting = true;
+                    w.onBreak = st.id === BREAK_STATION_ID;
                     return true;
                 }
             }
@@ -708,6 +732,7 @@ export class WorkerCrew {
         const r = this.routeBack(w);
         w.stroll = 'back';
         w.visiting = false;
+        w.onBreak = false;
         w.strollPauseMs = -1;
         w.path = r.points;
         w.arriveFacing = w.home.facing;
@@ -717,6 +742,7 @@ export class WorkerCrew {
 
     private finishStroll(w: WorkerState) {
         w.visiting = false;
+        w.onBreak = false;
         w.trail = [];
         w.stroll = 'rest';
         w.path = [];
@@ -746,7 +772,10 @@ export class WorkerCrew {
             }
         } else if (w.stroll === 'out') {
             if (w.mode === 'idle') {
-                if (w.strollPauseMs < 0) w.strollPauseMs = w.visiting ? 4500 + this.rng() * 3500 : 1500 + this.rng() * 2500;
+                if (w.strollPauseMs < 0) {
+                    w.strollPauseMs = w.onBreak ? 9000 + this.rng() * 7000 : w.visiting ? 4500 + this.rng() * 3500 : 1500 + this.rng() * 2500;
+                    if (w.onBreak) w.thoughtMs = Math.min(w.thoughtMs, 1200 + this.rng() * 1800); // piensa algo apenas llega
+                }
                 w.strollPauseMs -= dt;
                 if (w.strollPauseMs <= 0) {
                     w.strollPauseMs = -1;
@@ -773,9 +802,11 @@ export class WorkerCrew {
                     // Nadie habla ni piensa a la vez: se reintenta en un rato.
                     w.thoughtMs = 1500 + this.rng() * 2500;
                 } else {
-                    const idx = pickThoughtIndex(this.rng, this.lastThought);
-                    this.lastThought = idx;
-                    const text = THOUGHTS[idx % THOUGHTS.length];
+                    const onBreakNow = w.onBreak && w.visiting && w.stroll === 'out' && w.mode === 'idle';
+                    const pool = onBreakNow ? BREAK_THOUGHTS : THOUGHTS;
+                    const idx = onBreakNow ? Math.floor(this.rng() * pool.length) : pickThoughtIndex(this.rng, this.lastThought);
+                    if (!onBreakNow) this.lastThought = idx;
+                    const text = pool[idx % pool.length];
                     w.bubble = { text, tone: 'think' };
                     w.thoughtShowMs = lineDurationMs(text);
                 }
@@ -830,18 +861,19 @@ export class WorkerCrew {
                 const b = this.workers[j];
                 if (a.bubble || b.bubble || a.chatting || b.chatting) continue;
                 if (a.errand !== 'none' || b.errand !== 'none') continue;
-                if (a.mode !== 'walk' && b.mode !== 'walk') continue;
+                const bothBreak = a.onBreak && b.onBreak && a.mode === 'idle' && b.mode === 'idle' && a.stroll === 'out' && b.stroll === 'out';
+                if (!bothBreak && a.mode !== 'walk' && b.mode !== 'walk') continue;
                 if (Math.abs(a.x - b.x) > GREET_RANGE_X || Math.abs(a.y - b.y) > GREET_RANGE_Y) continue;
                 const key = `${a.spec.id}|${b.spec.id}`;
                 if (this.pairCooldown.has(key)) continue;
                 this.pairCooldown.set(key, GREET_PAIR_COOLDOWN_MS);
-                if (this.rng() >= GREET_CHANCE) continue;
+                if (this.rng() >= (bothBreak ? 0.8 : GREET_CHANCE)) continue;
 
                 const first = a.mode === 'walk' && b.mode !== 'walk' ? a : b.mode === 'walk' && a.mode !== 'walk' ? b : this.rng() < 0.5 ? a : b;
                 const second = first === a ? b : a;
-                const idx = pickGreetingIndex(this.rng, this.lastGreeting);
-                this.lastGreeting = idx;
-                const lines = GREETINGS[idx % GREETINGS.length];
+                const idx = bothBreak ? Math.floor(this.rng() * BREAK_CHATS.length) : pickGreetingIndex(this.rng, this.lastGreeting);
+                if (!bothBreak) this.lastGreeting = idx;
+                const lines = bothBreak ? BREAK_CHATS[idx % BREAK_CHATS.length] : GREETINGS[idx % GREETINGS.length];
                 first.bubble = { text: lines[0], tone: 'chat' };
                 this.greet = { first, second, lines, step: 0, ms: greetDurationMs(lines[0]) };
                 return;
@@ -1167,7 +1199,7 @@ export class WorkerCrew {
         if (w.mode === 'walk') {
             const frame = Math.floor((w.animMs / 1000) * WALK_FPS) % 4;
             w.sprite.texture = w.textures.walk[w.facing][frame];
-        } else if (w.facing === 'down' && (w.errand === 'dwell' || (w.visiting && w.stroll === 'out'))) {
+        } else if (w.facing === 'down' && !w.onBreak && (w.errand === 'dwell' || (w.visiting && w.stroll === 'out'))) {
             // Trabajando en la estación (herramienta del rol)
             w.sprite.texture = w.textures.work[Math.floor(w.animMs / 400) % 2];
         } else if (w.facing === 'down') {

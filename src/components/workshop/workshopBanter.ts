@@ -221,6 +221,32 @@ export const THOUGHTS: string[] = [
     'Subir la OT al sistema es el primer paso.'
 ];
 
+/** Pensamientos de quien está de descanso en la zona de Refrigerios (editar libremente). */
+export const BREAK_THOUGHTS: string[] = [
+    'Ahh, el primer sorbo de café del día...',
+    'Este café ya es nivel legendario.',
+    'Qué rico huele ese cafecito recién hecho.',
+    'Un mate no vendría mal... pero hoy toca café.',
+    'Si la heladera hablara, sabría todos los secretos.',
+    'Me preparo unas tostadas y vuelvo.',
+    'Cinco minutos de pausa y a seguir.',
+    'Descanso merecido: +10 de energía.',
+    'Hoy me siento con ganas de un snack.',
+    'Pensando en la próxima aventura de Zelda...',
+    'Un descanso a tiempo evita el wipe.',
+    'Qué linda pausa para ordenar las ideas.'
+];
+
+/** Charlas de a dos durante el descanso (quien habla primero, quien responde). */
+export const BREAK_CHATS: [string, string][] = [
+    ['¿Café o mate?', 'Café, que hoy hay que rendir.'],
+    ['¿Qué te preparás?', 'Unas tostadas. ¿Querés una?'],
+    ['Esta pausa me hacía falta.', 'A mí también. Cinco minutos y volvemos.'],
+    ['¿Hay algo rico en la heladera?', 'Siempre hay algo. Siempre.'],
+    ['¿Viste qué buen día de pedidos?', 'Sí, ¡y todavía queda!'],
+    ['Te invito el cafecito.', '¡Aceptado! Gracias.']
+];
+
 /**
  * Saludos al cruzarse por el taller. Cada par es [saludo de quien saluda, respuesta del otro].
  * Son cortos y temáticos (videojuegos, Blizzard, cultura pop); los operarios siguen su camino.

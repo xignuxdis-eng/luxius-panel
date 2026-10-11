@@ -197,7 +197,7 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
 }
 
 /** Qué está haciendo el operario ahora mismo, en texto (datos reales del movimiento del taller). */
-export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'>): string {
+export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean }): string {
     const station: Record<WorkerRole, string> = {
         disenador: 'Diseño',
         impresor: 'el Plotter',
@@ -208,6 +208,7 @@ export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' |
     if (w.errand === 'dwell') return `Entregando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
     if (w.errand === 'returning') return 'Volviendo a su puesto con la tarea cumplida';
     if (w.chatting) return 'Charlando con un compañero';
+    if (w.onBreak) return 'De descanso en Refrigerios (café, algo rico y a pensar un rato)';
     if (w.visiting) return 'Trabajando un rato en otra estación';
     if (w.stroll === 'out') return 'Dando una vuelta por el taller';
     if (w.stroll === 'back') return 'Volviendo a su puesto';

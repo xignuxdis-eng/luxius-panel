@@ -308,6 +308,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             lastStationCloseRef.current = null;
             return;
         }
+        if (id === 'refrigerios') {
+            // Zona de descanso: no tiene órdenes ni ficha de producción
+            showToast('☕ Refrigerios: de vez en cuando el equipo viene a tomar un descanso, charlar o pensar un rato.');
+            return;
+        }
         setSheetWorkerId(null);
         setSheetPetId(null);
         setWallPanel(null);
@@ -1448,8 +1453,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
             // Objetos de la estación (Bloque D): escritorio, estantes, mesa de corte, cajas, portón, mostrador
             if (!isPlotter) {
-                const props = createStationProps(id, width, height);
+                // propsScale (p. ej. 0.5): los objetos se dibujan en un lienzo más grande y se reducen; el título (16 px) no se escala
+                const ps = station.propsScale ?? 1;
+                const props = createStationProps(id, width / ps, 16 + (height - 16) / ps);
                 if (props) {
+                    if (ps !== 1) {
+                        props.container.scale.set(ps);
+                        props.container.y = 16 * (1 - ps);
+                    }
                     visualContainer.addChild(props.container);
                     props.setCount(countOrdersForStation(id, ordersRef.current));
                     stationPropsRef.current.set(id, props);

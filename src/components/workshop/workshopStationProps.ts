@@ -586,6 +586,100 @@ function buildCashier(w: number, _h: number): StationProps {
     };
 }
 
+/* --------------------------------- REFRIGERIOS -------------------------------- */
+/** Zona de descanso: heladera, mesada con cafetera y cocina. Los operarios vienen a tomar algo (ver workshopWorkers.ts). */
+function buildBreakRoom(w: number, _h: number): StationProps {
+    const c = new Container();
+    const base = new Graphics();
+    const anim = new Graphics();
+    c.addChild(base);
+    c.addChild(anim);
+
+    // Piso de baldosas (damero suave)
+    for (let i = 0; i < Math.floor((w - 4) / 4); i++) {
+        box(base, 2 + i * 4, 62, 4, 4, i % 2 === 0 ? 0x273241 : 0x1d2635, 0.9);
+        box(base, 2 + i * 4, 66, 4, 4, i % 2 === 0 ? 0x1d2635 : 0x273241, 0.9);
+    }
+    floorShadow(base, 3, 60, w - 6, 3, 0.35);
+
+    // Heladera (dos puertas, manijas, imanes)
+    obj(base, 4, 24, 16, 38, 0xe2e8f0);
+    box(base, 4, 38, 16, 1, 0x64748b); // separación freezer / heladera
+    box(base, 17, 28, 1, 6, 0x475569); // manija freezer
+    box(base, 17, 42, 1, 9, 0x475569); // manija heladera
+    box(base, 6, 26, 8, 1, 0xf8fafc, 0.7); // brillo
+    box(base, 7, 44, 3, 3, 0xf472b6); // imán
+    box(base, 11, 41, 3, 3, 0xfde047); // nota
+    box(base, 7, 30, 2, 2, 0x38bdf8); // imán
+    box(base, 4, 60, 16, 2, 0x94a3b8); // zócalo
+
+    // Mesada de madera con puertitas
+    obj(base, 22, 44, w - 26, 18, 0x7c5a3a);
+    box(base, 22, 44, w - 26, 2, 0xa07850); // tapa
+    box(base, 22 + Math.floor((w - 26) / 2), 47, 1, 14, 0x4a3322, 0.8);
+    box(base, 30, 51, 2, 1, 0xfbbf24);
+    box(base, 22 + Math.floor((w - 26) / 2) + 4, 51, 2, 1, 0xfbbf24);
+
+    // Alacena con tazas
+    obj(base, 24, 20, w - 30, 9, 0x6b4c2f);
+    box(base, 24 + Math.floor((w - 30) / 2), 21, 1, 7, 0x4a3322, 0.8);
+    box(base, 28, 22, 2, 1, 0xfbbf24);
+    box(base, 24 + Math.floor((w - 30) / 2) + 4, 22, 2, 1, 0xfbbf24);
+
+    // Cafetera (jarra de vidrio y piloto)
+    obj(base, 25, 32, 10, 12, 0x1f2937);
+    box(base, 26, 33, 8, 2, 0x475569);
+    obj(base, 27, 37, 5, 6, 0xbae6fd);
+    box(base, 27, 40, 5, 3, 0x3b2412, 0.9);
+    box(base, 33, 34, 1, 1, 0xef4444); // piloto
+
+    // Taza sobre la mesada
+    obj(base, 36, 40, 4, 4, 0xf8fafc);
+
+    // Cocina (hornallas y horno)
+    const sx = w - 20;
+    obj(base, sx, 38, 16, 6, 0x374151);
+    box(base, sx + 2, 38, 4, 1, 0x0f172a);
+    box(base, sx + 10, 38, 4, 1, 0x0f172a);
+    obj(base, sx + 1, 33, 7, 5, 0x94a3b8); // olla
+    box(base, sx + 1, 33, 7, 1, 0xe2e8f0);
+    box(base, sx + 8, 35, 2, 1, 0x64748b); // asa
+    obj(base, sx + 2, 47, 12, 10, 0x1f2937); // horno
+    box(base, sx + 3, 49, 10, 6, 0x0f172a);
+    box(base, sx + 3, 48, 10, 1, 0x94a3b8); // manija
+    for (let k = 0; k < 3; k++) box(base, sx + 3 + k * 4, 45, 2, 1, 0xcbd5e1); // perillas
+
+
+    const tick = makeThrottle();
+    return {
+        container: c,
+        setCount() {},
+        update(t) {
+            if (!tick(t)) return;
+            anim.clear();
+            // vapor de la cafetera
+            for (let k = 0; k < 3; k++) {
+                const rise = ((t / 130 + k * 6) % 14) / 14;
+                box(anim, 29 + k + Math.round(Math.sin(t / 280 + k)), 31 - Math.round(rise * 9), 1, 2, 0xffffff, 0.5 * (1 - rise));
+            }
+            // piloto parpadeante
+            if (Math.floor(t / 700) % 2 === 0) box(anim, 33, 34, 1, 1, 0xfca5a5, 0.9);
+            // llamas de la hornalla
+            const f = Math.floor(t / 110) % 3;
+            box(anim, sx + 3, 37, 2, 1, 0xf97316, 0.9);
+            box(anim, sx + 11, 37, 2, 1, 0x38bdf8, 0.9);
+            if (f > 0) box(anim, sx + 3 + (f - 1), 36, 1, 1, 0xfde047, 0.8);
+            // vapor de la olla
+            for (let k = 0; k < 2; k++) {
+                const rise = ((t / 140 + k * 7) % 14) / 14;
+                box(anim, sx + 3 + k * 2 + Math.round(Math.sin(t / 300 + k)), 31 - Math.round(rise * 8), 1, 2, 0xffffff, 0.45 * (1 - rise));
+            }
+            // luz tenue del horno
+            box(anim, sx + 3, 49, 10, 6, 0xf59e0b, 0.12 + 0.05 * Math.sin(t / 600));
+        }
+    };
+}
+
 /** Props de una estación hechos con una imagen PNG (content/sprites.ts): estática, sin animaciones ni pilas de cajas. */
 function buildImageProps(id: string, width: number, height: number): StationProps | null {
     const img = getStationImage(id);
@@ -607,6 +701,8 @@ export function createStationProps(id: string, width: number, height: number): S
     switch (id) {
         case 'diseno':
             return buildDesign(width, height);
+        case 'refrigerios':
+            return buildBreakRoom(width, height);
         case 'insumos':
             return buildSupplies(width, height);
         case 'corte':

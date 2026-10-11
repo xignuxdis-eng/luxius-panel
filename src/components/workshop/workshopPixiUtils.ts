@@ -84,10 +84,22 @@ export const getPixiStations = (): StationConfig[] => {
             description: 'Mesa de pre-prensa y validación de artes.',
             x: 16,
             y: 36,
-            width: 86,
-            height: 72,
+            width: 46,
+            height: 44,
             color: '#8b5cf6',
-            icon: '🖥️'
+            icon: '🖥️',
+            propsScale: 0.5
+        },
+        {
+            id: 'refrigerios',
+            title: 'Refrigerios',
+            description: 'Zona de descanso: heladera, cafetera y cocina para una pausa.',
+            x: 68,
+            y: 36,
+            width: 62,
+            height: 72,
+            color: '#14b8a6',
+            icon: '☕'
         }
     ];
 
@@ -138,12 +150,13 @@ export const getPixiStations = (): StationConfig[] => {
             id: 'insumos',
             title: 'Insumos',
             description: 'Tintas CMYK y bobinas en stock.',
-            x: 378,
+            x: 418,
             y: 36,
-            width: 86,
-            height: 72,
+            width: 46,
+            height: 44,
             color: '#eab308',
-            icon: '🎨'
+            icon: '🎨',
+            propsScale: 0.5
         },
         {
             id: 'despacho',
