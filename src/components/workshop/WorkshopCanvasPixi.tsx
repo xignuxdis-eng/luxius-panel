@@ -92,7 +92,16 @@ const DEFAULT_FX: FxToggles = { ...BASE_DEFAULT_FX };
 const loadFxToggles = (): FxToggles => {
     try {
         const raw = localStorage.getItem(FX_STORAGE_KEY);
-        if (raw) return { ...DEFAULT_FX, ...JSON.parse(raw) };
+        if (raw) {
+            const saved = { ...DEFAULT_FX, ...JSON.parse(raw) };
+            // Migración única: un valor viejo guardado como apagado dejaba el clima sin verse. Se enciende una vez y después se respeta lo que elija cada usuario.
+            if (!localStorage.getItem('luxius_print_den_weather_v2')) {
+                localStorage.setItem('luxius_print_den_weather_v2', '1');
+                saved.weather = true;
+            }
+            return saved;
+        }
+        localStorage.setItem('luxius_print_den_weather_v2', '1');
     } catch (_) {}
     return { ...DEFAULT_FX };
 };
