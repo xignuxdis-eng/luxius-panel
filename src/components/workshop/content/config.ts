@@ -53,9 +53,7 @@ export const WORKSHOP_CONFIG = {
         coffeeMs: 6000,
         happyHourMs: 11000,
         /** Apagón: duración total y momentos (ms desde el inicio). */
-        blackout: { darkUntilMs: 3600, endMs: 4400 },
-        /** Horario del guardia nocturno (hora decimal, 0-24). */
-        nightGuard: { fromHour: 22, toHour: 6 }
+        blackout: { darkUntilMs: 3600, endMs: 4400 }
     }
 };
 

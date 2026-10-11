@@ -4,7 +4,7 @@
 
 import type { BubbleTone } from '../workshopWorkers';
 
-export type GuestKind = 'repartidor' | 'tecnico' | 'guardia';
+export type GuestKind = 'repartidor' | 'tecnico';
 
 export interface GuestKindConfig {
     name: string;
@@ -39,21 +39,5 @@ export const GUEST_KINDS: Record<GuestKind, GuestKindConfig> = {
         tone: 'info',
         stayMs: 11000,
         lines: ['Vengo a revisar el plotter 🔧', 'Cabezales limpios, todo en orden.', 'Con estos cuidados, imprimen de maravilla.']
-    },
-    guardia: {
-        name: 'Guardia nocturno (visita)',
-        shirt: '#1e3a8a',
-        skin: '#fed7aa',
-        hair: '#374151',
-        speed: 20,
-        tone: 'info',
-        stayMs: 5000,
-        lines: [
-            'Todo tranquilo en el Den... por ahora.',
-            'Ronda nocturna: sin novedades.',
-            '¡Por el honor del taller! 🛡️',
-            'Alto ahí, viajero... ah, no, es un vinilo.',
-            'Que la luz de las lámparas guíe sus impresiones.'
-        ]
     }
 };

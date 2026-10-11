@@ -12,7 +12,7 @@ import {
     type CharacterTextures
 } from './workshopCharacters';
 import { lineDurationMs } from './workshopBanter';
-import { computeLanes, getStandPoint, planPath, MAP_W, type BubbleTone, type Lanes, type Point, type WorkerSnapshot } from './workshopWorkers';
+import { computeLanes, getStandPoint, planPath, type BubbleTone, type Lanes, type Point, type WorkerSnapshot } from './workshopWorkers';
 
 import { GUEST_KINDS, type GuestKind, type GuestKindConfig } from './content/guests';
 export type { GuestKind };
@@ -20,7 +20,7 @@ export type { GuestKind };
 type KindConfig = GuestKindConfig;
 const KIND = GUEST_KINDS;
 
-type Phase = 'in' | 'stay' | 'out' | 'patrol' | 'pause';
+type Phase = 'in' | 'stay' | 'out';
 
 interface Guest {
     id: string;
@@ -107,19 +107,14 @@ export class GuestManager {
             rest: 0
         };
 
-        if (kind === 'guardia') {
-            g.phase = 'patrol';
-            g.path = this.patrolLeg(g);
-        } else {
-            const target = this.targetStation(kind);
-            if (!target) {
-                container.destroy({ children: true });
-                return false;
-            }
-            const stand = getStandPoint(target, laneY, 0, this.lanes);
-            g.path = planPath({ x: g.x, y: g.y }, { x: stand.x, y: stand.y });
-            g.arriveFacing = stand.facing;
+        const target = this.targetStation(kind);
+        if (!target) {
+            container.destroy({ children: true });
+            return false;
         }
+        const stand = getStandPoint(target, laneY, 0, this.lanes);
+        g.path = planPath({ x: g.x, y: g.y }, { x: stand.x, y: stand.y });
+        g.arriveFacing = stand.facing;
         this.guests.push(g);
         this.sync(g);
         return true;
@@ -145,16 +140,6 @@ export class GuestManager {
         // si no está sobre el pasillo, primero vuelve al carril de abajo y sale por la puerta
         g.path = onLane ? [{ x: -10, y: g.y }] : planPath({ x: g.x, y: g.y }, { x: -10, y: this.lanes.low });
         g.mode = 'walk';
-    }
-
-    /** Un tramo del patrullaje: va a un punto del pasillo. */
-    private patrolLeg(g: Guest): Point[] {
-        const laneY = this.rng() < 0.5 ? this.lanes.low : this.lanes.high;
-        const x = Math.round(30 + this.rng() * (MAP_W - 60));
-        const pts: Point[] = [];
-        if (Math.abs(g.y - laneY) > 0.01) pts.push({ x: g.x, y: laneY });
-        pts.push({ x, y: laneY });
-        return pts;
     }
 
     private sync(g: Guest) {
@@ -214,10 +199,6 @@ export class GuestManager {
                         g.timerMs = g.cfg.stayMs;
                         g.lineIdx = 0;
                         g.rest = 600;
-                    } else if (g.phase === 'patrol') {
-                        g.phase = 'pause';
-                        g.timerMs = 2500 + this.rng() * 3500;
-                        g.facing = 'down';
                     }
                 }
             }
@@ -226,7 +207,7 @@ export class GuestManager {
             if (g.bubble) {
                 g.bubbleMs -= dt;
                 if (g.bubbleMs <= 0) g.bubble = null;
-            } else if ((g.phase === 'stay' || g.phase === 'pause') && !g.leaving && !someoneElseSpeaking) {
+            } else if (g.phase === 'stay' && !g.leaving && !someoneElseSpeaking) {
                 g.rest -= dt;
                 if (g.rest <= 0) {
                     const line = g.cfg.lines[g.lineIdx % g.cfg.lines.length];
@@ -241,13 +222,6 @@ export class GuestManager {
             if (g.phase === 'stay') {
                 g.timerMs -= dt;
                 if (g.timerMs <= 0) this.startLeaving(g);
-            } else if (g.phase === 'pause') {
-                g.timerMs -= dt;
-                if (g.timerMs <= 0 && !g.leaving) {
-                    g.phase = 'patrol';
-                    g.path = this.patrolLeg(g);
-                    g.mode = g.path.length > 0 ? 'walk' : 'idle';
-                }
             }
 
             this.sync(g);

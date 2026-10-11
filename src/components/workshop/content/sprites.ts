@@ -44,7 +44,7 @@ export const SPRITE_OVERRIDES = {
 
     /**
      * Operarios: una hoja de sprites PNG por rol ('disenador' | 'impresor' | 'cortador' | 'empaquetador'),
-     * o 'default' para todos los que no tengan hoja propia. Las visitas usan 'guest_repartidor', 'guest_tecnico', 'guest_guardia'.
+     * o 'default' para todos los que no tengan hoja propia. Las visitas usan 'guest_repartidor', 'guest_tecnico'.
      * Diseño de la hoja (cada cuadro 16×24 px, hoja de 64×120 px = 4 columnas × 5 filas), ver CHARACTER_SHEET_LAYOUT.
      * Ejemplo:  disenador: spriteUrl('operario-diseno.png'),
      */

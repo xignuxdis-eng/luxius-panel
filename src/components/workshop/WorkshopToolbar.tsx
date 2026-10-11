@@ -58,7 +58,7 @@ const chip = (active: boolean, accent = '#38bdf8'): React.CSSProperties => ({
 
 const FX_LABEL: Record<keyof FxToggles, { icon: string; label: string; title: string }> = {
     pet: { icon: '🐾', label: 'Mascotas', title: 'Mostrar/ocultar a las mascotas del taller: Frijol, Jaina, Muchi, Teo y Borry (decorativas)' },
-    events: { icon: '🎲', label: 'Eventos', title: 'Eventos y visitas aleatorias (decorativas): apagón, café, hora feliz, repartidor, técnico, guardia nocturno' },
+    events: { icon: '🎲', label: 'Eventos', title: 'Eventos y visitas aleatorias (decorativas): apagón, café, hora feliz, repartidor, técnico' },
     weather: { icon: '🌦️', label: 'Clima', title: 'Clima real por las ventanas (Open-Meteo)' },
     alerts: { icon: '🔔', label: 'Alertas', title: 'Íconos de alerta sobre las estaciones (stock bajo, máquina offline, atrasos)' },
     petSound: { icon: '🔊', label: 'Animales', title: 'Sonido de las mascotas al hacer clic en ellas' },

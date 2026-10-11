@@ -692,7 +692,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             x: Math.round(40 + Math.random() * 400),
                             y: Math.round(hallLanes.topEdge + 10 + Math.random() * Math.max(4, hallLanes.bottomEdge - hallLanes.topEdge - 16))
                         }),
-                        hour: () => hourOf(workshopNow()),
                         onPowerBack: () => petRef.current?.reunion()
                     });
                     eventsRef.current.setEnabled(fxToggleRef.current.events);

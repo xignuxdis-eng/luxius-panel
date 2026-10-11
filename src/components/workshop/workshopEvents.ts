@@ -1,6 +1,6 @@
 // workshopEvents.ts - Eventos y visitas aleatorias del Print Den (Bloque F5/F10)
 // TODOS son decorativos (no representan datos del sistema). Cada tanto ocurre algo: se corta la luz un ratito,
-// se derrama un café, empieza la "hora feliz" con música, llega un repartidor o un técnico. De noche hay un guardia.
+// se derrama un café, empieza la "hora feliz" con música, llega un repartidor o un técnico.
 // Nada pasa si el usuario apagó los eventos, y nunca hay dos eventos a la vez.
 
 import type { WorkshopFx } from './workshopFx';
@@ -38,8 +38,6 @@ export interface EventDeps {
     guests: () => GuestManager | null;
     /** Puntos libres del pasillo donde puede caer algo (coordenadas del mapa). */
     floorSpot: () => Point;
-    /** Hora decimal actual del taller (para el guardia nocturno). */
-    hour: () => number;
     /** Se llama cuando vuelve la luz después de un apagón (las mascotas se juntan). */
     onPowerBack?: () => void;
 }
@@ -56,7 +54,6 @@ export class WorkshopEvents {
     private enabled = true;
     private timer: number;
     private running: Running | null = null;
-    private guardCheckMs = 0;
     private notesMs = 0;
     private destroyed = false;
 
@@ -70,7 +67,6 @@ export class WorkshopEvents {
             this.stopRunning();
             this.deps.guests()?.dismiss('repartidor');
             this.deps.guests()?.dismiss('tecnico');
-            this.deps.guests()?.dismiss('guardia');
         }
     }
 
@@ -108,19 +104,6 @@ export class WorkshopEvents {
 
     update(dtMs: number) {
         if (this.destroyed) return;
-
-        // Guardia nocturno: patrulla de 22:00 a 06:00
-        this.guardCheckMs -= dtMs;
-        if (this.guardCheckMs <= 0) {
-            this.guardCheckMs = 5000;
-            const g = this.deps.guests();
-            if (g) {
-                const h = this.deps.hour();
-                const night = h >= WORKSHOP_CONFIG.events.nightGuard.fromHour || h < WORKSHOP_CONFIG.events.nightGuard.toHour;
-                if (this.enabled && night && !g.has('guardia')) g.spawn('guardia');
-                else if ((!night || !this.enabled) && g.has('guardia')) g.dismiss('guardia');
-            }
-        }
 
         // Evento en curso
         const r = this.running;
