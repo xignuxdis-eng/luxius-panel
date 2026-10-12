@@ -4,6 +4,7 @@ import { getClientes, getMateriales, getCalidades, saveOrden, getCombos, type Co
 import { useAuthStore } from '@/store/authStore';
 import { downloadPresupuestoPDF, type PresupuestoItem, type PresupuestoData } from '@/utils/presupuestoPdf';
 import type { UnidadMedida } from '@/types/orden';
+import { isDesignerRole } from '@/types';
 import './Presupuestador.css';
 
 export default function Presupuestador() {
@@ -264,6 +265,10 @@ export default function Presupuestador() {
                 observaciones2: '',
                 archivos: [],
                 vendedorNombre: user?.name || 'Ventas',
+                operarioNombre: isDesignerRole(user?.role) ? (user?.name || user?.username) : user?.name,
+                artistaId: isDesignerRole(user?.role) ? user?.id : undefined,
+                creadoPor: user?.username || (user?.id ? String(user?.id) : undefined),
+                usuarioId: user?.id,
                 isCustom: item.isCustom,
                 conceptoPersonalizado: item.isCustom ? item.concepto : undefined,
                 unidadMedida: item.unidadMedida,

@@ -3,7 +3,7 @@ import Header from '@components/layout/Header'
 import { getMaquinas, getOrdenes, saveOrden } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import type { Order } from '@/types'
-import { statusColors, statusLabels } from '@/types'
+import { statusColors, statusLabels, isDesignerRole, isDesignerOwner } from '@/types'
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
 import { downloadSingleOrderFiles } from '@/utils/orderFileDownloader'
 import './Impresion.css'
@@ -33,8 +33,8 @@ export default function Impresion() {
             )
 
             // Filter for Artist: only show prints originating from their designs
-            if (user?.role === 'artista') {
-                filtered = filtered.filter(o => o.artistaId === user.id)
+            if (isDesignerRole(user?.role)) {
+                filtered = filtered.filter(o => isDesignerOwner(o, user))
             }
 
             setOrders(filtered)
@@ -94,7 +94,7 @@ export default function Impresion() {
         <div className="impresion-page">
             <Header
                 title="Impresión"
-                subtitle={user?.role === 'artista' ? "Mis diseños en cola de impresión" : "Gestión de producción"}
+                subtitle={isDesignerRole(user?.role) ? "Mis diseños en cola de impresión" : "Gestión de producción"}
             />
 
             <div className="impresion-tabs">
@@ -112,7 +112,7 @@ export default function Impresion() {
                 </button>
             </div>
 
-            {user?.role !== 'artista' && (
+            {!isDesignerRole(user?.role) && (
                 <div className="machines-status-bar">
                     {maquinas.map((m) => (
                         <div key={m.id} className="machine-badge animate-fade-in">

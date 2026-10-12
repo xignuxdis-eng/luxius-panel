@@ -9,6 +9,7 @@
 
 // Types
 import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica, MonedaConfig, Caja, MovimientoCaja, MovimientoStock, Banco } from '@/types'
+import { isDesignerOwner } from '@/types'
 
 // API Configuration: dynamic between local server and Render cloud
 export const API_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -1908,8 +1909,9 @@ export async function getCalendarEvents(userId?: string | number, role?: string)
         if (role === 'impresion' && o.status === 'orden') return true
 
         // Artists see orders in design (En Diseño) assigned to them
-        if (role === 'artista' || role === 'diseno') {
-            return o.status === 'preorden' && o.artistaId === userId
+        // Artists only see their own assigned and published orders
+        if (role === 'artista' || role === 'diseno' || role === 'disenador') {
+            return isDesignerOwner(o, { id: userId, role })
         }
 
         // Sales see everything
@@ -1924,7 +1926,7 @@ export async function getCalendarEvents(userId?: string | number, role?: string)
     })
 
     const orderEvents: import('@/types').CalendarEvent[] = relevantOrders.map(o => {
-        const isAssignment = (role === 'artista' && o.artistaId === userId) ||
+        const isAssignment = ((role === 'artista' || role === 'diseno' || role === 'disenador') && isDesignerOwner(o, { id: userId, role })) ||
             (role === 'impresion' && o.status === 'preorden')
 
         // Use 'rebotado' only if the status exists, but our new typing might not support it yet. 

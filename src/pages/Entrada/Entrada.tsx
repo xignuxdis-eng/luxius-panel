@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
-import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag } from '../../types/orden'
+import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag, isDesignerOwner } from '../../types/orden'
+import { isDesignerRole } from '../../types/auth'
 import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
@@ -250,9 +251,8 @@ export default function Entrada() {
         const matchesCategory = categoryFilter === '' || order.category === categoryFilter;
         const matchesTag = !tagFilter || (order.tags && order.tags.includes(tagFilter));
 
-        const isArtista = user?.role === 'artista';
+        const isArtista = isDesignerRole(user?.role);
         const isImpresor = user?.role === 'impresion';
-        const isRelevantForArtista = order.status === 'diseno' || order.status === 'rebotado';
         const isRelevantForImpresor = ['orden', 'impreso', 'post', 'completo'].includes(order.status);
 
         if (user?.role === 'vendedor' && order.status !== 'relevamiento') return false;
@@ -270,7 +270,13 @@ export default function Entrada() {
             if (!matchesLinked && !matchesUser) return false;
         }
 
-        if (isArtista && !isRelevantForArtista) return false;
+        // Regla de Oro para Diseñadores:
+        // No deben poder ver los trabajos subidos por otros diseñadores o por el sistema.
+        // Solo pueden visualizar y dar seguimiento a sus propios trabajos publicados en todas las etapas.
+        if (isArtista) {
+            if (!isDesignerOwner(order, user)) return false;
+        }
+
         if (isImpresor && !isRelevantForImpresor) return false;
 
         return matchesSearch && matchesStatus && matchesCalidad && matchesMaterial && matchesCategory && matchesTag;

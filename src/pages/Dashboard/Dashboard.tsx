@@ -6,7 +6,7 @@ import { useAuthStore } from '@store/authStore'
 import { getStats, getOrdenes, getMateriales, saveOrden, API_URL } from '@data/db'
 import CalendarView from './CalendarView'
 import QuickNotes from './QuickNotes'
-import { Order } from '@/types'
+import { Order, isDesignerRole, isDesignerOwner } from '@/types'
 import './Dashboard.css'
 
 import WorkshopDashboard from '@components/workshop/WorkshopDashboard'
@@ -50,11 +50,11 @@ export default function Dashboard() {
                 setDbStats(stats)
 
                 // 2. Load Artist specific stats
-                if (user?.role === 'artista' && user.id) {
+                if (isDesignerRole(user?.role) && user) {
                     const allOrders = await getOrdenes()
-                    const myOrders = allOrders.filter(o => o.artistaId === user.id)
+                    const myOrders = allOrders.filter(o => isDesignerOwner(o, user))
                     setMyOrdersCount(myOrders.filter(o => o.status !== 'entregado').length)
-                    setMyPendingCount(myOrders.filter(o => o.status !== 'entregado' && o.status !== 'finalizado').length)
+                    setMyPendingCount(myOrders.filter(o => ['preorden', 'diseno', 'rebotado'].includes(o.status)).length)
                 }
 
                 // 4. Load Printer specific stats
@@ -102,7 +102,7 @@ export default function Dashboard() {
             { label: 'Listos para Retirar', value: clientStats.finalizados, color: 'default', path: '/entrada' },
             { label: 'Historial Total', value: clientStats.historico, color: 'default', path: '/entrada' },
         ]
-    } else if (user?.role === 'artista') {
+    } else if (isDesignerRole(user?.role)) {
         stats = [
             { label: 'Mis Trabajos', value: myOrdersCount, color: 'accent', path: '/diseno' },
             { label: 'Pendientes', value: myPendingCount, color: 'default', path: '/diseno' },
@@ -125,7 +125,7 @@ export default function Dashboard() {
     }
 
     const quickStats = [
-        ...(user?.role === 'artista' && user.id
+        ...(isDesignerRole(user?.role) && user?.id
             ? [{
                 label: 'Mis Pendientes',
                 value: myPendingCount,

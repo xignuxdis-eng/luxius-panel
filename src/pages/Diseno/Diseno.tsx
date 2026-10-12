@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
-import { statusColors, statusLabels } from '@/types'
+import { useAuthStore } from '@store/authStore'
+import { statusColors, statusLabels, isDesignerRole, isDesignerOwner } from '@/types'
 import { getOrdenes, resolveMediaUrl } from '@data/db'
 
 import NuevoPedidoModal from '../Entrada/NuevoPedidoModal'
@@ -13,6 +14,7 @@ import './Diseno.css'
 
 export default function Diseno() {
     const navigate = useNavigate()
+    const { user } = useAuthStore()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -23,6 +25,7 @@ export default function Diseno() {
 
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+    const [viewTab, setViewTab] = useState<'diseno' | 'seguimiento' | 'todos'>('diseno')
 
     // Load all orders but filter for Design relevant ones
     const [orders, setOrders] = useState<Order[]>([])
@@ -44,15 +47,29 @@ export default function Diseno() {
         loadOrders()
     }, [])
 
+    const isDesigner = isDesignerRole(user?.role);
+
     const filteredOrders = orders.filter(order => {
-        // Core filter for Artist View (V2)
-        const isRelevant = ['preorden', 'diseno', 'rebotado'].includes(order.status) || order.category === 'diseno';
-        if (!isRelevant) return false
+        // Regla estricta de privacidad: el rol de diseño solo puede ver y dar seguimiento a sus propios trabajos
+        if (isDesigner && !isDesignerOwner(order, user)) {
+            return false;
+        }
+
+        // Filtro por pestaña de vista
+        if (viewTab === 'diseno') {
+            const isDesignTask = ['preorden', 'diseno', 'rebotado'].includes(order.status) || order.category === 'diseno';
+            if (!isDesignTask) return false;
+        } else if (viewTab === 'seguimiento') {
+            const isFollowUp = ['orden', 'impreso', 'post', 'completo', 'entregado', 'finalizado'].includes(order.status);
+            if (!isFollowUp) return false;
+        }
 
         const matchesSearch =
             (order.clienteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
             (order.ot?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.id?.toString() || '').includes(searchTerm);
+            (order.id?.toString() || '').includes(searchTerm) ||
+            (order.material?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            (order.nombreTarea?.toLowerCase() || '').includes(searchTerm.toLowerCase());
 
         const matchesStatus = statusFilter === '' || order.status === statusFilter;
 
@@ -156,12 +173,90 @@ export default function Diseno() {
                 </div>
             </div>
 
+            {/* Tabs for Designer: En Diseño vs Seguimiento de Publicados */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                    onClick={() => setViewTab('diseno')}
+                    style={{
+                        padding: '7px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: viewTab === 'diseno' ? '#e879a8' : 'rgba(255,255,255,0.1)',
+                        background: viewTab === 'diseno' ? 'rgba(232, 121, 168, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                        color: viewTab === 'diseno' ? '#f472b6' : '#94a3b8',
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}
+                >
+                    🎨 En Diseño {isDesigner ? '(Mis Tareas)' : ''}
+                </button>
+                <button
+                    onClick={() => setViewTab('seguimiento')}
+                    style={{
+                        padding: '7px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: viewTab === 'seguimiento' ? '#38bdf8' : 'rgba(255,255,255,0.1)',
+                        background: viewTab === 'seguimiento' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                        color: viewTab === 'seguimiento' ? '#38bdf8' : '#94a3b8',
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}
+                >
+                    🚀 Seguimiento de Publicados (Impresión / Taller)
+                </button>
+                <button
+                    onClick={() => setViewTab('todos')}
+                    style={{
+                        padding: '7px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: viewTab === 'todos' ? '#a855f7' : 'rgba(255,255,255,0.1)',
+                        background: viewTab === 'todos' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                        color: viewTab === 'todos' ? '#c084fc' : '#94a3b8',
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}
+                >
+                    📂 Todos {isDesigner ? 'Mis Trabajos' : ''}
+                </button>
+
+                {isDesigner && (
+                    <span style={{
+                        marginLeft: 'auto',
+                        fontSize: '0.75rem',
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        color: '#7dd3fc',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}>
+                        🔒 Filtro de privacidad activo: Solo visualizas tus propios trabajos
+                    </span>
+                )}
+            </div>
+
             <div className="filters-bar">
                 <div className="filter-group">
                     <input
                         className="input-field"
                         type="text"
-                        placeholder="Buscar por Cliente, OT, ID..."
+                        placeholder="Buscar por Cliente, OT, ID, Material..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -172,9 +267,14 @@ export default function Diseno() {
                         title="Filtrar por Estado"
                     >
                         <option value="">Todos los Estados</option>
-                        <option value="orden">Pendiente (Orden)</option>
                         <option value="diseno">En Diseño</option>
-                        <option value="previa">En Previa</option>
+                        <option value="preorden">Diseño (Legacy / Preorden)</option>
+                        <option value="rebotado">Rechazado / Rebotado</option>
+                        <option value="orden">Para Imprimir</option>
+                        <option value="impreso">Impreso</option>
+                        <option value="post">Terminaciones</option>
+                        <option value="completo">Para Entregar</option>
+                        <option value="entregado">Entregado</option>
                     </select>
                 </div>
                 <div className="filter-actions">

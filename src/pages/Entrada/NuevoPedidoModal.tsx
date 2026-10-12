@@ -20,7 +20,7 @@ try {
 }
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
-import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS } from '@/types'
+import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS, isDesignerRole } from '@/types'
 import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, round2 } from '@/utils/pricingCalculator'
 import './NuevoPedidoModal.css'
 
@@ -1843,7 +1843,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 imgMetadata: item.metadata,
                                 status: data.status as any,
                                 category: (data.status === 'relevamiento' || data.status === 'diseno') ? 'diseno' : 'impresion',
-                                artistaId: user?.role === 'artista' ? user.id : order?.artistaId,
+                                artistaId: isDesignerRole(user?.role) ? user?.id : order?.artistaId,
+                                operarioNombre: order?.operarioNombre || (isDesignerRole(user?.role) ? (user?.name || user?.username) : user?.name),
+                                vendedorNombre: order?.vendedorNombre || (user?.role === 'vendedor' ? user?.name : undefined),
+                                creadoPor: (order as any)?.creadoPor || user?.username || (user?.id ? String(user?.id) : undefined),
+                                usuarioId: (order as any)?.usuarioId || user?.id,
                                 fechaCreacion: new Date().toString(),
                                 fechaEntrega: data.fechaEntrega || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                 tags: selectedTags,
@@ -1941,7 +1945,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         imgMetadata: metadata || order?.imgMetadata,
                         status: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') && numericData.status === 'orden') ? 'diseno' : (numericData.status || (order ? order.status : (currentDefaultStatus as any))),
                         category: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') || numericData.status === 'relevamiento' || numericData.status === 'diseno') ? 'diseno' : 'impresion',
-                        artistaId: user?.role === 'artista' ? user.id : order?.artistaId,
+                        artistaId: isDesignerRole(user?.role) ? user?.id : order?.artistaId,
+                        operarioNombre: order?.operarioNombre || (isDesignerRole(user?.role) ? (user?.name || user?.username) : user?.name),
+                        vendedorNombre: order?.vendedorNombre || (user?.role === 'vendedor' ? user?.name : undefined),
+                        creadoPor: (order as any)?.creadoPor || user?.username || (user?.id ? String(user?.id) : undefined),
+                        usuarioId: (order as any)?.usuarioId || user?.id,
                         servicios: data.servicios,
                         tags: selectedTags,
                     })

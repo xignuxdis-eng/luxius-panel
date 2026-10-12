@@ -37,6 +37,8 @@ export interface Order {
     origen?: 'mobile' | 'web' | string; // 'mobile' (App Móvil) vs 'web' (Luxius Web)
     operarioNombre?: string;
     vendedorNombre?: string;
+    creadoPor?: string;
+    usuarioId?: number | string;
     createdAt?: string; // ISO Date String
     updatedAt?: string; // ISO Date String
 
@@ -197,3 +199,53 @@ export const statusColors: Record<OrderStatus, string> = {
     rebotado: '#be123c',      // rose
     eliminado: '#475569'      // slate-dark
 }
+
+/**
+ * Determina si una orden pertenece o fue creada/publicada/asignada a un diseñador específico.
+ * Garantiza que el rol de diseño únicamente visualice y dé seguimiento a sus propios trabajos,
+ * ocultando completamente las órdenes publicadas por otros diseñadores o por el sistema/administración.
+ */
+export function isDesignerOwner(
+    order: Partial<Order> | null | undefined,
+    user: { id?: number | string; username?: string; name?: string; role?: string } | null | undefined
+): boolean {
+    if (!order || !user) return false;
+
+    const userIdStr = user.id !== undefined && user.id !== null ? String(user.id).trim() : '';
+    const username = (user.username || '').toLowerCase().trim();
+    const userName = (user.name || '').toLowerCase().trim();
+
+    // 1. Asignación directa por artistaId
+    if (order.artistaId !== undefined && order.artistaId !== null && String(order.artistaId).trim() !== '') {
+        if (userIdStr && String(order.artistaId).trim() === userIdStr) return true;
+    }
+
+    // 2. Creado por (creadoPor / creado_por) o usuarioId
+    const anyOrder = order as any;
+    const creadoPor = String(anyOrder.creadoPor || anyOrder.creado_por || '').toLowerCase().trim();
+    if (creadoPor) {
+        if (userIdStr && (creadoPor === userIdStr || creadoPor === `user_${userIdStr}`)) return true;
+        if (username && (creadoPor === username || creadoPor.includes(username))) return true;
+        if (userName && (creadoPor === userName || userName.includes(creadoPor))) return true;
+    }
+
+    const usuarioId = anyOrder.usuarioId || anyOrder.usuario_id;
+    if (usuarioId !== undefined && usuarioId !== null && String(usuarioId).trim() !== '') {
+        if (userIdStr && String(usuarioId).trim() === userIdStr) return true;
+    }
+
+    // 3. Operario / Diseñador que intervino en la orden
+    const operario = (order.operarioNombre || '').toLowerCase().trim();
+    const vendedor = (order.vendedorNombre || '').toLowerCase().trim();
+    if (userName) {
+        if (operario && (operario === userName || operario.includes(userName) || userName.includes(operario))) return true;
+        if (vendedor && (vendedor === userName || vendedor.includes(userName) || userName.includes(vendedor))) return true;
+    }
+    if (username) {
+        if (operario && (operario === username || operario.includes(username))) return true;
+        if (vendedor && (vendedor === username || vendedor.includes(username))) return true;
+    }
+
+    return false;
+}
+

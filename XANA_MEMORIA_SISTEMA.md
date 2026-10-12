@@ -262,6 +262,15 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - Aislamiento estricto de privacidad para el rol de Diseño y seguimiento continuo de trabajos publicados**:
+  - **Requerimiento del Usuario**: El rol de diseño no debe poder ver los trabajos subidos por otros diseñadores o por el sistema; debe poder dar seguimiento a sus propios trabajos publicados.
+  - **Helper de Propiedad (`isDesignerRole` e `isDesignerOwner`)**: En `src/types/auth.ts` y `src/types/orden.ts` se implementaron funciones centralizadas para verificar si el usuario tiene rol de diseño y determinar la propiedad de una orden comprobando `artistaId === user.id`, `creadoPor === user.username/id`, `usuarioId === user.id` u `operarioNombre/vendedorNombre === user.name/username`.
+  - **Página de Diseño (`Diseno.tsx`)**: Se integró `useAuthStore` y filtro estricto con `isDesignerOwner`. Se añadieron pestañas selectoras `🎨 En Diseño (Mis Tareas)`, `🚀 Seguimiento de Publicados (Impresión / Taller)` y `📂 Todos Mis Trabajos` con un selector completo de estados y badge visual de privacidad activa para que el diseñador siga el avance de sus órdenes en imprenta y taller. Los administradores/sistema conservan la visibilidad global de todo el taller.
+  - **Página de Entrada (`Entrada.tsx`)**: Se eliminó la restricción previa que ocultaba las órdenes del diseñador apenas pasaban a impresión; ahora el diseñador puede dar seguimiento a sus trabajos en todas las etapas (`orden`, `impreso`, `post`, `completo`, `entregado`) sin ver nunca los trabajos de otros diseñadores ni del sistema.
+  - **Dashboard & Impresión (`Dashboard.tsx`, `Impresion.tsx`)**: Métricas de "Mis Trabajos" y "Mis Pendientes" calculadas con `isDesignerOwner`. Cola de impresión restringida a trabajos propios cuando entra un diseñador.
+  - **Estampado de Autoría (`NuevoPedidoModal.tsx`, `Presupuestador.tsx`)**: Al crear pedidos (unitarios, lotes o presupuestos convertidos), se asigna de forma consistente `artistaId`, `operarioNombre`, `creadoPor` y `usuarioId`.
+  - **Backend (`routes/orders.py`)**: Se incluyeron las claves en `ORDER_SPEC_KEYS`, se expone `artistaId`, `creadoPor` y `usuarioId` en `_presupuesto_to_order`, y se reforzó `get_orders` y `get_order` con filtrado por rol y creador/artista para blindaje en profundidad.
+
 - **11/10/2026 - Corrección Frijol (Gato macho) y Habilidad de Alturas Inhóspitas**:
   - **Identidad**: Frijol es formalmente un **Gato** macho (`gender: 'm'`, título *"Vigía de las Alturas Inhóspitas"*), corrigiendo textos y fichas donde figuraba como hembra.
   - **Habilidad de Alturas Inhóspitas**: Frijol posee la habilidad única de trepar y observar el taller desde alturas muy elevadas e inaccesibles (`FRIJOL_HIGH_PERCHES`), encaramándose sobre el cartel central DEN V2.0, las vigas metálicas superiores de techumbre, la cornisa del ventanal y el lomo superior del plotter.

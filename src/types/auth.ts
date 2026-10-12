@@ -42,6 +42,12 @@ export function hasRolePermission(role: string | undefined, path: string): boole
     });
 }
 
+export function isDesignerRole(role: string | undefined | null): boolean {
+    if (!role) return false;
+    const r = role.toLowerCase().trim();
+    return r === 'artista' || r === 'disenador' || r === 'diseno' || r === 'diseñador' || r === 'diseño';
+}
+
 export interface RoleConfig {
     id: number
     name: string
