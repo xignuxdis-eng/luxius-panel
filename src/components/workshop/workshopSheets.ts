@@ -198,14 +198,16 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
     const rarity: WorkerSheet['rarity'] = avg >= 78 ? 'Legendario' : avg >= 68 ? 'Épico' : 'Raro';
     const rarityColor = rarity === 'Legendario' ? '#ff8000' : rarity === 'Épico' ? '#a335ee' : '#0070dd';
 
-    const rawClassName = profile.className;
-    const rawTitle = pick(profile.titles, 1)[0];
+    const rawClassName = profile.className || 'Especialista Gráfico';
+    const rawTitle = pick(profile.titles, 1)[0] || 'Maestro del Taller';
+    const className = snapshot.gender === 'f' ? feminize(rawClassName) : rawClassName;
+    const title = snapshot.gender === 'f' ? feminize(rawTitle) : rawTitle;
 
-    const isMirta = /mirta|admin/i.test(snapshot.name);
+    const isMirta = Boolean(snapshot.name && /mirta|admin/i.test(snapshot.name));
     if (isMirta) {
         return {
             className: 'Paladinesa de la Administración',
-            title: pick(['Guardiana del Libro Diario', 'Señora de la Conciliación', 'Archimaga de las Facturas', 'Guardiana de la Caja Chica'], 1)[0],
+            title: pick(['Guardiana del Libro Diario', 'Señora de la Conciliación', 'Archimaga de las Facturas', 'Guardiana de la Caja Chica'], 1)[0] || 'Guardiana de la Caja Chica',
             level,
             rarity,
             rarityColor,
@@ -235,8 +237,8 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
         stats,
         strengths: pick(profile.strengths, 2),
         weaknesses: pick(profile.weaknesses, 2),
-        quote: pick(profile.quotes, 1)[0],
-        gear: pick(profile.gear, 1)[0]
+        quote: pick(profile.quotes, 1)[0] || '¡Siempre listos para producir!',
+        gear: pick(profile.gear, 1)[0] || 'Herramienta de precisión del taller'
     };
 }
 

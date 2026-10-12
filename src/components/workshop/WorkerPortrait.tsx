@@ -17,7 +17,8 @@ export interface WorkerPortraitProps {
     name?: string;
 }
 
-const mix = (hex: string, t: number) => {
+const mix = (hex: string | undefined | null, t: number) => {
+    if (!hex || typeof hex !== 'string') return '#888888';
     const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
     if (!m) return hex;
     const n = parseInt(m[1], 16);
@@ -30,7 +31,16 @@ const mix = (hex: string, t: number) => {
 
 let uidCounter = 0;
 
-export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirtColor, hairColor, hairStyle = 'short', accessory = 'none', gender = 'm', size = 56, name }) => {
+export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ 
+    skinColor = '#fcd34d', 
+    shirtColor = '#3b82f6', 
+    hairColor, 
+    hairStyle = 'short', 
+    accessory = 'none', 
+    gender = 'm', 
+    size = 56, 
+    name 
+}) => {
     const uid = React.useMemo(() => `wp-${++uidCounter}`, []);
     const hair = hairColor || CHARACTER_PALETTE.hairDefault;
     const hairDark = mix(hair, -0.3);
