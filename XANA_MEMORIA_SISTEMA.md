@@ -1451,6 +1451,15 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Nesting de Bobina 2D (`nestingEngine.ts`)**: Algoritmo de bin-packing por altura decreciente con rotación opcional a 90°, cálculo de metros lineales, porcentaje de desperdicio y comparador de bobinas estándar (1.07m a 3.20m).
   - **Estudio Interactivo (`PrintSheeterStudio.tsx`)**: Tercera pestaña en Xpress Studio (`🧩 Mosaicos & Nesting HD`), canvas interactivo con zoom/paneo fluido, bandeja de miniaturas múltiples y exportación en alta definición PNG/JPG con retorno directo al Visor Xpress.
 
+- **Respaldo Integral Local de Sistema y Base de Datos (12/10/2026)**:
+  - Se desarrolló y ejecutó el script `scripts/backup_local_system_and_db.py`.
+  - **Base de Datos**: Dump completo en SQL (`full_database_dump.sql`, 3.24 MB) y exportación JSON por cada una de las 18 tablas (`clientes`, `presupuestos`, `usuarios`, `vendedores`, `config_global`, `orphan_review_queue`, tablas `xana_*`) ubicado en `backups/db_backup_20261012_014654/`.
+  - **Sistema y Código**: Archivo comprimido `backups/luxius_system_backup_20261012_014654.zip` (14.544 archivos, 709.66 MB) con todo el frontend, backend local, scripts, documentación y memoria.
+- **Verificación del Motor de Limpieza R2 → Google Drive (12/10/2026)**:
+  - Se auditó la ejecución de `scripts/sync_r2_to_drive.py`.
+  - Conexiones verificadas exitosamente: Cloudflare R2 (boto3 en bucket `luxius-media`), Google Drive API v3 (OAuth) y PostgreSQL en Supabase.
+  - Resultados de la inspección: 55 objetos evaluados en R2 mayores a 5 días, 69 thumbnails excluidos/protegidos, 0 errores de sincronización y validación estricta de órdenes no impresas intacta.
+
 ---
 
 
