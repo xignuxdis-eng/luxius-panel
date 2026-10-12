@@ -808,6 +808,158 @@ export function getClientesActivos(): Cliente[] {
 // Materiales
 // ============================================================
 
+export const DEFAULT_MATERIALES: Material[] = [
+    {
+        id: 13,
+        codigo: "VV",
+        descripcion: "Vinilo Orajet 3651",
+        calidad: "ECO",
+        tipo: "Sustrato",
+        tipoCobro: "ml",
+        precioM2: 32000,
+        ancho: 1.52,
+        habilitado: true,
+        unidad: "M Lineal",
+        stockActual: 45,
+        stockMinimo: 15,
+        bobinas: [
+            { ancho: 1.37, precioML: 32000 },
+            { ancho: 1.52, precioML: 34000 }
+        ]
+    },
+    {
+        id: 6,
+        codigo: "VM",
+        descripcion: "Vinilo Microperforado",
+        calidad: "ECO",
+        tipo: "Sustrato",
+        tipoCobro: "m2",
+        precioM2: 18000,
+        ancho: 1.52,
+        habilitado: true,
+        unidad: "M Lineal",
+        stockActual: 30,
+        stockMinimo: 10
+    },
+    {
+        id: 3,
+        codigo: "VBB",
+        descripcion: "Vinilo Adhesivo Base Blanca Brillante",
+        calidad: "ECO",
+        tipo: "Sustrato",
+        tipoCobro: "m2",
+        precioM2: 14000,
+        ancho: 1.52,
+        habilitado: true,
+        unidad: "M Lineal",
+        stockActual: 50,
+        stockMinimo: 20
+    },
+    {
+        id: 2,
+        codigo: "BL",
+        descripcion: "Lona Back Light 15oz",
+        calidad: "ECO",
+        tipo: "Sustrato",
+        tipoCobro: "m2",
+        precioM2: 18000,
+        ancho: 3.2,
+        habilitado: true,
+        unidad: "M Lineal",
+        stockActual: 60,
+        stockMinimo: 15
+    },
+    {
+        id: 1,
+        codigo: "FL",
+        descripcion: "Lona Front Light 13oz",
+        calidad: "ECO",
+        tipo: "Sustrato",
+        tipoCobro: "m2",
+        precioM2: 14000,
+        ancho: 3.2,
+        habilitado: true,
+        unidad: "M Lineal",
+        stockActual: 80,
+        stockMinimo: 25
+    },
+    {
+        id: 901,
+        codigo: "INK-C",
+        descripcion: "Tinta Cyan",
+        calidad: "ECO",
+        tipo: "tinta",
+        tipoCobro: "m2",
+        precioM2: 0,
+        ancho: 0,
+        color: "#00ffff",
+        unidad: "Litros",
+        habilitado: true,
+        stockActual: 10,
+        stockMinimo: 5
+    },
+    {
+        id: 902,
+        codigo: "INK-M",
+        descripcion: "Tinta Magenta",
+        calidad: "ECO",
+        tipo: "tinta",
+        tipoCobro: "m2",
+        precioM2: 0,
+        ancho: 0,
+        color: "#ff00ff",
+        unidad: "Litros",
+        habilitado: true,
+        stockActual: 10,
+        stockMinimo: 5
+    },
+    {
+        id: 903,
+        codigo: "INK-Y",
+        descripcion: "Tinta Yellow",
+        calidad: "ECO",
+        tipo: "tinta",
+        tipoCobro: "m2",
+        precioM2: 0,
+        ancho: 0,
+        color: "#ffff00",
+        unidad: "Litros",
+        habilitado: true,
+        stockActual: 10,
+        stockMinimo: 5
+    },
+    {
+        id: 904,
+        codigo: "INK-K",
+        descripcion: "Tinta Black",
+        calidad: "ECO",
+        tipo: "tinta",
+        tipoCobro: "m2",
+        precioM2: 0,
+        ancho: 0,
+        color: "#222222",
+        unidad: "Litros",
+        habilitado: true,
+        stockActual: 10,
+        stockMinimo: 5
+    },
+    {
+        id: 905,
+        codigo: "FLS-01",
+        descripcion: "Flush Limpieza",
+        calidad: "ECO",
+        tipo: "solvente",
+        tipoCobro: "m2",
+        precioM2: 0,
+        ancho: 0,
+        color: "#e0e0e0",
+        unidad: "Litros",
+        habilitado: true,
+        stockActual: 5,
+        stockMinimo: 2
+    }
+];
+
 export function getMateriales(): Material[] {
     const sessionItemsJson = localStorage.getItem(SESSION_MATERIALES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_MATERIALES_KEY)
@@ -819,6 +971,11 @@ export function getMateriales(): Material[] {
         try {
             sessionItems = JSON.parse(sessionItemsJson) as Material[]
         } catch (e) { }
+    }
+
+    if (sessionItems.length === 0) {
+        sessionItems = [...DEFAULT_MATERIALES];
+        try { localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(sessionItems)) } catch (e) { }
     }
 
     if (hiddenItemsJson) {

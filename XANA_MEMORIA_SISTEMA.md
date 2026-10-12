@@ -991,8 +991,16 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
     - `src/utils/pricingCalculator.ts` (cálculo de cotizaciones detalladas).
     - `src/utils/ripLogReconcile.ts` (reconciliación de logs RIP).
     - `src/utils/stockForecast.ts` (pronóstico de agotamiento de stock).
-- [x] **Verificación y Compilación**:
-  - `npm run build` ejecutado exitosamente en 6.38s con cero errores de TypeScript y bundle limpio.
+- [x] **Restauración y Sincronización Completa de Base de Datos en Supabase (11/10/2026)**:
+  - **Causa Raíz Diagnosticada**: La base en Neon Serverless fue suspendida por exceder la cuota (`ERROR: Your account or project has exceeded the quota`). Al configurar el nuevo backend en Supabase, el script inicial tomó datos de un archivo `luxius.db` local que contenía 0 presupuestos y no tenía cargada la clave `collection_materiales`, provocando que el frontend quedara sin órdenes, sin métricas, sin stock y con una nómina truncada de operarios en el workshop.
+  - **Recuperación Integral desde Backups Maestros (`F:\Sitio XignuX_BACKUP_DATA` y `F:\Backup`)**:
+    - **119 Presupuestos / Órdenes de Trabajo**: Restauradas con integridad relacional completa, especificaciones JSONB, estados de taller, montos de seña, saldos y fechas de entrega (13 órdenes activas vivas y 106 históricas).
+    - **Stock y Materiales (`config_global`)**: Restaurada la colección `collection_materiales` (10 materiales con stock actual, stock mínimo, bobinas y costos), junto con `collection_servicios`, `collection_combos`, `collection_logisticas`, `collection_calidades` y memoria de Xana.
+    - **Nómina y Roles del Workshop**: Restaurados los 13 usuarios en Supabase con sus roles de taller mapeados: Mirta (`administrador`, asignada en roles 2, 99 y 900908), Adrian (`principal`), Curushi (`artista` -> diseñadora), Carlos Flores (`impresion`), Impresión, Diseño, Vendedor y Clientes.
+    - **5 Vendedores**: Restaurados con asignación de IDs de usuario correspondientes.
+    - **120 Clientes**: Sincronizados y secuencias de PostgreSQL (`clientes_id_seq`, `usuarios_id_seq`, `vendedores_id_seq`) actualizadas.
+  - **Blindaje en Frontend (`src/data/db.ts`)**: Agregado `DEFAULT_MATERIALES` con catálogo y stock inicial como fallback seguro ante limpiezas de caché o inicios en frío.
+  - **Verificación en Producción**: Probados endpoints autenticados en backend Render en vivo (`https://luxius-backend.onrender.com`): `/api/orders` (200 OK, 13 órdenes vivas), `/api/materiales` (200 OK, 10 materiales con stock), `/api/usuarios` (200 OK, 13 usuarios con roles completos) y `/api/analytics/stats`.
 
 ---
 
