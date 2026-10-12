@@ -1399,3 +1399,19 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   **nunca** se borran de R2.
 
 ---
+
+## 10. 🔄 Migración Integral y Rescate de Datos: Neon -> Supabase (11/10/2026)
+
+- **Incidente de Bloqueo en Neon**: El 11/10/2026 el proveedor original Neon bloqueó el acceso por sobrepasar la cuota del plan gratuito (`ERROR: Your account or project has exceeded the quota`).
+- **Rescate 1:1 Ejecutado**: Tras desbloquear temporalmente el proyecto en Neon, se ejecutó una migración integral directa (`scripts/migrate_all_tables.py` y `scripts/copy_presupuestos.py`) con bypass de constraints en modo réplica (`SET session_replication_role = 'replica'`) y sincronización automática de secuencias `setval`.
+- **Volumen Migrado y Verificado en Supabase**:
+  - `presupuestos`: **213/213 registros recuperados** (incluyendo el lote completo **Mosto** de Axis, órdenes **Xignux** de octubre de 2026, y todos los presupuestos activos e históricos).
+  - `clientes`: **112/112 clientes recuperados** (incluyendo altas recientes de septiembre/octubre como `XignuX`, `PAOLA GOFFREDO`, `JOSE BOTERBERG - SATURNO HOGAR`, `CYBERDESIGN`, etc.).
+  - `usuarios`: **17/17 registros**.
+  - `vendedores`: **7/7 registros**.
+  - `config_global`: **8/8 registros**.
+  - `orphan_review_queue`: **680/680 registros**.
+  - `xana_*` (tablas de memoria del sistema): **100% migradas** (`xana_commits`, `xana_decisions`, `xana_knowledge`, `xana_sessions`, `xana_tasks`, `xana_actions`).
+- **Estado Actual**: Base de datos de producción apuntando a Supabase (`aws-0-us-east-1.pooler.supabase.com:5432/postgres`) con backend en Render y panel web sincronizados.
+
+---
