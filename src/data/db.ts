@@ -1224,9 +1224,9 @@ const DEFAULT_USUARIOS: Usuario[] = [
     },
     {
         id: 2,
-        nombre: "Admin (Administrador)",
+        nombre: "Mirta (Administración)",
         username: "admin",
-        email: "admin@luxius.com",
+        email: "mirta@luxius.com",
         rol: "administrador",
         role: "administrador",
         habilitado: true
@@ -1289,7 +1289,7 @@ const DEFAULT_USUARIOS: Usuario[] = [
 ];
 
 export function getUsuarios(): Usuario[] {
-    const versionKey = 'luxius_db_users_v8';
+    const versionKey = 'luxius_db_users_v9';
     const sessionItemsJson = localStorage.getItem(SESSION_USUARIOS_KEY);
     let sessionItems: Usuario[] = [];
 
@@ -1308,9 +1308,17 @@ export function getUsuarios(): Usuario[] {
         localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
     }
 
-    if (localStorage.getItem(versionKey) !== 'v8') {
+    if (localStorage.getItem(versionKey) !== 'v9') {
         const sessionIds = new Set(sessionItems.map(u => u.id));
         const sessionUsernames = new Set(sessionItems.map(u => (u.username || '').toLowerCase()));
+
+        // Actualizar usuario id 2 a Mirta si aún decía Admin
+        sessionItems = sessionItems.map(u => {
+            if (u.id === 2 || (u.username || '').toLowerCase() === 'admin') {
+                return { ...u, nombre: 'Mirta (Administración)', email: 'mirta@luxius.com' };
+            }
+            return u;
+        });
 
         for (const defUser of DEFAULT_USUARIOS) {
             if (!sessionIds.has(defUser.id) && !sessionUsernames.has((defUser.username || '').toLowerCase())) {
@@ -1318,7 +1326,7 @@ export function getUsuarios(): Usuario[] {
             }
         }
         localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(sessionItems));
-        localStorage.setItem(versionKey, 'v8');
+        localStorage.setItem(versionKey, 'v9');
     }
 
     if (sessionItems.length > 0) {

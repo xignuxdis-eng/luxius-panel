@@ -108,7 +108,7 @@ export function mapUserToWorkerRole(rol?: string): WorkerRole | null {
     return ROLE_ALIASES[norm(rol)] ?? null;
 }
 
-export type HeldKind = 'carpeta' | 'rebotada' | 'rollo' | 'caja' | 'balde';
+export type HeldKind = 'carpeta' | 'rebotada' | 'rollo' | 'caja' | 'balde' | 'mopa';
 export type BubbleTone = 'ok' | 'warn' | 'info' | 'chat' | 'think';
 /** Fase del paseo: 'rest' = en su puesto; 'out' = paseando; 'back' = volviendo por donde vino. */
 export type StrollPhase = 'rest' | 'out' | 'back';
@@ -364,6 +364,7 @@ interface WorkerState {
     announceMs: number;
     /** Tarea puntual en curso (ver `Chore`): se ejecuta al llegar al punto. */
     choreArrive?: () => HeldKind | null | void;
+    choreDwellMs?: number;
     /** true si el objeto de la mano de la tarea se conserva durante la vuelta al puesto. */
     choreKeep?: boolean;
 }
@@ -379,6 +380,10 @@ export interface Chore {
      * Se llama al llegar. Si devuelve un objeto, lo lleva en la mano de vuelta; si devuelve null, lo suelta.
      */
     onArrive: () => HeldKind | null | void;
+    /** Preferencia de operario por nombre o rol (ej. 'mirta'). */
+    preferName?: string;
+    /** Milisegundos que se queda trabajando en el lugar antes de volver. */
+    dwellMs?: number;
 }
 
 export interface CrewHooks {
@@ -935,16 +940,25 @@ export class WorkerCrew {
         if (this.chores.length === 0) return;
         // En orden: no arranca otra mientras alguien todavía va a cumplir una.
         if (this.workers.some((w) => w.choreArrive)) return;
+        const c = this.chores[0];
         const isFree = (w: WorkerState) => w.errand === 'none' && (w.mode === 'idle' || w.chatting || w.stroll !== 'rest');
-        const free = this.workers.find((w) => isFree(w) && !w.chatting) ?? this.workers.find(isFree);
+        let free: WorkerState | undefined;
+        if (c.preferName) {
+            const needle = c.preferName.toLowerCase();
+            free = this.workers.find((w) => isFree(w) && w.spec.name.toLowerCase().includes(needle));
+        }
+        if (!free) {
+            free = this.workers.find((w) => isFree(w) && !w.chatting) ?? this.workers.find(isFree);
+        }
         if (!free) return;
-        const c = this.chores.shift()!;
+        this.chores.shift();
         if (free.chatting) this.abortChat(free);
         free.errand = 'going';
         free.bubble = c.text ? { text: c.text, tone: c.tone ?? 'warn' } : null;
         this.setHeld(free, c.held ?? null);
         free.errandOrderId = null;
         free.choreArrive = c.onArrive;
+        free.choreDwellMs = c.dwellMs ?? 1400;
         free.choreKeep = false;
         free.thoughtMs = nextThoughtDelayMs(this.rng);
         this.startPath(free, c.point);
@@ -1007,6 +1021,29 @@ export class WorkerCrew {
             g.rect(0, 0, 8, 7).fill({ color: 0x64748b }).stroke({ width: 1, color: 0x334155 });
             g.rect(1, 1, 6, 1).fill({ color: 0x38bdf8 });
             g.rect(1, -3, 6, 1).fill({ color: 0x94a3b8 });
+        } else if (kind === 'mopa') {
+            // Balde centrífugo rojo con rueditas + mopa de microfibra (fiel a la foto del usuario)
+            // 1. Balde rojo con labio negro y ruedas
+            g.roundRect(-4, -1, 11, 8, 2).fill({ color: 0xdc2626 }).stroke({ width: 1, color: 0x991b1b });
+            g.rect(-4, -2, 11, 2).fill({ color: 0x18181b }); // borde superior negro
+            // Canastilla centrífuga plateada (lado izquierdo)
+            g.ellipse(-0.5, -1, 3, 1.8).fill({ color: 0xcbd5e1 }).stroke({ width: 0.5, color: 0x64748b });
+            g.rect(-1, -2, 1, 1).fill({ color: 0x334155 });
+            // Rueditas negras inferiores
+            g.rect(-3, 7, 2, 2).fill({ color: 0x09090b });
+            g.rect(4, 7, 2, 2).fill({ color: 0x09090b });
+
+            // 2. Mopa: palo cromado largo
+            g.rect(7, -19, 1.5, 21).fill({ color: 0xe2e8f0 });
+            // Empuñadura roja arriba
+            g.rect(6.5, -23, 2.5, 4).fill({ color: 0xdc2626 });
+            g.rect(7, -24, 1.5, 1).fill({ color: 0x18181b });
+            // Traba blanca intermedia
+            g.rect(6.5, -11, 2.5, 2).fill({ color: 0xffffff });
+            // Cabezal disco articulado rojo
+            g.ellipse(7.5, 2, 3.5, 1.8).fill({ color: 0xdc2626 });
+            // Corona blanca de microfibra circular
+            g.ellipse(7.5, 3, 5.5, 2.2).fill({ color: 0xffffff }).stroke({ width: 0.5, color: 0xe2e8f0 });
         } else {
             const base = kind === 'rebotada' ? 0xef4444 : 0xfacc15;
             const edge = kind === 'rebotada' ? 0x7f1d1d : 0x854d0e;
@@ -1232,7 +1269,7 @@ export class WorkerCrew {
                 if (w.choreArrive) {
                     const cb = w.choreArrive;
                     w.choreArrive = undefined;
-                    w.dwellMs = 1400;
+                    w.dwellMs = w.choreDwellMs ?? 1400;
                     try {
                         const h = cb();
                         if (h !== undefined) {

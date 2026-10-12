@@ -120,6 +120,13 @@ let curTraits: { hairStyle?: HairStyle; accessory?: Accessory; gender?: 'f' | 'm
 function decorateFront(g: Grid, back: boolean, bob: number) {
     const { hairStyle: hs, accessory: ac, gender } = curTraits;
     if (hs === 'tuft') rect(g, 7, 1 + bob, 8, 1 + bob, 'H');
+    if (hs === 'bun') {
+        rect(g, 6, 0 + bob, 9, 1 + bob, 'H');
+        rect(g, 7, 2 + bob, 8, 2 + bob, 'H');
+        rect(g, 4, 3 + bob, 4, 6 + bob, 'H');
+        rect(g, 11, 3 + bob, 11, 6 + bob, 'H');
+        if (back) rect(g, 5, 4 + bob, 10, 6 + bob, 'H');
+    }
     if (hs === 'long') {
         rect(g, 4, 3 + bob, 4, 9 + bob, 'H');
         rect(g, 11, 3 + bob, 11, 9 + bob, 'H');
@@ -158,6 +165,10 @@ function decorateFront(g: Grid, back: boolean, bob: number) {
 function decorateSide(g: Grid, bob: number) {
     const { hairStyle: hs, accessory: ac, gender } = curTraits;
     if (hs === 'tuft') rect(g, 6, 1 + bob, 7, 1 + bob, 'H');
+    if (hs === 'bun') {
+        rect(g, 4, 1 + bob, 6, 3 + bob, 'H');
+        rect(g, 5, 3 + bob, 7, 5 + bob, 'H');
+    }
     if (hs === 'long') rect(g, 4, 4 + bob, 6, 9 + bob, 'H');
     if (hs === 'cap') {
         rect(g, 5, 2 + bob, 9, 3 + bob, 'C');

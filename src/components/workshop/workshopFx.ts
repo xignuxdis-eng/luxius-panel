@@ -131,6 +131,47 @@ export class WorkshopFx {
         this.puddles.push({ g, life: 0, max: ttlMs });
     }
 
+    /** Charquito de pis (Teo o Muchi) en el piso con forma irregular amarilla y gotitas. */
+    peePuddle(x: number, y: number, ttlMs = 45000): { clear: () => void } {
+        if (this.destroyed || this.puddles.length >= 6) return { clear: () => {} };
+        const g = new Graphics();
+        // Charco principal amarillo dorado semitransparente
+        g.ellipse(0, 0, 8, 3.5).fill({ color: 0xfacc15, alpha: 0.85 });
+        g.ellipse(2, -1, 4, 2).fill({ color: 0xfef08a, alpha: 0.9 });
+        g.ellipse(-3, 1, 3, 1.5).fill({ color: 0xeab308, alpha: 0.95 });
+        // Gotitas sueltas
+        g.rect(9, -1, 1.5, 1.5).fill({ color: 0xfacc15, alpha: 0.8 });
+        g.rect(-8, 1, 1.5, 1.5).fill({ color: 0xfacc15, alpha: 0.8 });
+        g.x = x;
+        g.y = y;
+        g.eventMode = 'none';
+        this.floorLayer.addChild(g);
+        const puddleObj: Puddle = { g, life: 0, max: ttlMs };
+        this.puddles.push(puddleObj);
+
+        return {
+            clear: () => {
+                const idx = this.puddles.indexOf(puddleObj);
+                if (idx >= 0) this.puddles.splice(idx, 1);
+                try {
+                    if (!g.destroyed) g.destroy();
+                } catch (_) {}
+            }
+        };
+    }
+
+    /** Destellitos de limpieza brillante cuando Mirta pasa la mopa. */
+    sparkleClean(x: number, y: number, count = 4) {
+        for (let i = 0; i < count; i++) {
+            const g = new Graphics();
+            const c = this.rng() < 0.5 ? 0x38bdf8 : 0xffffff;
+            // Cruz brillante pixelada de 5x5
+            g.rect(2, 0, 1, 5).rect(0, 2, 5, 1).fill({ color: c });
+            g.rect(2, 2, 1, 1).fill({ color: 0xfef08a });
+            this.add('spark', g, x + (this.rng() - 0.5) * 16, y + (this.rng() - 0.5) * 8, (this.rng() - 0.5) * 0.15, -0.25 - this.rng() * 0.2, 0.005, 45 + Math.floor(this.rng() * 20));
+        }
+    }
+
     /**
      * Enciende o apaga el goteo de la gotera en (x, y). Con `withBucket` (por defecto) también pone o saca el balde
      * de inmediato; con `false` el balde lo maneja `setBucket` (para que un operario lo coloque o lo retire).

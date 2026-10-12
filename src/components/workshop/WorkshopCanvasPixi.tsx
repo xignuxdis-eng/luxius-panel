@@ -774,7 +774,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         breakSpot: () => {
                             const br = getPixiStations().find((s) => s.id === 'refrigerios');
                             return br ? { x: Math.round(br.x + br.width / 2), y: Math.round(br.y + br.height + 10) } : null;
-                        }
+                        },
+                        dogPee: (targetSpot, onPee) => petRef.current?.peeRun(targetSpot, onPee) ?? false
                     });
                     eventsRef.current.setEnabled(fxToggleRef.current.events);
                     skyRef.current?.setHour(hourOf(workshopNow()));

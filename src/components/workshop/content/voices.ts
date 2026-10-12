@@ -32,7 +32,9 @@ export const ROLE_VOICES: Record<WorkerRole, VoiceProfile> = {
  * Lo que no se indique se toma del rol.
  */
 export const VOICE_OVERRIDES: Record<string, Partial<VoiceProfile>> = {
-    curushi: { pitch: 680, wave: 'triangle', blipMs: 56, vol: 0.05 }
+    curushi: { pitch: 680, wave: 'triangle', blipMs: 56, vol: 0.05 },
+    mirta: { pitch: 580, wave: 'triangle', blipMs: 54, vol: 0.05 },
+    admin: { pitch: 580, wave: 'triangle', blipMs: 54, vol: 0.05 }
 };
 
 /** Cuanto varia el tono entre operarios del mismo rol (0.2 = +-20%). Ponelo en 0 para que todos suenen igual. */

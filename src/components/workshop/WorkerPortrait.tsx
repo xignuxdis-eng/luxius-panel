@@ -80,6 +80,13 @@ export const WorkerPortrait: React.FC<WorkerPortraitProps> = ({ skinColor, shirt
                 </>
             )}
             {hairStyle === 'tuft' && <path d="M21 9 Q22 3 26 4 Q25 7 28 9 Z" fill={hair} />}
+            {hairStyle === 'bun' && (
+                <>
+                    <circle cx="24" cy="5" r="5" fill={hair} />
+                    <circle cx="24" cy="5" r="4.2" fill={hairLight} opacity={0.6} />
+                    <path d="M12 18 Q12 11 24 9 Q36 11 36 18 Z" fill={hair} />
+                </>
+            )}
             {hairStyle === 'long' && (
                 <>
                     <rect x="9" y="16" width="5" height="22" rx="2.5" fill={hair} />

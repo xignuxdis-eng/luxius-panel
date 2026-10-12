@@ -729,6 +729,26 @@ export class PetManager {
         return this.pets.filter((p) => p.isVisible());
     }
 
+    /** Teo o Muchi van a un punto a hacer pis (para el evento de Mirta y la mopa). */
+    peeRun(targetSpot: Point, onPee: (dogName: string, spot: Point) => void): boolean {
+        if (!this.enabled || isPetNight()) return false;
+        const dogs = this.pets.filter((p) => (p.profile.id === 'teo' || p.profile.id === 'muchi') && p.isVisible() && !p.isLeaving());
+        let dog = dogs.length ? dogs[Math.floor(this.rng() * dogs.length)] : undefined;
+        if (!dog) {
+            const candidate = this.getPet(this.rng() < 0.5 ? 'teo' : 'muchi');
+            if (candidate) {
+                candidate.enter(true);
+                dog = candidate;
+            }
+        }
+        if (!dog) return false;
+
+        const dogRef = dog;
+        return dog.goTo(targetSpot, () => {
+            onPee(dogRef.profile.name, dogRef.getPosition());
+        });
+    }
+
     /** Apagón superado: aparecen todas juntas y luego se van de a una. */
     reunion() {
         if (!this.enabled || this.phase !== 'normal') return;

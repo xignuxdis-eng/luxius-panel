@@ -201,8 +201,30 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
     const rawClassName = profile.className;
     const rawTitle = pick(profile.titles, 1)[0];
 
-    const className = snapshot.gender === 'f' ? feminize(rawClassName) : rawClassName;
-    const title = snapshot.gender === 'f' ? feminize(rawTitle) : rawTitle;
+    const isMirta = /mirta|admin/i.test(snapshot.name);
+    if (isMirta) {
+        return {
+            className: 'Paladinesa de la Administración',
+            title: pick(['Guardiana del Libro Diario', 'Señora de la Conciliación', 'Archimaga de las Facturas', 'Guardiana de la Caja Chica'], 1)[0],
+            level,
+            rarity,
+            rarityColor,
+            stats,
+            strengths: pick([
+                'Cuadra la caja al centavo sin titubear jamás.',
+                'Detecta transferencias sin comprobante a kilómetros.',
+                'Manejo impecable del balde centrífugo y la mopa.',
+                'Paciencia de titanio para conciliar presupuestos y bancos.'
+            ], 2),
+            weaknesses: pick([
+                'Sufre eternamente por limpiar los orines de Teo y Muchi en los rincones del taller.',
+                'Sufre daño crítico cuando le dicen "te hago una transferencia mañana".',
+                'Se le eriza la piel ante comprobantes de pago borrosos o incompletos.'
+            ], 2),
+            quote: '¡Teo! ¡Muchi! ¡Otra vez en la esquina del plotter no! ¡Ya traigo la mopa!',
+            gear: 'Balde Centrífugo Rojo + Mopa de Microfibra Legendaria'
+        };
+    }
 
     return {
         className,
@@ -219,12 +241,13 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
 }
 
 /** Qué está haciendo el operario ahora mismo, en texto (datos reales del movimiento del taller). */
-export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm' }): string {
+export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm'; name?: string }): string {
+    const isMirta = w.name && /mirta|admin/i.test(w.name);
     const station: Record<WorkerRole, string> = {
-        disenador: 'Diseño',
-        impresor: 'el Plotter',
-        cortador: 'Refilado',
-        empaquetador: 'Empaque'
+        disenador: isMirta ? 'Administración' : 'Diseño',
+        impresor: isMirta ? 'Administración' : 'el Plotter',
+        cortador: isMirta ? 'Administración' : 'Refilado',
+        empaquetador: isMirta ? 'Administración' : 'Empaque'
     };
     if (w.errand === 'going') return `Llevando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
     if (w.errand === 'dwell') return `Entregando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
@@ -245,7 +268,8 @@ export const ROLE_LABEL: Record<WorkerRole, string> = {
     empaquetador: 'Empaquetador'
 };
 
-export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm'): string {
+export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string): string {
+    if (name && /mirta|admin/i.test(name)) return 'Administrativa';
     if (gender === 'f') {
         const femaleLabels: Record<WorkerRole, string> = {
             disenador: 'Diseñadora',

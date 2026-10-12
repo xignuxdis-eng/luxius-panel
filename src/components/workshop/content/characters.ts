@@ -20,7 +20,7 @@ export const LEGACY_SKINS = ['#fca5a5', '#fdba74', '#c68642', '#fed7aa', '#8d552
 /** Colores de pelo posibles (castaño, negro, caoba, rubio oscuro, rubio, pelirrojo, canoso). */
 export const HAIR_COLORS = ['#3b2a20', '#1f1a17', '#7c4a21', '#b9772f', '#d6b25e', '#8a3b1f', '#6b7280'];
 
-export type HairStyle = 'short' | 'tuft' | 'long' | 'cap';
+export type HairStyle = 'short' | 'tuft' | 'long' | 'cap' | 'bun';
 export type Accessory = 'none' | 'glasses' | 'beard' | 'headband' | 'mustache';
 
 /** Peinados posibles (repetir un valor lo hace más frecuente). */
@@ -42,6 +42,18 @@ export const LOOK_OVERRIDES: Record<string, Partial<LookTraits>> = {
         hairStyle: 'long',
         hairColor: '#4a2818',
         accessory: 'headband'
+    },
+    mirta: {
+        gender: 'f',
+        hairStyle: 'bun',
+        hairColor: '#52525b',
+        accessory: 'glasses'
+    },
+    admin: {
+        gender: 'f',
+        hairStyle: 'bun',
+        hairColor: '#52525b',
+        accessory: 'glasses'
     }
 };
 

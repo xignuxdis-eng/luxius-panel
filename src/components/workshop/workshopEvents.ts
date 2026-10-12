@@ -8,9 +8,9 @@ import type { WorkshopLighting } from './workshopLighting';
 import type { GuestManager } from './workshopGuests';
 import type { WorkerCrew, Point } from './workshopWorkers';
 
-export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'birthday' | 'repartidor' | 'tecnico' | 'cliente' | 'pizzero' | 'yawn' | 'ordertalk';
+export type WorkshopEventName = 'blackout' | 'coffee' | 'happyhour' | 'birthday' | 'repartidor' | 'tecnico' | 'cliente' | 'pizzero' | 'yawn' | 'ordertalk' | 'pet_pee';
 
-export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'birthday', 'repartidor', 'tecnico', 'cliente', 'pizzero', 'yawn', 'ordertalk'];
+export const EVENT_NAMES: WorkshopEventName[] = ['blackout', 'coffee', 'happyhour', 'birthday', 'repartidor', 'tecnico', 'cliente', 'pizzero', 'yawn', 'ordertalk', 'pet_pee'];
 
 import { EVENT_TEXTS } from './content/texts';
 import { WORKSHOP_CONFIG, randomIn } from './content/config';
@@ -54,6 +54,8 @@ export interface EventDeps {
     breakSpot?: () => Point | null;
     /** Una frase con datos reales del día (sin nombres de clientes), o null si no hay datos. */
     orderLine?: () => string | null;
+    /** Ejecuta la caminata de Teo o Muchi para hacer pis en un punto. */
+    dogPee?: (targetSpot: Point, onPee: (dogName: string, spot: Point) => void) => boolean;
 }
 
 interface Running {
@@ -132,6 +134,30 @@ export class WorkshopEvents {
             this.notesMs = 0;
         } else if (name === 'blackout') {
             crew?.announce(BLACKOUT_LINES, 1);
+        } else if (name === 'pet_pee') {
+            const spot = this.deps.floorSpot();
+            const started = this.deps.dogPee?.(spot, (dogName, peeSpot) => {
+                const puddle = this.deps.fx()?.peePuddle(peeSpot.x, peeSpot.y);
+                const warnList = EVENT_TEXTS.petPeeWarn;
+                const warnText = warnList[Math.floor(this.rng() * warnList.length)].replace('Teo / Muchi', dogName);
+                crew?.announce([warnText], 1, 'warn');
+                crew?.requestChore({
+                    point: { x: peeSpot.x, y: peeSpot.y, facing: 'down' },
+                    held: 'mopa',
+                    preferName: 'mirta',
+                    text: EVENT_TEXTS.mirtaMopGo,
+                    tone: 'warn',
+                    dwellMs: 3000,
+                    onArrive: () => {
+                        puddle?.clear();
+                        this.deps.fx()?.sparkleClean(peeSpot.x, peeSpot.y);
+                        crew?.announce([EVENT_TEXTS.mirtaMopDone], 1, 'ok');
+                        return null;
+                    }
+                });
+            }) ?? false;
+            if (!started) return false;
+            this.running = { name: 'pet_pee', t: 0, done: false, step: 0 };
         }
         return true;
     }
@@ -163,6 +189,11 @@ export class WorkshopEvents {
                 }
             } else if (r.name === 'coffee') {
                 if (r.t >= WORKSHOP_CONFIG.events.coffeeMs) {
+                    this.running = null;
+                    this.timer = nextDelayMs(this.rng);
+                }
+            } else if (r.name === 'pet_pee') {
+                if (r.t >= 15000) {
                     this.running = null;
                     this.timer = nextDelayMs(this.rng);
                 }

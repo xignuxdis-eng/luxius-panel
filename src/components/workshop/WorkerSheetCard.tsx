@@ -141,7 +141,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                     {sheet.rarity}
                 </span>
                 <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 4, padding: '1px 6px' }}>
-                    Rol: {getRoleLabel(snap.role, snap.gender)}
+                    Rol: {getRoleLabel(snap.role, snap.gender, snap.name)}
                     {snap.roleFromUser ? '' : ' (asignado)'}
                 </span>
             </div>

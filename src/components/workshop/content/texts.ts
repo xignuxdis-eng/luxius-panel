@@ -16,7 +16,11 @@ export const EVENT_TEXTS = {
     /** El operario que lleva el balde hasta la gotera. */
     rainBucketGo: 'Ya llevo el balde 🪣',
     /** El operario que retira el balde cuando deja de llover. */
-    rainBucketTake: 'Guardo el balde 🪣'
+    rainBucketTake: 'Guardo el balde 🪣',
+    /** Cuando Teo o Muchi hacen pis en el taller. */
+    petPeeWarn: ['¡Nooo! ¡Teo / Muchi otra vez en el piso! 🐾💦', '¡Cuidado con el pis! ¡No lo pisen! 🐕💦', '¡Teo! ¡Muchi! ¡Al patio se va! 🐾'],
+    mirtaMopGo: '¡Ya voy con el balde y la mopa! 🪣🧹',
+    mirtaMopDone: 'Listo... ¡quedó impecable y desinfectado! ✨'
 };
 
 /**
