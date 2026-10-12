@@ -1465,6 +1465,13 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - Se auditó la ejecución de `scripts/sync_r2_to_drive.py`.
   - Conexiones verificadas exitosamente: Cloudflare R2 (boto3 en bucket `luxius-media`), Google Drive API v3 (OAuth) y PostgreSQL en Supabase.
   - Resultados de la inspección: 55 objetos evaluados en R2 mayores a 5 días, 69 thumbnails excluidos/protegidos, 0 errores de sincronización y validación estricta de órdenes no impresas intacta.
+- **Corrección de Conectividad Móvil y Login Android Capacitor (12/10/2026)**:
+  - **Diagnóstico y Causa Raíz**: En Android nativo (Capacitor WebView), `window.location.hostname` reporta `'localhost'`, lo que provocaba que la aplicación intentara comunicarse con `http://localhost:5000/api` en el propio teléfono móvil en lugar del backend de producción en la nube (`https://luxius-backend.onrender.com/api`), bloqueando permanentemente el inicio de sesión con fallas de red/timeout.
+  - **Detección Nativa Resiliente (`isCapacitorNative`)**: Se implementó en `src/data/db.ts` la detección automática de entornos nativos móviles vía `@capacitor/core` (`Capacitor.isNativePlatform()`, User-Agent, esquemas nativos), resolviendo siempre el endpoint de producción para Android/iOS con soporte de sobreescritura manual en `localStorage` (`luxius_api_url`).
+  - **Barra de Conectividad en Pantalla de Login**: Se añadió indicador lumínico en vivo (online verde, durmiendo naranja, probando azul, offline rojo) con medición de latencia en milisegundos (`ping`), banner visual de aviso ante despertar en frío del servidor en Render (`cold-start`) con timeout extendido a 60s, y modal de configuración rápida (icono de engranaje ⚙️) para conmutar entre Render Cloud, Local PC o ingresar la IP local del taller (LAN).
+  - **Redirección Móvil Automática**: Al iniciar sesión desde la aplicación móvil o en viewports compactos, la aplicación redirige de manera predeterminada al Taller Móvil (`/mobile`).
+  - **Optimización de Memoria en Compilación Vite**: Se modularizó el empaquetado separando `pixi.js` en su propio chunk (`vendor-pixi`) en `vite.config.ts`, y se elevaron los scripts de compilación y empaquetado de Android a 4 GB (`--max-old-space-size=4096`), resolviendo de raíz el error de memoria `JavaScript heap out of memory`.
+  - **Nuevo APK Generado y Verificado**: Se compiló y sincronizó con éxito la versión `LuXius-Taller-Mobile.apk` (7.49 MB) con el login y flujo de pre-impresión 100% operativos.
 
 ---
 

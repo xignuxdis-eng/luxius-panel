@@ -3,7 +3,7 @@ import { useAuthStore } from '@store/authStore'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { hasRolePermission } from '@/types/auth'
-import { initializeData } from '@/data/db'
+import { initializeData, isCapacitorNative } from '@/data/db'
 
 // Layouts (static — always needed)
 import MainLayout from '@components/layout/MainLayout'
@@ -54,6 +54,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
 
     const currentPath = location.pathname
+
+    // En la app nativa de Android/iOS (Capacitor), redirigir la raíz al taller móvil (/mobile)
+    if (isCapacitorNative() && (currentPath === '/' || currentPath === '')) {
+        return <Navigate to="/mobile" replace />
+    }
+
     const allowed = hasRolePermission(user.role, currentPath)
 
     if (!allowed) {

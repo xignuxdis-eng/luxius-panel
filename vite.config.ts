@@ -76,6 +76,9 @@ export default defineConfig({
                 assetFileNames: `assets/[name]-[hash].[ext]`,
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
+                        if (id.includes('pixi.js')) {
+                            return 'vendor-pixi';
+                        }
                         if (id.includes('pdfjs-dist') || id.includes('pdf-lib')) {
                             return 'vendor-pdf';
                         }

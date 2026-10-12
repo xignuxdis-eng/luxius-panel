@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuthStore } from '@store/authStore'
+import { API_URL, isCapacitorNative, setCustomApiUrl } from '@/data/db'
 import type { LoginCredentials } from '@/types'
 import './Login.css'
 
@@ -9,12 +10,51 @@ export default function Login() {
     const navigate = useNavigate()
     const login = useAuthStore((state) => state.login)
 
-    const buildTime = '2026-02-03 01:25'
+    const buildTime = '2026-10-12 15:40'
     const [isLoading, setIsLoading] = useState(false)
     const [isWakingServer, setIsWakingServer] = useState(false)
     const [error, setError] = useState('')
 
     const [showPassword, setShowPassword] = useState(false)
+
+    // Server Connectivity & Configuration
+    const [serverStatus, setServerStatus] = useState<'idle' | 'checking' | 'online' | 'sleeping' | 'offline'>('idle')
+    const [serverPingMs, setServerPingMs] = useState<number | null>(null)
+    const [showServerModal, setShowServerModal] = useState(false)
+    const [customUrlInput, setCustomUrlInput] = useState(localStorage.getItem('luxius_api_url') || '')
+
+    const isCloudServer = API_URL.includes('luxius-backend.onrender.com')
+    const isCustomServer = !!localStorage.getItem('luxius_api_url')
+
+    const checkServerHealth = async () => {
+        setServerStatus('checking')
+        const start = Date.now()
+        try {
+            const controller = new AbortController()
+            const timer = setTimeout(() => controller.abort(), 12000)
+            const res = await fetch(`${API_URL}/usuarios?_t=${Date.now()}`, {
+                signal: controller.signal,
+                cache: 'no-store'
+            }).catch(() => null)
+            clearTimeout(timer)
+
+            if (res && (res.status === 200 || res.status === 401 || res.status === 403)) {
+                setServerPingMs(Date.now() - start)
+                setServerStatus('online')
+            } else if (!res) {
+                // Posible suspensión en la nube
+                setServerStatus('sleeping')
+            } else {
+                setServerStatus('online')
+            }
+        } catch {
+            setServerStatus('offline')
+        }
+    }
+
+    useEffect(() => {
+        checkServerHealth()
+    }, [])
 
     const { register, handleSubmit, formState: { errors } } = useForm<LoginCredentials>()
 
@@ -32,7 +72,11 @@ export default function Login() {
         setIsWakingServer(false)
 
         if (result.success) {
-            navigate('/')
+            if (isCapacitorNative() || window.innerWidth < 768) {
+                navigate('/mobile')
+            } else {
+                navigate('/')
+            }
         } else {
             setError(result.message || 'Error desconocido al iniciar sesión')
         }
@@ -149,10 +193,41 @@ export default function Login() {
                                 <span>Despertando servidor en la nube... Esto puede tomar unos segundos.</span>
                             </div>
                         )}
+
+                        {/* Barra de conectividad del servidor */}
+                        <div className="login-server-bar">
+                            <div 
+                                className="login-server-info" 
+                                onClick={checkServerHealth} 
+                                title="Toca para verificar estado de conexión"
+                            >
+                                <span className={`status-indicator-dot ${serverStatus}`}></span>
+                                <span className="server-text-main">
+                                    {isCloudServer ? '☁️ Nube Render' : isCustomServer ? '🌐 Personalizado' : '💻 Servidor Local'}
+                                </span>
+                                {serverStatus === 'online' && serverPingMs !== null && (
+                                    <span className="server-ping-pill">{serverPingMs}ms</span>
+                                )}
+                                {serverStatus === 'checking' && (
+                                    <span className="server-ping-pill">probando...</span>
+                                )}
+                                {serverStatus === 'sleeping' && (
+                                    <span className="server-ping-pill sleeping">esperando</span>
+                                )}
+                                {serverStatus === 'offline' && (
+                                    <span className="server-ping-pill offline">desconectado</span>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                className="server-gear-btn"
+                                onClick={() => setShowServerModal(true)}
+                                title="Configurar conexión del servidor"
+                            >
+                                ⚙️
+                            </button>
+                        </div>
                     </form>
-
-
-
 
                     <div className="login-footer">
                         <p>Sistema de Gestión de Impresión</p>
@@ -165,6 +240,76 @@ export default function Login() {
 
                 </div>
             </div>
+
+            {/* Modal de selección de servidor */}
+            {showServerModal && (
+                <div className="server-modal-backdrop" onClick={() => setShowServerModal(false)}>
+                    <div className="server-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="server-modal-title">
+                            <span>⚙️ Servidor LuXius</span>
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                            Selecciona el servidor de datos con el que se comunicará la app:
+                        </p>
+
+                        <button
+                            type="button"
+                            className={`server-opt-btn ${isCloudServer && !isCustomServer ? 'active' : ''}`}
+                            onClick={() => {
+                                setCustomApiUrl(null)
+                            }}
+                        >
+                            <span className="server-opt-name">☁️ Servidor Nube Render (Recomendado Móvil)</span>
+                            <span className="server-opt-url">https://luxius-backend.onrender.com/api</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className={`server-opt-btn ${!isCloudServer && !isCustomServer ? 'active' : ''}`}
+                            onClick={() => {
+                                setCustomApiUrl('http://localhost:5000/api')
+                            }}
+                        >
+                            <span className="server-opt-name">💻 Local PC (Desarrollo)</span>
+                            <span className="server-opt-url">http://localhost:5000/api</span>
+                        </button>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>O ingresa IP local del taller:</span>
+                            <input
+                                type="text"
+                                className="server-custom-input"
+                                placeholder="http://192.168.1.50:5000/api"
+                                value={customUrlInput}
+                                onChange={(e) => setCustomUrlInput(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="server-modal-actions">
+                            <button
+                                type="button"
+                                className="server-action-cancel"
+                                onClick={() => setShowServerModal(false)}
+                            >
+                                Cerrar
+                            </button>
+                            <button
+                                type="button"
+                                className="server-action-save"
+                                onClick={() => {
+                                    if (customUrlInput.trim()) {
+                                        setCustomApiUrl(customUrlInput.trim())
+                                    } else {
+                                        setCustomApiUrl(null)
+                                    }
+                                }}
+                            >
+                                Guardar y Conectar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

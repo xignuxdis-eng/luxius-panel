@@ -11,6 +11,10 @@ const BACKEND_PREFIXES = [
 ]
 
 function isBackendUrl(url: string): boolean {
+    if (typeof window !== 'undefined') {
+        const custom = localStorage.getItem('luxius_api_url')
+        if (custom && url.startsWith(custom.replace(/\/api\/?$/, ''))) return true
+    }
     return BACKEND_PREFIXES.some(prefix => url.startsWith(prefix))
 }
 

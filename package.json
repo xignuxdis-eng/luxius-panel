@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
-    "sync:android": "vite build && npx cap sync android",
-    "build:apk": "vite build && npx cap sync android && powershell -Command \"$env:JAVA_HOME = 'C:\\Program Files\\Android\\Android Studio\\jbr'; cd android; .\\gradlew.bat assembleDebug; cd ..; Copy-Item android\\app\\build\\outputs\\apk\\debug\\app-debug.apk LuXius-Taller-Mobile.apk -Force\"",
+    "sync:android": "npm run build && npx cap sync android",
+    "build:apk": "npm run build && npx cap sync android && powershell -Command \"$env:JAVA_HOME = 'C:\\Program Files\\Android\\Android Studio\\jbr'; cd android; .\\gradlew.bat assembleDebug; cd ..; Copy-Item android\\app\\build\\outputs\\apk\\debug\\app-debug.apk LuXius-Taller-Mobile.apk -Force\"",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

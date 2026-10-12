@@ -11,10 +11,65 @@
 import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica, MonedaConfig, Caja, MovimientoCaja, MovimientoStock, Banco } from '@/types'
 import { isDesignerOwner } from '@/types'
 
+import { Capacitor } from '@capacitor/core'
+
+/**
+ * Detects if app is executing inside a native mobile wrapper (Android / iOS via Capacitor)
+ */
+export function isCapacitorNative(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        if (Capacitor.isNativePlatform()) return true;
+    } catch {}
+    const win = window as any;
+    return !!(
+        win.Capacitor?.isNativePlatform?.() ||
+        window.location.protocol === 'capacitor:' ||
+        navigator.userAgent.includes('Capacitor') ||
+        (window.location.hostname === 'localhost' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+    );
+}
+
+/**
+ * Resolves current active backend API base URL:
+ * 1. User manual override from localStorage ('luxius_api_url')
+ * 2. Capacitor Android / iOS native wrapper -> always production cloud ('https://luxius-backend.onrender.com/api')
+ * 3. Local desktop browser development -> 'http://localhost:5000/api'
+ * 4. Production Web (GitHub Pages / custom domain) -> 'https://luxius-backend.onrender.com/api'
+ */
+export function getApiBaseUrl(): string {
+    if (typeof window === 'undefined') return 'https://luxius-backend.onrender.com/api';
+    
+    // Check manual override
+    try {
+        const custom = localStorage.getItem('luxius_api_url');
+        if (custom && custom.trim().startsWith('http')) {
+            return custom.trim().replace(/\/+$/, '');
+        }
+    } catch {}
+
+    // Capacitor Native Android / iOS app
+    if (isCapacitorNative()) {
+        return 'https://luxius-backend.onrender.com/api';
+    }
+
+    // Local PC browser development
+    const isLocalBrowser = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isLocalBrowser ? 'http://localhost:5000/api' : 'https://luxius-backend.onrender.com/api';
+}
+
+export function setCustomApiUrl(url: string | null): void {
+    if (typeof window === 'undefined') return;
+    if (!url || !url.trim()) {
+        localStorage.removeItem('luxius_api_url');
+    } else {
+        localStorage.setItem('luxius_api_url', url.trim().replace(/\/+$/, ''));
+    }
+    window.location.reload();
+}
+
 // API Configuration: dynamic between local server and Render cloud
-export const API_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:5000/api'
-    : 'https://luxius-backend.onrender.com/api';
+export const API_URL = getApiBaseUrl();
 
 export function resolveMediaUrl(fileStr: string): string {
     if (!fileStr) return ''
