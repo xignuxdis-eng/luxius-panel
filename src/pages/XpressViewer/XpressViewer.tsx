@@ -11,6 +11,7 @@ import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '.
 import { extractCdrThumbnail } from '../../utils/cdrPreview';
 import { RedrawerStudio } from './RedrawerStudio';
 import { PrintSheeterStudio } from './printsheeter/PrintSheeterStudio';
+import { GimpStudio } from './imageEditor/GimpStudio';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -67,8 +68,8 @@ export interface XpressViewerProps {
 export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, initialOrderId, onClose }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : 'viewer');
-    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter'>(initialTab);
+    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : (searchParams.get('tab') === 'gimpstudio' || searchParams.get('tab') === 'editor' ? 'gimpstudio' : 'viewer'));
+    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter' | 'gimpstudio'>(initialTab);
 
     // Orden Vinculada (Fase 3 & 5)
     const orderIdParam = searchParams.get('orderId') || (initialOrderId ? String(initialOrderId) : null);
@@ -1085,6 +1086,19 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         🧩 Mosaicos & Nesting HD
                         <span className="xpress-tab-pill" style={{ background: '#0284c7', color: '#fff' }}>PRINT SHEETER</span>
                     </button>
+                    <button 
+                        type="button"
+                        className={`xpress-nav-tab ${activeTab === 'gimpstudio' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('gimpstudio');
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.set('tab', 'gimpstudio');
+                            setSearchParams(newParams);
+                        }}
+                    >
+                        🎨 GimpStudio HD
+                        <span className="xpress-tab-pill" style={{ background: '#7c3aed', color: '#fff' }}>EDITOR</span>
+                    </button>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1162,6 +1176,36 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         setSearchParams(newParams);
                     }}
                     onClose={onClose}
+                />
+            ) : activeTab === 'gimpstudio' ? (
+                <GimpStudio 
+                    initialImageUrl={previewUrl}
+                    initialFile={file || undefined}
+                    orderId={order?.id}
+                    onSendToRedrawer={(dataUrl) => {
+                        setPreviewUrl(dataUrl);
+                        setActiveTab('redrawer');
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.set('tab', 'redrawer');
+                        setSearchParams(newParams);
+                    }}
+                    onSendToPrintSheeter={(dataUrl, name) => {
+                        setPreviewUrl(dataUrl);
+                        setActiveTab('printsheeter');
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.set('tab', 'printsheeter');
+                        setSearchParams(newParams);
+                    }}
+                    onSaveToOrder={async (dataUrl) => {
+                        if (!order) return;
+                        const existing = order.archivos || [];
+                        await saveOrden({
+                            id: order.id,
+                            ot: order.ot,
+                            archivos: [dataUrl, ...existing]
+                        });
+                        alert(`¡Imagen editada guardada exitosamente en la Orden #${order.ot || order.id}!`);
+                    }}
                 />
             ) : (
                 <div className="xpress-main-layout">
@@ -1535,6 +1579,33 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             >
                                 <span>✨</span>
                                 <span>Escalar IA</span>
+                            </button>
+                            <button 
+                                type="button"
+                                className="xpress-tool-btn" 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setActiveTab('gimpstudio'); 
+                                    const p = new URLSearchParams(searchParams);
+                                    p.set('tab', 'gimpstudio');
+                                    setSearchParams(p);
+                                }} 
+                                title="Abrir en GimpStudio HD (Editor de Capas y Retoque)"
+                                style={{
+                                    background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+                                    width: 'auto',
+                                    padding: '0 12px',
+                                    borderRadius: '18px',
+                                    fontWeight: 700,
+                                    fontSize: '0.78rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: '0 2px 10px rgba(236, 72, 153, 0.4)'
+                                }}
+                            >
+                                <span>🎨</span>
+                                <span>GimpStudio</span>
                             </button>
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>
