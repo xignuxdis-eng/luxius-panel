@@ -203,19 +203,123 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
     const className = snapshot.gender === 'f' ? feminize(rawClassName) : rawClassName;
     const title = snapshot.gender === 'f' ? feminize(rawTitle) : rawTitle;
 
+    const isAdrian = Boolean(snapshot.name && /adrian/i.test(snapshot.name));
+    const isCarlos = Boolean(snapshot.name && /carlos/i.test(snapshot.name));
     const isMirta = Boolean(snapshot.name && /mirta|admin/i.test(snapshot.name));
+    const isAgustin = Boolean(snapshot.name && /agustin/i.test(snapshot.name));
+
+    if (isAdrian) {
+        return {
+            className: 'Arquitecto de Sistemas & Soluciones',
+            title: pick(['Guardián del Backend', 'Optimizador de Algoritmos', 'Señor de la Alta Disponibilidad', 'Archimago de la Infraestructura'], 1)[0] || 'Guardián del Backend',
+            level: 65,
+            rarity: 'Legendario',
+            rarityColor: '#ff8000',
+            stats: [
+                { key: 'logica', label: 'Lógica & Código', icon: '💻', value: 96, color: '#38bdf8' },
+                { key: 'incidentes', label: 'Resolución Rápida', icon: '⚡', value: 94, color: '#facc15' },
+                { key: 'precision', label: 'Precisión Lógica', icon: '🎯', value: 91, color: '#a78bfa' },
+                { key: 'aguante', label: 'Resistencia a Caídas', icon: '🛡️', value: 88, color: '#4ade80' },
+                { key: 'cafe', label: 'Maná de Café', icon: '☕', value: 98, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia Debug', icon: '🧘', value: 85, color: '#f472b6' }
+            ],
+            strengths: pick([
+                'Resuelve caídas de base de datos y migraciones complejas en tiempo récord.',
+                'Automatiza procesos repetitivos para que el taller no se detenga jamás.',
+                'Detecta y extermina cuellos de botella antes de que afecten la producción.',
+                'Mantiene la infraestructura en la nube funcionando con estabilidad del 99.9%.'
+            ], 2),
+            weaknesses: pick([
+                'Sufre daño crítico cuando un proveedor en la nube bloquea una cuota sin avisar.',
+                'Vulnerable a que se le enfríe el café mientras depura código.',
+                'Alergia a procesos manuales que podrían ser un script de tres líneas.'
+            ], 2),
+            quote: 'Si compila en local y pasa las pruebas, va directo a producción.',
+            gear: 'MacBook Pro M-Series + Terminal SSL de Alta Disponibilidad'
+        };
+    }
+
+    if (isCarlos) {
+        return {
+            className: 'Maestro de la Forja de Tinta',
+            title: pick(['Domador del Plotter', 'Guardián del Cabezal', 'Alquimista CMYK', 'Señor del Banding Cero'], 1)[0] || 'Domador del Plotter',
+            level: 62,
+            rarity: 'Épico',
+            rarityColor: '#a335ee',
+            stats: [
+                { key: 'calibracion', label: 'Calibración Plotters', icon: '🖨️', value: 95, color: '#38bdf8' },
+                { key: 'color', label: 'Ojo Clínico CMYK', icon: '🎨', value: 92, color: '#a78bfa' },
+                { key: 'velocidad', label: 'Velocidad de Tirada', icon: '⚡', value: 86, color: '#facc15' },
+                { key: 'aguante', label: 'Aguante en Pie', icon: '🛡️', value: 88, color: '#4ade80' },
+                { key: 'cafe', label: 'Maná de Café', icon: '☕', value: 82, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia Bobinas', icon: '🧘', value: 80, color: '#f472b6' }
+            ],
+            strengths: pick([
+                'Detecta banding o falta de un inyector a veinte metros de distancia.',
+                'Calibra tensiones de bobinas pesadas con tacto milimétrico.',
+                'Aprovecha cada centímetro de vinilo y lona sin desperdiciar material.',
+                'Sincroniza pasadas bidireccionales con precisión absoluta.'
+            ], 2),
+            weaknesses: pick([
+                'Sufre daño moral cuando se traba un pliego de 4 metros al 95% de avance.',
+                'Alergia a archivos con perfiles de color RGB descalibrados.',
+                'Odia que alguien toque el sensor de carga mientras el plotter está tirando.'
+            ], 2),
+            quote: 'El pliego sale nítido en alta resolución o no sale del taller.',
+            gear: 'Lupa de Inyectores + Espátula de Calibración Legendaria'
+        };
+    }
+
+    if (isAgustin) {
+        return {
+            className: 'Maestro del Filo y Refilado',
+            title: pick(['Cuchilla Milimétrica', 'Señor de la Escuadra', 'Verdugo del Sangrado', 'Cirujano del Corte'], 1)[0] || 'Cuchilla Milimétrica',
+            level: 60,
+            rarity: 'Épico',
+            rarityColor: '#a335ee',
+            stats: [
+                { key: 'corte', label: 'Precisión de Corte', icon: '✂️', value: 96, color: '#ec4899' },
+                { key: 'velocidad', label: 'Velocidad de Refilado', icon: '⚡', value: 92, color: '#facc15' },
+                { key: 'escuadra', label: 'Escuadrado Pliegos', icon: '📐', value: 94, color: '#38bdf8' },
+                { key: 'aguante', label: 'Resistencia Muñeca', icon: '🛡️', value: 89, color: '#4ade80' },
+                { key: 'cafe', label: 'Maná de Café', icon: '☕', value: 78, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia con Lonas', icon: '🧘', value: 82, color: '#f472b6' }
+            ],
+            strengths: pick([
+                'Refila vinilos y lonas a escuadra perfecta a mano alzada sin titubear.',
+                'Jamás deja una rebaba o desvío en el corte de un pliego.',
+                'Velocidad supersónica para despejar la mesa de corte en picos de entrega.',
+                'Conoce el ángulo de corte ideal para cada sustrato (brillante, mate, microperforado).'
+            ], 2),
+            weaknesses: pick([
+                'Odio mortal hacia las reglas metálicas con muescas o melladuras.',
+                'Vulnerable al dolor de muñeca tras refilar 300 carteles en una sola jornada.',
+                'Se descontrola si le piden "dejale un filetito blanco de un milímetro".'
+            ], 2),
+            quote: 'Medir dos veces, cortar una sola y que quede al milímetro.',
+            gear: 'Cutter Olfa Profesional + Regla Metálica Antideslizante de 2 Metros'
+        };
+    }
+
     if (isMirta) {
         return {
-            className: 'Paladinesa de la Administración',
-            title: pick(['Guardiana del Libro Diario', 'Señora de la Conciliación', 'Archimaga de las Facturas', 'Guardiana de la Caja Chica'], 1)[0] || 'Guardiana de la Caja Chica',
-            level,
-            rarity,
-            rarityColor,
-            stats,
+            className: 'Paladinesa de la Administración & Finanzas',
+            title: pick(['Guardiana de la Caja Chica', 'Señora de la Conciliación', 'Archimaga de las Facturas', 'Defensora del Orden'], 1)[0] || 'Guardiana de la Caja Chica',
+            level: 63,
+            rarity: 'Épico',
+            rarityColor: '#a335ee',
+            stats: [
+                { key: 'caja', label: 'Cuadre Caja & Bancos', icon: '📑', value: 99, color: '#38bdf8' },
+                { key: 'pagos', label: 'Rastreo Transferencias', icon: '🔍', value: 95, color: '#facc15' },
+                { key: 'mopa', label: 'Destreza con Mopa', icon: '🧹', value: 93, color: '#4ade80' },
+                { key: 'firmeza', label: 'Cobranzas Firmes', icon: '🛡️', value: 90, color: '#ec4899' },
+                { key: 'cafe', label: 'Maná de Café', icon: '☕', value: 88, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia Clientes', icon: '🧘', value: 78, color: '#f472b6' }
+            ],
             strengths: pick([
                 'Cuadra la caja al centavo sin titubear jamás.',
                 'Detecta transferencias sin comprobante a kilómetros.',
-                'Manejo impecable del balde centrífugo y la mopa.',
+                'Manejo impecable del balde centrífugo con rueditas y la mopa.',
                 'Paciencia de titanio para conciliar presupuestos y bancos.'
             ], 2),
             weaknesses: pick([
@@ -224,7 +328,7 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
                 'Se le eriza la piel ante comprobantes de pago borrosos o incompletos.'
             ], 2),
             quote: '¡Teo! ¡Muchi! ¡Otra vez en la esquina del plotter no! ¡Ya traigo la mopa!',
-            gear: 'Balde Centrífugo Rojo + Mopa de Microfibra Legendaria'
+            gear: 'Balde Centrífugo con Rueditas + Mopa de Microfibra Legendaria'
         };
     }
 
@@ -242,17 +346,43 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
     };
 }
 
+/** Estación o área del taller donde se ubica el operario. */
+export function getStationName(role: WorkerRole, name?: string): string {
+    const n = (name || '').toLowerCase();
+    if (n.includes('adrian')) return 'Sistemas y Diseño';
+    if (n.includes('carlos')) return 'Plotter de Impresión';
+    if (n.includes('agustin')) return 'Mesa de Refilado';
+    if (n.includes('mirta') || /admin/i.test(n)) return 'Administración y Mostrador';
+    if (role === 'disenador') return 'Diseño y Preparación';
+    if (role === 'impresor') return 'Plotter de Impresión';
+    if (role === 'cortador') return 'Mesa de Refilado';
+    if (role === 'empaquetador') return 'Empaque y Despacho';
+    return 'Taller Gráfico';
+}
+
 /** Qué está haciendo el operario ahora mismo, en texto (datos reales del movimiento del taller). */
 export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm'; name?: string }): string {
-    const isMirta = w.name && /mirta|admin/i.test(w.name);
-    const station: Record<string, string> = {
-        disenador: isMirta ? 'Administración' : 'Diseño',
-        impresor: isMirta ? 'Administración' : 'el Plotter',
-        cortador: isMirta ? 'Administración' : 'Refilado',
-        empaquetador: isMirta ? 'Administración' : 'Empaque'
-    };
-    if (w.errand === 'going') return `Llevando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
-    if (w.errand === 'dwell') return `Entregando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
+    const isAdrian = Boolean(w.name && /adrian/i.test(w.name));
+    const isCarlos = Boolean(w.name && /carlos/i.test(w.name));
+    const isMirta = Boolean(w.name && /mirta|admin/i.test(w.name));
+    const isAgustin = Boolean(w.name && /agustin/i.test(w.name));
+
+    const stationLabel = getStationName(w.role, w.name);
+
+    if (w.errand === 'going') {
+        if (isAdrian) return `Llevando especificaciones de orden al taller${w.errandText ? ` (${w.errandText})` : ''}`;
+        if (isCarlos) return `Llevando pliegos impresos a la mesa de refilado${w.errandText ? ` (${w.errandText})` : ''}`;
+        if (isAgustin) return `Llevando materiales refilados a empaque${w.errandText ? ` (${w.errandText})` : ''}`;
+        if (isMirta) return `Supervisando orden lista en mostrador${w.errandText ? ` (${w.errandText})` : ''}`;
+        return `Llevando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
+    }
+    if (w.errand === 'dwell') {
+        if (isAdrian) return `Sincronizando detalles técnicos con producción`;
+        if (isCarlos) return `Entregando el rollo impreso para corte y refile`;
+        if (isAgustin) return `Entregando pliegos cortados a escuadra`;
+        if (isMirta) return `Verificando el pedido y comprobante de despacho`;
+        return `Entregando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
+    }
     if (w.errand === 'returning') return `Volviendo a su puesto con la tarea cumplida`;
     if (w.chatting) return w.gender === 'f' ? 'Charlando con un compañero o compañera' : 'Charlando con un compañero';
     if (w.onBreak) return 'De descanso en Refrigerios (café, algo rico y a pensar un rato)';
@@ -260,25 +390,35 @@ export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' |
     if (w.stroll === 'out') return 'Dando una vuelta por el taller';
     if (w.stroll === 'back') return 'Volviendo a su puesto';
     if (w.mode === 'walk') return 'Caminando por el taller';
-    const targetStation = station[w.role] || (isMirta ? 'Administración' : 'su estación');
-    return `En su puesto de ${targetStation}, ${w.gender === 'f' ? 'atenta' : 'atento'} a nuevas órdenes`;
+    
+    if (isAdrian) return 'En su estación de Sistemas, optimizando la plataforma y monitoreando el flujo de órdenes';
+    if (isCarlos) return 'En el Plotter de Impresión, supervisando calibración y avance de tirada';
+    if (isAgustin) return 'En la mesa de Refilado, preparando cuchillas y verificando cortes milimétricos';
+    if (isMirta) return 'En Administración, cuadrando caja y supervisando comprobantes y entregas';
+
+    return `En su puesto de ${stationLabel}, ${w.gender === 'f' ? 'atenta' : 'atento'} a nuevas órdenes`;
 }
 
 export const ROLE_LABEL: Record<string, string> = {
-    disenador: 'Diseñador',
+    disenador: 'Sistema',
     impresor: 'Impresor',
-    cortador: 'Cortador',
-    empaquetador: 'Empaquetador'
+    cortador: 'Refilador',
+    empaquetador: 'Administración'
 };
 
 export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string): string {
-    if (name && /mirta|admin/i.test(name)) return 'Administrativa';
+    const n = (name || '').toLowerCase();
+    if (n.includes('adrian')) return 'Sistema';
+    if (n.includes('carlos')) return 'Impresor';
+    if (n.includes('mirta') || /admin/i.test(n)) return 'Administración';
+    if (n.includes('agustin')) return 'Refilador';
+
     if (gender === 'f') {
         const femaleLabels: Record<string, string> = {
             disenador: 'Diseñadora',
             impresor: 'Impresora',
-            cortador: 'Cortadora',
-            empaquetador: 'Empaquetadora',
+            cortador: 'Refiladora',
+            empaquetador: 'Administradora',
             administrador: 'Administradora',
             admin: 'Administradora',
             vendedor: 'Vendedora',
@@ -287,14 +427,14 @@ export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string
         return femaleLabels[role] || 'Operaria';
     }
     const maleLabels: Record<string, string> = {
-        disenador: 'Diseñador',
+        disenador: 'Sistema',
         impresor: 'Impresor',
-        cortador: 'Cortador',
-        empaquetador: 'Empaquetador',
+        cortador: 'Refilador',
+        empaquetador: 'Administrador',
         administrador: 'Administrador',
         admin: 'Administrador',
         vendedor: 'Vendedor',
-        principal: 'Jefe de Producción'
+        principal: 'Jefe de Sistemas'
     };
     return maleLabels[role] || ROLE_LABEL[role] || 'Operario';
 }

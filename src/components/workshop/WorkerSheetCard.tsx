@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkerSnapshot } from './workshopWorkers';
-import { ROLE_LABEL, getRoleLabel, buildWorkerSheet, describeActivity } from './workshopSheets';
+import { ROLE_LABEL, getRoleLabel, getStationName, buildWorkerSheet, describeActivity } from './workshopSheets';
 import { WorkerPortrait } from './WorkerPortrait';
 
 export interface WorkerSheetCardProps {
@@ -127,22 +127,35 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                         name={snap.name}
                     />
                 </div>
-                <div style={{ minWidth: 0 }}>
-                    <div style={{ color: sheet.rarityColor, fontWeight: 800, fontSize: 15, wordBreak: 'break-word' }}>{snap.name}</div>
-                    <div style={{ color: '#ffd100' }}>{sheet.title}</div>
-                    <div style={{ opacity: 0.85 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                    {/* Nombre del operario */}
+                    <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 16, letterSpacing: '0.3px', lineHeight: 1.2 }}>
+                        {snap.name}
+                    </div>
+
+                    {/* Rol real en el taller */}
+                    <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2d1f14', border: '1px solid #d97706', borderRadius: 4, padding: '2px 8px' }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#fef3c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            🛠️ ROL: {getRoleLabel(snap.role, snap.gender, snap.name)}
+                        </span>
+                    </div>
+
+                    {/* Ficha RPG / Fantasía */}
+                    <div style={{ color: '#ffd100', fontSize: 11, fontWeight: 600, marginTop: 4 }}>
+                        {sheet.title}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>
                         Nivel {sheet.level} · {sheet.className}
                     </div>
                 </div>
             </div>
 
-            <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ border: `1px solid ${sheet.rarityColor}`, color: sheet.rarityColor, borderRadius: 4, padding: '1px 6px' }}>
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ border: `1px solid ${sheet.rarityColor}`, color: sheet.rarityColor, borderRadius: 4, padding: '1px 6px', fontWeight: 700, fontSize: 11 }}>
                     {sheet.rarity}
                 </span>
-                <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 4, padding: '1px 6px' }}>
-                    Rol: {getRoleLabel(snap.role, snap.gender, snap.name)}
-                    {snap.roleFromUser ? '' : ' (asignado)'}
+                <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>
+                    📍 {getStationName(snap.role, snap.name)}
                 </span>
             </div>
 

@@ -162,49 +162,82 @@ export function planErrand(diff: {
 
 const DUP_OFFSETS = [0, 20, -20, 40];
 
+interface CoreTeamRole {
+    key: string;
+    name: string;
+    role: WorkerRole;
+    match: (u: WorkerUser) => boolean;
+}
+
+const WORKSHOP_CORE_TEAM: CoreTeamRole[] = [
+    {
+        key: 'adrian',
+        name: 'Adrian',
+        role: 'disenador', // Sistema
+        match: (u) => /adrian/i.test(`${u.nombre || ''} ${u.username || ''}`)
+    },
+    {
+        key: 'carlos',
+        name: 'Carlos',
+        role: 'impresor', // Impresor
+        match: (u) => /carlos/i.test(`${u.nombre || ''} ${u.username || ''}`)
+    },
+    {
+        key: 'agustin',
+        name: 'Agustín',
+        role: 'cortador', // Refilador
+        match: (u) => /agustin/i.test(`${u.nombre || ''} ${u.username || ''}`)
+    },
+    {
+        key: 'mirta',
+        name: 'Mirta',
+        role: 'empaquetador', // Administración
+        match: (u) => /mirta|admin/i.test(`${u.nombre || ''} ${u.username || ''}`)
+    }
+];
+
 /**
- * Crea hasta MAX_WORKERS operarios a partir de la lista de usuarios.
- * Se ignoran usuarios deshabilitados y clientes externos (no son operarios del taller).
+ * Crea los 4 operarios centrales del taller a partir de la lista de usuarios.
+ * Garantiza la presencia de Adrian (Sistema), Carlos (Impresor), Agustín (Refilador) y Mirta (Administración).
  */
 export function buildCrewSpecs(users: WorkerUser[]): WorkerSpec[] {
     const candidates = users.filter((u) => u && u.habilitado !== false && norm(u.rol || u.role) !== 'cliente');
 
-    const withRole = candidates
-        .map((u) => ({ u, role: mapUserToWorkerRole(u.rol || u.role) }))
-        .filter((x): x is { u: WorkerUser; role: WorkerRole } => x.role !== null)
-        .slice(0, MAX_WORKERS);
+    const entries: Array<{ id: string; name: string; role: WorkerRole; fromUser: boolean }> = [];
+    const usedUserIds = new Set<string | number>();
 
-    const usedIds = new Set(withRole.map((x) => x.u.id));
-    const rest = candidates.filter((u) => !usedIds.has(u.id) && mapUserToWorkerRole(u.rol || u.role) === null);
-
-    const entries: Array<{ u: WorkerUser; role: WorkerRole; fromUser: boolean }> = withRole.map((x) => ({
-        u: x.u,
-        role: x.role,
-        fromUser: true
-    }));
-
-    // Puestos libres: se reparten los roles que todavía no tiene nadie, en el orden del sistema viejo.
-    for (const u of rest) {
-        if (entries.length >= MAX_WORKERS) break;
-        const taken = new Set(entries.map((e) => e.role));
-        const role = LEGACY_ROLE_ORDER.find((r) => !taken.has(r)) ?? LEGACY_ROLE_ORDER[entries.length % LEGACY_ROLE_ORDER.length];
-        entries.push({ u, role, fromUser: false });
+    for (const member of WORKSHOP_CORE_TEAM) {
+        const found = candidates.find((u) => !usedUserIds.has(u.id) && member.match(u));
+        if (found) {
+            usedUserIds.add(found.id);
+            entries.push({
+                id: `w-${found.id}`,
+                name: member.name,
+                role: member.role,
+                fromUser: true
+            });
+        } else {
+            entries.push({
+                id: `w-core-${member.key}`,
+                name: member.name,
+                role: member.role,
+                fromUser: false
+            });
+        }
     }
 
     const perRoleCount: Partial<Record<WorkerRole, number>> = {};
     return entries.map((e, index) => {
         const dup = perRoleCount[e.role] ?? 0;
         perRoleCount[e.role] = dup + 1;
-        const id = `w-${e.u.id}`;
-        const name = e.u.nombre || e.u.username || `Operario ${index + 1}`;
         return {
-            id,
-            name,
+            id: e.id,
+            name: e.name,
             role: e.role,
             roleFromUser: e.fromUser,
             shirtColor: ROLE_SHIRT[e.role],
             skinColor: LEGACY_SKINS[index % LEGACY_SKINS.length],
-            ...pickTraits(id, name),
+            ...pickTraits(e.id, e.name),
             speedPxPerSec: legacySpeedToPxPerSec(2.1 + index * 0.1),
             index,
             dupOffsetX: DUP_OFFSETS[dup % DUP_OFFSETS.length]

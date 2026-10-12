@@ -37,11 +37,17 @@ export interface LookTraits {
 
 /** Rasgos fijos para operarios concretos. Clave: nombre en minúsculas. */
 export const LOOK_OVERRIDES: Record<string, Partial<LookTraits>> = {
-    curushi: {
-        gender: 'f',
-        hairStyle: 'long',
-        hairColor: '#4a2818',
-        accessory: 'headband'
+    adrian: {
+        gender: 'm',
+        hairStyle: 'short',
+        hairColor: '#2b2118',
+        accessory: 'glasses'
+    },
+    carlos: {
+        gender: 'm',
+        hairStyle: 'cap',
+        hairColor: '#1f1a17',
+        accessory: 'beard'
     },
     mirta: {
         gender: 'f',
@@ -54,6 +60,18 @@ export const LOOK_OVERRIDES: Record<string, Partial<LookTraits>> = {
         hairStyle: 'bun',
         hairColor: '#52525b',
         accessory: 'glasses'
+    },
+    agustin: {
+        gender: 'm',
+        hairStyle: 'tuft',
+        hairColor: '#7c4a21',
+        accessory: 'none'
+    },
+    curushi: {
+        gender: 'f',
+        hairStyle: 'long',
+        hairColor: '#4a2818',
+        accessory: 'headband'
     }
 };
 
