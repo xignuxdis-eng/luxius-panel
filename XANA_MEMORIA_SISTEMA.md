@@ -1445,7 +1445,13 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - Se implementó el sistema de visitas acotadas (`workshopRealClients.ts`): los clientes ingresan por la puerta, se dirigen al mostrador/caja, saludan con frases contextuales a sus metros impresos, permanecen un tiempo breve y acotado (10 a 12 segundos) y se retiran hacia la salida.
   - Se asociaron clientes reales del sistema con su volumen histórico de metros impresos, liderados por **`Miguel Zacco:Axis`** (Top 1 · 89 OTs · +416 m² impresos), junto a **`Paola Goffredo`** y **`José Boterberg`**.
   - Al interactuar con el cliente en el taller se despliega su ficha técnica legendaria con estadísticas de fidelidad, exigencia de calidad y volumen de metros impresos.
+- **Integración de PrintSheeter HD Studio en Xpress Viewer (12/10/2026)**:
+  - Se portaron los algoritmos matemáticos del software de escritorio original (`F:\Backup sistema Imprima\Nesting Luxius\printsheeter`) a TypeScript y React en `src/pages/XpressViewer/printsheeter/`.
+  - **Mosaicos Artísticos & Deco (`mosaicEngine.ts`)**: Soporte completo de patrones: Espiral Áurea, Matriz/Marco, Ondas Senoidales, Halftone Radial, Ladrillo/Diagonal, Brazos Espirales y Foto-Mosaico RGB con análisis de color y pieza central (Centerpiece), evasión de colisión central y desvanecimiento de bordes.
+  - **Nesting de Bobina 2D (`nestingEngine.ts`)**: Algoritmo de bin-packing por altura decreciente con rotación opcional a 90°, cálculo de metros lineales, porcentaje de desperdicio y comparador de bobinas estándar (1.07m a 3.20m).
+  - **Estudio Interactivo (`PrintSheeterStudio.tsx`)**: Tercera pestaña en Xpress Studio (`🧩 Mosaicos & Nesting HD`), canvas interactivo con zoom/paneo fluido, bandeja de miniaturas múltiples y exportación en alta definición PNG/JPG con retorno directo al Visor Xpress.
 
 ---
+
 
 

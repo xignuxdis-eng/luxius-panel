@@ -10,6 +10,7 @@ import JSZip from 'jszip';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../../utils/vectorPreview';
 import { extractCdrThumbnail } from '../../utils/cdrPreview';
 import { RedrawerStudio } from './RedrawerStudio';
+import { PrintSheeterStudio } from './printsheeter/PrintSheeterStudio';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -66,8 +67,8 @@ export interface XpressViewerProps {
 export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, initialOrderId, onClose }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : 'viewer';
-    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer'>(initialTab);
+    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : 'viewer');
+    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter'>(initialTab);
 
     // Orden Vinculada (Fase 3 & 5)
     const orderIdParam = searchParams.get('orderId') || (initialOrderId ? String(initialOrderId) : null);
@@ -1069,7 +1070,20 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         }}
                     >
                         ✏️ Redrawer & Vectorizador
-                        <span className="xpress-tab-pill">NUEVO</span>
+                        <span className="xpress-tab-pill">VECTOR</span>
+                    </button>
+                    <button 
+                        type="button"
+                        className={`xpress-nav-tab ${activeTab === 'printsheeter' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('printsheeter');
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.set('tab', 'printsheeter');
+                            setSearchParams(newParams);
+                        }}
+                    >
+                        🧩 Mosaicos & Nesting HD
+                        <span className="xpress-tab-pill" style={{ background: '#0284c7', color: '#fff' }}>PRINT SHEETER</span>
                     </button>
                 </div>
 
@@ -1117,6 +1131,30 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             dpi: 300,
                             colorMode: 'Vector SVG (Redrawer)',
                             source: 'Redrawer Studio'
+                        });
+                        setActiveTab('viewer');
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('tab');
+                        setSearchParams(newParams);
+                    }}
+                    onClose={onClose}
+                />
+            ) : activeTab === 'printsheeter' ? (
+                <PrintSheeterStudio 
+                    initialImageUrl={previewUrl}
+                    initialFileName={file?.name ? file.name.replace(/\.[^/.]+$/, '') : (metadata?.name ? metadata.name.replace(/\.[^/.]+$/, '') : 'diseno')}
+                    order={order}
+                    onSendToViewer={(composedUrl, newFileName) => {
+                        setPreviewUrl(composedUrl);
+                        setMetadata({
+                            name: newFileName || 'mosaico_printsheeter.jpg',
+                            format: 'JPG',
+                            size: 'Composición HD',
+                            width: 2400,
+                            height: 2400,
+                            dpi: 300,
+                            colorMode: 'RGB (PrintSheeter)',
+                            source: 'PrintSheeter Studio'
                         });
                         setActiveTab('viewer');
                         const newParams = new URLSearchParams(searchParams);
