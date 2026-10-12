@@ -176,7 +176,7 @@ function feminize(text: string): string {
 
 /** Fichas de ejemplo para pruebas y para mostrar en pantalla. Siempre la misma ficha para el mismo operario. */
 export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 'role'> & { gender?: 'f' | 'm' }): WorkerSheet {
-    const profile = PROFILES[snapshot.role];
+    const profile = PROFILES[snapshot.role] ?? PROFILES.disenador;
     const seed = hashString(`${snapshot.id}|${snapshot.name}|${snapshot.role}`);
     const rnd = seeded(seed);
 
@@ -243,7 +243,7 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
 /** Qué está haciendo el operario ahora mismo, en texto (datos reales del movimiento del taller). */
 export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm'; name?: string }): string {
     const isMirta = w.name && /mirta|admin/i.test(w.name);
-    const station: Record<WorkerRole, string> = {
+    const station: Record<string, string> = {
         disenador: isMirta ? 'Administración' : 'Diseño',
         impresor: isMirta ? 'Administración' : 'el Plotter',
         cortador: isMirta ? 'Administración' : 'Refilado',
@@ -258,10 +258,11 @@ export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' |
     if (w.stroll === 'out') return 'Dando una vuelta por el taller';
     if (w.stroll === 'back') return 'Volviendo a su puesto';
     if (w.mode === 'walk') return 'Caminando por el taller';
-    return `En su puesto de ${station[w.role]}, ${w.gender === 'f' ? 'atenta' : 'atento'} a nuevas órdenes`;
+    const targetStation = station[w.role] || (isMirta ? 'Administración' : 'su estación');
+    return `En su puesto de ${targetStation}, ${w.gender === 'f' ? 'atenta' : 'atento'} a nuevas órdenes`;
 }
 
-export const ROLE_LABEL: Record<WorkerRole, string> = {
+export const ROLE_LABEL: Record<string, string> = {
     disenador: 'Diseñador',
     impresor: 'Impresor',
     cortador: 'Cortador',
@@ -271,14 +272,28 @@ export const ROLE_LABEL: Record<WorkerRole, string> = {
 export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string): string {
     if (name && /mirta|admin/i.test(name)) return 'Administrativa';
     if (gender === 'f') {
-        const femaleLabels: Record<WorkerRole, string> = {
+        const femaleLabels: Record<string, string> = {
             disenador: 'Diseñadora',
             impresor: 'Impresora',
             cortador: 'Cortadora',
-            empaquetador: 'Empaquetadora'
+            empaquetador: 'Empaquetadora',
+            administrador: 'Administradora',
+            admin: 'Administradora',
+            vendedor: 'Vendedora',
+            principal: 'Jefa de Taller'
         };
-        return femaleLabels[role];
+        return femaleLabels[role] || 'Operaria';
     }
-    return ROLE_LABEL[role];
+    const maleLabels: Record<string, string> = {
+        disenador: 'Diseñador',
+        impresor: 'Impresor',
+        cortador: 'Cortador',
+        empaquetador: 'Empaquetador',
+        administrador: 'Administrador',
+        admin: 'Administrador',
+        vendedor: 'Vendedor',
+        principal: 'Jefe de Producción'
+    };
+    return maleLabels[role] || ROLE_LABEL[role] || 'Operario';
 }
 
