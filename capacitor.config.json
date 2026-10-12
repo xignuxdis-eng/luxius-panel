@@ -1,0 +1,12 @@
+{
+  "appId": "com.xignux.luxius.mobile",
+  "appName": "LuXius Taller",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": [
+      "*"
+    ]
+  }
+}

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "sync:android": "vite build && npx cap sync android",
+    "build:apk": "vite build && npx cap sync android && powershell -Command \"$env:JAVA_HOME = 'C:\\Program Files\\Android\\Android Studio\\jbr'; cd android; .\\gradlew.bat assembleDebug; cd ..; Copy-Item android\\app\\build\\outputs\\apk\\debug\\app-debug.apk LuXius-Taller-Mobile.apk -Force\"",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -26,6 +28,9 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
