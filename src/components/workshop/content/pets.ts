@@ -70,10 +70,10 @@ export const PET_PROFILES: PetProfile[] = [
         id: 'frijol',
         name: 'Frijol',
         species: 'gato',
-        gender: 'f',
+        gender: 'm',
         emoji: '🐈‍⬛',
-        title: 'Gata Negra de Guardia',
-        level: 7,
+        title: 'Vigía de las Alturas Inhóspitas',
+        level: 8,
         body: 0x2b2b35,
         shade: 0x111116,
         belly: 0x3c3c48,
@@ -81,21 +81,28 @@ export const PET_PROFILES: PetProfile[] = [
         nose: 0xfda4af,
         collar: 0xa855f7,
         markings: ['chest'],
-        speed: 14,
-        rest: [3000, 8000],
-        sleepChance: 0.4,
+        speed: 15,
+        rest: [4000, 9000],
+        sleepChance: 0.35,
         scratchChance: 0,
-        petChance: 0.7,
-        sound: { type: 'meow', pitch: 520 },
+        petChance: 0.75,
+        sound: { type: 'meow', pitch: 480 },
         stats: [
-            { label: 'Sigilo', value: 92, color: '#a78bfa' },
-            { label: 'Cariño', value: 70, color: '#f472b6' },
-            { label: 'Curiosidad', value: 78, color: '#38bdf8' },
-            { label: 'Energía', value: 55, color: '#fbbf24' },
-            { label: 'Siesta', value: 85, color: '#34d399' }
+            { label: 'Alturas', value: 99, color: '#38bdf8' },
+            { label: 'Sigilo', value: 96, color: '#a78bfa' },
+            { label: 'Vigilancia', value: 95, color: '#facc15' },
+            { label: 'Curiosidad', value: 88, color: '#34d399' },
+            { label: 'Siesta', value: 85, color: '#f472b6' }
         ],
-        strengths: ['Se pasea por todo el taller como si fuera suyo', 'Ronroneo calmante: +5 de buen ánimo al equipo'],
-        weaknesses: ['Se camufla con el vinilo negro', 'Despierta de mal humor si la siesta se interrumpe']
+        strengths: [
+            'Habilidad especial: Ojo Panorámico — trepa a alturas inhóspitas y vigila todo el taller desde las vigas y techos.',
+            'Sigilo absoluto: se desplaza por los puntos más elevados e inaccesibles sin hacer un solo ruido.',
+            'Ronroneo calmante: +5 de buen ánimo a los operarios cuando baja de las alturas a pedir caricias.'
+        ],
+        weaknesses: [
+            'Nadie entiende cómo llegó tan arriba y a veces mira a todos con desdén desde el techo.',
+            'Se camufla con las sombras de la estructura y el vinilo negro.'
+        ]
     },
     {
         id: 'jaina',

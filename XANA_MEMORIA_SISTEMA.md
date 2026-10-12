@@ -262,6 +262,11 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 ---
 
+- **11/10/2026 - Corrección Frijol (Gato macho) y Habilidad de Alturas Inhóspitas**:
+  - **Identidad**: Frijol es formalmente un **Gato** macho (`gender: 'm'`, título *"Vigía de las Alturas Inhóspitas"*), corrigiendo textos y fichas donde figuraba como hembra.
+  - **Habilidad de Alturas Inhóspitas**: Frijol posee la habilidad única de trepar y observar el taller desde alturas muy elevadas e inaccesibles (`FRIJOL_HIGH_PERCHES`), encaramándose sobre el cartel central DEN V2.0, las vigas metálicas superiores de techumbre, la cornisa del ventanal y el lomo superior del plotter.
+  - **Comportamiento en Alturas**: Al estar encaramado en las vigas (`zIndex: 600`), es inalcanzable para los operarios del suelo, proyecta sombra sutil aérea y reporta en su ficha técnica la actividad exacta (*"Mirando todo el taller desde una altura inhóspita (...)"*), maullando orgulloso con feedback visual de corazones/destellos al interactuar.
+
 - **11/10/2026 - Roles fijos de taller, personajes activos (Clientes/Vendedores/Diseñadores) y migración Supabase**:
   - **Roles Fijos**: El núcleo base de 4 personajes del taller es permanente y fijo en sus puestos de trabajo: Adrian (`Sistema`), Carlos (`Impresor`), Mirta (`Administración`) y Agustín (`Refilador`).
   - **Soporte de Roles Dinámicos en Sesión**: Cuando un usuario con rol de `cliente`, `vendedor`, `artista/disenador` o administración inicia sesión o está presente en la base de datos, se incorpora al taller (hasta 7 miembros) ocupando su puesto correspondiente con color de camisa distintivo (celeste para clientes, ámbar/oro para vendedores, violeta para diseño).

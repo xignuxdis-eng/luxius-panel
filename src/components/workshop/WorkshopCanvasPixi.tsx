@@ -382,8 +382,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const handlePetTap = (profile: PetProfile, px: number, py: number, petted: boolean) => {
         if (dragMovedRef.current) return;
         if (fxToggleRef.current.petSound) playAnimalSound(profile.sound);
-        if (petted) fxRef.current?.hearts(px, py);
-        else showToast(`${profile.emoji} ${profile.name} no se dejó acariciar esta vez 💨`);
+        const petObj = petRef.current?.getPet(profile.id);
+        const isHigh = petObj?.isPerchedNow?.();
+        if (isHigh) {
+            showToast(`${profile.emoji} ${profile.name} te mira atentamente desde las alturas inhóspitas del taller 🐾`);
+            fxRef.current?.hearts(px, py);
+        } else if (petted) {
+            fxRef.current?.hearts(px, py);
+        } else {
+            showToast(`${profile.emoji} ${profile.name} no se dejó acariciar esta vez 💨`);
+        }
         const last = lastPetCloseRef.current;
         if (last && last.id === profile.id && Date.now() - last.t < 600) {
             lastPetCloseRef.current = null;

@@ -29,6 +29,23 @@ export const isPetNight = (): boolean => {
 };
 const MAX_Y = 262;
 
+export interface HighPerchSpot {
+    name: string;
+    x: number;
+    y: number;
+    desc: string;
+}
+
+/** Alturas muy elevadas e inhóspitas donde Frijol trepa a observar y vigilar todo el taller. */
+export const FRIJOL_HIGH_PERCHES: HighPerchSpot[] = [
+    { name: 'cartel_den', x: 212, y: 22, desc: 'sobre el cartel central DEN V2.0 en la pared alta' },
+    { name: 'viga_plotters', x: 82, y: 26, desc: 'encaramado en la viga metálica sobre los plotters' },
+    { name: 'viga_empaque', x: 395, y: 26, desc: 'en la estructura superior sobre el sector de empaque' },
+    { name: 'cornisa_diseno', x: 148, y: 22, desc: 'en la cornisa alta junto al ventanal superior' },
+    { name: 'techo_plotter', x: 62, y: 44, desc: 'en el lomo superior del chasis de impresión' },
+    { name: 'viga_corte', x: 320, y: 22, desc: 'sobre la viga industrial de la mesa de refilado' }
+];
+
 export interface PetHooks {
     /** Clic sobre una mascota (posición en el mapa). `petted` indica si se dejó acariciar. */
     onTap?: (profile: PetProfile, x: number, y: number, petted: boolean) => void;
@@ -89,6 +106,8 @@ export class WorkshopPet {
     /** Al llegar al destino de goTo(): se sienta (y avisa). */
     private arriveSit = false;
     private arriveCb: (() => void) | null = null;
+    private isPerched = false;
+    private currentPerchDesc = '';
     private rng: () => number;
 
     constructor(
@@ -164,10 +183,17 @@ export class WorkshopPet {
         return this.leaving;
     }
 
+    isPerchedNow(): boolean {
+        return this.isPerched;
+    }
+
     /** Qué está haciendo ahora (para la ficha). */
     getActivity(): string {
         if (!this.visible) return 'Descansando fuera del taller';
         if (this.leaving) return 'Yéndose a dar una vuelta';
+        if (this.isPerched) {
+            return `Mirando todo el taller desde una altura inhóspita (${this.currentPerchDesc || 'en las vigas del techo'}) 🐾`;
+        }
         switch (this.state) {
             case 'walk':
                 return 'Paseando por el taller';
@@ -176,7 +202,7 @@ export class WorkshopPet {
             case 'scratch':
                 return 'Rascándose las pulgas';
             default:
-                return (this.profile.gender === 'f' || this.profile.species === 'gato') ? 'Sentada, mirando todo' : 'Sentado, atento';
+                return this.profile.gender === 'f' ? 'Sentada, mirando todo' : 'Sentado, atento a todo lo que pasa';
         }
     }
 
@@ -204,6 +230,20 @@ export class WorkshopPet {
         this.visible = true;
         this.leaving = false;
         const laneY = this.lanes.low + 4;
+        if (this.profile.id === 'frijol' && (instant ? this.rng() < 0.6 : this.rng() < 0.4)) {
+            const spot = FRIJOL_HIGH_PERCHES[Math.floor(this.rng() * FRIJOL_HIGH_PERCHES.length)];
+            this.x = spot.x;
+            this.y = spot.y;
+            this.isPerched = true;
+            this.currentPerchDesc = spot.desc;
+            this.facingLeft = this.rng() < 0.5;
+            this.setState('sit', 20000 + this.rng() * 20000);
+            this.sync();
+            this.applyVisibility();
+            return;
+        }
+        this.isPerched = false;
+        this.currentPerchDesc = '';
         if (instant) {
             for (let i = 0; i < 20; i++) {
                 const p = this.sampleTarget();
@@ -229,6 +269,11 @@ export class WorkshopPet {
     /** Se va caminando hacia un costado del mapa y desaparece. */
     leave() {
         if (this.destroyed || !this.visible || this.leaving) return;
+        if (this.isPerched) {
+            this.isPerched = false;
+            this.currentPerchDesc = '';
+            this.y = this.lanes.low + 4;
+        }
         const laneY = this.lanes.low + 4;
         const toLeft = this.x < MAP_W / 2;
         const edge = toLeft ? -6 : MAP_W + 6;
@@ -252,7 +297,7 @@ export class WorkshopPet {
 
     /** Un operario intenta acariciarla. Devuelve true si se dejó. */
     tryPetByWorker(): boolean {
-        if (!this.visible || this.leaving || this.workerCooldownMs > 0) return false;
+        if (this.isPerched || !this.visible || this.leaving || this.workerCooldownMs > 0) return false;
         this.workerCooldownMs = randomIn(WORKSHOP_CONFIG.pets.careCooldownMs, this.rng);
         if (this.rng() < this.profile.petChance) {
             this.path = [];
@@ -267,6 +312,11 @@ export class WorkshopPet {
     /** Camina hasta un punto y se sienta ahí (si hay camino). `onArrive` se llama al llegar. Devuelve false si no pudo. */
     goTo(target: Point, onArrive?: () => void): boolean {
         if (this.destroyed || !this.visible || this.leaving) return false;
+        if (this.isPerched) {
+            this.isPerched = false;
+            this.currentPerchDesc = '';
+            this.y = this.lanes.topEdge + 4;
+        }
         const from: Point = { x: this.x, y: this.y };
         const tos: Point[] = [target, { x: target.x, y: target.y + 6 }, { x: target.x, y: target.y + 12 }, { x: target.x, y: target.y - 6 }];
         for (const to of tos) {
@@ -296,7 +346,7 @@ export class WorkshopPet {
 
     private tap() {
         if (!this.enabled || !this.visible || this.destroyed) return;
-        const petted = this.rng() < this.profile.petChance;
+        const petted = this.isPerched ? true : (this.rng() < this.profile.petChance);
         if (petted) {
             this.path = [];
             this.leaving = false;
@@ -524,8 +574,12 @@ export class WorkshopPet {
         }
         const sh = this.shadow;
         sh.clear();
-        const w = this.profile.chubby ? 8 : 6;
-        sh.ellipse(0, 0, w, 1.6).fill({ color: 0x000000, alpha: 0.28 });
+        if (this.isPerched) {
+            sh.ellipse(0, 0, 4, 1.2).fill({ color: 0x000000, alpha: 0.18 });
+        } else {
+            const w = this.profile.chubby ? 8 : 6;
+            sh.ellipse(0, 0, w, 1.6).fill({ color: 0x000000, alpha: 0.28 });
+        }
         const draw = () => (this.profile.species === 'gato' ? this.drawCat(pose) : this.drawDog(pose));
         // Contorno: la misma silueta, de un solo color, corrida 1px en cada direccion (queda debajo del sprite)
         for (const o of this.outlines) {
@@ -558,7 +612,7 @@ export class WorkshopPet {
         if (this.container.destroyed) return;
         this.container.x = Math.round(this.x);
         this.container.y = Math.round(this.y);
-        this.container.zIndex = Math.round(this.y);
+        this.container.zIndex = this.isPerched ? 600 : Math.round(this.y);
         this.container.scale.x = this.facingLeft ? -1 : 1;
         if (this.hit && !this.hit.destroyed) {
             this.hit.x = this.container.x;
@@ -627,9 +681,26 @@ export class WorkshopPet {
         } else {
             this.timerMs -= dt;
             if (this.timerMs <= 0) {
-                // De noche, al despertar o terminar de estar sentadas, vuelven a dormirse casi siempre
-                if (isPetNight() && this.rng() < (this.state === 'sleep' ? 0.85 : 0.7)) this.setState('sleep', 20000 + this.rng() * 20000);
-                else if (!this.planLeg()) this.setState('sit', 2000 + this.rng() * 3000);
+                if (this.isPerched) {
+                    // Frijol baja ágilmente de las alturas al pasillo principal
+                    this.isPerched = false;
+                    this.currentPerchDesc = '';
+                    this.y = this.lanes.topEdge + 4;
+                    this.setState('sit', 4000 + this.rng() * 4000);
+                } else if (this.profile.id === 'frijol' && this.rng() < 0.4) {
+                    // Habilidad de Frijol: Trepar a alturas inhóspitas y vigilar todo el taller
+                    const spot = FRIJOL_HIGH_PERCHES[Math.floor(this.rng() * FRIJOL_HIGH_PERCHES.length)];
+                    this.x = spot.x;
+                    this.y = spot.y;
+                    this.isPerched = true;
+                    this.currentPerchDesc = spot.desc;
+                    this.facingLeft = this.rng() < 0.5;
+                    this.setState('sit', 20000 + this.rng() * 22000);
+                } else if (isPetNight() && this.rng() < (this.state === 'sleep' ? 0.85 : 0.7)) {
+                    this.setState('sleep', 20000 + this.rng() * 20000);
+                } else if (!this.planLeg()) {
+                    this.setState('sit', 2000 + this.rng() * 3000);
+                }
             }
         }
         this.sync();
