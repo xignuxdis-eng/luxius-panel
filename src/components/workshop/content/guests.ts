@@ -41,14 +41,19 @@ export const GUEST_KINDS: Record<GuestKind, GuestKindConfig> = {
         lines: ['Vengo a revisar el plotter 🔧', 'Cabezales limpios, todo en orden.', 'Con estos cuidados, imprimen de maravilla.']
     },
     cliente: {
-        name: 'Persona que viene a retirar (visita)',
-        shirt: '#0ea5e9',
-        skin: '#e8b98a',
-        hair: '#78350f',
+        name: 'Miguel Zacco:Axis',
+        shirt: '#0284c7',
+        skin: '#f5d0a9',
+        hair: '#334155',
         speed: 29,
         tone: 'info',
-        stayMs: 10000,
-        lines: ['Buen día, vengo a retirar mi pedido.', 'Qué bien se ve el taller por dentro.', 'Gracias, ya me llevo todo. ¡Hasta pronto!']
+        stayMs: 12000, // Permanencia breve y acotada en mostrador
+        lines: [
+            '¡Buen día equipo! Vengo a ver los metros de Axis.',
+            '¿Cómo viene la tirada de lonas para Axis?',
+            'Excelente nitidez y fidelidad de color como siempre.',
+            'Ya me llevo los pliegos de Axis. ¡Gran trabajo chicos!'
+        ]
     },
     pizzero: {
         name: 'Repartidor de pizza (visita)',

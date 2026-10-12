@@ -332,21 +332,25 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
 
     const isCliente = Boolean(snapshot.workshopRole === 'Cliente' || (snapshot.name && /cliente/i.test(snapshot.name)));
     if (isCliente) {
+        const isAxis = Boolean(snapshot.name && /axis|zacco/i.test(snapshot.name));
         return {
             className: 'Socio Comercial / Cliente del Taller',
-            title: pick(['Fiel Cliente de XignuX', 'Cliente VIP de Gran Formato', 'Comprador Frecuente', 'Entusiasta del Buen Impreso'], 1)[0] || 'Fiel Cliente de XignuX',
-            level: 50,
-            rarity: 'Épico',
-            rarityColor: '#0ea5e9',
+            title: isAxis ? 'Cliente VIP Gran Formato · Axis' : (pick(['Fiel Cliente de XignuX', 'Cliente VIP de Gran Formato', 'Comprador Frecuente', 'Entusiasta del Buen Impreso'], 1)[0] || 'Fiel Cliente de XignuX'),
+            level: isAxis ? 89 : 50,
+            rarity: isAxis ? 'Legendario' : 'Épico',
+            rarityColor: isAxis ? '#f59e0b' : '#0ea5e9',
             stats: [
-                { key: 'fidelidad', label: 'Fidelidad de Marca', icon: '⭐', value: 95, color: '#facc15' },
-                { key: 'calidad', label: 'Exigencia de Calidad', icon: '🎯', value: 92, color: '#38bdf8' },
-                { key: 'puntualidad', label: 'Puntualidad en Pagos', icon: '💳', value: 90, color: '#4ade80' },
-                { key: 'volumen', label: 'Volumen de Pedidos', icon: '📦', value: 85, color: '#a78bfa' },
+                { key: 'fidelidad', label: 'Fidelidad de Marca', icon: '⭐', value: isAxis ? 99 : 95, color: '#facc15' },
+                { key: 'calidad', label: 'Exigencia de Calidad', icon: '🎯', value: isAxis ? 96 : 92, color: '#38bdf8' },
+                { key: 'puntualidad', label: 'Puntualidad en Pagos', icon: '💳', value: isAxis ? 98 : 90, color: '#4ade80' },
+                { key: 'volumen', label: 'Metros Impresos', icon: '📦', value: isAxis ? 99 : 85, color: '#a78bfa' },
                 { key: 'cafe', label: 'Degustación de Café', icon: '☕', value: 88, color: '#fb923c' },
-                { key: 'paciencia', label: 'Paciencia en Mostrador', icon: '⏳', value: 82, color: '#f472b6' }
+                { key: 'paciencia', label: 'Paciencia en Mostrador', icon: '⏳', value: isAxis ? 85 : 82, color: '#f472b6' }
             ],
-            strengths: pick([
+            strengths: isAxis ? [
+                'Cliente insignia #1 en metros impresos de lonas y vinilos en el taller.',
+                'Prioridad en cola de impresión por volumen continuo y fidelidad histórica.'
+            ] : pick([
                 'Confía plenamente en la calidad de impresión y acabados de XignuX.',
                 'Envía los archivos vectorizados y listos con sangrado para tirada rápida.',
                 'Abona sus órdenes a tiempo y valora el trabajo artesanal del taller.',
@@ -357,8 +361,8 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
                 'A veces pide "un retoquecito rápido de color" cuando la máquina ya está tirando.',
                 'Le cuesta decidirse entre lona mate y vinilo brillante en cartelería.'
             ], 2),
-            quote: '¡Qué buena calidad tienen estos impresos! Siempre vuelvo acá.',
-            gear: 'Muestrario de Materiales XignuX + Comprobante de Transferencia Aprobado'
+            quote: isAxis ? '¡Excelente nitidez en los vinilos de Axis! Siempre confío en este taller.' : '¡Qué buena calidad tienen estos impresos! Siempre vuelvo acá.',
+            gear: isAxis ? '89 Órdenes Impresas + 416 m² de Lonas y Vinilos para Axis' : 'Muestrario de Materiales XignuX + Comprobante de Transferencia Aprobado'
         };
     }
 

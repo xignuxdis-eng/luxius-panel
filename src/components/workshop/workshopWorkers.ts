@@ -265,29 +265,34 @@ export function buildCrewSpecs(users: WorkerUser[], loggedUser?: WorkerUser | nu
     };
 
     // 2. Si hay un usuario logueado en sesión que no es de los 4 fijos, aparece en el taller con su rol
+    // REGLA: Los clientes NO integran la cuadrilla fija permanente; su permanencia es acotada al mostrador.
     if (loggedUser) {
         const isCore = WORKSHOP_CORE_TEAM.some((m) => m.match(loggedUser));
         if (!isCore) {
-            const info = resolveRoleInfo(loggedUser);
-            const cleanName = loggedUser.nombre || loggedUser.username || 'Usuario';
-            usedUserIds.add(loggedUser.id);
-            entries.push({
-                id: `w-auth-${loggedUser.id}`,
-                name: cleanName,
-                role: info.role,
-                workshopRole: info.workshopRole,
-                fromUser: true,
-                shirtColor: info.shirtColor
-            });
+            const rawRole = norm(loggedUser.rol || loggedUser.role);
+            if (rawRole !== 'cliente') {
+                const info = resolveRoleInfo(loggedUser);
+                const cleanName = loggedUser.nombre || loggedUser.username || 'Usuario';
+                usedUserIds.add(loggedUser.id);
+                entries.push({
+                    id: `w-auth-${loggedUser.id}`,
+                    name: cleanName,
+                    role: info.role,
+                    workshopRole: info.workshopRole,
+                    fromUser: true,
+                    shirtColor: info.shirtColor
+                });
+            }
         }
     }
 
-    // 3. Revisar si hay otros usuarios (clientes registrados, diseñadores, vendedores) hasta 7 en total
+    // 3. Revisar si hay otros usuarios del personal (diseñadores, vendedores) hasta 6 en total
+    // Los clientes reales aparecen como visitas transitorias con permanencia acotada (ej. Miguel Zacco:Axis)
     for (const u of candidates) {
-        if (entries.length >= 7) break;
+        if (entries.length >= 6) break;
         if (usedUserIds.has(u.id)) continue;
         const rawRole = norm(u.rol || u.role);
-        if (rawRole === 'cliente' || rawRole === 'vendedor' || rawRole === 'artista') {
+        if (rawRole === 'vendedor' || rawRole === 'artista' || rawRole === 'disenador' || rawRole === 'diseno') {
             usedUserIds.add(u.id);
             const info = resolveRoleInfo(u);
             entries.push({

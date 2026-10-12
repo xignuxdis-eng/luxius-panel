@@ -52,8 +52,8 @@ export class GuestManager {
     private lanes: Lanes;
     private destroyed = false;
     private seq = 0;
-    /** Se llama al tocar a una visita (la ficha es un aviso corto: son personajes decorativos). */
-    onTap?: (info: { kind: GuestKind; name: string; text: string }) => void;
+    /** Se llama al tocar a una visita (la ficha es un aviso corto o la ficha RPG del cliente). */
+    onTap?: (info: { kind: GuestKind; name: string; text: string; id: string }) => void;
 
     constructor(private layer: Container, private stations: StationConfig[], private rng: () => number = Math.random) {
         this.lanes = computeLanes(stations);
@@ -68,11 +68,22 @@ export class GuestManager {
     }
 
     /** Hace entrar a una visita. Devuelve false si ya hay una de ese tipo (máximo 1 por tipo). */
-    spawn(kind: GuestKind): boolean {
+    spawn(kind: GuestKind, customCfg?: Partial<GuestKindConfig>): boolean {
         if (this.destroyed || this.has(kind)) return false;
-        const cfg = KIND[kind];
+        const base = KIND[kind];
+        const cfg: KindConfig = {
+            ...base,
+            ...(customCfg || {}),
+            lines: customCfg?.lines ?? base.lines
+        };
         const laneY = this.lanes.low;
-        const textures = getCharacterTextures({ role: 'empaquetador', sheetKey: `guest_${kind}`, shirtColor: cfg.shirt, skinColor: cfg.skin, hairColor: cfg.hair });
+        const textures = getCharacterTextures({
+            role: 'empaquetador',
+            sheetKey: `guest_${kind}_${cfg.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
+            shirtColor: cfg.shirt,
+            skinColor: cfg.skin,
+            hairColor: cfg.hair
+        });
 
         const container = new Container();
         container.label = `Guest:${kind}`;
@@ -121,8 +132,8 @@ export class GuestManager {
         g.arriveFacing = stand.facing;
         this.guests.push(g);
         container.on('pointertap', () => {
-            const text = g.bubble?.text ?? cfg.lines[Math.floor(this.rng() * cfg.lines.length)];
-            this.onTap?.({ kind, name: cfg.name, text });
+            const text = g.bubble?.text ?? g.cfg.lines[Math.floor(this.rng() * g.cfg.lines.length)];
+            this.onTap?.({ kind, name: g.cfg.name, text, id: g.id });
         });
         this.sync(g);
         return true;
@@ -244,6 +255,7 @@ export class GuestManager {
             id: g.id,
             name: g.cfg.name,
             role: 'empaquetador',
+            workshopRole: g.kind === 'cliente' ? 'Cliente' : (g.kind === 'tecnico' ? 'Técnico' : (g.kind === 'repartidor' ? 'Repartidor' : 'Visita')),
             x: g.x,
             y: g.y,
             mode: g.mode,

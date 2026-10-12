@@ -1440,6 +1440,12 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - **Mirta**: Rol `Administración` (Estación Administración / Despacho).
     - **Agustín**: Rol `Refilador` (Estación Mesa de Refilado).
   - Cada miembro cuenta con ficha técnica, estadísticas personalizadas acordes a su función real y actividad en vivo en el taller.
+- **Clientes Reales y Permanencia Acotada en Taller (12/10/2026)**:
+  - Se excluyó el rol `cliente` de la cuadrilla fija de operarios del taller (`buildCrewSpecs`) para evitar que permanezcan deambulando indefinidamente por las máquinas.
+  - Se implementó el sistema de visitas acotadas (`workshopRealClients.ts`): los clientes ingresan por la puerta, se dirigen al mostrador/caja, saludan con frases contextuales a sus metros impresos, permanecen un tiempo breve y acotado (10 a 12 segundos) y se retiran hacia la salida.
+  - Se asociaron clientes reales del sistema con su volumen histórico de metros impresos, liderados por **`Miguel Zacco:Axis`** (Top 1 · 89 OTs · +416 m² impresos), junto a **`Paola Goffredo`** y **`José Boterberg`**.
+  - Al interactuar con el cliente en el taller se despliega su ficha técnica legendaria con estadísticas de fidelidad, exigencia de calidad y volumen de metros impresos.
 
 ---
+
 

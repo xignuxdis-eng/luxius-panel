@@ -41,6 +41,8 @@ function nextDelayMs(rng: () => number): number {
     return randomIn(fast ? WORKSHOP_CONFIG.events.intervalFastMs : WORKSHOP_CONFIG.events.intervalMs, rng);
 }
 
+import type { GuestKindConfig } from './content/guests';
+
 export interface EventDeps {
     crew: () => WorkerCrew | null;
     fx: () => WorkshopFx | null;
@@ -56,6 +58,8 @@ export interface EventDeps {
     orderLine?: () => string | null;
     /** Ejecuta la caminata de Teo o Muchi para hacer pis en un punto. */
     dogPee?: (targetSpot: Point, onPee: (dogName: string, spot: Point) => void) => boolean;
+    /** Información y frases de clientes reales con metros impresos (ej: Miguel Zacco:Axis) */
+    nextClient?: () => Partial<GuestKindConfig> | null;
 }
 
 interface Running {
@@ -102,7 +106,8 @@ export class WorkshopEvents {
         if (this.destroyed || this.running) return false;
         const crew = this.deps.crew();
         if (name === 'repartidor' || name === 'tecnico' || name === 'cliente' || name === 'pizzero') {
-            const ok = this.deps.guests()?.spawn(name) ?? false;
+            const customCfg = (name === 'cliente' && this.deps.nextClient) ? (this.deps.nextClient() ?? undefined) : undefined;
+            const ok = this.deps.guests()?.spawn(name, customCfg) ?? false;
             if (ok && name === 'pizzero') crew?.announce(['¡Llegó la pizza! 🍕'], 1, 'ok');
             return ok;
         }

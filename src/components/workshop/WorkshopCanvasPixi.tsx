@@ -63,6 +63,7 @@ import PetSheetCard from './PetSheetCard';
 import WallPanel from './WallPanel';
 import { WorkshopEvents } from './workshopEvents';
 import { computeLanes } from './workshopWorkers';
+import { pickNextClientVisit } from './workshopRealClients';
 import { fetchWeather, WEATHER_REFRESH_MS, type WeatherInfo } from './workshopWeather';
 import { computeAchievements, syncUnlocked, loadUnlocked, type Achievement } from './workshopAchievements';
 import StationSheetCard from './StationSheetCard';
@@ -317,10 +318,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         return order;
     };
 
-    // Ficha técnica del operario seleccionado (clic en el personaje)
+    // Ficha técnica del operario o cliente seleccionado (clic en el personaje)
     const [sheetWorkerId, setSheetWorkerId] = useState<string | null>(null);
     const getWorkerSnapshot = useCallback(
-        (workerId: string) => crewRef.current?.getWorkers().find((w) => w.id === workerId),
+        (workerId: string) => {
+            const fromCrew = crewRef.current?.getWorkers().find((w) => w.id === workerId);
+            if (fromCrew) return fromCrew;
+            return guestsRef.current?.getSnapshots().find((g) => g.id === workerId);
+        },
         []
     );
     // Clic en un operario: abre su ficha técnica (lo que hace ahora + estadísticas de fantasía).
@@ -760,10 +765,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const hallLanes = computeLanes(hallStations);
                     fxRef.current = new WorkshopFx(floorFxLayer, particlesLayer);
                     guestsRef.current = new GuestManager(workersLayer, hallStations);
-                    guestsRef.current.onTap = ({ name, text }) => {
+                    guestsRef.current.onTap = ({ kind, name, text, id }) => {
                         if (dragMovedRef.current) return;
                         audioEngine.playClick();
                         showToast(`${name}: «${text}»`);
+                        if (kind === 'cliente') {
+                            setSheetStationId(null);
+                            setSheetPetId(null);
+                            setWallPanel(null);
+                            setSheetWorkerId(id);
+                        }
                     };
                     petRef.current = new PetManager(workersLayer, workerHitLayer, hallStations, {
                         onWorkerPet: (_p, px, py) => fxRef.current?.hearts(px, py),
@@ -790,7 +801,8 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             const br = getPixiStations().find((s) => s.id === 'refrigerios');
                             return br ? { x: Math.round(br.x + br.width / 2), y: Math.round(br.y + br.height + 10) } : null;
                         },
-                        dogPee: (targetSpot, onPee) => petRef.current?.peeRun(targetSpot, onPee) ?? false
+                        dogPee: (targetSpot, onPee) => petRef.current?.peeRun(targetSpot, onPee) ?? false,
+                        nextClient: () => pickNextClientVisit(ordersRef.current)
                     });
                     eventsRef.current.setEnabled(fxToggleRef.current.events);
                     skyRef.current?.setHour(hourOf(workshopNow()));
