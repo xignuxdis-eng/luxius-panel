@@ -32,7 +32,8 @@ export default function Login() {
         try {
             const controller = new AbortController()
             const timer = setTimeout(() => controller.abort(), 12000)
-            const res = await fetch(`${API_URL}/usuarios?_t=${Date.now()}`, {
+            const healthUrl = API_URL.replace(/\/+$/, '') + '/health'
+            const res = await fetch(`${healthUrl}?_t=${Date.now()}`, {
                 signal: controller.signal,
                 cache: 'no-store'
             }).catch(() => null)
