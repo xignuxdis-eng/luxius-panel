@@ -1413,5 +1413,13 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - `orphan_review_queue`: **680/680 registros**.
   - `xana_*` (tablas de memoria del sistema): **100% migradas** (`xana_commits`, `xana_decisions`, `xana_knowledge`, `xana_sessions`, `xana_tasks`, `xana_actions`).
 - **Estado Actual**: Base de datos de producción apuntando a Supabase (`aws-0-us-east-1.pooler.supabase.com:5432/postgres`) con backend en Render y panel web sincronizados.
+- **Equipo Central del Workshop (Print Den)**:
+  - Se estructuró la diferenciación nítida entre Nombre y Rol real de taller en `workshopWorkers.ts`, `workshopSheets.ts` y `WorkerSheetCard.tsx`:
+    - **Adrian**: Rol `Sistema` (Estación Sistemas y Diseño).
+    - **Carlos**: Rol `Impresor` (Estación Plotter de Impresión).
+    - **Mirta**: Rol `Administración` (Estación Administración / Despacho).
+    - **Agustín**: Rol `Refilador` (Estación Mesa de Refilado).
+  - Cada miembro cuenta con ficha técnica, estadísticas personalizadas acordes a su función real y actividad en vivo en el taller.
 
 ---
+
