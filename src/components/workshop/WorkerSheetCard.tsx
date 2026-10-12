@@ -80,9 +80,19 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
         return () => window.clearInterval(t);
     }, [workerId, getSnapshot]);
 
-    const sheet = useMemo(() => (snap ? buildWorkerSheet(snap) : null), [snap?.id, snap?.name, snap?.role, snap?.gender]);
+    const sheet = useMemo(() => (snap ? buildWorkerSheet(snap) : null), [snap?.id, snap?.name, snap?.role, snap?.gender, snap?.workshopRole]);
 
     if (!snap || !sheet) return null;
+
+    const roleText = (snap.workshopRole || getRoleLabel(snap.role, snap.gender, snap.name)).trim();
+    const roleIcon = 
+        /cliente/i.test(roleText) ? '🛍️' :
+        /vendedor/i.test(roleText) ? '💼' :
+        /diseñad/i.test(roleText) ? '🎨' :
+        /sistema/i.test(roleText) ? '💻' :
+        /impres/i.test(roleText) ? '🖨️' :
+        /refilad/i.test(roleText) ? '✂️' :
+        /administra/i.test(roleText) ? '📑' : '🛠️';
 
     return (
         <div ref={panelRef} style={panelStyle} role="dialog" aria-label={`Ficha técnica de ${snap.name}`} id="worker-sheet-card">
@@ -136,7 +146,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                     {/* Rol real en el taller */}
                     <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2d1f14', border: '1px solid #d97706', borderRadius: 4, padding: '2px 8px' }}>
                         <span style={{ fontSize: 10, fontWeight: 800, color: '#fef3c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            🛠️ ROL: {getRoleLabel(snap.role, snap.gender, snap.name)}
+                            {roleIcon} ROL: {roleText.toUpperCase()}
                         </span>
                     </div>
 
@@ -155,7 +165,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                     {sheet.rarity}
                 </span>
                 <span style={{ border: '1px solid #475569', color: '#cbd5e1', borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>
-                    📍 {getStationName(snap.role, snap.name)}
+                    📍 {getStationName(snap.role, snap.name, snap.workshopRole)}
                 </span>
             </div>
 

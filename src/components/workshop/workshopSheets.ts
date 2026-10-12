@@ -175,7 +175,7 @@ function feminize(text: string): string {
 }
 
 /** Fichas de ejemplo para pruebas y para mostrar en pantalla. Siempre la misma ficha para el mismo operario. */
-export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 'role'> & { gender?: 'f' | 'm' }): WorkerSheet {
+export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 'role' | 'workshopRole'> & { gender?: 'f' | 'm' }): WorkerSheet {
     const profile = PROFILES[snapshot.role] ?? PROFILES.disenador;
     const seed = hashString(`${snapshot.id}|${snapshot.name}|${snapshot.role}`);
     const rnd = seeded(seed);
@@ -327,8 +327,102 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
                 'Sufre daño crítico cuando le dicen "te hago una transferencia mañana".',
                 'Se le eriza la piel ante comprobantes de pago borrosos o incompletos.'
             ], 2),
-            quote: '¡Teo! ¡Muchi! ¡Otra vez en la esquina del plotter no! ¡Ya traigo la mopa!',
-            gear: 'Balde Centrífugo con Rueditas + Mopa de Microfibra Legendaria'
+        };
+    }
+
+    const isCliente = Boolean(snapshot.workshopRole === 'Cliente' || (snapshot.name && /cliente/i.test(snapshot.name)));
+    if (isCliente) {
+        return {
+            className: 'Socio Comercial / Cliente del Taller',
+            title: pick(['Fiel Cliente de XignuX', 'Cliente VIP de Gran Formato', 'Comprador Frecuente', 'Entusiasta del Buen Impreso'], 1)[0] || 'Fiel Cliente de XignuX',
+            level: 50,
+            rarity: 'Épico',
+            rarityColor: '#0ea5e9',
+            stats: [
+                { key: 'fidelidad', label: 'Fidelidad de Marca', icon: '⭐', value: 95, color: '#facc15' },
+                { key: 'calidad', label: 'Exigencia de Calidad', icon: '🎯', value: 92, color: '#38bdf8' },
+                { key: 'puntualidad', label: 'Puntualidad en Pagos', icon: '💳', value: 90, color: '#4ade80' },
+                { key: 'volumen', label: 'Volumen de Pedidos', icon: '📦', value: 85, color: '#a78bfa' },
+                { key: 'cafe', label: 'Degustación de Café', icon: '☕', value: 88, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia en Mostrador', icon: '⏳', value: 82, color: '#f472b6' }
+            ],
+            strengths: pick([
+                'Confía plenamente en la calidad de impresión y acabados de XignuX.',
+                'Envía los archivos vectorizados y listos con sangrado para tirada rápida.',
+                'Abona sus órdenes a tiempo y valora el trabajo artesanal del taller.',
+                'Recomienda el taller a colegas y agencias de la zona.'
+            ], 2),
+            weaknesses: pick([
+                'Sufre ansiedad cuando necesita un cartel o banner urgente para el mismo día.',
+                'A veces pide "un retoquecito rápido de color" cuando la máquina ya está tirando.',
+                'Le cuesta decidirse entre lona mate y vinilo brillante en cartelería.'
+            ], 2),
+            quote: '¡Qué buena calidad tienen estos impresos! Siempre vuelvo acá.',
+            gear: 'Muestrario de Materiales XignuX + Comprobante de Transferencia Aprobado'
+        };
+    }
+
+    const isVendedor = Boolean(snapshot.workshopRole === 'Vendedor' || (snapshot.name && /vendedor/i.test(snapshot.name)));
+    if (isVendedor) {
+        return {
+            className: 'Estratega de Cuentas & Ventas',
+            title: pick(['Asesor Comercial de Taller', 'Cerrador de Cotizaciones', 'Domador del Metro Lineal', 'Defensor del Presupuesto'], 1)[0] || 'Asesor Comercial de Taller',
+            level: 58,
+            rarity: 'Épico',
+            rarityColor: '#f59e0b',
+            stats: [
+                { key: 'negociacion', label: 'Cierre de Cotizaciones', icon: '💼', value: 94, color: '#f59e0b' },
+                { key: 'presupuestos', label: 'Velocidad de Cotización', icon: '⚡', value: 95, color: '#facc15' },
+                { key: 'metro_lineal', label: 'Cálculo de Metros', icon: '📐', value: 91, color: '#38bdf8' },
+                { key: 'fidelizacion', label: 'Fidelización Clientes', icon: '🤝', value: 93, color: '#4ade80' },
+                { key: 'cafe', label: 'Maná de Café', icon: '☕', value: 89, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia en Objeciones', icon: '🧘', value: 84, color: '#f472b6' }
+            ],
+            strengths: pick([
+                'Cotiza en el acto al mejor valor de metro lineal optimizando el pliego.',
+                'Trae clientes de alto volumen y cuida cada cuenta como propia.',
+                'Excelente empatía para entender exactamente qué material necesita el cliente.',
+                'Conoce al dedillo las tarifas oficiales y los márgenes de ganancia.'
+            ], 2),
+            weaknesses: pick([
+                'Promete tiempos de entrega récord que hacen transpirar al impresor y al refilador.',
+                'Insiste con meter un pedido más en la cola de impresión de las 18:00 hs.',
+                'Sufre cuando el cliente pide descuento sobre el precio de costo.'
+            ], 2),
+            quote: 'Te preparo la cotización al instante con el mejor precio y en la mejor calidad.',
+            gear: 'Lista Oficial de Precios XignuX + Calculadora de Bobinas de Alta Precisión'
+        };
+    }
+
+    const isDisenador = Boolean((snapshot.workshopRole === 'Diseñador' || snapshot.workshopRole === 'Diseñadora' || snapshot.role === 'disenador') && !isAdrian);
+    if (isDisenador) {
+        return {
+            className: snapshot.gender === 'f' ? 'Hechicera de las Capas & Vectores' : 'Hechicero de las Capas & Vectores',
+            title: pick(['Diseñador Gráfico de Producción', 'Vectores Infinitos', 'Curador de Tipografías', 'Alquimista del Sangrado'], 1)[0] || 'Diseñador Gráfico de Producción',
+            level: 59,
+            rarity: 'Épico',
+            rarityColor: '#a855f7',
+            stats: [
+                { key: 'vectores', label: 'Trazado y Curvas', icon: '🎨', value: 95, color: '#a855f7' },
+                { key: 'cmyk', label: 'Ajuste de Perfiles CMYK', icon: '👁️', value: 92, color: '#38bdf8' },
+                { key: 'resolucion', label: 'Limpieza de DPI & Sangrado', icon: '📐', value: 93, color: '#4ade80' },
+                { key: 'creatividad', label: 'Composición Visual', icon: '✨', value: 91, color: '#facc15' },
+                { key: 'cafe', label: 'Maná de Café', icon: '☕', value: 90, color: '#fb923c' },
+                { key: 'paciencia', label: 'Paciencia con Fuentes', icon: '🧘', value: 79, color: '#f472b6' }
+            ],
+            strengths: pick([
+                'Detecta fuentes sin incrustar o imágenes en baja resolución antes de mandar al RIP.',
+                'Prepara originales, sangrados y montajes en minutos.',
+                'Calibra curvas de color para que lo que se ve en pantalla coincida con el impreso.',
+                'Manejo virtuoso de Illustrator, Corel y Photoshop con atajos de teclado.'
+            ], 2),
+            weaknesses: pick([
+                'Le sangran los ojos cuando el cliente manda el logo incrustado en un documento Word.',
+                'Alergia severa a archivos RGB enviados por WhatsApp comprimidos al 10%.',
+                'Odia que le digan "agrandame un poquito el logo".'
+            ], 2),
+            quote: 'Un poco más de contraste, perfil Fogra 39 y el original queda perfecto para tirada.',
+            gear: 'Tableta Gráfica Wacom + Calibrador Pantone de Bolsillo'
         };
     }
 
@@ -347,7 +441,15 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
 }
 
 /** Estación o área del taller donde se ubica el operario. */
-export function getStationName(role: WorkerRole, name?: string): string {
+export function getStationName(role: WorkerRole, name?: string, workshopRole?: string): string {
+    if (workshopRole === 'Cliente') return 'Mostrador de Clientes y Retiro';
+    if (workshopRole === 'Vendedor') return 'Mostrador Comercial y Ventas';
+    if (workshopRole === 'Diseñador' || workshopRole === 'Diseñadora') return 'Estación de Diseño Gráfico';
+    if (workshopRole === 'Sistema') return 'Sistemas y Diseño';
+    if (workshopRole === 'Impresor') return 'Plotter de Impresión';
+    if (workshopRole === 'Refilador') return 'Mesa de Refilado';
+    if (workshopRole === 'Administración') return 'Administración y Finanzas';
+
     const n = (name || '').toLowerCase();
     if (n.includes('adrian')) return 'Sistemas y Diseño';
     if (n.includes('carlos')) return 'Plotter de Impresión';
@@ -361,19 +463,24 @@ export function getStationName(role: WorkerRole, name?: string): string {
 }
 
 /** Qué está haciendo el operario ahora mismo, en texto (datos reales del movimiento del taller). */
-export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm'; name?: string }): string {
+export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' | 'stroll' | 'mode' | 'visiting' | 'errandText' | 'role'> & { onBreak?: boolean; gender?: 'f' | 'm'; name?: string; workshopRole?: string }): string {
     const isAdrian = Boolean(w.name && /adrian/i.test(w.name));
     const isCarlos = Boolean(w.name && /carlos/i.test(w.name));
     const isMirta = Boolean(w.name && /mirta|admin/i.test(w.name));
     const isAgustin = Boolean(w.name && /agustin/i.test(w.name));
+    const isCliente = Boolean(w.workshopRole === 'Cliente');
+    const isVendedor = Boolean(w.workshopRole === 'Vendedor');
+    const isDisenador = Boolean((w.workshopRole === 'Diseñador' || w.workshopRole === 'Diseñadora') && !isAdrian);
 
-    const stationLabel = getStationName(w.role, w.name);
+    const stationLabel = getStationName(w.role, w.name, w.workshopRole);
 
     if (w.errand === 'going') {
         if (isAdrian) return `Llevando especificaciones de orden al taller${w.errandText ? ` (${w.errandText})` : ''}`;
         if (isCarlos) return `Llevando pliegos impresos a la mesa de refilado${w.errandText ? ` (${w.errandText})` : ''}`;
         if (isAgustin) return `Llevando materiales refilados a empaque${w.errandText ? ` (${w.errandText})` : ''}`;
         if (isMirta) return `Supervisando orden lista en mostrador${w.errandText ? ` (${w.errandText})` : ''}`;
+        if (isCliente) return `Acercándose al mostrador a consultar por su pedido${w.errandText ? ` (${w.errandText})` : ''}`;
+        if (isVendedor) return `Llevando cotización al sector de producción${w.errandText ? ` (${w.errandText})` : ''}`;
         return `Llevando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
     }
     if (w.errand === 'dwell') {
@@ -381,6 +488,8 @@ export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' |
         if (isCarlos) return `Entregando el rollo impreso para corte y refile`;
         if (isAgustin) return `Entregando pliegos cortados a escuadra`;
         if (isMirta) return `Verificando el pedido y comprobante de despacho`;
+        if (isCliente) return `Revisando los pliegos impresos en el mostrador`;
+        if (isVendedor) return `Coordinando fecha y hora de entrega`;
         return `Entregando una orden${w.errandText ? ` (${w.errandText})` : ''}`;
     }
     if (w.errand === 'returning') return `Volviendo a su puesto con la tarea cumplida`;
@@ -395,18 +504,22 @@ export function describeActivity(w: Pick<WorkerSnapshot, 'errand' | 'chatting' |
     if (isCarlos) return 'En el Plotter de Impresión, supervisando calibración y avance de tirada';
     if (isAgustin) return 'En la mesa de Refilado, preparando cuchillas y verificando cortes milimétricos';
     if (isMirta) return 'En Administración, cuadrando caja y supervisando comprobantes y entregas';
+    if (isCliente) return 'En el mostrador de retiro, esperando la entrega de su pedido';
+    if (isVendedor) return 'En el sector comercial, cotizando órdenes y asesorando cuentas';
+    if (isDisenador) return 'En la estación de diseño, ajustando originales y perfiles de color';
 
     return `En su puesto de ${stationLabel}, ${w.gender === 'f' ? 'atenta' : 'atento'} a nuevas órdenes`;
 }
 
 export const ROLE_LABEL: Record<string, string> = {
-    disenador: 'Sistema',
+    disenador: 'Diseñador',
     impresor: 'Impresor',
     cortador: 'Refilador',
     empaquetador: 'Administración'
 };
 
-export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string): string {
+export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string, workshopRole?: string): string {
+    if (workshopRole) return workshopRole;
     const n = (name || '').toLowerCase();
     if (n.includes('adrian')) return 'Sistema';
     if (n.includes('carlos')) return 'Impresor';
@@ -422,18 +535,20 @@ export function getRoleLabel(role: WorkerRole, gender?: 'f' | 'm', name?: string
             administrador: 'Administradora',
             admin: 'Administradora',
             vendedor: 'Vendedora',
+            cliente: 'Cliente',
             principal: 'Jefa de Taller'
         };
         return femaleLabels[role] || 'Operaria';
     }
     const maleLabels: Record<string, string> = {
-        disenador: 'Sistema',
+        disenador: 'Diseñador',
         impresor: 'Impresor',
         cortador: 'Refilador',
         empaquetador: 'Administrador',
         administrador: 'Administrador',
         admin: 'Administrador',
         vendedor: 'Vendedor',
+        cliente: 'Cliente',
         principal: 'Jefe de Sistemas'
     };
     return maleLabels[role] || ROLE_LABEL[role] || 'Operario';

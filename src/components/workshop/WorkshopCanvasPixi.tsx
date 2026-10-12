@@ -36,6 +36,7 @@ import { WorkerBubbles } from './workshopBubbles';
 import { playVoice, playUiSound, resolveVoice, randomGreeting } from './workshopVoice';
 import { getUsuarios, getMaquinas, getMateriales } from '@/data/db';
 import { createStationProps, StationProps } from './workshopStationProps';
+import { useAuthStore } from '@/store/authStore';
 import WorkerSheetCard from './WorkerSheetCard';
 import { WorkshopLighting, workshopNow, hourOf } from './workshopLighting';
 import { Camera, DEFAULT_CAMERA, clampCamera, zoomAt, MAP_W_LOGICAL, MAP_H_LOGICAL, MAX_ZOOM } from './workshopCamera';
@@ -139,6 +140,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     selectedStation,
     onError
 }) => {
+    const authUser = useAuthStore((state) => state.user);
+    const authUserRef = useRef(authUser);
+    useEffect(() => {
+        authUserRef.current = authUser;
+    }, [authUser]);
+
     useEffect(() => {
         console.log(`[PrintDen] build ${BUILD_TAG}`);
     }, []);
@@ -738,7 +745,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             if (errand.held === 'rebotada') { if (fxToggleRef.current.sndAlerts) audioEngine.playBounceWarning(); }
                             else if (errand.held === 'rollo') { if (fxToggleRef.current.sndMachines) audioEngine.playScissorsCut(); }
                         }
-                    });
+                    }, authUserRef.current);
 
                     // 2c. Extras (Bloque F): efectos, mascota, visitas y eventos aleatorios (todo decorativo)
                     const hallStations = getPixiStations();

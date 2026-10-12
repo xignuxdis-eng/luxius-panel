@@ -62,6 +62,8 @@ export interface WorkerSpec {
     id: string;
     name: string;
     role: WorkerRole;
+    /** Rol real mostrado en el taller (ej. 'Sistema', 'Impresor', 'Refilador', 'Administración', 'Cliente', 'Vendedor'). */
+    workshopRole?: string;
     /** Rol real del usuario si se pudo mapear; false si ocupó un puesto libre por orden del sistema viejo. */
     roleFromUser: boolean;
     shirtColor: string;
@@ -166,6 +168,7 @@ interface CoreTeamRole {
     key: string;
     name: string;
     role: WorkerRole;
+    workshopRole: string;
     match: (u: WorkerUser) => boolean;
 }
 
@@ -174,38 +177,51 @@ const WORKSHOP_CORE_TEAM: CoreTeamRole[] = [
         key: 'adrian',
         name: 'Adrian',
         role: 'disenador', // Sistema
+        workshopRole: 'Sistema',
         match: (u) => /adrian/i.test(`${u.nombre || ''} ${u.username || ''}`)
     },
     {
         key: 'carlos',
         name: 'Carlos',
         role: 'impresor', // Impresor
+        workshopRole: 'Impresor',
         match: (u) => /carlos/i.test(`${u.nombre || ''} ${u.username || ''}`)
     },
     {
         key: 'agustin',
         name: 'Agustín',
         role: 'cortador', // Refilador
+        workshopRole: 'Refilador',
         match: (u) => /agustin/i.test(`${u.nombre || ''} ${u.username || ''}`)
     },
     {
         key: 'mirta',
         name: 'Mirta',
         role: 'empaquetador', // Administración
+        workshopRole: 'Administración',
         match: (u) => /mirta|admin/i.test(`${u.nombre || ''} ${u.username || ''}`)
     }
 ];
 
 /**
- * Crea los 4 operarios centrales del taller a partir de la lista de usuarios.
- * Garantiza la presencia de Adrian (Sistema), Carlos (Impresor), Agustín (Refilador) y Mirta (Administración).
+ * Crea los operarios del taller a partir de la lista de usuarios y la sesión activa.
+ * - Los 4 miembros base son SIEMPRE FIJOS: Adrian (Sistema), Carlos (Impresor), Agustín (Refilador) y Mirta (Administración).
+ * - Cuando un cliente, diseñador, vendedor u otro usuario está logueado o presente, se suma al taller con su rol adecuado.
  */
-export function buildCrewSpecs(users: WorkerUser[]): WorkerSpec[] {
-    const candidates = users.filter((u) => u && u.habilitado !== false && norm(u.rol || u.role) !== 'cliente');
+export function buildCrewSpecs(users: WorkerUser[], loggedUser?: WorkerUser | null): WorkerSpec[] {
+    const candidates = users.filter((u) => u && u.habilitado !== false);
 
-    const entries: Array<{ id: string; name: string; role: WorkerRole; fromUser: boolean }> = [];
+    const entries: Array<{
+        id: string;
+        name: string;
+        role: WorkerRole;
+        workshopRole: string;
+        fromUser: boolean;
+        shirtColor?: string;
+    }> = [];
     const usedUserIds = new Set<string | number>();
 
+    // 1. Los 4 personajes base del taller son SIEMPRE FIJOS en sus puestos
     for (const member of WORKSHOP_CORE_TEAM) {
         const found = candidates.find((u) => !usedUserIds.has(u.id) && member.match(u));
         if (found) {
@@ -214,6 +230,7 @@ export function buildCrewSpecs(users: WorkerUser[]): WorkerSpec[] {
                 id: `w-${found.id}`,
                 name: member.name,
                 role: member.role,
+                workshopRole: member.workshopRole,
                 fromUser: true
             });
         } else {
@@ -221,7 +238,65 @@ export function buildCrewSpecs(users: WorkerUser[]): WorkerSpec[] {
                 id: `w-core-${member.key}`,
                 name: member.name,
                 role: member.role,
+                workshopRole: member.workshopRole,
                 fromUser: false
+            });
+        }
+    }
+
+    const resolveRoleInfo = (u: WorkerUser): { role: WorkerRole; workshopRole: string; shirtColor: string } => {
+        const rawRole = norm(u.rol || u.role);
+        if (rawRole === 'cliente') {
+            return { role: 'empaquetador', workshopRole: 'Cliente', shirtColor: '#0ea5e9' }; // Mostrador / celeste
+        }
+        if (rawRole === 'vendedor') {
+            return { role: 'empaquetador', workshopRole: 'Vendedor', shirtColor: '#f59e0b' }; // Ventas / dorado
+        }
+        if (rawRole === 'artista' || rawRole === 'disenador' || rawRole === 'diseno') {
+            return { role: 'disenador', workshopRole: 'Diseñador', shirtColor: '#a855f7' }; // Diseño / violeta
+        }
+        if (rawRole === 'impresion' || rawRole === 'impresor') {
+            return { role: 'impresor', workshopRole: 'Impresor', shirtColor: '#22c55e' };
+        }
+        if (rawRole === 'cortador' || rawRole === 'corte' || rawRole === 'refilado') {
+            return { role: 'cortador', workshopRole: 'Refilador', shirtColor: '#ec4899' };
+        }
+        return { role: 'empaquetador', workshopRole: 'Administración', shirtColor: '#64748b' };
+    };
+
+    // 2. Si hay un usuario logueado en sesión que no es de los 4 fijos, aparece en el taller con su rol
+    if (loggedUser) {
+        const isCore = WORKSHOP_CORE_TEAM.some((m) => m.match(loggedUser));
+        if (!isCore) {
+            const info = resolveRoleInfo(loggedUser);
+            const cleanName = loggedUser.nombre || loggedUser.username || 'Usuario';
+            usedUserIds.add(loggedUser.id);
+            entries.push({
+                id: `w-auth-${loggedUser.id}`,
+                name: cleanName,
+                role: info.role,
+                workshopRole: info.workshopRole,
+                fromUser: true,
+                shirtColor: info.shirtColor
+            });
+        }
+    }
+
+    // 3. Revisar si hay otros usuarios (clientes registrados, diseñadores, vendedores) hasta 7 en total
+    for (const u of candidates) {
+        if (entries.length >= 7) break;
+        if (usedUserIds.has(u.id)) continue;
+        const rawRole = norm(u.rol || u.role);
+        if (rawRole === 'cliente' || rawRole === 'vendedor' || rawRole === 'artista') {
+            usedUserIds.add(u.id);
+            const info = resolveRoleInfo(u);
+            entries.push({
+                id: `w-${u.id}`,
+                name: u.nombre || u.username || 'Usuario',
+                role: info.role,
+                workshopRole: info.workshopRole,
+                fromUser: true,
+                shirtColor: info.shirtColor
             });
         }
     }
@@ -234,11 +309,12 @@ export function buildCrewSpecs(users: WorkerUser[]): WorkerSpec[] {
             id: e.id,
             name: e.name,
             role: e.role,
+            workshopRole: e.workshopRole,
             roleFromUser: e.fromUser,
-            shirtColor: ROLE_SHIRT[e.role],
+            shirtColor: e.shirtColor || ROLE_SHIRT[e.role] || '#64748b',
             skinColor: LEGACY_SKINS[index % LEGACY_SKINS.length],
             ...pickTraits(e.id, e.name),
-            speedPxPerSec: legacySpeedToPxPerSec(2.1 + index * 0.1),
+            speedPxPerSec: legacySpeedToPxPerSec(2.1 + (index % 4) * 0.1),
             index,
             dupOffsetX: DUP_OFFSETS[dup % DUP_OFFSETS.length]
         };
@@ -332,6 +408,7 @@ export interface WorkerSnapshot {
     id: string;
     name: string;
     role: WorkerRole;
+    workshopRole?: string;
     x: number;
     y: number;
     mode: 'idle' | 'walk';
@@ -499,7 +576,7 @@ export class WorkerCrew {
     private gapXs: number[] = [];
     private lowerRowBottom = 240;
 
-    constructor(layer: Container, users: WorkerUser[], stations: StationConfig[], hooks?: CrewHooks) {
+    constructor(layer: Container, users: WorkerUser[], stations: StationConfig[], hooks?: CrewHooks, loggedUser?: WorkerUser | null) {
         this.hooks = hooks;
         this.stations = stations;
         this.lanes = computeLanes(stations);
@@ -514,7 +591,7 @@ export class WorkerCrew {
 
         const shadowTex = getCharacterShadowTexture();
 
-        for (const spec of buildCrewSpecs(users)) {
+        for (const spec of buildCrewSpecs(users, loggedUser)) {
             const station = this.findStationForRole(spec.role);
             const laneY = this.lanes.rows[spec.index % this.lanes.rows.length];
             const home = station
@@ -613,6 +690,7 @@ export class WorkerCrew {
             id: w.spec.id,
             name: w.spec.name,
             role: w.spec.role,
+            workshopRole: w.spec.workshopRole,
             x: w.x,
             y: w.y,
             mode: w.mode,
