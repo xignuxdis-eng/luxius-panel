@@ -24,6 +24,7 @@ const Stock = lazy(() => import('@pages/Stock/Stock'))
 const Presupuestador = lazy(() => import('@/pages/Presupuestador/Presupuestador'))
 const XpressViewer = lazy(() => import('@/pages/XpressViewer/XpressViewer'))
 const XanaDashboard = lazy(() => import('@/pages/Xana/XanaDashboard'))
+const MobileWorkshopApp = lazy(() => import('@/pages/MobileWorkshop/MobileWorkshopApp'))
 
 // Route loading fallback
 function RouteFallback() {
@@ -123,6 +124,17 @@ function App() {
         <Suspense fallback={<RouteFallback />}>
             <Routes>
                 <Route path="/login" element={<Login />} />
+
+                <Route
+                    path="/mobile/*"
+                    element={
+                        <ProtectedRoute>
+                            <Suspense fallback={<RouteFallback />}>
+                                <MobileWorkshopApp />
+                            </Suspense>
+                        </ProtectedRoute>
+                    }
+                />
 
                 <Route
                     path="/*"

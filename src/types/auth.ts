@@ -22,10 +22,10 @@ export interface LoginCredentials {
 export const rolePermissions: Record<string, string[]> = {
     principal: ['*'],
     administrador: ['*'],
-    vendedor: ['/', '/entrada', '/presupuestador', '/abm/clientes', '/utilidades'],
-    impresion: ['/', '/impresion', '/stock', '/utilidades'],
-    artista: ['/', '/entrada', '/diseno', '/impresion', '/presupuestador', '/utilidades', '/xpress-viewer'],
-    cliente: ['/', '/entrada', '/utilidades'],
+    vendedor: ['/', '/entrada', '/presupuestador', '/abm/clientes', '/utilidades', '/mobile'],
+    impresion: ['/', '/impresion', '/stock', '/utilidades', '/mobile'],
+    artista: ['/', '/entrada', '/diseno', '/impresion', '/presupuestador', '/utilidades', '/xpress-viewer', '/mobile'],
+    cliente: ['/', '/entrada', '/utilidades', '/mobile'],
 }
 
 export function hasRolePermission(role: string | undefined, path: string): boolean {

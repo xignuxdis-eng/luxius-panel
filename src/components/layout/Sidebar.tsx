@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
     { label: 'Utilidades', path: '/utilidades', icon: '🛠️' },
     { label: 'Reportes', path: '/reportes', icon: '📊' },
     { label: 'Sistema', path: '/sistema', icon: '⚙️' },
+    { label: 'Taller Móvil', path: '/mobile', icon: '📱' },
     { label: 'Xana Memoria', path: '/xana', icon: '🧠' },
 ]
 
