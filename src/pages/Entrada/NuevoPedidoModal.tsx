@@ -6,7 +6,7 @@ import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { extractCdrThumbnail } from '@/utils/cdrPreview'
 import { generateVectorCard } from '@/utils/vectorPreview'
 import { PDFDocument } from 'pdf-lib'
-import { getClientes, getMateriales, getCalidades, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, getAuthHeaders, type ComboData } from '@data/db'
+import { getClientes, getMateriales, getCalidades, DEFAULT_CALIDADES, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, getAuthHeaders, type ComboData } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -43,6 +43,7 @@ interface BatchItem {
     confirmed: boolean
     copias: number
     material: string
+    calidad?: string
     descripcionItem?: string
     demasiasConfig?: DemasiasConfig
     servicios?: Record<string, boolean>
@@ -350,31 +351,45 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         return d.includes('lona') || d.includes('front') || d.includes('back') || d.includes('banner') || (!d.includes('vinilo') && !c.includes('vin'));
     }
 
+    // Calidades disponibles con fallback garantizado a DEFAULT_CALIDADES
+    const [calidadesList, setCalidadesList] = useState<import('@/types').Calidad[]>(() => {
+        const quals = getCalidades().filter(c => c.habilitado !== false);
+        return quals.length > 0 ? quals : DEFAULT_CALIDADES;
+    });
+
     useEffect(() => {
-        const activeQuals = getCalidades().filter(c => c.habilitado !== false);
+        if (isOpen) {
+            const quals = getCalidades().filter(c => c.habilitado !== false);
+            setCalidadesList(quals.length > 0 ? quals : DEFAULT_CALIDADES);
+        }
+    }, [isOpen]);
+
+    const availableCalidades = useMemo(() => {
+        return calidadesList.length > 0 ? calidadesList : DEFAULT_CALIDADES;
+    }, [calidadesList]);
+
+    // Auto-selección inicial de calidad respetando la elección manual del usuario
+    useEffect(() => {
+        if (!isOpen) return;
+        const activeQuals = availableCalidades;
         if (activeQuals.length === 0) return;
 
-        if (!watchedCalidad || (watchedCalidad as string).trim() === '' || activeQuals.length === 1) {
-            if (activeQuals.length === 1) {
-                if (watchedCalidad !== activeQuals[0].nombre) {
-                    setValue('calidad', activeQuals[0].nombre);
-                }
-            } else if (watchedMaterial) {
+        // Solo auto-asignar si el campo calidad está vacío o sin definir
+        if (!watchedCalidad || (watchedCalidad as string).trim() === '') {
+            if (watchedMaterial) {
                 const mats = getMateriales();
                 const mat = mats.find(m => m.codigo === watchedMaterial);
                 if (mat?.calidad) {
                     const match = activeQuals.find(q => (q.nombre || '').toLowerCase().trim() === mat.calidad.toLowerCase().trim());
                     if (match) {
-                        setValue('calidad', match.nombre);
+                        setValue('calidad', match.nombre, { shouldValidate: true });
+                        return;
                     }
-                } else {
-                    setValue('calidad', activeQuals[0].nombre);
                 }
-            } else if (!watchedCalidad) {
-                setValue('calidad', activeQuals[0].nombre);
             }
+            setValue('calidad', activeQuals[0].nombre, { shouldValidate: true });
         }
-    }, [watchedMaterial, watchedCalidad, setValue])
+    }, [isOpen, watchedMaterial, watchedCalidad, setValue, availableCalidades]);
 
     // Memoized printable materials with full deduplication by normalized code and description
     const availableMaterials = useMemo(() => {
@@ -409,6 +424,13 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setBatchItems(prev => prev.map(item => item.material ? item : { ...item, material: watchedMaterial }));
         }
     }, [watchedMaterial, batchItems.length]);
+
+    // Synchronize batch items calidad when global watchedCalidad changes or when items are empty
+    useEffect(() => {
+        if (watchedCalidad && batchItems.length > 0) {
+            setBatchItems(prev => prev.map(item => item.calidad ? item : { ...item, calidad: watchedCalidad }));
+        }
+    }, [watchedCalidad, batchItems.length]);
 
     // Auto-select client for Client Role
     useEffect(() => {
@@ -559,8 +581,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             return;
         }
 
-        const activeQuals = getCalidades().filter(c => c.habilitado !== false);
-        const defaultCalidad = activeQuals.length > 0 ? activeQuals[0].nombre : '';
+        const activeQuals = availableCalidades;
+        const defaultCalidad = activeQuals.length > 0 ? activeQuals[0].nombre : 'ECO';
 
         if (order) {
             const currentOrderId = order.id || (order as any).ot || 'loaded';
@@ -1313,7 +1335,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 metadata: { width: 0, height: 0, dpi: 72, format: '', colorMode: '' },
                                 confirmed: true,
                                 copias: 1,
-                                material: watchedMaterial || ''
+                                material: watchedMaterial || '',
+                                calidad: watchedCalidad || (availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO')
                             };
                             setBatchItems(prev => [...prev, placeholder]);
                             
@@ -1520,9 +1543,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const availableMats = availableMaterials;
         const currentMat = getValues('material');
         const initialMat = currentMat || watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
+        const currentQual = getValues('calidad');
+        const initialQual = currentQual || watchedCalidad || (availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO');
 
         // STEP 1: ADD INSTANT PLACEHOLDER CARDS FOR ALL FILES
-        const queue: { file: File; fileId: string; ext: string; url: string; initialMat: string }[] = [];
+        const queue: { file: File; fileId: string; ext: string; url: string; initialMat: string; initialQual: string }[] = [];
 
         for (const file of files) {
             const fileId = Math.random().toString(36).substring(2, 9);
@@ -1539,17 +1564,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 confirmed: true,
                 copias: 1,
                 material: initialMat,
+                calidad: initialQual,
                 demasiasConfig: { top: false, bottom: false, left: false, right: false },
                 servicios: {}
             };
             setBatchItems(prev => [...prev, placeholder]);
-            queue.push({ file, fileId, ext, url, initialMat });
+            queue.push({ file, fileId, ext, url, initialMat, initialQual });
         }
 
         // STEP 2: SEQUENTIAL BACKGROUND QUEUE (processes files one-by-one to keep UI alive)
         (async () => {
             for (const item of queue) {
-                const { file, fileId, ext, url, initialMat } = item;
+                const { file, fileId, ext, url, initialMat, initialQual } = item;
                 try {
                     let masterBuffer: ArrayBuffer | undefined = undefined;
                     if (ext === 'PDF') {
@@ -1605,6 +1631,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
                         const mother = batchItemsRef.current.find(it => it.id === fileId);
                         const inheritedMaterial = mother?.material || initialMat;
+                        const inheritedCalidad = mother?.calidad || initialQual;
                         const inheritedCopias = mother?.copias || 1;
                         const inheritedServicios = mother?.servicios || {};
 
@@ -1663,6 +1690,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     confirmed: true,
                                     copias: inheritedCopias,
                                     material: inheritedMaterial,
+                                    calidad: inheritedCalidad,
                                     demasiasConfig: { top: false, bottom: false, left: false, right: false },
                                     servicios: inheritedServicios
                                 };
@@ -1842,6 +1870,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 alto: itemAlto,
                                 copias: Number(item.copias),
                                 material: item.material,
+                                calidad: item.calidad || data.calidad || (availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO'),
                                 subtotal: itemSubtotal,
                                 total: itemSubtotal,
                                 sena: itemSena,
@@ -2211,9 +2240,16 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     </div>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                         <label>Calidad</label>
-                                        <select {...register('calidad', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
-                                            {getCalidades().filter(c => c.habilitado !== false).length > 1 && <option value="">...</option>}
-                                            {getCalidades().filter(c => c.habilitado !== false).map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                                        <select
+                                            {...register('calidad', { required: activeTab === 'unitario' && watch('status') === 'orden' })}
+                                            value={watchedCalidad || ''}
+                                            onChange={(e) => setValue('calidad', e.target.value, { shouldValidate: true, shouldDirty: true })}
+                                            className="input-field"
+                                        >
+                                            <option value="">Seleccionar calidad...</option>
+                                            {availableCalidades.map(c => (
+                                                <option key={c.id} value={c.nombre}>{c.nombre} {c.descripcion ? `(${c.descripcion})` : ''}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
@@ -2616,7 +2652,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             {/* Lote Tab */}
                             {activeTab === 'lote' && (
                                 <div className="form-group" style={{ gridColumn: 'span 4' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                                         <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                                             <span style={{ display: 'block', fontWeight: 600, color: 'var(--accent)', fontSize: '0.85rem', marginBottom: '6px' }}>
                                                 🏷️ Nombre del Proyecto / Lote (Etiqueta Global):
@@ -2648,6 +2684,28 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 <option value="">Seleccionar material (Obligatorio)...</option>
                                                 {availableMaterials.map(m => (
                                                     <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                                            <span style={{ display: 'block', fontWeight: 600, color: 'var(--accent)', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                                ✨ Calidad por defecto para el lote:
+                                            </span>
+                                            <select
+                                                className="input-field"
+                                                style={{ padding: '6px 12px', width: '100%' }}
+                                                value={watchedCalidad || ''}
+                                                onChange={(e) => {
+                                                    const selectedQual = e.target.value;
+                                                    setValue('calidad', selectedQual, { shouldValidate: true, shouldDirty: true });
+                                                    if (selectedQual && batchItems.length > 0) {
+                                                        setBatchItems(prev => prev.map(item => ({ ...item, calidad: selectedQual })));
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Seleccionar calidad...</option>
+                                                {availableCalidades.map(c => (
+                                                    <option key={c.id} value={c.nombre}>{c.nombre} {c.descripcion ? `(${c.descripcion})` : ''}</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -2949,7 +3007,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                         </div>
                                                     )}
 
-                                                    {/* Controls: Material and Copies */}
+                                                    {/* Controls: Material, Calidad and Copies */}
                                                     <div style={{ display: 'flex', gap: '8px' }}>
                                                         <div style={{ flex: 1 }}>
                                                             <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Material</label>
@@ -2964,10 +3022,23 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 ))}
                                                             </select>
                                                         </div>
-                                                        <div style={{ width: '50px' }}>
+                                                        <div style={{ width: '100px' }}>
+                                                            <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Calidad</label>
+                                                            <select
+                                                                style={{ width: '100%', padding: '4px', fontSize: '0.8rem', borderRadius: '4px', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                                                                value={item.calidad || watchedCalidad || ''}
+                                                                onChange={(e) => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, calidad: e.target.value } : i))}
+                                                            >
+                                                                {availableCalidades.map(c => (
+                                                                    <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div style={{ width: '45px' }}>
                                                             <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Cant.</label>
                                                             <input
                                                                 type="number"
+                                                                min="1"
                                                                 style={{ width: '100%', padding: '4px', fontSize: '0.8rem', borderRadius: '4px', background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                                                                 value={item.copias}
                                                                 onChange={(e) => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, copias: parseInt(e.target.value) || 1 } : i))}

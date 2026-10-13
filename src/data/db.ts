@@ -244,8 +244,12 @@ export async function initializeData() {
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data)) {
-                        const finalData = col.endpoint === 'materiales' ? deduplicateMaterials(data) : data;
-                        localStorage.setItem(col.key, JSON.stringify(finalData));
+                        if (col.endpoint === 'calidades' && data.length === 0) {
+                            // Conservar calidades predeterminadas si el servidor devuelve lista vacía
+                        } else {
+                            const finalData = col.endpoint === 'materiales' ? deduplicateMaterials(data) : data;
+                            localStorage.setItem(col.key, JSON.stringify(finalData));
+                        }
                     }
                 }
             } catch (e) { }
@@ -264,8 +268,12 @@ export async function refreshCollection(endpoint: string) {
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
-                const finalData = endpoint === 'materiales' ? deduplicateMaterials(data) : data;
-                localStorage.setItem(config.key, JSON.stringify(finalData));
+                if (endpoint === 'calidades' && data.length === 0) {
+                    // Conservar calidades predeterminadas si el servidor devuelve lista vacía
+                } else {
+                    const finalData = endpoint === 'materiales' ? deduplicateMaterials(data) : data;
+                    localStorage.setItem(config.key, JSON.stringify(finalData));
+                }
             }
         }
     } catch (e) { }
@@ -1420,6 +1428,15 @@ export function saveMovimientoStock(mov: Partial<MovimientoStock>): MovimientoSt
 // Calidades
 // ============================================================
 
+export const DEFAULT_CALIDADES: Calidad[] = [
+    { id: 1, nombre: 'ECO', descripcion: 'Tintas ecológicas de alta duración', habilitado: true, orden: 1 },
+    { id: 2, nombre: 'Estándar', descripcion: 'Calidad estándar 720 DPI', habilitado: true, orden: 2 },
+    { id: 3, nombre: 'Alta', descripcion: 'Alta calidad 1440 DPI', habilitado: true, orden: 3 },
+    { id: 4, nombre: 'UV', descripcion: 'Impresión UV cama plana y rollo', habilitado: true, orden: 4 },
+    { id: 5, nombre: 'Fotográfica', descripcion: 'Impresión fotográfica de alta resolución', habilitado: true, orden: 5 },
+    { id: 6, nombre: 'General', descripcion: 'Calidad estándar / insumos generales', habilitado: true, orden: 6 }
+];
+
 export function getCalidades(): Calidad[] {
     const sessionItemsJson = localStorage.getItem(SESSION_CALIDADES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_CALIDADES_KEY)
@@ -1433,6 +1450,24 @@ export function getCalidades(): Calidad[] {
         } catch (e) { }
     }
 
+    if (!Array.isArray(sessionItems) || sessionItems.length === 0) {
+        sessionItems = [...DEFAULT_CALIDADES];
+        try { localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems)) } catch (e) { }
+    } else {
+        // Enriquecer automáticamente si faltan opciones para que el usuario nunca quede atrapado
+        const existingNames = new Set(sessionItems.map(c => (c.nombre || '').toLowerCase().trim()));
+        let merged = false;
+        for (const def of DEFAULT_CALIDADES) {
+            if (!existingNames.has(def.nombre.toLowerCase().trim())) {
+                sessionItems.push(def);
+                merged = true;
+            }
+        }
+        if (merged) {
+            try { localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems)) } catch (e) { }
+        }
+    }
+
     if (hiddenItemsJson) {
         try {
             hiddenIds = JSON.parse(hiddenItemsJson) as number[]
@@ -1441,6 +1476,10 @@ export function getCalidades(): Calidad[] {
 
     const hiddenSet = new Set(hiddenIds)
     const filteredSession = sessionItems.filter(i => !hiddenSet.has(i.id))
+
+    if (filteredSession.length === 0) {
+        return DEFAULT_CALIDADES;
+    }
 
     return filteredSession
 }
@@ -1453,6 +1492,10 @@ export function saveCalidad(calidad: Partial<Calidad>): Calidad {
         try {
             sessionItems = JSON.parse(sessionItemsJson)
         } catch (e) { }
+    }
+
+    if (!Array.isArray(sessionItems) || sessionItems.length === 0) {
+        sessionItems = [...DEFAULT_CALIDADES];
     }
 
     const existingIndex = sessionItems.findIndex(c => String(c.id) === String(calidad.id))
@@ -1479,14 +1522,9 @@ export function saveCalidad(calidad: Partial<Calidad>): Calidad {
 }
 
 export function deleteCalidad(id: number) {
-    const sessionItemsJson = localStorage.getItem(SESSION_CALIDADES_KEY)
-    if (sessionItemsJson) {
-        try {
-            let sessionItems = JSON.parse(sessionItemsJson) as Calidad[]
-            sessionItems = sessionItems.filter(c => c.id !== id)
-            localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems))
-        } catch (e) { }
-    }
+    let sessionItems = getCalidades();
+    sessionItems = sessionItems.filter(c => c.id !== id);
+    localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems));
     syncDelete('calidades', id);
 }
 
