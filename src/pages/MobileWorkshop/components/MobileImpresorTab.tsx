@@ -118,54 +118,140 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
         }
     }
 
+    // Calculate in-process orders
+    const inProcessCount = useMemo(() => {
+        return orders.filter(o => (o as any).status === 'en_proceso' || (o as any).enMaquina === true).length
+    }, [orders])
+
     return (
         <div className="mobile-tab-content workshop-theme">
-            {/* Header Workshop Banner */}
-            <div className="workshop-hero-banner">
-                <div className="hero-text">
-                    <div className="pill-tag">
-                        <Printer size={14} />
-                        <span>Módulo Plotters & Taller</span>
+            {/* GOOGLE STITCH: TOP KPI RIBBON */}
+            <section className="stitch-kpi-ribbon">
+                <div className="stitch-kpi-card">
+                    <div className="stitch-kpi-header">
+                        <span>Cola Lin.</span>
+                        <Sliders size={14} color="#f59e0b" />
                     </div>
-                    <h2>Cola de Impresión</h2>
-                </div>
-                <div className="workshop-counters">
-                    <div className="counter-chip">
-                        <span className="count-num">{workshopStats.colaCount}</span>
-                        <span className="count-lbl">En Espera</span>
+                    <div className="stitch-kpi-val">
+                        {workshopStats.totalM2Cola}<span>ml</span>
                     </div>
-                    <div className="counter-chip highlight">
-                        <span className="count-num">{workshopStats.totalM2Cola} m²</span>
-                        <span className="count-lbl">Metros Cola</span>
+                    <div className="stitch-kpi-sub">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#f59e0b' }}></span>
+                        <span>{workshopStats.colaCount} pendientes</span>
                     </div>
                 </div>
+
+                <div className="stitch-kpi-card">
+                    <div className="stitch-kpi-header">
+                        <span>Plotters</span>
+                        <Printer size={14} color="#4cd7f6" />
+                    </div>
+                    <div className="stitch-kpi-val">
+                        2<span style={{ color: '#869397' }}> / 3</span>
+                    </div>
+                    <div className="stitch-kpi-sub">
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#4cd7f6' }}></span>
+                        <span>Roland & Flora</span>
+                    </div>
+                </div>
+
+                <div className="stitch-kpi-card">
+                    <div className="stitch-kpi-header">
+                        <span>Hoy</span>
+                        <Sparkles size={14} color="#acedff" />
+                    </div>
+                    <div className="stitch-kpi-val">
+                        {workshopStats.impresosHoy}<span>OTs</span>
+                    </div>
+                    <div className="stitch-kpi-sub">
+                        <span style={{ color: '#4cd7f6', fontWeight: 600 }}>Completadas</span>
+                    </div>
+                </div>
+            </section>
+
+            {/* GOOGLE STITCH: RIP SERVER TELEMETRY CHIP */}
+            <div className="stitch-rip-chip">
+                <div className="stitch-rip-left">
+                    <RotateCw size={15} color="#4cd7f6" className="spinning" />
+                    <span>RIP Server: <strong>VersaWorks v6.8</strong> sincronizado</span>
+                </div>
+                <span className="stitch-rip-badge">Buffer 0.4b</span>
             </div>
 
-            {/* Filter Buttons */}
-            <div className="workshop-filter-bar">
+            {/* GOOGLE STITCH: ERGONOMIC THUMB FILTER PILLS (48px Touch) */}
+            <div className="stitch-filter-pills">
                 <button
-                    className={`workshop-filter-btn ${filterState === 'cola' ? 'active' : ''}`}
+                    type="button"
+                    className={`stitch-filter-pill ${filterState === 'cola' ? 'active' : ''}`}
                     onClick={() => setFilterState('cola')}
                 >
-                    <Flame size={16} />
-                    <span>Por Imprimir ({workshopStats.colaCount})</span>
+                    <Flame size={15} />
+                    <span>En Cola</span>
+                    <span className="stitch-pill-count">{workshopStats.colaCount}</span>
                 </button>
+
                 <button
-                    className={`workshop-filter-btn ${filterState === 'terminados' ? 'active' : ''}`}
+                    type="button"
+                    className={`stitch-filter-pill ${filterState === 'imprimiendo' ? 'active-amber' : ''}`}
+                    onClick={() => setFilterState('imprimiendo')}
+                >
+                    <Play size={14} />
+                    <span>En Máq.</span>
+                    <span className="stitch-pill-count">{inProcessCount}</span>
+                </button>
+
+                <button
+                    type="button"
+                    className={`stitch-filter-pill ${filterState === 'terminados' ? 'active' : ''}`}
                     onClick={() => setFilterState('terminados')}
                 >
-                    <CheckCircle2 size={16} />
-                    <span>Terminados ({workshopStats.impresosHoy})</span>
+                    <CheckCircle2 size={15} />
+                    <span>Listas</span>
+                    <span className="stitch-pill-count">{workshopStats.impresosHoy}</span>
                 </button>
             </div>
 
-            {/* Big Touch Order Cards */}
+            {/* GOOGLE STITCH: TELEMETRÍA DE TALLER (LIVE MACHINE STRIP) */}
+            <section className="stitch-telemetry-box">
+                <div className="stitch-telemetry-title">
+                    <span>⚡ Telemetría de Plotters</span>
+                    <span>2 Motores Activos</span>
+                </div>
+
+                <div className="stitch-machine-item">
+                    <div className="stitch-machine-row">
+                        <span className="stitch-machine-name">
+                            <span className="status-indicator-dot online"></span>
+                            Roland TrueVIS VG3-640
+                        </span>
+                        <span className="stitch-machine-ot">Tirada 68% (12m rest.)</span>
+                    </div>
+                    <div className="stitch-progress-track">
+                        <div className="stitch-progress-fill" style={{ width: '68%' }}></div>
+                    </div>
+                </div>
+
+                <div className="stitch-machine-item">
+                    <div className="stitch-machine-row">
+                        <span className="stitch-machine-name">
+                            <span className="status-indicator-dot online"></span>
+                            Flora UV 3200 Hybrid
+                        </span>
+                        <span className="stitch-machine-ot" style={{ color: '#ffb95f' }}>Tirada 40% (28m rest.)</span>
+                    </div>
+                    <div className="stitch-progress-track">
+                        <div className="stitch-progress-fill amber" style={{ width: '40%' }}></div>
+                    </div>
+                </div>
+            </section>
+
+            {/* WORKSHOP ORDER CARDS */}
             <div className="workshop-orders-container">
                 {queueOrders.length === 0 ? (
                     <div className="workshop-empty-state">
-                        <Printer size={48} color="#475569" />
-                        <h3>¡Sin órdenes pendientes!</h3>
-                        <p>No hay trabajos en este estado de la cola.</p>
+                        <Printer size={48} color="#4cd7f6" style={{ opacity: 0.6 }} />
+                        <h3>¡Sin órdenes en este estado!</h3>
+                        <p>No hay trabajos pendientes en esta sección de la cola.</p>
                     </div>
                 ) : (
                     queueOrders.map(o => {
@@ -188,7 +274,7 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
                                         )}
                                     </div>
                                     <span className={`status-pill status-${o.status}`}>
-                                        {o.status === 'orden' ? 'Listo p/ Imprimir' : o.status}
+                                        {o.status === 'orden' ? 'Listo p/ Imprimir' : o.status === 'en_proceso' ? 'En Plotter' : o.status}
                                     </span>
                                 </div>
 
@@ -200,7 +286,7 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
                                 <div className="workshop-specs-box">
                                     <div className="spec-item big-dimension">
                                         <span className="spec-label">Dimensiones</span>
-                                        <span className="spec-value">{o.ancho} x {o.alto} m</span>
+                                        <span className="spec-value">{o.ancho} × {o.alto} m</span>
                                     </div>
                                     <div className="spec-item">
                                         <span className="spec-label">Copias</span>
@@ -219,9 +305,9 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
                                 </div>
 
                                 {/* Bleed / Notes */}
-                                {(o.observaciones || o.demasias > 0) && (
+                                {(o.observaciones || (o.demasias && o.demasias > 0)) && (
                                     <div className="workshop-notes-box">
-                                        {o.demasias > 0 && <span className="bleed-pill">+{o.demasias}cm demasía</span>}
+                                        {o.demasias && o.demasias > 0 && <span className="bleed-pill">+{o.demasias}cm demasía</span>}
                                         <p>{o.observaciones}</p>
                                     </div>
                                 )}
@@ -238,11 +324,36 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
                                             <ExternalLink size={16} />
                                             <span>Abrir Archivo de Impresión</span>
                                         </a>
+                                        <a
+                                            href={`#/xpress-viewer?orderId=${o.id}`}
+                                            className="open-file-btn"
+                                            style={{ borderColor: 'rgba(139, 92, 246, 0.4)', color: '#d0bcff' }}
+                                        >
+                                            <Maximize2 size={16} />
+                                            <span>Visor Xpress</span>
+                                        </a>
                                     </div>
                                 )}
 
                                 {/* Workshop Action Buttons */}
-                                <div className="workshop-actions-row">
+                                <div className="workshop-actions-row" style={{ marginTop: '12px' }}>
+                                    {/* Set In Machine */}
+                                    {o.status === 'orden' && (
+                                        <button
+                                            type="button"
+                                            className="giant-workshop-btn"
+                                            style={{
+                                                background: 'rgba(245, 158, 11, 0.15)',
+                                                border: '1px solid rgba(245, 158, 11, 0.4)',
+                                                color: '#ffb95f'
+                                            }}
+                                            onClick={() => handleSetInMachine(o)}
+                                        >
+                                            <Play size={18} />
+                                            <span>▶ Cargar en Plotter</span>
+                                        </button>
+                                    )}
+
                                     {/* Photo Proof Capture */}
                                     <label className="photo-proof-btn" title="Sacar foto de prueba de color">
                                         <Camera size={18} />
@@ -262,7 +373,7 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
                                             className="giant-workshop-btn finish-btn"
                                             onClick={() => handleSetPrinted(o)}
                                         >
-                                            <CheckCircle2 size={22} />
+                                            <CheckCircle2 size={20} />
                                             <span>✔ Marcar Impreso</span>
                                         </button>
                                     ) : (

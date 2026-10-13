@@ -13,7 +13,12 @@ import {
     DollarSign,
     Layers,
     FileText,
-    ExternalLink
+    ExternalLink,
+    Zap,
+    DownloadCloud,
+    Check,
+    MessageSquare,
+    Store
 } from 'lucide-react'
 
 interface QuickOrderModalProps {
@@ -148,6 +153,16 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
         return Math.max(0, subtotal - senaMonto)
     }, [subtotal, senaMonto])
 
+    const detectedCount = useMemo(() => {
+        let count = 0
+        if (parsed?.primaryUrl) count++
+        if (parsed?.confianza?.medidas) count++
+        if (parsed?.copias && parsed.copias > 1) count++
+        if (parsed?.matchedCliente || parsed?.detectedClientName) count++
+        if (parsed?.materialNombre) count++
+        return count
+    }, [parsed])
+
     const handleClienteSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value
         setSelectedClienteId(id)
@@ -236,10 +251,10 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
         if (!savedOrder) return
         const phone = clienteTelefono.replace(/[^0-9]/g, '')
         const msg = `*LuXius / XignuX - Comprobante de Orden*\n\n` +
-            `¡Hola ${clienteNombre}! Recibimos tu pedido exitosamente:\n\n` +
+            `¡Hola ${clienteNombre}! 👋 Recibimos tu pedido exitosamente:\n\n` +
             `📋 *Orden:* #${savedOrder.ot || savedOrder.id}\n` +
             `📦 *Trabajo:* ${savedOrder.nombreTarea || materialSeleccionado}\n` +
-            `📏 *Medidas:* ${ancho} x ${alto} m (${copias} copias - ${totalM2} m²)\n` +
+            `📏 *Medidas:* ${ancho} x ${alto} m (${copias} ${copias > 1 ? 'copias' : 'copia'} - ${totalM2} m²)\n` +
             `🏷️ *Material:* ${materialSeleccionado}\n` +
             `💰 *Total:* $${subtotal.toLocaleString('es-AR')}\n` +
             (senaMonto > 0 ? `💵 *Seña abonada:* $${senaMonto.toLocaleString('es-AR')} (${senaMetodo})\n` : '') +
@@ -257,128 +272,273 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
 
     return (
         <div className="mobile-modal-overlay">
-            <div className="mobile-modal-container">
-                {/* Header */}
-                <div className="mobile-modal-header">
+            <div className="mobile-modal-container" style={{
+                background: 'var(--stitch-surface)',
+                border: '1px solid rgba(76, 215, 246, 0.25)',
+                boxShadow: '0 0 32px rgba(0, 0, 0, 0.85)'
+            }}>
+                {/* Header (Stitch Interceptor Style) */}
+                <div className="mobile-modal-header" style={{
+                    background: 'var(--stitch-surface-container)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
                     <div className="modal-title-wrap">
-                        <div className="sparkle-badge">
-                            <Sparkles size={16} />
-                            <span>WhatsApp Link Receiver</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                background: 'rgba(76, 215, 246, 0.15)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#4cd7f6'
+                            }}>
+                                <Zap size={18} />
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '18px', fontWeight: 800, color: '#fff', margin: 0 }}>
+                                        Captura Rápida de Orden
+                                    </h2>
+                                    <span style={{
+                                        fontFamily: 'JetBrains Mono, monospace',
+                                        fontSize: '9px',
+                                        fontWeight: 800,
+                                        background: 'rgba(76, 215, 246, 0.2)',
+                                        color: '#4cd7f6',
+                                        padding: '2px 6px',
+                                        borderRadius: '10px',
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        INTERCEPT
+                                    </span>
+                                </div>
+                                <p style={{ fontSize: '11px', color: '#869397', margin: 0 }}>
+                                    Copia el mensaje de WhatsApp y LuXius extrae cliente, link y medidas automáticamente.
+                                </p>
+                            </div>
                         </div>
-                        <h2>Nueva Orden Express</h2>
                     </div>
                     <button className="mobile-modal-close" onClick={onClose}>✕</button>
                 </div>
 
                 {/* Content */}
-                <div className="mobile-modal-body">
+                <div className="mobile-modal-body" style={{ padding: '14px' }}>
                     {savedOrder ? (
                         /* SUCCESS SCREEN */
-                        <div className="mobile-success-card">
-                            <div className="success-icon-wrap">
-                                <CheckCircle2 size={54} color="#10b981" />
+                        <div className="mobile-success-card" style={{
+                            textAlign: 'center',
+                            padding: '24px 14px',
+                            background: 'var(--stitch-surface-container)',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(16, 185, 129, 0.3)'
+                        }}>
+                            <div style={{
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                background: 'rgba(16, 185, 129, 0.15)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 14px',
+                                color: '#34d399'
+                            }}>
+                                <CheckCircle2 size={40} />
                             </div>
-                            <h3>¡Orden Creada con Éxito!</h3>
-                            <div className="ot-badge-lg">
-                                <span>{savedOrder.ot || `OT-${savedOrder.id}`}</span>
+                            <h3 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '20px', fontWeight: 800, color: '#fff' }}>
+                                ¡Orden Creada con Éxito!
+                            </h3>
+                            <div style={{
+                                display: 'inline-block',
+                                fontFamily: 'JetBrains Mono, monospace',
+                                fontSize: '16px',
+                                fontWeight: 800,
+                                color: '#4cd7f6',
+                                background: 'rgba(76, 215, 246, 0.15)',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                margin: '8px 0'
+                            }}>
+                                {savedOrder.ot || `OT #${savedOrder.id}`}
                             </div>
-                            <p className="success-subtitle">
-                                La orden fue enviada directamente a la cola del taller y ya está disponible para impresión.
+                            <p style={{ fontSize: '12px', color: '#869397', maxWidth: '320px', margin: '0 auto 16px' }}>
+                                La orden fue enviada directamente a la cola de taller y ya está disponible para revisión y corte.
                             </p>
 
-                            <div className="summary-box">
-                                <div className="summary-row">
-                                    <span>Cliente:</span>
-                                    <strong>{clienteNombre}</strong>
+                            <div style={{
+                                background: 'var(--stitch-surface-low)',
+                                borderRadius: '12px',
+                                padding: '12px',
+                                textAlign: 'left',
+                                fontSize: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                                marginBottom: '16px',
+                                border: '1px solid rgba(255, 255, 255, 0.05)'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: '#869397' }}>Cliente:</span>
+                                    <strong style={{ color: '#fff' }}>{clienteNombre}</strong>
                                 </div>
-                                <div className="summary-row">
-                                    <span>Material:</span>
-                                    <strong>{materialSeleccionado} ({ancho}x{alto}m)</strong>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: '#869397' }}>Trabajo:</span>
+                                    <strong style={{ color: '#fff' }}>{materialSeleccionado} ({ancho}x{alto}m)</strong>
                                 </div>
-                                <div className="summary-row">
-                                    <span>Total:</span>
-                                    <strong>${subtotal.toLocaleString('es-AR')}</strong>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: '#869397' }}>Total:</span>
+                                    <strong style={{ color: '#4cd7f6' }}>${subtotal.toLocaleString('es-AR')}</strong>
                                 </div>
                                 {saldoPendiente > 0 && (
-                                    <div className="summary-row highlight-pending">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ffb95f' }}>
                                         <span>Saldo pendiente:</span>
                                         <strong>${saldoPendiente.toLocaleString('es-AR')}</strong>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="success-actions">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <button
-                                    className="mobile-btn whatsapp-cta-btn"
+                                    type="button"
+                                    className="stitch-btn-whatsapp-notify"
                                     onClick={handleSendWhatsAppConfirmation}
                                 >
                                     <Send size={18} />
                                     <span>Enviar Confirmación por WhatsApp</span>
                                 </button>
                                 <button
-                                    className="mobile-btn secondary-btn"
+                                    type="button"
+                                    className="mobile-btn ghost-btn"
                                     onClick={() => {
                                         setSavedOrder(null)
                                         setRawInput('')
                                         onClose()
                                     }}
                                 >
-                                    Cerrar y Volver
+                                    Cerrar y Volver al Taller
                                 </button>
                             </div>
                         </div>
                     ) : (
                         /* FORM SCREEN */
                         <>
-                            {/* Raw Text Input with Smart Paste */}
-                            <div className="input-group">
-                                <div className="input-label-row">
-                                    <label>Mensaje de WhatsApp o Enlace</label>
-                                    <button
-                                        type="button"
-                                        className="paste-clipboard-btn"
-                                        onClick={handlePasteFromClipboard}
-                                        title="Pegar lo último copiado"
-                                    >
-                                        <Copy size={13} />
-                                        <span>Pegar</span>
-                                    </button>
+                            {/* 1-Tap Paste Trigger Button (Google Stitch Style) */}
+                            <div className="stitch-intercept-card">
+                                <button
+                                    type="button"
+                                    className="stitch-paste-trigger-btn"
+                                    onClick={handlePasteFromClipboard}
+                                >
+                                    <Copy size={18} />
+                                    <span>Pegar desde Portapapeles (1-Tap)</span>
+                                </button>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#869397' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#4cd7f6' }}></span>
+                                        Interceptor de WhatsApp Activo
+                                    </span>
+                                    <span style={{ fontFamily: 'JetBrains Mono, monospace', color: '#4cd7f6' }}>
+                                        Buffer: {rawInput.length} caracteres
+                                    </span>
                                 </div>
+
+                                {/* Raw Text Input */}
                                 <textarea
                                     className="mobile-textarea"
                                     rows={3}
-                                    placeholder="Pega aquí el mensaje con el link de WeTransfer/Drive y medidas (ej: 'Hola te paso el wetransfer https://we.tl/... para imprimir 2 lonas de 2.5x1.2')..."
+                                    style={{
+                                        marginTop: '8px',
+                                        background: 'var(--stitch-surface-low)',
+                                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                                        borderRadius: '10px',
+                                        color: '#fff',
+                                        fontSize: '12px'
+                                    }}
+                                    placeholder="O escribe/pega el mensaje de WhatsApp aquí..."
                                     value={rawInput}
                                     onChange={handleTextChange}
                                 />
-                                {parsed?.primaryUrl && (
-                                    <div className="detected-link-chip">
-                                        <Link2 size={14} color="#00e5ff" />
-                                        <span className="link-text">{parsed.primaryUrl}</span>
-                                        <a
-                                            href={parsed.primaryUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="test-link-btn"
-                                            title="Abrir enlace para verificar archivo"
-                                        >
-                                            <ExternalLink size={12} />
-                                        </a>
+
+                                {/* AI Parser Feedback Tag */}
+                                {detectedCount > 0 && (
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: 'rgba(76, 215, 246, 0.1)',
+                                        padding: '6px 10px',
+                                        borderRadius: '8px',
+                                        marginTop: '8px',
+                                        fontSize: '11px',
+                                        color: '#4cd7f6'
+                                    }}>
+                                        <Sparkles size={14} />
+                                        <span>
+                                            <strong>{detectedCount} datos detectados:</strong> {parsed?.detectedClientName ? `Cliente (${parsed.detectedClientName}), ` : ''} {parsed?.confianza?.medidas ? `Medidas (${ancho}×${alto}m), ` : ''} {parsed?.primaryUrl ? 'Link de archivo' : ''}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Detected Cloud Link Card */}
+                                {enlaceArchivo && (
+                                    <div className="stitch-cloud-transfer">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                            <Link2 size={16} color="#4cd7f6" style={{ shrink: 0 }} />
+                                            <a
+                                                href={enlaceArchivo}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="stitch-cloud-link"
+                                            >
+                                                {enlaceArchivo}
+                                            </a>
+                                        </div>
+                                        <span style={{
+                                            fontSize: '9px',
+                                            fontFamily: 'JetBrains Mono, monospace',
+                                            background: 'rgba(76, 215, 246, 0.2)',
+                                            color: '#4cd7f6',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontWeight: 700
+                                        }}>
+                                            LINK OK
+                                        </span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Client Section */}
-                            <div className="mobile-section-card">
-                                <div className="card-header-sm">
-                                    <UserPlus size={15} color="#00e5ff" />
+                            {/* Client Identification Field */}
+                            <div className="stitch-intercept-card">
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    color: '#869397',
+                                    marginBottom: '8px'
+                                }}>
+                                    <Store size={14} color="#4cd7f6" />
                                     <span>Cliente Destinatario</span>
-                                </div>
+                                </label>
 
                                 {!showNewClientForm ? (
-                                    <div className="client-select-wrap">
+                                    <>
                                         <select
                                             className="mobile-select"
+                                            style={{
+                                                background: 'var(--stitch-surface-low)',
+                                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                borderRadius: '8px',
+                                                color: '#fff',
+                                                fontSize: '13px',
+                                                marginBottom: '8px'
+                                            }}
                                             value={selectedClienteId}
                                             onChange={handleClienteSelect}
                                         >
@@ -390,20 +550,35 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                             ))}
                                         </select>
 
-                                        <div className="client-manual-row">
+                                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
                                             <input
                                                 type="text"
                                                 className="mobile-input"
-                                                placeholder="O escribe nombre del cliente..."
+                                                placeholder="O nombre del cliente..."
                                                 value={clienteNombre}
                                                 onChange={e => setClienteNombre(e.target.value)}
+                                                style={{
+                                                    flex: 1,
+                                                    background: 'var(--stitch-surface-low)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                    borderRadius: '8px',
+                                                    color: '#fff'
+                                                }}
                                             />
                                             {onSaveCliente && (
                                                 <button
                                                     type="button"
-                                                    className="mini-add-client-btn"
                                                     onClick={() => setShowNewClientForm(true)}
-                                                    title="Crear cliente rápido"
+                                                    style={{
+                                                        padding: '0 12px',
+                                                        borderRadius: '8px',
+                                                        background: 'rgba(76, 215, 246, 0.15)',
+                                                        border: '1px solid rgba(76, 215, 246, 0.3)',
+                                                        color: '#4cd7f6',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer'
+                                                    }}
                                                 >
                                                     + Nuevo
                                                 </button>
@@ -412,15 +587,26 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
 
                                         <input
                                             type="tel"
-                                            className="mobile-input mt-2"
+                                            className="mobile-input"
                                             placeholder="WhatsApp/Teléfono (ej: 3518192655)"
                                             value={clienteTelefono}
                                             onChange={e => setClienteTelefono(e.target.value)}
+                                            style={{
+                                                background: 'var(--stitch-surface-low)',
+                                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                borderRadius: '8px',
+                                                color: '#fff'
+                                            }}
                                         />
-                                    </div>
+                                    </>
                                 ) : (
-                                    <div className="quick-client-box">
-                                        <h4>Nuevo Cliente Rápido</h4>
+                                    <div style={{
+                                        background: 'var(--stitch-surface-low)',
+                                        borderRadius: '10px',
+                                        padding: '10px',
+                                        border: '1px solid rgba(76, 215, 246, 0.2)'
+                                    }}>
+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#4cd7f6' }}>Nuevo Cliente Rápido</h4>
                                         <input
                                             type="text"
                                             className="mobile-input mb-2"
@@ -435,7 +621,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                             value={newClientPhone}
                                             onChange={e => setNewClientPhone(e.target.value)}
                                         />
-                                        <div className="form-actions-inline">
+                                        <div style={{ display: 'flex', gap: '8px' }}>
                                             <button
                                                 type="button"
                                                 className="mobile-btn primary-btn btn-sm"
@@ -455,16 +641,25 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                 )}
                             </div>
 
-                            {/* Job Specifications */}
-                            <div className="mobile-section-card">
-                                <div className="card-header-sm">
-                                    <Layers size={15} color="#10b981" />
-                                    <span>Especificaciones Técnicas</span>
-                                </div>
+                            {/* Technical Specifications */}
+                            <div className="stitch-intercept-card">
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    color: '#869397',
+                                    marginBottom: '8px'
+                                }}>
+                                    <Layers size={14} color="#4cd7f6" />
+                                    <span>Sustrato y Bobina Asignada</span>
+                                </label>
 
-                                <div className="input-row-2">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
                                     <div>
-                                        <label className="field-lbl">Material</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Material</span>
                                         <select
                                             className="mobile-select"
                                             value={materialSeleccionado}
@@ -484,7 +679,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="field-lbl">Calidad</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Calidad</span>
                                         <select
                                             className="mobile-select"
                                             value={calidadSeleccionada}
@@ -497,10 +692,10 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Dimensions with Quick Presets */}
-                                <div className="dimensions-grid mt-2">
+                                {/* Dimensions Steppers */}
+                                <div className="dimensions-grid" style={{ marginBottom: '8px' }}>
                                     <div className="dim-col">
-                                        <label className="field-lbl">Ancho (m)</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Ancho (m)</span>
                                         <div className="stepper-input">
                                             <button
                                                 type="button"
@@ -520,7 +715,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                     </div>
 
                                     <div className="dim-col">
-                                        <label className="field-lbl">Alto (m)</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Alto (m)</span>
                                         <div className="stepper-input">
                                             <button
                                                 type="button"
@@ -540,7 +735,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                     </div>
 
                                     <div className="dim-col">
-                                        <label className="field-lbl">Copias</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Copias</span>
                                         <div className="stepper-input">
                                             <button
                                                 type="button"
@@ -561,50 +756,48 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                 </div>
 
                                 {/* Preset Pills */}
-                                <div className="preset-pills-row mt-2">
-                                    <button
-                                        type="button"
-                                        className="preset-pill"
-                                        onClick={() => { setAncho(1.0); setAlto(1.0); }}
-                                    >1x1m</button>
-                                    <button
-                                        type="button"
-                                        className="preset-pill"
-                                        onClick={() => { setAncho(2.0); setAlto(1.0); }}
-                                    >2x1m</button>
-                                    <button
-                                        type="button"
-                                        className="preset-pill"
-                                        onClick={() => { setAncho(1.9); setAlto(0.9); }}
-                                    >1.9x0.9 (Banner)</button>
-                                    <button
-                                        type="button"
-                                        className="preset-pill"
-                                        onClick={() => { setAncho(2.5); setAlto(1.2); }}
-                                    >2.5x1.2m</button>
-                                    <button
-                                        type="button"
-                                        className="preset-pill"
-                                        onClick={() => { setAncho(3.0); setAlto(1.5); }}
-                                    >3x1.5m</button>
+                                <div className="preset-pills-row" style={{ marginBottom: '8px' }}>
+                                    <button type="button" className="preset-pill" onClick={() => { setAncho(1.0); setAlto(1.0); }}>1x1m</button>
+                                    <button type="button" className="preset-pill" onClick={() => { setAncho(2.0); setAlto(1.0); }}>2x1m</button>
+                                    <button type="button" className="preset-pill" onClick={() => { setAncho(1.9); setAlto(0.9); }}>1.9x0.9</button>
+                                    <button type="button" className="preset-pill" onClick={() => { setAncho(2.5); setAlto(1.2); }}>2.5x1.2</button>
+                                    <button type="button" className="preset-pill" onClick={() => { setAncho(3.0); setAlto(1.5); }}>3x1.5</button>
                                 </div>
 
-                                <div className="total-m2-badge mt-2">
-                                    <span>Superficie total:</span>
-                                    <strong>{totalM2} m²</strong>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '6px 10px',
+                                    background: 'var(--stitch-surface-low)',
+                                    borderRadius: '8px',
+                                    fontSize: '11px',
+                                    fontFamily: 'JetBrains Mono, monospace'
+                                }}>
+                                    <span style={{ color: '#869397' }}>Superficie calculada:</span>
+                                    <strong style={{ color: '#4cd7f6' }}>{totalM2} m²</strong>
                                 </div>
                             </div>
 
-                            {/* Financials & Payment */}
-                            <div className="mobile-section-card">
-                                <div className="card-header-sm">
-                                    <DollarSign size={15} color="#f59e0b" />
+                            {/* Financials & Deposit */}
+                            <div className="stitch-intercept-card">
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    color: '#869397',
+                                    marginBottom: '8px'
+                                }}>
+                                    <DollarSign size={14} color="#ffb95f" />
                                     <span>Importes y Seña</span>
-                                </div>
+                                </label>
 
-                                <div className="input-row-2">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                                     <div>
-                                        <label className="field-lbl">Precio x m² ($)</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Precio x m² ($)</span>
                                         <input
                                             type="number"
                                             className="mobile-input"
@@ -613,16 +806,27 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <label className="field-lbl">Subtotal Calculado</label>
-                                        <div className="calculated-val-box">
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Subtotal Calculado</span>
+                                        <div style={{
+                                            height: '38px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            padding: '0 10px',
+                                            background: 'var(--stitch-surface-low)',
+                                            borderRadius: '8px',
+                                            fontFamily: 'Outfit, sans-serif',
+                                            fontSize: '16px',
+                                            fontWeight: 800,
+                                            color: '#fff'
+                                        }}>
                                             ${subtotal.toLocaleString('es-AR')}
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="input-row-2 mt-2">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                                     <div>
-                                        <label className="field-lbl">Seña / Anticipo ($)</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Seña / Anticipo ($)</span>
                                         <input
                                             type="number"
                                             className="mobile-input"
@@ -632,7 +836,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <label className="field-lbl">Medio de Pago Seña</label>
+                                        <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Medio de Pago</span>
                                         <select
                                             className="mobile-select"
                                             value={senaMetodo}
@@ -646,52 +850,61 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="balance-info-row mt-2">
-                                    <span>Saldo pendiente a pagar:</span>
-                                    <strong className={saldoPendiente > 0 ? 'text-amber' : 'text-emerald'}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '6px 10px',
+                                    borderRadius: '8px',
+                                    background: 'var(--stitch-surface-low)',
+                                    fontSize: '11px'
+                                }}>
+                                    <span style={{ color: '#869397' }}>Saldo pendiente a pagar:</span>
+                                    <strong style={{
+                                        fontFamily: 'Outfit, sans-serif',
+                                        fontSize: '14px',
+                                        color: saldoPendiente > 0 ? '#ffb95f' : '#34d399'
+                                    }}>
                                         ${saldoPendiente.toLocaleString('es-AR')}
                                     </strong>
                                 </div>
                             </div>
 
-                            {/* Enlace Directo y Notas */}
-                            <div className="input-group">
-                                <label className="field-lbl">Enlace al Archivo de Descarga</label>
-                                <input
-                                    type="url"
-                                    className="mobile-input"
-                                    placeholder="https://we.tl/... o https://drive.google.com/..."
-                                    value={enlaceArchivo}
-                                    onChange={e => setEnlaceArchivo(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="input-group">
-                                <label className="field-lbl">Nombre del Proyecto / Tarea</label>
+                            {/* Task Name Field */}
+                            <div className="stitch-intercept-card">
+                                <span style={{ fontSize: '10px', color: '#869397', display: 'block', marginBottom: '2px' }}>Nombre del Proyecto / Tarea</span>
                                 <input
                                     type="text"
                                     className="mobile-input"
                                     placeholder="Ej: Lonas Promoción Farmacia"
                                     value={nombreTarea}
                                     onChange={e => setNombreTarea(e.target.value)}
+                                    style={{
+                                        background: 'var(--stitch-surface-low)',
+                                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                                        borderRadius: '8px',
+                                        color: '#fff'
+                                    }}
                                 />
                             </div>
 
-                            {/* Submit Button */}
-                            <div className="mobile-modal-footer">
+                            {/* Submit & Cancel Buttons */}
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
                                 <button
                                     type="button"
                                     className="mobile-btn ghost-btn"
                                     onClick={onClose}
                                     disabled={isSaving}
+                                    style={{ flex: 1 }}
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="button"
-                                    className="mobile-btn primary-btn submit-btn"
+                                    className="stitch-btn-approve"
                                     onClick={handleSaveOrder}
                                     disabled={isSaving}
+                                    style={{ flex: 2 }}
                                 >
                                     {isSaving ? 'Creando Orden...' : '🚀 Crear Orden de Trabajo'}
                                 </button>
