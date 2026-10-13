@@ -501,7 +501,8 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
 export async function saveBatchOrders(
     action: 'delete' | 'update' | 'restore',
     ids: (number | string)[],
-    data?: Partial<Order>
+    data?: Partial<Order>,
+    items?: (Partial<Order> & { id: number | string })[]
 ): Promise<{ success: boolean, count: number }> {
     if (!ids || ids.length === 0) return { success: true, count: 0 };
 
@@ -514,12 +515,18 @@ export async function saveBatchOrders(
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
 
-    } else if (action === 'update' && data) {
+    } else if (action === 'update') {
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
         try {
             let localOrders: Order[] = JSON.parse(localOrdersJson);
             localOrders = localOrders.map(o => {
-                if (ids.some(targetId => matchesOrderId(o, targetId))) {
+                if (items && items.length > 0) {
+                    const specific = items.find(it => matchesOrderId(o, it.id));
+                    if (specific) {
+                        return { ...o, ...data, ...specific };
+                    }
+                }
+                if (data && ids.some(targetId => matchesOrderId(o, targetId))) {
                     return { ...o, ...data };
                 }
                 return o;
@@ -564,7 +571,7 @@ export async function saveBatchOrders(
         const response = await fetchWithTimeout(`${API_URL}/orders/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, ids, data, updateData: data }),
+            body: JSON.stringify({ action, ids, data, updateData: data, items }),
         }, 60000);
         if (!response.ok) {
             console.error('[db] API saveBatchOrders respuesta no-ok:', response.status);
@@ -578,6 +585,94 @@ export async function saveBatchOrders(
     }
 
     return { success: true, count: ids.length };
+}
+
+export interface UpdateBatchGroupParams {
+    batchId?: string;
+    batchName: string;
+    clientId?: number;
+    clienteNombre?: string;
+    fechaEntrega?: string;
+    envio?: string;
+    observaciones?: string;
+    items?: Array<{
+        id: number | string;
+        itemDesc?: string;
+        unlinked?: boolean;
+    }>;
+}
+
+/**
+ * Actualiza los datos de un lote/grupo (nombre de proyecto, cliente, fecha de entrega, envío, observaciones)
+ * y actualiza la nomenclatura y subtareas de todas las órdenes asociadas.
+ */
+export async function updateBatchGroup(
+    batchOrders: Order[],
+    params: UpdateBatchGroupParams
+): Promise<{ success: boolean; count: number }> {
+    if (!batchOrders || batchOrders.length === 0) {
+        throw new Error('No se encontraron órdenes para actualizar en el lote');
+    }
+
+    const cleanBatchName = (params.batchName || '').trim() || 'Lote de Producción';
+    const slug = cleanBatchName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const targetBatchId = params.batchId || batchOrders[0]?.batchId || `lote_${params.clientId || batchOrders[0]?.clientId || '0'}_${slug}_${Date.now().toString(36)}`;
+
+    const itemsToUpdate: (Partial<Order> & { id: number | string })[] = [];
+    const allIds: (number | string)[] = [];
+
+    for (const order of batchOrders) {
+        const orderId = (order as any).uuid || order.id || order.ot;
+        allIds.push(orderId);
+
+        const itemParam = params.items?.find(i => matchesOrderId(order, i.id));
+        if (itemParam?.unlinked) {
+            // Desvincular orden del lote: quitar batchId y loteNombre
+            const baseDesc = order.descripcionItem || (order.nombreTarea && order.nombreTarea.includes(' - ') ? order.nombreTarea.split(' - ').slice(1).join(' - ').trim() : '') || order.archivosOriginales?.[0] || 'OT Individual';
+            itemsToUpdate.push({
+                id: orderId,
+                batchId: '',
+                loteNombre: '',
+                nombreTarea: baseDesc,
+                descripcion: baseDesc,
+                ...(params.clientId ? { clientId: params.clientId, clienteNombre: params.clienteNombre } : {}),
+                ...(params.fechaEntrega !== undefined ? { fechaEntrega: params.fechaEntrega } : {}),
+                ...(params.envio !== undefined ? { envio: params.envio } : {}),
+                ...(params.observaciones !== undefined ? { observaciones: params.observaciones, comments: params.observaciones } : {})
+            });
+        } else {
+            // Mantener en el lote con el nuevo nombre y datos compartidos
+            const pieceDesc = itemParam?.itemDesc !== undefined
+                ? itemParam.itemDesc.trim()
+                : (order.descripcionItem || (order.nombreTarea && order.nombreTarea.includes(' - ') ? order.nombreTarea.split(' - ').slice(1).join(' - ').trim() : '') || order.archivosOriginales?.[0] || '');
+            
+            const newNombreTarea = pieceDesc ? `${cleanBatchName} - ${pieceDesc}` : cleanBatchName;
+
+            itemsToUpdate.push({
+                id: orderId,
+                batchId: targetBatchId,
+                loteNombre: cleanBatchName,
+                descripcionItem: pieceDesc,
+                nombreTarea: newNombreTarea,
+                descripcion: newNombreTarea,
+                ...(params.clientId ? { clientId: params.clientId, clienteNombre: params.clienteNombre } : {}),
+                ...(params.fechaEntrega !== undefined ? { fechaEntrega: params.fechaEntrega } : {}),
+                ...(params.envio !== undefined ? { envio: params.envio } : {}),
+                ...(params.observaciones !== undefined ? { observaciones: params.observaciones, comments: params.observaciones } : {})
+            });
+        }
+    }
+
+    const result = await saveBatchOrders('update', allIds, {
+        batchId: targetBatchId,
+        loteNombre: cleanBatchName,
+        ...(params.clientId ? { clientId: params.clientId, clienteNombre: params.clienteNombre } : {}),
+        ...(params.fechaEntrega !== undefined ? { fechaEntrega: params.fechaEntrega } : {}),
+        ...(params.envio !== undefined ? { envio: params.envio } : {}),
+        ...(params.observaciones !== undefined ? { observaciones: params.observaciones } : {})
+    }, itemsToUpdate);
+
+    return result;
 }
 
 /**

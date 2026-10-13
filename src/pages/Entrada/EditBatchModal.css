@@ -1,0 +1,310 @@
+.edit-batch-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    color: var(--text-primary, #f1f5f9);
+}
+
+.edit-batch-header-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+    border: 1px solid rgba(96, 165, 250, 0.25);
+    border-radius: 10px;
+}
+
+.edit-batch-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.edit-batch-title-tag {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #93c5fd;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.edit-batch-pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.edit-batch-pill {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.edit-batch-pill.highlight {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.edit-batch-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+}
+
+.edit-batch-form-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+.edit-batch-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.edit-batch-field label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary, #94a3b8);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.edit-batch-field .field-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted, #64748b);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.edit-batch-input,
+.edit-batch-select,
+.edit-batch-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #f8fafc;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.edit-batch-input:focus,
+.edit-batch-select:focus,
+.edit-batch-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.edit-batch-textarea {
+    resize: vertical;
+    min-height: 64px;
+    font-family: inherit;
+}
+
+/* Items List Section */
+.edit-batch-items-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.edit-batch-items-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.edit-batch-items-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-secondary, #94a3b8);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.edit-batch-items-list {
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+}
+
+.edit-batch-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.edit-batch-item-row.unlinked {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.3);
+    opacity: 0.65;
+}
+
+.edit-batch-item-ot {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #60a5fa;
+    white-space: nowrap;
+    min-width: 90px;
+}
+
+.edit-batch-item-input {
+    flex: 1;
+    padding: 6px 10px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #f1f5f9;
+    font-size: 0.82rem;
+}
+
+.edit-batch-item-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.edit-batch-item-meta {
+    font-size: 0.72rem;
+    color: var(--text-muted, #94a3b8);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.edit-batch-item-unlink-btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.edit-batch-item-unlink-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: #f87171;
+}
+
+.edit-batch-item-relink-btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.edit-batch-item-relink-btn:hover {
+    background: rgba(16, 185, 129, 0.3);
+    border-color: #34d399;
+}
+
+/* Actions Footer */
+.edit-batch-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.edit-batch-btn-cancel {
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #cbd5e1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edit-batch-btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+.edit-batch-btn-save {
+    padding: 8px 20px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    border: 1px solid #60a5fa;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.edit-batch-btn-save:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.5);
+    transform: translateY(-1px);
+}
+
+.edit-batch-btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.edit-batch-error {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+    .edit-batch-form-grid {
+        grid-template-columns: 1fr;
+    }
+}

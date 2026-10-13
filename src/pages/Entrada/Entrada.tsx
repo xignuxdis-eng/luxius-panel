@@ -4,10 +4,11 @@ import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag, isDesignerOwner } from '../../types/orden'
 import { isDesignerRole } from '../../types/auth'
-import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, resolveMediaUrl } from '@data/db'
+import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, updateBatchGroup, resolveMediaUrl } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
 import StatusChangeModal from './StatusChangeModal'
+import EditBatchModal from './EditBatchModal'
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
 import OrderChatModal from '@components/shared/OrderChatModal'
 import type { Order, Cliente, Material } from '@/types'
@@ -120,6 +121,12 @@ export default function Entrada() {
     const [isNestingModalOpen, setIsNestingModalOpen] = useState(false)
     const [nestingModalOrders, setNestingModalOrders] = useState<Order[]>([])
     const [nestingModalBatchName, setNestingModalBatchName] = useState<string>('')
+
+    // EDIT BATCH MODAL STATE
+    const [isEditBatchModalOpen, setIsEditBatchModalOpen] = useState(false)
+    const [editBatchOrders, setEditBatchOrders] = useState<Order[]>([])
+    const [editBatchName, setEditBatchName] = useState<string>('')
+    const [editBatchId, setEditBatchId] = useState<string>('')
 
     const [defaultStatus, setDefaultStatus] = useState<string>('orden')
 
@@ -863,6 +870,13 @@ export default function Entrada() {
         setIsNestingModalOpen(true);
     };
 
+    const handleOpenEditBatchModal = (batchOrders: Order[], batchName?: string, batchId?: string) => {
+        setEditBatchOrders(batchOrders);
+        setEditBatchName(batchName || 'Lote de Producción');
+        setEditBatchId(batchId || '');
+        setIsEditBatchModalOpen(true);
+    };
+
     const handleOpenNestingForSelected = () => {
         const selectedOrders = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)));
         if (selectedOrders.length === 0) return;
@@ -1429,7 +1443,20 @@ export default function Entrada() {
                                                 <td>
                                                     <div className="composite-cell-primary" style={{ cursor: 'pointer' }} onClick={() => toggleExpandBatch(item.batchId)}>
                                                         <div className="composite-top-row">
-                                                            <span className="batch-badge-pill">🏷️ {item.batchName}</span>
+                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span className="batch-badge-pill">🏷️ {item.batchName}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-edit-batch-inline"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleOpenEditBatchModal(item.orders, item.batchName, item.batchId);
+                                                                    }}
+                                                                    title="Editar grupo / cambiar nombre del proyecto"
+                                                                >
+                                                                    ✏️
+                                                                </button>
+                                                            </div>
                                                             <span className="batch-count-pill">📦 {item.orders.length} OTs</span>
                                                             {item.primaryOrder.origen === 'mobile' ? (
                                                                 <span className="origin-badge origin-badge-mobile">📱 Móvil</span>
@@ -1597,6 +1624,16 @@ export default function Entrada() {
                                                             </button>
                                                             {actionMenuOrderId === `batch:${item.batchId}` && (
                                                                 <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-menu-item"
+                                                                        onClick={() => {
+                                                                            setActionMenuOrderId(null);
+                                                                            handleOpenEditBatchModal(item.orders, item.batchName, item.batchId);
+                                                                        }}
+                                                                    >
+                                                                        <span>✏️</span> Editar Grupo / Proyecto
+                                                                    </button>
                                                                     <button
                                                                         type="button"
                                                                         className="action-menu-item"
@@ -2300,6 +2337,21 @@ export default function Entrada() {
                         setNestingModalOrders([]);
                     }}
                     onSaveBatch={handleSaveNestingBatch}
+                />
+            )}
+            {isEditBatchModalOpen && (
+                <EditBatchModal
+                    isOpen={isEditBatchModalOpen}
+                    onClose={async (updated) => {
+                        setIsEditBatchModalOpen(false);
+                        if (updated) {
+                            await loadOrders();
+                        }
+                    }}
+                    batchOrders={editBatchOrders}
+                    currentBatchName={editBatchName}
+                    currentBatchId={editBatchId}
+                    clientes={allClientes}
                 />
             )}
             {downloadProgress && (
