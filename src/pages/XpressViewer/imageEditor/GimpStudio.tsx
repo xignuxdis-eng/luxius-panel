@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Order } from '../../../types/orden';
 import {
     BlendMode,
     CropBox,
@@ -27,6 +28,8 @@ import {
     ZoomIn,
     ZoomOut,
     Maximize,
+    Maximize2,
+    Minimize2,
     Undo2,
     Redo2,
     Crop,
@@ -49,27 +52,61 @@ import {
     ShieldAlert,
     ExternalLink,
     Check,
-    RefreshCw
+    RefreshCw,
+    FolderOpen,
+    Save,
+    ChevronDown,
+    X,
+    UploadCloud,
+    Expand
 } from 'lucide-react';
 import './GimpStudio.css';
 
-interface GimpStudioProps {
+export interface GimpStudioProps {
     initialImageUrl?: string;
     initialFile?: File;
     orderId?: number;
+    order?: Order | null;
+    onOrderUpdated?: (order: Order) => void;
     onSendToRedrawer?: (dataUrl: string) => void;
     onSendToPrintSheeter?: (dataUrl: string, name?: string) => void;
+    onSendToViewer?: (dataUrl: string, name?: string) => void;
     onSaveToOrder?: (dataUrl: string) => Promise<void>;
+    onClose?: () => void;
 }
 
 export const GimpStudio: React.FC<GimpStudioProps> = ({
     initialImageUrl,
     initialFile,
     orderId,
+    order,
+    onOrderUpdated,
     onSendToRedrawer,
     onSendToPrintSheeter,
-    onSaveToOrder
+    onSendToViewer,
+    onSaveToOrder,
+    onClose
 }) => {
+    // Fullscreen / Maximize Mode
+    const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
+    // Current Image Filename & Menus
+    const [imageFileName, setImageFileName] = useState<string>(
+        initialFile?.name || 'diseno_gimpstudio.png'
+    );
+    const [showFileMenu, setShowFileMenu] = useState<boolean>(false);
+    const [showSaveMenu, setShowSaveMenu] = useState<boolean>(false);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [isDraggingFileOver, setIsDraggingFileOver] = useState<boolean>(false);
+
+    // DOM & File Inputs references
+    const containerRef = useRef<HTMLDivElement>(null);
+    const openFileInputRef = useRef<HTMLInputElement>(null);
+    const addLayerFileInputRef = useRef<HTMLInputElement>(null);
+    const fileMenuRef = useRef<HTMLDivElement>(null);
+    const saveMenuRef = useRef<HTMLDivElement>(null);
+
     // Canvas dimensions
     const [canvasWidth, setCanvasWidth] = useState<number>(1200);
     const [canvasHeight, setCanvasHeight] = useState<number>(800);
@@ -187,6 +224,7 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
 
         setCanvasWidth(w);
         setCanvasHeight(h);
+        setImageFileName(name);
 
         const layerCanvas = document.createElement('canvas');
         layerCanvas.width = w;
@@ -228,12 +266,59 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
         }
 
         // Push initial history
-        pushHistory('Imagen cargada', newLayers, w, h);
+        pushHistory('Imagen cargada: ' + name, newLayers, w, h);
     }, [pushHistory]);
+
+    // Add Layer from loaded Image
+    const addLayerFromImage = useCallback((img: HTMLImageElement, name: string = 'Nueva Capa') => {
+        const imgW = img.naturalWidth || img.width;
+        const imgH = img.naturalHeight || img.height;
+
+        if (layers.length === 0) {
+            initFromImage(img, name);
+            return;
+        }
+
+        let targetW = imgW;
+        let targetH = imgH;
+        if (targetW > canvasWidth || targetH > canvasHeight) {
+            const scale = Math.min(canvasWidth / targetW, canvasHeight / targetH);
+            targetW = Math.max(10, Math.round(targetW * scale));
+            targetH = Math.max(10, Math.round(targetH * scale));
+        }
+
+        const layerCanvas = document.createElement('canvas');
+        layerCanvas.width = targetW;
+        layerCanvas.height = targetH;
+        const ctx = layerCanvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+
+        const posX = Math.round((canvasWidth - targetW) / 2);
+        const posY = Math.round((canvasHeight - targetH) / 2);
+
+        const newLayer: Layer = {
+            id: 'layer_' + Date.now(),
+            name,
+            visible: true,
+            opacity: 1.0,
+            blendMode: 'normal',
+            canvas: layerCanvas,
+            x: posX,
+            y: posY,
+            width: targetW,
+            height: targetH
+        };
+
+        const updated = [...layers, newLayer];
+        setLayers(updated);
+        setActiveLayerId(newLayer.id);
+        pushHistory('Añadir capa: ' + name, updated, canvasWidth, canvasHeight);
+    }, [layers, canvasWidth, canvasHeight, initFromImage, pushHistory]);
 
     // Load initial image or file
     useEffect(() => {
         if (initialFile) {
+            setImageFileName(initialFile.name);
             const url = URL.createObjectURL(initialFile);
             const img = new Image();
             img.onload = () => {
@@ -242,6 +327,7 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
             };
             img.src = url;
         } else if (initialImageUrl) {
+            setImageFileName('diseno_cargado.png');
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => {
@@ -249,6 +335,7 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
             };
             img.src = initialImageUrl;
         } else {
+            setImageFileName('lienzo_blanco.png');
             // Default blank HD canvas (1920x1080)
             const blank = document.createElement('canvas');
             blank.width = 1920;
@@ -638,98 +725,588 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
         pushHistory('Aplanar Imagen', updated, canvasWidth, canvasHeight);
     };
 
+    // Toast notification helper
+    const showToast = useCallback((msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => {
+            setToastMessage(prev => (prev === msg ? null : prev));
+        }, 3500);
+    }, []);
+
+    // Fullscreen / Maximize toggle
+    const handleToggleMaximize = useCallback(() => {
+        setIsMaximized(prev => {
+            const next = !prev;
+            if (next) {
+                if (containerRef.current && !document.fullscreenElement) {
+                    containerRef.current.requestFullscreen?.().catch(() => {});
+                }
+            } else {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen?.().catch(() => {});
+                }
+            }
+            setTimeout(() => {
+                if (viewportRef.current) {
+                    const vpW = viewportRef.current.clientWidth - 40;
+                    const vpH = viewportRef.current.clientHeight - 40;
+                    const fitZ = Math.min(vpW / canvasWidth, vpH / canvasHeight);
+                    setZoom(Math.max(0.05, Math.round(fitZ * 100) / 100));
+                    setPanOffset({ x: 0, y: 0 });
+                }
+            }, 100);
+            return next;
+        });
+    }, [canvasWidth, canvasHeight]);
+
     // Export Handlers
-    const getFlattenedDataUrl = (format: 'image/png' | 'image/jpeg' = 'image/png', quality: number = 0.95): string => {
+    const getFlattenedDataUrl = useCallback((format: 'image/png' | 'image/jpeg' = 'image/png', quality: number = 0.95): string => {
         const flattened = flattenLayers(layers, canvasWidth, canvasHeight);
         return flattened.toDataURL(format, quality);
-    };
+    }, [layers, canvasWidth, canvasHeight]);
 
-    const handleDownloadPng = () => {
+    const handleDownloadPng = useCallback(() => {
         const dataUrl = getFlattenedDataUrl('image/png');
         const link = document.createElement('a');
-        link.download = `gimpstudio_export_${Date.now()}.png`;
+        const cleanName = imageFileName.replace(/\.[^/.]+$/, '');
+        link.download = `${cleanName}_gimp_${Date.now()}.png`;
         link.href = dataUrl;
         link.click();
-    };
+        showToast('✓ PNG descargado con canal alfa transparente');
+    }, [getFlattenedDataUrl, imageFileName, showToast]);
 
-    const handleDownloadJpeg = () => {
+    const handleDownloadJpeg = useCallback(() => {
         const dataUrl = getFlattenedDataUrl('image/jpeg', 1.0);
         const link = document.createElement('a');
-        link.download = `gimpstudio_export_${Date.now()}.jpg`;
+        const cleanName = imageFileName.replace(/\.[^/.]+$/, '');
+        link.download = `${cleanName}_gimp_${Date.now()}.jpg`;
         link.href = dataUrl;
         link.click();
-    };
+        showToast('✓ JPEG descargado al 100% de calidad');
+    }, [getFlattenedDataUrl, imageFileName, showToast]);
+
+    // Quick save (Ctrl+S or Primary Save button)
+    const handleQuickSave = useCallback(async () => {
+        const dataUrl = getFlattenedDataUrl('image/png');
+        if (orderId && onSaveToOrder) {
+            setIsSaving(true);
+            try {
+                await onSaveToOrder(dataUrl);
+                showToast(`✓ Imagen guardada en Orden #${orderId}`);
+            } catch (err) {
+                console.error(err);
+                showToast('Error al guardar en la orden');
+            } finally {
+                setIsSaving(false);
+            }
+        } else {
+            handleDownloadPng();
+        }
+    }, [orderId, onSaveToOrder, getFlattenedDataUrl, handleDownloadPng, showToast]);
+
+    const handleSaveToOrderExplicit = useCallback(async () => {
+        if (!orderId || !onSaveToOrder) return;
+        setIsSaving(true);
+        try {
+            await onSaveToOrder(getFlattenedDataUrl('image/png'));
+            showToast(`✓ Guardado con éxito en la Orden #${orderId}`);
+        } catch (err) {
+            console.error(err);
+            showToast('Error al guardar en la orden');
+        } finally {
+            setIsSaving(false);
+            setShowSaveMenu(false);
+        }
+    }, [orderId, onSaveToOrder, getFlattenedDataUrl, showToast]);
+
+    // File input handlers
+    const handleOpenFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        setImageFileName(file.name);
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            initFromImage(img, file.name);
+            URL.revokeObjectURL(url);
+            showToast(`✓ Imagen "${file.name}" cargada`);
+        };
+        img.src = url;
+        e.target.value = '';
+        setShowFileMenu(false);
+    }, [initFromImage, showToast]);
+
+    const handleAddLayerFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            addLayerFromImage(img, file.name);
+            URL.revokeObjectURL(url);
+            showToast(`✓ Capa "${file.name}" insertada`);
+        };
+        img.src = url;
+        e.target.value = '';
+        setShowFileMenu(false);
+    }, [addLayerFromImage, showToast]);
+
+    const handleCloseImage = useCallback(() => {
+        const blankW = 1920;
+        const blankH = 1080;
+        setCanvasWidth(blankW);
+        setCanvasHeight(blankH);
+
+        const blank = document.createElement('canvas');
+        blank.width = blankW;
+        blank.height = blankH;
+        const ctx = blank.getContext('2d')!;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, blankW, blankH);
+
+        const baseLayer: Layer = {
+            id: 'layer_' + Date.now(),
+            name: 'Lienzo Blanco',
+            visible: true,
+            opacity: 1.0,
+            blendMode: 'normal',
+            canvas: blank,
+            x: 0,
+            y: 0,
+            width: blankW,
+            height: blankH
+        };
+
+        const newLayers = [baseLayer];
+        setLayers(newLayers);
+        setActiveLayerId(baseLayer.id);
+        setCropBox({ x: 0, y: 0, width: blankW, height: blankH });
+        setImageFileName('nuevo_lienzo.png');
+        pushHistory('Lienzo en blanco', newLayers, blankW, blankH);
+        showToast('Lienzo reiniciado a blanco');
+        setShowFileMenu(false);
+    }, [pushHistory, showToast]);
+
+    // Drag & Drop on canvas
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDraggingFileOver(false);
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                setImageFileName(file.name);
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    if (layers.length <= 1 && layers[0]?.name === 'Lienzo Blanco') {
+                        initFromImage(img, file.name);
+                    } else {
+                        addLayerFromImage(img, file.name);
+                    }
+                    URL.revokeObjectURL(url);
+                    showToast(`✓ Imagen "${file.name}" importada`);
+                };
+                img.src = url;
+            }
+        }
+    }, [layers, initFromImage, addLayerFromImage, showToast]);
+
+    // Click outside dropdowns
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+                setShowFileMenu(false);
+            }
+            if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) {
+                setShowSaveMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Keyboard Shortcuts (Ctrl+S, Ctrl+O, Esc, Ctrl+Z, Ctrl+Y)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (isMaximized) {
+                    setIsMaximized(false);
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen?.().catch(() => {});
+                    }
+                }
+                setShowFileMenu(false);
+                setShowSaveMenu(false);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                handleQuickSave();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+                e.preventDefault();
+                openFileInputRef.current?.click();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                handleUndo();
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+                e.preventDefault();
+                handleRedo();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isMaximized, handleQuickSave]);
+
+    // Paste from clipboard
+    useEffect(() => {
+        const handlePaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        const url = URL.createObjectURL(blob);
+                        const img = new Image();
+                        img.onload = () => {
+                            if (layers.length <= 1 && layers[0]?.name === 'Lienzo Blanco') {
+                                initFromImage(img, 'Imagen Pegada');
+                            } else {
+                                addLayerFromImage(img, 'Capa Pegada');
+                            }
+                            URL.revokeObjectURL(url);
+                            showToast('✓ Imagen pegada desde el portapapeles');
+                        };
+                        img.src = url;
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [layers, initFromImage, addLayerFromImage, showToast]);
 
     return (
-        <div className="gimp-studio-container">
+        <div ref={containerRef} className={`gimp-studio-container ${isMaximized ? 'gimp-maximized' : ''}`}>
             {/* TOP BAR */}
             <div className="gimp-top-toolbar">
-                <div className="gimp-brand-badge">
-                    <span className="sparkle-icon">✦</span>
-                    <span className="gimp-title">GimpStudio Pre-Press HD</span>
+                <div className="gimp-toolbar-left">
+                    <div className="gimp-brand-badge">
+                        <span className="sparkle-icon">✦</span>
+                        <span className="gimp-title">GimpStudio Pre-Press HD</span>
+                    </div>
+
+                    {/* MENU ARCHIVO */}
+                    <div className="gimp-menu-dropdown-wrapper" ref={fileMenuRef}>
+                        <button
+                            type="button"
+                            className={`gimp-toolbar-btn ${showFileMenu ? 'active' : ''}`}
+                            onClick={() => {
+                                setShowFileMenu(prev => !prev);
+                                setShowSaveMenu(false);
+                            }}
+                            title="Menú de Archivo: Abrir imagen, insertar capa o cerrar lienzo"
+                        >
+                            <FolderOpen size={15} />
+                            <span>Archivo</span>
+                            <ChevronDown size={12} />
+                        </button>
+
+                        {showFileMenu && (
+                            <div className="gimp-dropdown-menu">
+                                <button
+                                    type="button"
+                                    className="gimp-dropdown-item"
+                                    onClick={() => {
+                                        openFileInputRef.current?.click();
+                                        setShowFileMenu(false);
+                                    }}
+                                >
+                                    <FolderOpen size={15} className="item-icon" />
+                                    <div className="item-text">
+                                        <strong>Abrir Imagen...</strong>
+                                        <span>Cargar archivo como nuevo lienzo</span>
+                                    </div>
+                                    <span className="kbd-shortcut">Ctrl+O</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="gimp-dropdown-item"
+                                    onClick={() => {
+                                        addLayerFileInputRef.current?.click();
+                                        setShowFileMenu(false);
+                                    }}
+                                >
+                                    <Plus size={15} className="item-icon" />
+                                    <div className="item-text">
+                                        <strong>Insertar como Nueva Capa...</strong>
+                                        <span>Añade imagen sobre las capas existentes</span>
+                                    </div>
+                                </button>
+                                <div className="gimp-dropdown-divider" />
+                                <button
+                                    type="button"
+                                    className="gimp-dropdown-item"
+                                    onClick={handleCloseImage}
+                                >
+                                    <RotateCcw size={15} className="item-icon" />
+                                    <div className="item-text">
+                                        <strong>Cerrar Imagen / Nuevo Lienzo</strong>
+                                        <span>Reinicia a lienzo limpio en blanco</span>
+                                    </div>
+                                </button>
+                                {onClose && (
+                                    <button
+                                        type="button"
+                                        className="gimp-dropdown-item item-danger"
+                                        onClick={() => {
+                                            setShowFileMenu(false);
+                                            onClose();
+                                        }}
+                                    >
+                                        <X size={15} className="item-icon" />
+                                        <div className="item-text">
+                                            <strong>Cerrar Editor</strong>
+                                            <span>Volver al Visor de Xpress</span>
+                                        </div>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* BOTÓN DIVIDIDO GUARDAR */}
+                    <div className="gimp-menu-dropdown-wrapper" ref={saveMenuRef}>
+                        <div className="gimp-split-btn-group">
+                            <button
+                                type="button"
+                                className="gimp-save-primary-btn"
+                                onClick={handleQuickSave}
+                                disabled={isSaving}
+                                title={orderId ? `Guardar en Orden #${orderId} (Ctrl+S)` : 'Guardar y Descargar PNG (Ctrl+S)'}
+                            >
+                                <Save size={15} />
+                                <span>{isSaving ? 'Guardando...' : (orderId ? `Guardar en OT #${orderId}` : 'Guardar')}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="gimp-save-arrow-btn"
+                                onClick={() => {
+                                    setShowSaveMenu(prev => !prev);
+                                    setShowFileMenu(false);
+                                }}
+                                title="Opciones de guardado y exportación"
+                            >
+                                <ChevronDown size={13} />
+                            </button>
+                        </div>
+
+                        {showSaveMenu && (
+                            <div className="gimp-dropdown-menu save-menu">
+                                {orderId && onSaveToOrder && (
+                                    <button
+                                        type="button"
+                                        className="gimp-dropdown-item item-highlight"
+                                        onClick={handleSaveToOrderExplicit}
+                                        disabled={isSaving}
+                                    >
+                                        <Check size={15} className="item-icon text-success" />
+                                        <div className="item-text">
+                                            <strong>Guardar en Orden #{orderId}</strong>
+                                            <span>Adjuntar a la ficha y lista de archivos de la orden</span>
+                                        </div>
+                                        <span className="kbd-shortcut">Ctrl+S</span>
+                                    </button>
+                                )}
+
+                                {onSendToViewer && (
+                                    <button
+                                        type="button"
+                                        className="gimp-dropdown-item"
+                                        onClick={() => {
+                                            setShowSaveMenu(false);
+                                            onSendToViewer(getFlattenedDataUrl(), imageFileName);
+                                            showToast('✓ Imagen transferida al Visor');
+                                        }}
+                                    >
+                                        <Eye size={15} className="item-icon" />
+                                        <div className="item-text">
+                                            <strong>Actualizar en Visor Xpress</strong>
+                                            <span>Ver en el visor con mediciones, tintas y cotizador</span>
+                                        </div>
+                                    </button>
+                                )}
+
+                                <div className="gimp-dropdown-divider" />
+
+                                <button
+                                    type="button"
+                                    className="gimp-dropdown-item"
+                                    onClick={() => {
+                                        setShowSaveMenu(false);
+                                        handleDownloadPng();
+                                    }}
+                                >
+                                    <Download size={15} className="item-icon" />
+                                    <div className="item-text">
+                                        <strong>Descargar PNG</strong>
+                                        <span>Máxima nitidez con canal alfa transparente</span>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="gimp-dropdown-item"
+                                    onClick={() => {
+                                        setShowSaveMenu(false);
+                                        handleDownloadJpeg();
+                                    }}
+                                >
+                                    <Download size={15} className="item-icon" />
+                                    <div className="item-text">
+                                        <strong>Descargar JPEG</strong>
+                                        <span>Calidad 100% lista para impresión directa</span>
+                                    </div>
+                                </button>
+
+                                {(onSendToRedrawer || onSendToPrintSheeter) && (
+                                    <>
+                                        <div className="gimp-dropdown-divider" />
+                                        {onSendToRedrawer && (
+                                            <button
+                                                type="button"
+                                                className="gimp-dropdown-item"
+                                                onClick={() => {
+                                                    setShowSaveMenu(false);
+                                                    onSendToRedrawer(getFlattenedDataUrl());
+                                                }}
+                                            >
+                                                <ExternalLink size={15} className="item-icon" />
+                                                <div className="item-text">
+                                                    <strong>Enviar al Vectorizador</strong>
+                                                    <span>Convertir a curvas SVG / DXF en Redrawer</span>
+                                                </div>
+                                            </button>
+                                        )}
+                                        {onSendToPrintSheeter && (
+                                            <button
+                                                type="button"
+                                                className="gimp-dropdown-item"
+                                                onClick={() => {
+                                                    setShowSaveMenu(false);
+                                                    onSendToPrintSheeter(getFlattenedDataUrl(), imageFileName);
+                                                }}
+                                            >
+                                                <ExternalLink size={15} className="item-icon" />
+                                                <div className="item-text">
+                                                    <strong>Enviar a PrintSheeter</strong>
+                                                    <span>Nesting y composición para bobina</span>
+                                                </div>
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* DESHACER / REHACER */}
+                    <div className="gimp-tool-group">
+                        <button
+                            className="gimp-icon-btn"
+                            onClick={handleUndo}
+                            disabled={historyIndex <= 0}
+                            title="Deshacer (Ctrl+Z)"
+                        >
+                            <Undo2 size={16} />
+                        </button>
+                        <button
+                            className="gimp-icon-btn"
+                            onClick={handleRedo}
+                            disabled={historyIndex >= history.length - 1}
+                            title="Rehacer (Ctrl+Y)"
+                        >
+                            <Redo2 size={16} />
+                        </button>
+                    </div>
+
+                    {/* ZOOM */}
+                    <div className="gimp-tool-group">
+                        <button
+                            className="gimp-icon-btn"
+                            onClick={() => setZoom(z => Math.max(0.1, z - 0.15))}
+                            title="Alejar Zoom"
+                        >
+                            <ZoomOut size={16} />
+                        </button>
+                        <span className="gimp-zoom-label">{Math.round(zoom * 100)}%</span>
+                        <button
+                            className="gimp-icon-btn"
+                            onClick={() => setZoom(z => Math.min(5.0, z + 0.15))}
+                            title="Acercar Zoom"
+                        >
+                            <ZoomIn size={16} />
+                        </button>
+                        <button
+                            className="gimp-icon-btn"
+                            onClick={() => {
+                                if (!viewportRef.current) return;
+                                const vpW = viewportRef.current.clientWidth - 40;
+                                const vpH = viewportRef.current.clientHeight - 40;
+                                const fitZ = Math.min(vpW / canvasWidth, vpH / canvasHeight);
+                                setZoom(Math.max(0.05, Math.round(fitZ * 100) / 100));
+                                setPanOffset({ x: 0, y: 0 });
+                            }}
+                            title="Ajustar Lienzo a la Pantalla"
+                        >
+                            <Expand size={16} />
+                        </button>
+                        <button
+                            className="gimp-icon-btn"
+                            onClick={() => { setZoom(1.0); setPanOffset({ x: 0, y: 0 }); }}
+                            title="100% Tamaño Real"
+                        >
+                            1:1
+                        </button>
+                    </div>
                 </div>
 
-                <div className="gimp-tool-group">
-                    <button
-                        className="gimp-icon-btn"
-                        onClick={handleUndo}
-                        disabled={historyIndex <= 0}
-                        title="Deshacer (Ctrl+Z)"
-                    >
-                        <Undo2 size={16} />
-                    </button>
-                    <button
-                        className="gimp-icon-btn"
-                        onClick={handleRedo}
-                        disabled={historyIndex >= history.length - 1}
-                        title="Rehacer (Ctrl+Y)"
-                    >
-                        <Redo2 size={16} />
-                    </button>
-                </div>
-
-                <div className="gimp-tool-group">
-                    <button
-                        className="gimp-icon-btn"
-                        onClick={() => setZoom(z => Math.max(0.1, z - 0.15))}
-                        title="Alejar Zoom"
-                    >
-                        <ZoomOut size={16} />
-                    </button>
-                    <span className="gimp-zoom-label">{Math.round(zoom * 100)}%</span>
-                    <button
-                        className="gimp-icon-btn"
-                        onClick={() => setZoom(z => Math.min(5.0, z + 0.15))}
-                        title="Acercar Zoom"
-                    >
-                        <ZoomIn size={16} />
-                    </button>
-                    <button
-                        className="gimp-icon-btn"
-                        onClick={() => {
-                            if (!viewportRef.current) return;
-                            const vpW = viewportRef.current.clientWidth - 40;
-                            const vpH = viewportRef.current.clientHeight - 40;
-                            const fitZ = Math.min(vpW / canvasWidth, vpH / canvasHeight);
-                            setZoom(Math.max(0.05, Math.round(fitZ * 100) / 100));
-                            setPanOffset({ x: 0, y: 0 });
-                        }}
-                        title="Ajustar a la pantalla"
-                    >
-                        <Maximize size={16} />
-                    </button>
-                    <button
-                        className="gimp-icon-btn"
-                        onClick={() => { setZoom(1.0); setPanOffset({ x: 0, y: 0 }); }}
-                        title="100% Tamaño Real"
-                    >
-                        1:1
-                    </button>
-                </div>
-
+                {/* DIMENSIONES & INFO */}
                 <div className="gimp-dimensions-info">
+                    <span className="filename-tag" title={imageFileName}>📄 {imageFileName}</span>
                     <span>{canvasWidth} × {canvasHeight} px</span>
                     <span className="dpi-tag">@150 DPI: {(canvasWidth / 59).toFixed(1)} × {(canvasHeight / 59).toFixed(1)} cm</span>
+                </div>
+
+                {/* BOTONES DERECHA: PANTALLA COMPLETA & CERRAR */}
+                <div className="gimp-toolbar-right">
+                    <button
+                        type="button"
+                        className={`gimp-action-badge-btn ${isMaximized ? 'active' : ''}`}
+                        onClick={handleToggleMaximize}
+                        title={isMaximized ? "Restaurar Pantalla (Esc)" : "Maximizar Pantalla Completa"}
+                    >
+                        {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        <span>{isMaximized ? 'Restaurar' : 'Maximizar'}</span>
+                    </button>
+
+                    {onClose && (
+                        <button
+                            type="button"
+                            className="gimp-close-editor-btn"
+                            onClick={onClose}
+                            title="Cerrar Editor y volver al Visor"
+                        >
+                            <X size={17} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -774,6 +1351,12 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
                 <div
                     className="gimp-canvas-viewport"
                     ref={viewportRef}
+                    onDragOver={e => {
+                        e.preventDefault();
+                        setIsDraggingFileOver(true);
+                    }}
+                    onDragLeave={() => setIsDraggingFileOver(false)}
+                    onDrop={handleDrop}
                     onMouseDown={e => {
                         if (e.button === 1 || activeTool === 'select') {
                             setIsPanning(true);
@@ -848,6 +1431,17 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
                                 <strong>{pickedColor.hex}</strong>
                                 <span>RGB({pickedColor.rgb.join(', ')})</span>
                                 <span className="cmyk-tag">{pickedColor.cmyk}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Drag & Drop Visual Overlay */}
+                    {isDraggingFileOver && (
+                        <div className="gimp-drop-overlay">
+                            <div className="gimp-drop-card">
+                                <UploadCloud size={48} className="drop-icon-anim" />
+                                <h3>Soltar imagen aquí</h3>
+                                <p>Se cargará inmediatamente en el lienzo de GimpStudio</p>
                             </div>
                         </div>
                     )}
@@ -1382,6 +1976,29 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Hidden file inputs */}
+            <input
+                ref={openFileInputRef}
+                type="file"
+                accept="image/*,.png,.jpg,.jpeg,.webp,.svg,.bmp"
+                style={{ display: 'none' }}
+                onChange={handleOpenFile}
+            />
+            <input
+                ref={addLayerFileInputRef}
+                type="file"
+                accept="image/*,.png,.jpg,.jpeg,.webp,.svg,.bmp"
+                style={{ display: 'none' }}
+                onChange={handleAddLayerFile}
+            />
+
+            {/* Floating Toast Notification */}
+            {toastMessage && (
+                <div className="gimp-toast-notification">
+                    {toastMessage}
+                </div>
+            )}
         </div>
     );
 };

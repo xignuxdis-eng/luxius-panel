@@ -1474,6 +1474,31 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Optimización de Memoria en Compilación Vite**: Se modularizó el empaquetado separando `pixi.js` en su propio chunk (`vendor-pixi`) en `vite.config.ts`, y se elevaron los scripts de compilación y empaquetado de Android a 4 GB (`--max-old-space-size=4096`), resolviendo de raíz el error de memoria `JavaScript heap out of memory`.
   - **Nuevo APK Generado y Verificado**: Se compiló y sincronizó con éxito la versión `LuXius-Taller-Mobile.apk` (7.49 MB) con el login y flujo de pre-impresión 100% operativos.
 
+- **Mejoras en GimpStudio HD de Xpress Viewer (13/10/2026)**:
+  - **Maximizar Pantalla Completa**:
+    - Se implementó el modo pantalla completa / maximizado (`isMaximized`) con botón toggle (`Maximize2` / `Minimize2`) en la barra superior.
+    - Soporte híbrido: overlay CSS de alta prioridad (`position: fixed; inset: 0; z-index: 999999`) y Fullscreen API nativo del navegador, garantizando funcionamiento sin bordes ni recortes en cualquier resolución o modal.
+    - Recálculo automático del zoom al maximizar/restaurar para encajar perfectamente el lienzo en el nuevo espacio de trabajo.
+    - Salida rápida mediante tecla `Escape`.
+  - **Abrir Imágenes In-Situ y Capas**:
+    - Menú desplegable **Archivo** con atajo `Ctrl+O`.
+    - **Abrir Imagen**: selector de archivo desde el disco que carga imágenes locales (PNG, JPG, WEBP, SVG, BMP) como nuevo lienzo.
+    - **Insertar como Nueva Capa**: carga imágenes sobre el lienzo existente, auto-escaladas y centradas con precisión.
+    - **Drag & Drop en Lienzo**: soporte para arrastrar imágenes desde el explorador de Windows directamente sobre el viewport con overlay visual animado.
+    - **Portapapeles**: soporte para pegar imágenes con `Ctrl+V` directamente en el espacio de trabajo.
+  - **Cerrar Imagen y Editor**:
+    - Opción **Cerrar Imagen / Nuevo Lienzo**: limpia y reinicia el espacio de trabajo a un lienzo blanco HD limpio (1920x1080).
+    - Botón **Cerrar Editor** (`X` en la esquina superior derecha y en el menú Archivo): retorna limpiamente al Visor de Xpress conservando el contexto de la orden.
+  - **Guardar y Exportación Rápida "Ahí Mismo"**:
+    - Botón principal de guardado dividido (**Guardar** / `Ctrl+S`): con 1 clic guarda directamente en la Orden de Trabajo (`#OT`) si existe orden vinculada, o descarga PNG.
+    - Menú desplegable de guardado con opciones dedicadas:
+      - *Guardar en Orden #OT* (con feedback visual de éxito).
+      - *Actualizar en Visor Xpress* (transfiere el diseño aplanado al visor técnico con cotización y medidas).
+      - *Descargar PNG* (con canal alfa transparente).
+      - *Descargar JPEG* (máxima calidad 100%).
+      - *Enviar a Redrawer* (vectorización) y *Enviar a PrintSheeter* (nesting).
+    - Sistema de notificaciones flotantes (Toasts) con confirmaciones en vivo de cada operación.
+
 ---
 
 

@@ -1182,6 +1182,8 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     initialImageUrl={previewUrl}
                     initialFile={file || undefined}
                     orderId={order?.id}
+                    order={order}
+                    onOrderUpdated={(savedOrder) => setOrder(savedOrder)}
                     onSendToRedrawer={(dataUrl) => {
                         setPreviewUrl(dataUrl);
                         setActiveTab('redrawer');
@@ -1196,14 +1198,42 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         newParams.set('tab', 'printsheeter');
                         setSearchParams(newParams);
                     }}
+                    onSendToViewer={(dataUrl, name) => {
+                        setPreviewUrl(dataUrl);
+                        setMetadata(prev => ({
+                            name: name || (file?.name ? `gimp_${file.name}` : 'diseno_retocado.png'),
+                            format: 'PNG',
+                            size: 'Editado HD',
+                            width: prev?.width || 1920,
+                            height: prev?.height || 1080,
+                            dpi: prev?.dpi || 150,
+                            colorMode: 'RGB (GimpStudio)',
+                            source: 'GimpStudio HD'
+                        }));
+                        setActiveTab('viewer');
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('tab');
+                        setSearchParams(newParams);
+                    }}
+                    onClose={() => {
+                        if (onClose) {
+                            onClose();
+                        } else {
+                            setActiveTab('viewer');
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.delete('tab');
+                            setSearchParams(newParams);
+                        }
+                    }}
                     onSaveToOrder={async (dataUrl) => {
                         if (!order) return;
                         const existing = order.archivos || [];
-                        await saveOrden({
+                        const saved = await saveOrden({
                             id: order.id,
                             ot: order.ot,
                             archivos: [dataUrl, ...existing]
                         });
+                        if (saved) setOrder(saved);
                         alert(`¡Imagen editada guardada exitosamente en la Orden #${order.ot || order.id}!`);
                     }}
                 />
