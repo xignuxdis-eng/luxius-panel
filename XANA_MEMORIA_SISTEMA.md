@@ -1515,6 +1515,22 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - Resiliencia de carga de imágenes R2/S3/CDN: resolución unificada con `resolveMediaUrl`, control anti-reinicio de lienzo mediante `loadedSourceRef` y fallback automático a Blob en caso de bloqueos por CORS anónimo.
     - Preservación del nombre de producción (`gimp_${nombre}`) al guardar en `archivos` y `archivosOriginales` de la orden de trabajo.
 
+- **Deduplicación y Saneamiento Integral de Materiales (13/10/2026)**:
+  - **Base de Datos (Supabase PostgreSQL)**:
+    - Saneamiento de `config_global.collection_materiales`, eliminando registros duplicados generados históricamente con IDs aleatorios de 6 dígitos (`FL` ID 255221 y `VBB` ID 706837).
+    - Consolidación de stocks en las fichas canónicas: `FL` (ID 1: stock consolidado a 19 unidades) y `VBB` (ID 3: stock consolidado a 55 unidades).
+    - Verificación de integridad: ninguna orden en `presupuestos` dependía de los IDs purgados.
+  - **Backend API (`luXius-Backend/app.py`)**:
+    - Filtro de salvaguarda en memoria en `_get_json_collection('materiales')` que normaliza por código y descripción para evitar que la API sirva duplicados incluso ante anomalías.
+    - Matching inteligente en `post_json_collection('materiales')`: si un upsert no provee ID o trae uno nuevo pero coincide en código o descripción, actualiza el registro existente preservando su ID canónico.
+  - **Frontend State y Caché (`src/data/db.ts`)**:
+    - Función `deduplicateMaterials()` que consolida atributos, unifica stocks, preserva precios válidos y descarta duplicados.
+    - Auto-sanación reactiva de `localStorage` (`SESSION_MATERIALES_KEY`) en `getMateriales()`, `initializeData()` y `refreshCollection()`.
+    - Blindaje de `saveMaterial()`: vinculación por código y descripción existente previa a cualquier generación de ID aleatorio.
+  - **Modal de Nuevos Pedidos (`NuevoPedidoModal.tsx`)**:
+    - Selector memoizado `availableMaterials` con deduplicación estricta por código/descripción normalizados y orden alfabético.
+    - Reemplazo y unificación en los 3 selectores de materiales del modal: Pestaña Unitaria, Selector General de Carga Masiva (Lote) y Tarjetas de Archivos Individuales en Lote.
+
 ---
 
 

@@ -244,7 +244,8 @@ export async function initializeData() {
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data)) {
-                        localStorage.setItem(col.key, JSON.stringify(data));
+                        const finalData = col.endpoint === 'materiales' ? deduplicateMaterials(data) : data;
+                        localStorage.setItem(col.key, JSON.stringify(finalData));
                     }
                 }
             } catch (e) { }
@@ -263,7 +264,8 @@ export async function refreshCollection(endpoint: string) {
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
-                localStorage.setItem(config.key, JSON.stringify(data));
+                const finalData = endpoint === 'materiales' ? deduplicateMaterials(data) : data;
+                localStorage.setItem(config.key, JSON.stringify(finalData));
             }
         }
     } catch (e) { }
@@ -1111,6 +1113,51 @@ export const DEFAULT_MATERIALES: Material[] = [
     }
 ];
 
+export function deduplicateMaterials(materials: Material[]): Material[] {
+    if (!Array.isArray(materials) || materials.length === 0) return [];
+
+    const deduped: Material[] = [];
+
+    for (const item of materials) {
+        if (!item) continue;
+        const codeKey = (item.codigo || '').trim().toUpperCase();
+        const descKey = (item.descripcion || '').trim().toLowerCase();
+
+        let existingIndex = -1;
+        if (codeKey) {
+            existingIndex = deduped.findIndex(d => (d.codigo || '').trim().toUpperCase() === codeKey);
+        }
+        if (existingIndex === -1 && descKey) {
+            existingIndex = deduped.findIndex(d => (d.descripcion || '').trim().toLowerCase() === descKey);
+        }
+
+        if (existingIndex !== -1) {
+            const existing = deduped[existingIndex];
+
+            // Prefer the item with a price > 0, or with official/lower ID
+            const preferCurrent = (Number(existing.precioM2 || 0) === 0 && Number(item.precioM2 || 0) > 0) ||
+                                  (Number(existing.id) > 100000 && Number(item.id) < 100000);
+
+            const base = preferCurrent ? item : existing;
+            const other = preferCurrent ? existing : item;
+
+            deduped[existingIndex] = {
+                ...other,
+                ...base,
+                id: (base.id < 100000 ? base.id : other.id) || base.id,
+                stockActual: (existing.stockActual || 0) + (item.stockActual || 0),
+                stockMinimo: Math.max(existing.stockMinimo || 0, item.stockMinimo || 0),
+                precioM2: Number(base.precioM2 || 0) > 0 ? base.precioM2 : (other.precioM2 || 0),
+                habilitado: existing.habilitado !== false && item.habilitado !== false
+            };
+        } else {
+            deduped.push({ ...item });
+        }
+    }
+
+    return deduped;
+}
+
 export function getMateriales(): Material[] {
     const sessionItemsJson = localStorage.getItem(SESSION_MATERIALES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_MATERIALES_KEY)
@@ -1127,6 +1174,17 @@ export function getMateriales(): Material[] {
     if (sessionItems.length === 0) {
         sessionItems = [...DEFAULT_MATERIALES];
         try { localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(sessionItems)) } catch (e) { }
+    }
+
+    // Deduplicate in memory and auto-heal localStorage if duplicates were stored
+    const dedupedItems = deduplicateMaterials(sessionItems);
+    if (dedupedItems.length !== sessionItems.length) {
+        try {
+            localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(dedupedItems));
+        } catch (e) { }
+        sessionItems = dedupedItems;
+    } else {
+        sessionItems = dedupedItems;
     }
 
     if (hiddenItemsJson) {
@@ -1190,7 +1248,7 @@ export function saveMaterial(material: Partial<Material>): Material {
 
     if (sessionItemsJson) {
         try {
-            sessionItems = JSON.parse(sessionItemsJson)
+            sessionItems = deduplicateMaterials(JSON.parse(sessionItemsJson))
         } catch (e) { }
     }
 
@@ -1210,7 +1268,14 @@ export function saveMaterial(material: Partial<Material>): Material {
         }
     }
 
-    const existingIndex = sessionItems.findIndex(m => String(m.id) === String(material.id))
+    const targetCode = (material.codigo || '').trim().toUpperCase();
+    const targetDesc = (material.descripcion || '').trim().toLowerCase();
+
+    const existingIndex = sessionItems.findIndex(m =>
+        (material.id !== undefined && material.id !== null && String(m.id) === String(material.id)) ||
+        (targetCode && (m.codigo || '').trim().toUpperCase() === targetCode) ||
+        (targetDesc && (m.descripcion || '').trim().toLowerCase() === targetDesc)
+    );
     const prevStock = existingIndex !== -1 ? (sessionItems[existingIndex].stockActual || 0) : undefined
     let result: Material
 
@@ -1218,6 +1283,7 @@ export function saveMaterial(material: Partial<Material>): Material {
         sessionItems[existingIndex] = {
             ...sessionItems[existingIndex],
             ...material,
+            id: sessionItems[existingIndex].id,
             calidad: normalizedCalidad
         } as Material
         result = sessionItems[existingIndex]
@@ -1235,14 +1301,14 @@ export function saveMaterial(material: Partial<Material>): Material {
             habilitado: material.habilitado !== undefined ? material.habilitado : true,
             stockActual: material.stockActual || 0,
             stockMinimo: material.stockMinimo || 10
-
         }
 
         sessionItems.unshift(newMaterial)
         result = newMaterial
     }
 
-    localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(sessionItems))
+    const cleanedItems = deduplicateMaterials(sessionItems)
+    localStorage.setItem(SESSION_MATERIALES_KEY, JSON.stringify(cleanedItems))
     syncSave('materiales', result);
 
     // Registrar movimiento de stock si cambió la cantidad

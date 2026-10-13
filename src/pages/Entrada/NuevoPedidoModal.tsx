@@ -376,15 +376,32 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [watchedMaterial, watchedCalidad, setValue])
 
+    // Memoized printable materials with full deduplication by normalized code and description
+    const availableMaterials = useMemo(() => {
+        const raw = getMateriales().filter(m =>
+            m.habilitado !== false &&
+            !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase())
+        );
+        const seen = new Set<string>();
+        return raw.filter(m => {
+            const codeKey = (m.codigo || '').trim().toUpperCase();
+            const descKey = (m.descripcion || '').trim().toLowerCase();
+            const key = codeKey || descKey;
+            if (!key || seen.has(key) || (descKey && seen.has(descKey))) return false;
+            seen.add(key);
+            if (descKey) seen.add(descKey);
+            return true;
+        }).sort((a, b) => (a.descripcion || '').localeCompare(b.descripcion || ''));
+    }, [isOpen]);
+
     // Auto-select initial default material if empty
     useEffect(() => {
         if (isOpen && (!watchedMaterial || watchedMaterial.trim() === '')) {
-            const mats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
-            if (mats.length > 0) {
-                setValue('material', mats[0].codigo);
+            if (availableMaterials.length > 0) {
+                setValue('material', availableMaterials[0].codigo);
             }
         }
-    }, [isOpen, watchedMaterial, setValue]);
+    }, [isOpen, watchedMaterial, setValue, availableMaterials]);
 
     // Synchronize batch items material when global watchedMaterial changes or when items are empty
     useEffect(() => {
@@ -1500,7 +1517,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         console.log(`[Luxius-Batch] Iniciando carga de ${files.length} archivos.`);
         setExtracting(true);
 
-        const availableMats = getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
+        const availableMats = availableMaterials;
         const currentMat = getValues('material');
         const initialMat = currentMat || watchedMaterial || (availableMats.length > 0 ? availableMats[0].codigo : '');
 
@@ -2187,22 +2204,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                         <label>Material</label>
                                         <select {...register('material', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
                                             <option value="">...</option>
-                                            {(() => {
-                                                // RESTORED: Filter out ink and solvent types
-                                                let mats = getMateriales().filter(m =>
-                                                    m.habilitado !== false &&
-                                                    !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase())
-                                                );
-                                                const seen = new Set();
-                                                return mats
-                                                    .filter(m => {
-                                                        if (seen.has(m.descripcion)) return false;
-                                                        seen.add(m.descripcion);
-                                                        return true;
-                                                    })
-                                                    .sort((a, b) => a.descripcion.localeCompare(b.descripcion))
-                                                    .map(m => <option key={m.id} value={m.codigo}>{m.descripcion}</option>);
-                                            })()}
+                                            {availableMaterials.map(m => (
+                                                <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
@@ -2642,11 +2646,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 }}
                                             >
                                                 <option value="">Seleccionar material (Obligatorio)...</option>
-                                                {getMateriales()
-                                                    .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
-                                                    .map(m => (
-                                                        <option key={m.id} value={m.codigo}>{m.descripcion}</option>
-                                                    ))}
+                                                {availableMaterials.map(m => (
+                                                    <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                ))}
                                             </select>
                                         </div>
                                     </div>
@@ -2957,11 +2959,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                                 onChange={(e) => setBatchItems(prev => prev.map(i => i.id === item.id ? { ...i, material: e.target.value } : i))}
                                                             >
                                                                 <option value="">Elija material</option>
-                                                                {getMateriales()
-                                                                    .filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()))
-                                                                    .map(m => (
-                                                                        <option key={m.id} value={m.codigo}>{m.descripcion}</option>
-                                                                    ))}
+                                                                {availableMaterials.map(m => (
+                                                                    <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                                ))}
                                                             </select>
                                                         </div>
                                                         <div style={{ width: '50px' }}>
