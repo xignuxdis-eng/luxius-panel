@@ -1,0 +1,1 @@
+Pone aca tus imagenes PNG de sprites (operarios, plotter, estaciones...) y activalas en src/components/workshop/content/sprites.ts. Guia: src/components/workshop/README.md
