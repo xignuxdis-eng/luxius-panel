@@ -60,11 +60,13 @@ import {
     UploadCloud,
     Expand
 } from 'lucide-react';
+import { resolveMediaUrl } from '../../../data/db';
 import './GimpStudio.css';
 
 export interface GimpStudioProps {
     initialImageUrl?: string;
     initialFile?: File;
+    initialFileName?: string;
     orderId?: number;
     order?: Order | null;
     onOrderUpdated?: (order: Order) => void;
@@ -78,6 +80,7 @@ export interface GimpStudioProps {
 export const GimpStudio: React.FC<GimpStudioProps> = ({
     initialImageUrl,
     initialFile,
+    initialFileName,
     orderId,
     order,
     onOrderUpdated,
@@ -92,7 +95,7 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
 
     // Current Image Filename & Menus
     const [imageFileName, setImageFileName] = useState<string>(
-        initialFile?.name || 'diseno_gimpstudio.png'
+        initialFileName || initialFile?.name || 'diseno_gimpstudio.png'
     );
     const [showFileMenu, setShowFileMenu] = useState<boolean>(false);
     const [showSaveMenu, setShowSaveMenu] = useState<boolean>(false);
@@ -316,25 +319,58 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
     }, [layers, canvasWidth, canvasHeight, initFromImage, pushHistory]);
 
     // Load initial image or file
+    const loadedSourceRef = useRef<string | null>(null);
+
     useEffect(() => {
         if (initialFile) {
-            setImageFileName(initialFile.name);
+            const fileKey = `file_${initialFile.name}_${initialFile.size}_${initialFile.lastModified}`;
+            if (loadedSourceRef.current === fileKey) return;
+            loadedSourceRef.current = fileKey;
+
+            const name = initialFileName || initialFile.name;
+            setImageFileName(name);
             const url = URL.createObjectURL(initialFile);
             const img = new Image();
             img.onload = () => {
-                initFromImage(img, initialFile.name);
+                initFromImage(img, name);
                 URL.revokeObjectURL(url);
             };
             img.src = url;
         } else if (initialImageUrl) {
-            setImageFileName('diseno_cargado.png');
+            const resolved = resolveMediaUrl(initialImageUrl);
+            if (loadedSourceRef.current === resolved) return;
+            loadedSourceRef.current = resolved;
+
+            const fileName = initialFileName || resolved.split('/').pop()?.split('?')[0] || 'diseno_cargado.png';
+            setImageFileName(fileName);
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => {
-                initFromImage(img, 'Diseño Cargado');
+                initFromImage(img, fileName);
             };
-            img.src = initialImageUrl;
-        } else {
+            img.onerror = () => {
+                // Si crossOrigin anónimo falla por restricciones CORS del CDN/S3, cargar mediante blob o directo
+                fetch(resolved)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const blobUrl = URL.createObjectURL(blob);
+                        const fallbackImg = new Image();
+                        fallbackImg.onload = () => {
+                            initFromImage(fallbackImg, fileName);
+                            URL.revokeObjectURL(blobUrl);
+                        };
+                        fallbackImg.src = blobUrl;
+                    })
+                    .catch(err => {
+                        console.warn('Fallback imagen directa en GimpStudio:', err);
+                        const directImg = new Image();
+                        directImg.onload = () => initFromImage(directImg, fileName);
+                        directImg.src = resolved;
+                    });
+            };
+            img.src = resolved;
+        } else if (!loadedSourceRef.current) {
+            loadedSourceRef.current = 'blank_canvas';
             setImageFileName('lienzo_blanco.png');
             // Default blank HD canvas (1920x1080)
             const blank = document.createElement('canvas');
@@ -347,7 +383,7 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
             img.onload = () => initFromImage(img, 'Lienzo Blanco');
             img.src = blank.toDataURL();
         }
-    }, [initialFile, initialImageUrl, initFromImage]);
+    }, [initialFile, initialImageUrl, initialFileName, initFromImage]);
 
     // Render composited layers to renderCanvas
     const renderComposited = useCallback(() => {

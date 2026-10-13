@@ -18,6 +18,7 @@ interface UniversalFilePreviewProps {
     colorMode?: string;
     fileSize?: string;
     enableModal?: boolean;
+    orderId?: number;
 }
 
 const getExtension = (filename: string) => {
@@ -52,7 +53,8 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
     dpi,
     colorMode,
     fileSize,
-    enableModal = true
+    enableModal = true,
+    orderId
 }) => {
     const [imgSrc, setImgSrc] = useState<string | null>(null);
     const [hasError, setHasError] = useState(false);
@@ -302,6 +304,7 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                     colorMode={colorMode}
                     fileSize={fileSize}
                     downloadUrl={fileUrl || undefined}
+                    orderId={orderId}
                 />
             )}
         </>

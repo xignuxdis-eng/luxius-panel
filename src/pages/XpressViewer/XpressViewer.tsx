@@ -71,6 +71,14 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
     const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : (searchParams.get('tab') === 'gimpstudio' || searchParams.get('tab') === 'editor' ? 'gimpstudio' : 'viewer'));
     const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter' | 'gimpstudio'>(initialTab);
 
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'redrawer') setActiveTab('redrawer');
+        else if (tabParam === 'printsheeter' || tabParam === 'mosaic') setActiveTab('printsheeter');
+        else if (tabParam === 'gimpstudio' || tabParam === 'editor') setActiveTab('gimpstudio');
+        else if (!tabParam && activeTab !== 'viewer') setActiveTab('viewer');
+    }, [searchParams]);
+
     // Orden Vinculada (Fase 3 & 5)
     const orderIdParam = searchParams.get('orderId') || (initialOrderId ? String(initialOrderId) : null);
     const [order, setOrder] = useState<Order | null>(null);
@@ -1179,8 +1187,9 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 />
             ) : activeTab === 'gimpstudio' ? (
                 <GimpStudio 
-                    initialImageUrl={previewUrl}
+                    initialImageUrl={previewUrl || paramFileUrl || undefined}
                     initialFile={file || undefined}
+                    initialFileName={file?.name || paramFileName || metadata?.name || undefined}
                     orderId={order?.id}
                     order={order}
                     onOrderUpdated={(savedOrder) => setOrder(savedOrder)}
@@ -1228,10 +1237,13 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     onSaveToOrder={async (dataUrl) => {
                         if (!order) return;
                         const existing = order.archivos || [];
+                        const origExisting = order.archivosOriginales || [];
+                        const savedName = `gimp_${paramFileName || file?.name || 'diseno_retocado.png'}`;
                         const saved = await saveOrden({
                             id: order.id,
                             ot: order.ot,
-                            archivos: [dataUrl, ...existing]
+                            archivos: [dataUrl, ...existing],
+                            archivosOriginales: [savedName, ...origExisting]
                         });
                         if (saved) setOrder(saved);
                         alert(`¡Imagen editada guardada exitosamente en la Orden #${order.ot || order.id}!`);

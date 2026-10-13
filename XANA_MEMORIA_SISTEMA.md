@@ -1499,7 +1499,23 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
       - *Enviar a Redrawer* (vectorización) y *Enviar a PrintSheeter* (nesting).
     - Sistema de notificaciones flotantes (Toasts) con confirmaciones en vivo de cada operación.
 
+- **Apertura Directa de Cualquier Imagen en GimpStudio desde Detalle y Preview de Órdenes (13/10/2026)**:
+  - **Modal de Detalle de Orden (`SharedFileViewerModal.tsx`)**:
+    - **Botón en Cabecera**: agregado botón `🎨 Abrir en GIMP` en la barra superior junto a *Ver / Imprimir PDF Presupuesto* y *Etiqueta*, permitiendo abrir con 1 clic el diseño principal de la OT en el editor.
+    - **Botonera por Archivo (`.card-actions`)**: añadido botón `🎨 Editor GIMP` en cada tarjeta de archivo, permitiendo editar de forma independiente cualquier imagen o diseño adjunto a la orden.
+    - **Clic Directo en Miniatura**: las miniaturas de imágenes ahora son interactivas (cursor pointer) con badge hover `🎨 Editar GIMP`, abriendo directamente el lienzo en GimpStudio.
+  - **Lightbox y Previsualizador Universal (`FilePreviewModal.tsx` y `UniversalFilePreview.tsx`)**:
+    - Añadido botón de paleta (`Palette` / `🎨`) en la barra superior del visualizador y botón `🎨 Abrir en Editor GIMP` en el pie de especificaciones técnicas, vinculado con el `orderId` y nombre de producción.
+  - **Menú Rápido de Fila en Entrada (`Entrada.tsx`)**:
+    - Agregada opción `🎨 Editor GIMP` en el menú contextual de 3 puntos (`•••`) de cada fila de pedido (tanto para órdenes individuales como para pedidos agrupados en lotes).
+  - **Carga Inmediata y Resiliencia en `XpressViewer.tsx` y `GimpStudio.tsx`**:
+    - Paso instantáneo de `initialImageUrl` y `initialFileName` desde parámetros de búsqueda (`paramFileUrl` y `paramFileName`), sin esperar procesamiento asíncrono.
+    - Sincronización automática y reactiva de la pestaña `activeTab` ante cambios en la URL (`tab=gimpstudio` o `tab=editor`).
+    - Resiliencia de carga de imágenes R2/S3/CDN: resolución unificada con `resolveMediaUrl`, control anti-reinicio de lienzo mediante `loadedSourceRef` y fallback automático a Blob en caso de bloqueos por CORS anónimo.
+    - Preservación del nombre de producción (`gimp_${nombre}`) al guardar en `archivos` y `archivosOriginales` de la orden de trabajo.
+
 ---
+
 
 
 

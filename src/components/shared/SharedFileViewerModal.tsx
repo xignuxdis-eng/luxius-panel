@@ -271,6 +271,35 @@ export default function SharedFileViewerModal({
                         >
                             🏷️ Imprimir Etiqueta
                         </button>
+                        {order.archivos && order.archivos.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    onClose();
+                                    const firstFile = resolveMediaUrl(order.archivos[0]);
+                                    const orig = order.archivosOriginales?.[0] || order.archivos[0].split('/').pop()?.split('?')[0] || 'diseno';
+                                    const prod = buildProductionFilename(order, 0, orig);
+                                    const orderParam = order?.id ? `&orderId=${order.id}` : '';
+                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}${orderParam}&tab=gimpstudio`);
+                                }}
+                                style={{
+                                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '0.6rem 1.2rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)',
+                                    whiteSpace: 'nowrap'
+                                }}
+                                title="Abrir diseño principal en el Editor GIMP"
+                            >
+                                🎨 Abrir en GIMP
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -300,39 +329,71 @@ export default function SharedFileViewerModal({
                                 <div key={i} className={`file-card ${standardized ? 'is-standard' : 'is-pending'}`}>
                                     <div className="file-preview-container" style={{ minHeight: isPdf ? '250px' : isVideo ? '200px' : 'auto' }}>
                                         {isImage ? (
-                                            <img
-                                                src={url}
-                                                alt={originalName}
-                                                className="img-preview"
-                                                onError={(e) => {
-                                                    console.warn('[Image Error] Fallback thumbnail or card:', url)
-                                                    if (order.imgMetadata?.thumbnailUrl && e.currentTarget.src !== order.imgMetadata.thumbnailUrl) {
-                                                        e.currentTarget.src = order.imgMetadata.thumbnailUrl
-                                                    } else {
-                                                        // Ocultar imagen rota y mostrar card universal
-                                                        e.currentTarget.style.display = 'none'
-                                                        const parent = e.currentTarget.parentElement
-                                                        if (parent && !parent.querySelector('.universal-preview-fallback')) {
-                                                            const fallbackDiv = document.createElement('div')
-                                                            fallbackDiv.className = 'universal-preview-fallback'
-                                                            fallbackDiv.style.padding = '20px'
-                                                            fallbackDiv.style.textAlign = 'center'
-                                                            const iconDiv = document.createElement('div')
-                                                            iconDiv.style.fontSize = '2.5rem'
-                                                            iconDiv.style.marginBottom = '8px'
-                                                            iconDiv.textContent = '🖼️'
-                                                            const nameDiv = document.createElement('div')
-                                                            nameDiv.style.fontSize = '0.85rem'
-                                                            nameDiv.style.color = '#94a3b8'
-                                                            nameDiv.style.wordBreak = 'break-all'
-                                                            nameDiv.textContent = String(originalName)
-                                                            fallbackDiv.appendChild(iconDiv)
-                                                            fallbackDiv.appendChild(nameDiv)
-                                                            parent.appendChild(fallbackDiv)
-                                                        }
-                                                    }
+                                            <div
+                                                style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
+                                                title="Hacé clic para editar en GIMP Studio"
+                                                onClick={() => {
+                                                    onClose()
+                                                    const orderParam = order?.id ? `&orderId=${order.id}` : ''
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=gimpstudio`)
                                                 }}
-                                            />
+                                            >
+                                                <img
+                                                    src={url}
+                                                    alt={originalName}
+                                                    className="img-preview"
+                                                    onError={(e) => {
+                                                        console.warn('[Image Error] Fallback thumbnail or card:', url)
+                                                        if (order.imgMetadata?.thumbnailUrl && e.currentTarget.src !== order.imgMetadata.thumbnailUrl) {
+                                                            e.currentTarget.src = order.imgMetadata.thumbnailUrl
+                                                        } else {
+                                                            // Ocultar imagen rota y mostrar card universal
+                                                            e.currentTarget.style.display = 'none'
+                                                            const parent = e.currentTarget.parentElement
+                                                            if (parent && !parent.querySelector('.universal-preview-fallback')) {
+                                                                const fallbackDiv = document.createElement('div')
+                                                                fallbackDiv.className = 'universal-preview-fallback'
+                                                                fallbackDiv.style.padding = '20px'
+                                                                fallbackDiv.style.textAlign = 'center'
+                                                                const iconDiv = document.createElement('div')
+                                                                iconDiv.style.fontSize = '2.5rem'
+                                                                iconDiv.style.marginBottom = '8px'
+                                                                iconDiv.textContent = '🖼️'
+                                                                const nameDiv = document.createElement('div')
+                                                                nameDiv.style.fontSize = '0.85rem'
+                                                                nameDiv.style.color = '#94a3b8'
+                                                                nameDiv.style.wordBreak = 'break-all'
+                                                                nameDiv.textContent = String(originalName)
+                                                                fallbackDiv.appendChild(iconDiv)
+                                                                fallbackDiv.appendChild(nameDiv)
+                                                                parent.appendChild(fallbackDiv)
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                                <div 
+                                                    style={{
+                                                        position: 'absolute',
+                                                        bottom: '6px',
+                                                        right: '6px',
+                                                        background: 'rgba(15, 23, 42, 0.85)',
+                                                        backdropFilter: 'blur(4px)',
+                                                        border: '1px solid rgba(139, 92, 246, 0.6)',
+                                                        color: '#c084fc',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 700,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        pointerEvents: 'none',
+                                                        boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
+                                                    }}
+                                                >
+                                                    <span>🎨</span> Editar GIMP
+                                                </div>
+                                            </div>
                                         ) : isVideo ? (
                                             <div className="video-preview-box" style={{ width: '100%', padding: '4px' }}>
                                                 <video controls src={url} style={{ width: '100%', maxHeight: '220px', borderRadius: '8px', background: '#000' }} playsInline></video>
@@ -350,6 +411,7 @@ export default function SharedFileViewerModal({
                                                 dpi={order.imgMetadata?.dpi}
                                                 colorMode={order.imgMetadata?.colorMode}
                                                 style={{ minHeight: '180px', maxHeight: '250px' }}
+                                                orderId={order.id}
                                             />
                                         )}
                                         {!standardized && (
@@ -389,6 +451,26 @@ export default function SharedFileViewerModal({
                                             >
                                                 <span className="icon">👁️</span>
                                                 Xpress Studio
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn-download-premium"
+                                                onClick={() => {
+                                                    onClose()
+                                                    const orderParam = order?.id ? `&orderId=${order.id}` : ''
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=gimpstudio`)
+                                                }}
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                                                    borderColor: '#7c3aed',
+                                                    color: '#fff',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.35)'
+                                                }}
+                                                title="Abrir y editar en GIMP Studio (Retoque, capas, filtros, guardar a orden)"
+                                            >
+                                                <span className="icon">🎨</span>
+                                                Editor GIMP
                                             </button>
                                             <button
                                                 type="button"

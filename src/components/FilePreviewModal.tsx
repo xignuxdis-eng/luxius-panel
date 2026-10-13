@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ZoomIn, ZoomOut, RotateCcw, X, Download, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ZoomIn, ZoomOut, RotateCcw, X, Download, FileText, Palette } from 'lucide-react';
 import './FilePreviewModal.css';
 
 export interface FilePreviewModalProps {
@@ -14,6 +15,7 @@ export interface FilePreviewModalProps {
     colorMode?: string;
     fileSize?: string;
     downloadUrl?: string;
+    orderId?: number;
 }
 
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
@@ -26,8 +28,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     dpi,
     colorMode,
     fileSize,
-    downloadUrl
+    downloadUrl,
+    orderId
 }) => {
+    const navigate = useNavigate();
     const [zoom, setZoom] = useState<number>(1);
     const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -120,6 +124,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                                 <Download size={16} />
                             </a>
                         )}
+                        {(downloadUrl || imgSrc) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClose();
+                                    const targetUrl = downloadUrl || imgSrc || '';
+                                    const orderPart = orderId ? `&orderId=${orderId}` : '';
+                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(targetUrl)}&fileName=${encodeURIComponent(fileName)}${orderPart}&tab=gimpstudio`);
+                                }}
+                                className="tool-btn"
+                                title="Abrir y editar en GIMP Studio (Capas, retoque y filtros)"
+                                style={{ color: '#c084fc' }}
+                            >
+                                <Palette size={16} />
+                            </button>
+                        )}
                         <button type="button" onClick={onClose} title="Cerrar (Esc)" className="tool-btn close-btn">
                             <X size={18} />
                         </button>
@@ -180,8 +200,38 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                             </div>
                         )}
                     </div>
-                    <div className="preview-tip">
-                        💡 <em>Arrastrá para mover y usá la rueda del mouse para hacer zoom</em>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        {(downloadUrl || imgSrc) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClose();
+                                    const targetUrl = downloadUrl || imgSrc || '';
+                                    const orderPart = orderId ? `&orderId=${orderId}` : '';
+                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(targetUrl)}&fileName=${encodeURIComponent(fileName)}${orderPart}&tab=gimpstudio`);
+                                }}
+                                style={{
+                                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '5px 12px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
+                                }}
+                                title="Abrir imagen en el Editor GIMP"
+                            >
+                                🎨 Abrir en Editor GIMP
+                            </button>
+                        )}
+                        <div className="preview-tip">
+                            💡 <em>Arrastrá para mover y usá la rueda del mouse para hacer zoom</em>
+                        </div>
                     </div>
                 </div>
             </div>

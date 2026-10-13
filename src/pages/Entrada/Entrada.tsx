@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag, isDesignerOwner } from '../../types/orden'
 import { isDesignerRole } from '../../types/auth'
-import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch } from '@data/db'
+import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, resolveMediaUrl } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
 import StatusChangeModal from './StatusChangeModal'
@@ -17,7 +18,7 @@ import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
 import NestingStudioModal from '@components/workshop/NestingStudioModal'
 import { runNesting, getBobinaUsefulWidth, type NestingItem } from '@/utils/nestingEngine'
-import { downloadSingleOrderFiles, downloadBatchOrdersZip, type DownloadProgressState } from '@/utils/orderFileDownloader'
+import { downloadSingleOrderFiles, downloadBatchOrdersZip, buildProductionFilename, type DownloadProgressState } from '@/utils/orderFileDownloader'
 import './Entrada.css'
 
 interface OrderTagBadgesProps {
@@ -102,6 +103,7 @@ function OrderTagBadges({ order, tagPopoverOrderId, setTagPopoverOrderId, onTogg
 }
 
 export default function Entrada() {
+    const navigate = useNavigate()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -1844,6 +1846,22 @@ export default function Entrada() {
                                                                             >
                                                                                 <span>💬</span> Chat / Mensajes
                                                                             </button>
+                                                                            {order.archivos && order.archivos.length > 0 && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="action-menu-item"
+                                                                                    onClick={() => {
+                                                                                        setActionMenuOrderId(null);
+                                                                                        const firstFile = resolveMediaUrl(order.archivos[0]);
+                                                                                        const orig = order.archivosOriginales?.[0] || order.archivos[0].split('/').pop()?.split('?')[0] || 'diseno';
+                                                                                        const prod = buildProductionFilename(order, 0, orig);
+                                                                                        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${order.id}&tab=gimpstudio`);
+                                                                                    }}
+                                                                                    style={{ color: '#c084fc', fontWeight: 600 }}
+                                                                                >
+                                                                                    <span>🎨</span> Editor GIMP
+                                                                                </button>
+                                                                            )}
                                                                             <button
                                                                                 type="button"
                                                                                 className="action-menu-item"
@@ -2124,6 +2142,22 @@ export default function Entrada() {
                                                                     >
                                                                         <span>💬</span> Chat / Mensajes
                                                                     </button>
+                                                                    {order.archivos && order.archivos.length > 0 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="action-menu-item"
+                                                                            onClick={() => {
+                                                                                setActionMenuOrderId(null);
+                                                                                const firstFile = resolveMediaUrl(order.archivos[0]);
+                                                                                const orig = order.archivosOriginales?.[0] || order.archivos[0].split('/').pop()?.split('?')[0] || 'diseno';
+                                                                                const prod = buildProductionFilename(order, 0, orig);
+                                                                                navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${order.id}&tab=gimpstudio`);
+                                                                            }}
+                                                                            style={{ color: '#c084fc', fontWeight: 600 }}
+                                                                        >
+                                                                            <span>🎨</span> Editor GIMP
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         type="button"
                                                                         className="action-menu-item"
