@@ -79,24 +79,38 @@ export function resolveMediaUrl(fileStr: string): string {
 
     const baseUrl = API_URL.replace(/\/api\/?$/, '')
 
+    // Helper: appendea ?token= al final de una URL de /uploads/ para que
+    // <img src>, window.open() y links directos pasen autenticación.
+    const withToken = (url: string): string => {
+        const jwt = localStorage.getItem('luxius_auth_token')
+        if (!jwt) return url
+        const sep = url.includes('?') ? '&' : '?'
+        return `${url}${sep}token=${encodeURIComponent(jwt)}`
+    }
+
     // Normalize localhost / 127.0.0.1 or cloud URLs to the active baseUrl
     if (trimmed.includes('localhost:5000/uploads/') || trimmed.includes('127.0.0.1:5000/uploads/')) {
         const parts = trimmed.split('/uploads/')
         const filename = parts[parts.length - 1]
-        return `${baseUrl}/uploads/${filename}`
+        return withToken(`${baseUrl}/uploads/${filename}`)
     }
 
     if (trimmed.includes('luxius-backend.onrender.com/uploads/')) {
         const parts = trimmed.split('/uploads/')
         const filename = parts[parts.length - 1]
-        return `${baseUrl}/uploads/${filename}`
+        return withToken(`${baseUrl}/uploads/${filename}`)
     }
 
     const httpIdx = trimmed.indexOf('http://')
     const httpsIdx = trimmed.indexOf('https://')
     const firstHttp = httpIdx !== -1 ? httpIdx : httpsIdx
     if (firstHttp !== -1) {
-        return trimmed.substring(firstHttp)
+        const url = trimmed.substring(firstHttp)
+        // Solo appendear token si es una URL de /uploads/ de nuestro propio backend
+        if (url.includes('/uploads/') && url.includes(baseUrl.replace(/^https?:\/\//, ''))) {
+            return withToken(url)
+        }
+        return url
     }
 
     let cleanPath = trimmed.replace(/^\/+/, '')
@@ -104,7 +118,7 @@ export function resolveMediaUrl(fileStr: string): string {
         cleanPath = cleanPath.replace(/^uploads\//, '')
     }
 
-    return `${baseUrl}/uploads/${cleanPath}`
+    return withToken(`${baseUrl}/uploads/${cleanPath}`)
 }
 
 const COLLECTIONS_CONFIG = [
