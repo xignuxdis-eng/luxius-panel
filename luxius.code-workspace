@@ -28,9 +28,69 @@
 		},
 		"python.defaultInterpreterPath": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
 		"java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
+		"python.analysis.extraPaths": [
+			"${workspaceFolder:luXius-Backend (API Flask)}"
+		],
 		"[python]": {
 			"editor.tabSize": 4
 		}
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Frontend: Dev Server (Vite)",
+				"type": "shell",
+				"command": "npm run dev",
+				"options": {
+					"cwd": "${workspaceFolder:luxius-panel (Frontend)}"
+				},
+				"isBackground": true,
+				"problemMatcher": ["$vite"]
+			},
+			{
+				"label": "Frontend: Verify (Typecheck + Lint + Build)",
+				"type": "shell",
+				"command": "npm run verify",
+				"options": {
+					"cwd": "${workspaceFolder:luxius-panel (Frontend)}"
+				},
+				"group": {
+					"kind": "test",
+					"isDefault": true
+				}
+			},
+			{
+				"label": "Frontend: Deploy gh-pages",
+				"type": "shell",
+				"command": ".\\scripts\\deploy_gh_pages.ps1",
+				"options": {
+					"cwd": "${workspaceFolder:luxius-panel (Frontend)}"
+				}
+			},
+			{
+				"label": "Backend: Run Flask API",
+				"type": "shell",
+				"command": "python app.py",
+				"options": {
+					"cwd": "${workspaceFolder:luXius-Backend (API Flask)}"
+				},
+				"isBackground": true
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Backend: Flask API (Debug)",
+				"type": "python",
+				"request": "launch",
+				"program": "${workspaceFolder:luXius-Backend (API Flask)}/app.py",
+				"cwd": "${workspaceFolder:luXius-Backend (API Flask)}",
+				"console": "integratedTerminal"
+			}
+		]
 	},
 	"extensions": {
 		"recommendations": [

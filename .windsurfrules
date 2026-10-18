@@ -1,0 +1,21 @@
+# Reglas de Flujo de Trabajo y Contexto Maestro - Luxius System
+
+Documentos de contexto permanente:
+- `XANA_MEMORIA_SISTEMA.md`: Contexto maestro de arquitectura, bitácora, APIs y decisiones de diseño.
+- `.agents/AGENTS.md`: Reglas obligatorias de flujo de trabajo.
+
+## Reglas Clave:
+1. **Desarrollo y Verificación**:
+   - Cada cambio en el frontend debe verificarse con `npm run verify` (`tsc` + `eslint` + `vite build`) asegurando 0 errores.
+2. **Base de Datos**:
+   - Supabase PostgreSQL (Session pooler `aws-0-us-east-1.pooler.supabase.com:5432/postgres`). Neon fue eliminada el 18/10/2026; no usarla.
+3. **Control de Versiones y Despliegue**:
+   - Terminales no interactivas: `$env:GIT_TERMINAL_PROMPT = '0'`.
+   - Remoto: `origin master` apunta exclusivamente a GitHub (`github.com/xignuxdis-eng/luxius-panel`).
+   - Al compilar y verificar: `git add`, `git commit -m "..."`, `git push origin master`.
+   - Actualización de versión pública gh-pages: `.\scripts\deploy_gh_pages.ps1`.
+   - Nginx local: copiar `dist/*` a `D:\XignuX\luxius-panel\dist\`.
+4. **Memoria del Sistema**:
+   - Todo cambio relevante (bugfix, arquitectura, decisión) se asienta en `XANA_MEMORIA_SISTEMA.md` (bitácora sección 6) en el mismo commit.
+5. **Autonomía y Auto-Aprobación**:
+   - Ejecutar de forma autónoma tareas, compilaciones y despliegues sin esperar aprobaciones intermedias.
