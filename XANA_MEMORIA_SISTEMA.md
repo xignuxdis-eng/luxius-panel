@@ -1052,6 +1052,27 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 #### 🚨 Nivel P0: Acciones Inmediatas del Usuario (Credenciales y Seguridad Crítica)
 
+##### 📋 Estado del tablero P0 (verificado 18/10/2026)
+
+| # | Tarea | Estado | Qué falta | Quién |
+|---|---|---|---|---|
+| P0.1 | Rotar token de **Cloudflare R2** | 🔴 **ABIERTA — la más urgente** | `private_legacy_r2.py` sigue en disco; credenciales viejas vivas en el historial público | **Usuario** (Cloudflare + Render) |
+| P0.2 | Baja de **Neon** | 🟢 **CERRADA** | — | Hecho 18/10. Instancia eliminada, `.env` migrados a Supabase, confirmado inaccesible |
+| P0.3 | Repartir contraseñas y purgar `CREDENCIALES_NUEVAS.txt` | 🟡 **ABIERTA (parcial)** | El archivo sigue en `f:\luXius-Backend\CREDENCIALES_NUEVAS.txt` (510 bytes, 03/10). No está en ningún repo. Falta confirmar que el personal recibió sus credenciales | **Usuario** |
+| P0.4 | Habilitar acceso a **usuarios cliente** | 🟡 **ABIERTA** | 3 usuarios cliente sin `client_id` y todos sin `password_hash` | **Usuario** (ABM → Usuarios) |
+
+> **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
+
+##### 🔧 Herramienta de verificación (creada 18/10/2026)
+
+```bash
+python scripts/verificar_p0_r2.py
+```
+
+Solo lectura. Reporta en un vistazo: (1) `storage` real en producción, (2) si `private_legacy_r2.py` sigue en disco, (3) si `config.py` todavía lo importa, (4) secretos R2 hardcodeados en el código, (5) commits del historial público que tocaron `R2_SECRET_ACCESS_KEY`. Correrlo **después** de rotar en Cloudflare + Render: debe dar todo en OK.
+
+**Resultado al 18/10/2026 (baseline):** `HTTP 200 | storage = r2-legacy` → la rotación **NO** está hecha. `private_legacy_r2.py` sigue en disco y `config.py` lo sigue importando. Sin secretos hardcodeados en el código fuente del panel. 11 commits del historial público tocaron la clave de R2.
+
 ##### [ ] Tarea P0.1: Rotación de Token API de Cloudflare R2 y Desactivación de Fallback Transitorio
 - **Objetivo**: Garantizar el almacenamiento multimedia en Cloudflare R2 con credenciales rotadas y privadas, eliminando el fallback transitorio `private_legacy_r2.py`.
 - **Prerrequisitos**: Acceso a la consola de Cloudflare (cuenta XignuX) y al panel de control de Render (`luxius-backend`).
@@ -1078,6 +1099,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
   - `GET https://luxius-backend.onrender.com/health` responde `{"status": "ok", "storage": "r2"}`.
   - Subida de un archivo de prueba vía `/api/cloud-import` o `/xpress-viewer` confirmada en el bucket.
 - **Riesgo y Rollback**: Si las credenciales son incorrectas, `boto3` fallará al conectar con S3; el servicio caerá al fallback local o emitirá error 500 al subir archivos. Rollback: verificar sintaxis de claves en Render sin espacios adicionales.
+- **🔴 ESTADO REAL 18/10/2026 (verificado, NO HECHO)**: `f:\luXius-Backend\private_legacy_r2.py` **sigue en disco** y `config.py` todavía lo importa. Mientras el archivo exista, la P0.1 no se puede cerrar: las credenciales R2 antiguas siguen vivas y explotables desde el historial público de `luxius-panel`. Es la **única P0 que aún permite acceso real a datos**. Requiere el panel de Cloudflare (crear token nuevo) y el de Render (cargar las 4 variables).
 
 ##### [~] Tarea P0.2: Baja Definitiva de Neon PostgreSQL (SUPERADA por la migración — 18/10/2026)
 - **Estado original**: *Rotación de Contraseña de Neon.* **Cerrada sin ejecutar.**
