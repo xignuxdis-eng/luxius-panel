@@ -5,7 +5,7 @@
 
 ---
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 09/10/2026 01:10 (Auditoría Ergonómica Integral, Rollback Point v1.0.0-baseline, Upgrade de Versión a v1.1.0 y Roadmap de Refinamiento UX/UI ErgoDesign)  
+> **Última Actualización:** 18/10/2026 11:53 (Resolución de Problemas Estáticos, Java 21 para Gradle Android y Compatibilidad CSS)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -1550,9 +1550,18 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - Función `deduplicateMaterials()` que consolida atributos, unifica stocks, preserva precios válidos y descarta duplicados.
     - Auto-sanación reactiva de `localStorage` (`SESSION_MATERIALES_KEY`) en `getMateriales()`, `initializeData()` y `refreshCollection()`.
     - Blindaje de `saveMaterial()`: vinculación por código y descripción existente previa a cualquier generación de ID aleatorio.
-  - **Modal de Nuevos Pedidos (`NuevoPedidoModal.tsx`)**:
-    - Selector memoizado `availableMaterials` con deduplicación estricta por código/descripción normalizados y orden alfabético.
-    - Reemplazo y unificación en los 3 selectores de materiales del modal: Pestaña Unitaria, Selector General de Carga Masiva (Lote) y Tarjetas de Archivos Individuales en Lote.
+- **Resolución de Problemas Estáticos, Java 21 para Gradle Android y Compatibilidad CSS (18/10/2026)**:
+  - **Backend API (`luXius-Backend/models.py`)**:
+    - Definición de clase base `BaseModel(db.Model)` con `__abstract__ = True` y `__init__(self, **kwargs: Any) -> None` que delega en `super().__init__(**kwargs)`.
+    - Migración de los 8 modelos (`Cliente`, `Maquina`, `Usuario`, `Vendedor`, `Presupuesto`, `SyncLog`, `ConfigGlobal`, `DriveVaultAudit`) para heredar de `BaseModel`.
+    - Resuelve 34 errores de análisis estático en `app.py` y `routes/orders.py` donde el linter reportaba `Unexpected keyword argument ... in function object.__init__`.
+  - **Android Gradle (`android/gradle.properties`)**:
+    - Agregado `org.gradle.java.home=C:/Program Files/Android/Android Studio/jbr` para utilizar OpenJDK 21 de Android Studio en lugar del JRE 8 global del sistema, resolviendo el error de configuración de Gradle `Dependency requires at least JVM runtime version 11. This build uses a Java 8 JVM`.
+  - **Configuración de Workspace (`luxius.code-workspace`)**:
+    - Limpieza de IDs de formateadores no soportados por el IDE y declaración de `java.jdt.ls.java.home`.
+  - **Estilos CSS (`MobileWorkshop.css` y `GimpStudio.css`)**:
+    - Agregada propiedad estándar `background-clip: text` junto a `-webkit-background-clip: text`.
+    - Agregada propiedad estándar `appearance: none` en `GimpStudio.css` para `input[type="range"]`.
 
 ---
 

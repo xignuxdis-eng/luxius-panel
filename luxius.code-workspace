@@ -12,7 +12,6 @@
 	"settings": {
 		"editor.formatOnSave": true,
 		"typescript.tsdk": "node_modules/typescript/lib",
-		"editor.defaultFormatter": "esbenp.prettier-vscode",
 		"editor.tabSize": 2,
 		"editor.rulers": [100],
 		"files.exclude": {
@@ -28,8 +27,8 @@
 			"**/backup*": true
 		},
 		"python.defaultInterpreterPath": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+		"java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
 		"[python]": {
-			"editor.defaultFormatter": "ms-python.black-formatter",
 			"editor.tabSize": 4
 		}
 	},
