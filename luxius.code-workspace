@@ -1,13 +1,46 @@
 {
 	"folders": [
 		{
+			"name": "luxius-panel (Frontend)",
 			"path": "."
+		},
+		{
+			"name": "luXius-Backend (API Flask)",
+			"path": "../luXius-Backend"
 		}
 	],
 	"settings": {
 		"editor.formatOnSave": true,
 		"typescript.tsdk": "node_modules/typescript/lib",
 		"editor.defaultFormatter": "esbenp.prettier-vscode",
-		"editor.tabSize": 2
+		"editor.tabSize": 2,
+		"editor.rulers": [100],
+		"files.exclude": {
+			"**/node_modules": true,
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/dist": false
+		},
+		"search.exclude": {
+			"**/node_modules": true,
+			"**/__pycache__": true,
+			"**/dist": true,
+			"**/backup*": true
+		},
+		"python.defaultInterpreterPath": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.black-formatter",
+			"editor.tabSize": 4
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"esbenp.prettier-vscode",
+			"ms-python.python",
+			"ms-python.black-formatter",
+			"bradlc.vscode-tailwindcss",
+			"dbaeumer.vscode-eslint"
+		]
 	}
 }
+
