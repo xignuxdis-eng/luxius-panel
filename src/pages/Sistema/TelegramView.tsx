@@ -12,6 +12,9 @@ interface TelegramStatus {
         can_join_groups?: boolean;
     };
     admins_count: number;
+    /** Conteo de chats admin configurados. El backend lo devuelve como
+     *  `len(admins)` (número), no booleano. */
+    admins_configured?: number;
     admins?: string[];
     admin_chat_id?: string;
     has_token?: boolean;
@@ -30,7 +33,7 @@ export default function TelegramView() {
     const [botToken, setBotToken] = useState('');
     const [adminChatId, setAdminChatId] = useState('');
     const [showToken, setShowToken] = useState(false);
-    const [webhookUrl, setWebhookUrl] = useState('https://luxius-backend.onrender.com/api/telegram/webhook');
+    const [webhookUrl] = useState('https://luxius-backend.onrender.com/api/telegram/webhook');
 
     const fetchStatus = async () => {
         setLoading(true);
@@ -60,7 +63,7 @@ export default function TelegramView() {
         fetchStatus();
     }, []);
 
-    const handleSaveConfig = async (autoWebhook = false) => {
+    const handleSaveConfig = async () => {
         if (!botToken.trim() && !status?.configured) {
             setFeedback({ type: 'error', text: '⚠️ Por favor pega el Token del bot obtenido de @BotFather.' });
             return;
@@ -339,7 +342,7 @@ export default function TelegramView() {
                     <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => handleSaveConfig(true)}
+                        onClick={() => handleSaveConfig()}
                         disabled={actionLoading === 'save'}
                     >
                         {actionLoading === 'save' ? 'Validando y Guardando...' : '💾 Guardar y Conectar Bot'}

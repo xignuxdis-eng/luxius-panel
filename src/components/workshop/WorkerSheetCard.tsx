@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorkerSnapshot } from './workshopWorkers';
-import { ROLE_LABEL, getRoleLabel, getStationName, buildWorkerSheet, describeActivity } from './workshopSheets';
+import { getRoleLabel, getStationName, buildWorkerSheet, describeActivity } from './workshopSheets';
 import { WorkerPortrait } from './WorkerPortrait';
 
 export interface WorkerSheetCardProps {

@@ -6,7 +6,6 @@ import {
     CheckCircle2,
     ExternalLink,
     Camera,
-    AlertCircle,
     Maximize2,
     RotateCw,
     Sliders,
@@ -22,11 +21,9 @@ interface MobileImpresorTabProps {
 
 export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
     orders,
-    onSaveOrder,
-    onUploadPhotoProof
+    onSaveOrder
 }) => {
     const [filterState, setFilterState] = useState<'cola' | 'imprimiendo' | 'terminados'>('cola')
-    const [selectedOrderForPhoto, setSelectedOrderForPhoto] = useState<Order | null>(null)
     const [uploadingOrderId, setUploadingOrderId] = useState<number | null>(null)
 
     // Filter queue orders
@@ -274,7 +271,7 @@ export const MobileImpresorTab: React.FC<MobileImpresorTabProps> = ({
                                         )}
                                     </div>
                                     <span className={`status-pill status-${o.status}`}>
-                                        {o.status === 'orden' ? 'Listo p/ Imprimir' : o.status === 'en_proceso' ? 'En Plotter' : o.status}
+                                        {o.status === 'orden' ? 'Listo p/ Imprimir' : o.status}
                                     </span>
                                 </div>
 

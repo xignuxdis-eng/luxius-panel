@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { 
-    CheckCircle2, AlertTriangle, ExternalLink, RefreshCw, 
-    Layers, Image as ImageIcon, Sparkles, Edit3, ShieldCheck, DollarSign 
+import {
+    CheckCircle2, AlertTriangle, ExternalLink, RefreshCw,
+    Image as ImageIcon, Sparkles, Edit3, ShieldCheck
 } from 'lucide-react';
-import { API_URL, getMateriales, getCalidades } from '../data/db';
+import { API_URL, getMateriales } from '../data/db';
 import { calculateItemPriceDetailed, round2 } from '@/utils/pricingCalculator';
 import './XanaSmartOrderCard.css';
 
@@ -67,10 +67,6 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
 }) => {
     const availableMaterials = useMemo(() => {
         return getMateriales().filter(m => m.habilitado !== false && !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase()));
-    }, []);
-
-    const availableCalidades = useMemo(() => {
-        return getCalidades().filter(c => c.habilitado !== false);
     }, []);
 
     // Inicializar y recalcular con el motor oficial de NuevoPedidoModal

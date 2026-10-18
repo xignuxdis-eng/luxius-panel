@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 import {
@@ -24,9 +24,6 @@ import {
     PackageCheck,
     Plus,
     RotateCw,
-    Shield,
-    Sparkles,
-    LayoutDashboard,
     ArrowLeft
 } from 'lucide-react'
 import './MobileWorkshop.css'

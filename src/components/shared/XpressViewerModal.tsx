@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import Modal from '@components/ui/Modal';
 import { XpressViewer } from '../../pages/XpressViewer/XpressViewer';
 
@@ -6,6 +6,8 @@ interface XpressViewerModalProps {
     isOpen: boolean;
     onClose: () => void;
     initialFileUrl?: string;
+    /** Archivo local ya cargado (no solo URL). Lo acepta `XpressViewer`. */
+    initialFile?: File;
     initialFileName?: string;
 }
 

@@ -5,14 +5,11 @@ import {
     Clock,
     CheckCircle,
     AlertTriangle,
-    DollarSign,
     PhoneCall,
     Search,
     PlusCircle,
     Send,
     Filter,
-    ArrowUpRight,
-    Users
 } from 'lucide-react'
 
 interface MobileAdminTabProps {
@@ -25,8 +22,7 @@ interface MobileAdminTabProps {
 export const MobileAdminTab: React.FC<MobileAdminTabProps> = ({
     orders,
     clientes,
-    onOpenQuickOrder,
-    onSaveOrder
+    onOpenQuickOrder
 }) => {
     const [searchTerm, setSearchTerm] = useState('')
     const [filterSection, setFilterSection] = useState<'todos' | 'pendientes' | 'hoy'>('todos')

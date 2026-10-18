@@ -16,7 +16,8 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
     const { register, handleSubmit, reset, watch, setValue } = useForm<any>()
     const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
     const [showPassword, setShowPassword] = useState(false)
-    const [isSaving, setIsSaving] = useState(false)
+    // `isSaving` solo se escribía, nunca se leía: el modal no muestra spinner.
+    const [, setIsSaving] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {

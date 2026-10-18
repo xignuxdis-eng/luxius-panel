@@ -8,6 +8,11 @@ export interface Cliente {
     responsable: string
     email: string
     telefono: string
+    /** Alias móvil de `telefono`. El backend no lo persiste: se mantiene para
+     *  compatibilidad con datos viejos de localStorage. Usar `telefono`. */
+    celular?: string
+    /** Nombre de fantasía. No lo devuelve el backend; fallback a `nombre`. */
+    nombreFantasia?: string
     direccion: string
     habilitado: boolean
     vip: boolean
@@ -21,6 +26,9 @@ export interface Material {
     codigo: string
     calidad: string
     descripcion: string
+    /** Alias de `descripcion`. El backend y `DEFAULT_MATERIALES` usan
+     *  `descripcion`; `nombre` solo existe en registros viejos de localStorage. */
+    nombre?: string
     tipo: string
     unidad?: string
     color?: string
@@ -85,6 +93,9 @@ export interface Servicio {
     descripcion: string
     precioBase: number
     unidad: 'm2' | 'unidad' | 'metro'
+    /** Agrupador funcional (ej. 'infraestructura', 'acabados'). Opcional:
+     *  no todos los servicios de legacy lo tienen. */
+    categoria?: string
     habilitado: boolean
 }
 

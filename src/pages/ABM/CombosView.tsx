@@ -131,7 +131,7 @@ export default function CombosView() {
                                                 </span>
                                             ))
                                         ) : (
-                                            <span style={{ color: 'var(--text-muted)', italic: 'true' }}>Sin componentes detallados</span>
+                                            <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin componentes detallados</span>
                                         )}
                                     </div>
                                 </td>

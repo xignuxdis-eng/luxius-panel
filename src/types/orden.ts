@@ -31,9 +31,18 @@ export interface Order {
     clienteNombre: string
     clientName?: string // Optional for legacy
     nombreTarea?: string; // Nombre del proyecto o tarea relevada
+    /** Descripción corta de la orden. El backend la expone como
+     *  `descripcion`; es el mismo texto que `nombreTarea`. */
+    descripcion?: string;
     batchId?: string; // ID único del lote para agrupar
     loteNombre?: string; // Nombre del lote (ej. "Hilux Dixtron")
     descripcionItem?: string; // Sub-descripción del archivo (ej. "Lateral Izquierdo")
+    /** Vendedor asignado. El backend lo devuelve en el listado de órdenes
+     *  (`vendedorId`); se usa al reabrir una orden en el modal. */
+    vendedorId?: number;
+    /** Identificador externo heredado. Hoy el backend emite `id` numérico,
+     *  por eso todo el código cae a `o.id` cuando `uuid` no está. */
+    uuid?: string;
     origen?: 'mobile' | 'web' | string; // 'mobile' (App Móvil) vs 'web' (Luxius Web)
     operarioNombre?: string;
     vendedorNombre?: string;

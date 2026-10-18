@@ -5,19 +5,11 @@ import {
     Link2,
     Copy,
     CheckCircle2,
-    AlertCircle,
-    UserPlus,
     Send,
     Sparkles,
-    Trash2,
     DollarSign,
     Layers,
-    FileText,
-    ExternalLink,
     Zap,
-    DownloadCloud,
-    Check,
-    MessageSquare,
     Store
 } from 'lucide-react'
 
@@ -40,7 +32,6 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
     initialUrl = '',
     clientes,
     materiales,
-    calidades,
     onSaveOrder,
     onSaveCliente
 }) => {
@@ -486,7 +477,7 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                 {enlaceArchivo && (
                                     <div className="stitch-cloud-transfer">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                            <Link2 size={16} color="#4cd7f6" style={{ shrink: 0 }} />
+                                            <Link2 size={16} color="#4cd7f6" style={{ flexShrink: 0 }} />
                                             <a
                                                 href={enlaceArchivo}
                                                 target="_blank"
@@ -674,7 +665,9 @@ export const QuickOrderModal: React.FC<QuickOrderModalProps> = ({
                                             <option value="Lienzo Canvas">Lienzo Canvas</option>
                                             <option value="Corrugado Plástico">Corrugado Plástico</option>
                                             {materiales.map(m => (
-                                                <option key={m.id} value={m.nombre}>{m.nombre}</option>
+                                                <option key={m.id} value={m.descripcion || m.nombre || m.codigo}>
+                                                    {m.descripcion || m.nombre || m.codigo}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>

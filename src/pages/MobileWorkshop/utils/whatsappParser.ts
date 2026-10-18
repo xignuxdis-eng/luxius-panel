@@ -140,11 +140,18 @@ export function parseWhatsAppMessage(
         'foamboard': 'Foamboard',
     }
 
+    // Nombre legible de un material. `descripcion` es el campo canónico; `nombre`
+    // y `codigo` son fallbacks para registros viejos o incompletos. Antes se
+    // llamaba directo a `m.nombre.toLowerCase()`, que rompía con materiales
+    // guardados sin ese campo.
+    const materialLabel = (m: Material): string =>
+        (m.descripcion || m.nombre || m.codigo || '')
+
     for (const [kw, matName] of Object.entries(materialKeywords)) {
         if (lowerText.includes(kw)) {
             // Verificar si el material existe en materialesDisponibles
-            const foundMat = materialesDisponibles.find(m => m.nombre.toLowerCase().includes(matName.toLowerCase()))
-            result.materialNombre = foundMat ? foundMat.nombre : matName
+            const foundMat = materialesDisponibles.find(m => materialLabel(m).toLowerCase().includes(matName.toLowerCase()))
+            result.materialNombre = foundMat ? materialLabel(foundMat) : matName
             result.confianza.material = true
             break
         }
@@ -152,9 +159,9 @@ export function parseWhatsAppMessage(
 
     // Si no encontró por palabra clave, chequear directamente con nombres de materiales cargados
     if (!result.materialNombre && materialesDisponibles.length > 0) {
-        const found = materialesDisponibles.find(m => lowerText.includes(m.nombre.toLowerCase()))
+        const found = materialesDisponibles.find(m => lowerText.includes(materialLabel(m).toLowerCase()))
         if (found) {
-            result.materialNombre = found.nombre
+            result.materialNombre = materialLabel(found)
             result.confianza.material = true
         }
     }

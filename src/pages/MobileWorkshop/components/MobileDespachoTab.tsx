@@ -7,13 +7,10 @@ import {
     Send,
     Search,
     CheckCircle2,
-    Clock,
     PhoneCall,
-    Sparkles,
     QrCode,
     Archive,
     Check,
-    Layers,
     AlertCircle
 } from 'lucide-react'
 

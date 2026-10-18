@@ -291,7 +291,7 @@ export const WorkshopCanvas: React.FC<WorkshopCanvasProps> = ({
 
             // 3. Update & Draw Workers in Memory Ref
             workersRef.current.forEach(worker => {
-                let { x, y, targetX, targetY, speed, animFrame } = worker;
+                const { x, y, targetX, targetY, speed, animFrame } = worker;
 
                 const dx = targetX - x;
                 const dy = targetY - y;

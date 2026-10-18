@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Button from '@components/ui/Button';
-import { 
-    CheckCircle2, AlertTriangle, RefreshCw, HardDrive, ShieldCheck, 
-    Cloud, Server, FileText, ExternalLink, Database, Activity, Clock,
-    Archive, Trash2, Eye
+import {
+    CheckCircle2, AlertTriangle, RefreshCw, HardDrive, ShieldCheck,
+    Cloud, ExternalLink, Database, Activity, Clock,
+    Archive
 } from 'lucide-react';
 import { API_URL, getAuthHeaders } from '@data/db';
 
@@ -56,7 +56,7 @@ interface VaultStatus {
 }
 
 export default function GoogleDriveView() {
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams] = useSearchParams();
     const [status, setStatus] = useState<GoogleDriveStatus | null>(null);
     const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
     const [loading, setLoading] = useState(true);

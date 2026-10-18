@@ -25,7 +25,7 @@ export const SpaceInvadersGame: React.FC<GameProps> = ({ username: _username, na
         let localWave = 1
         let invulnerableTimer = 0
 
-        let player = { x: canvas.width / 2 - 15, y: canvas.height - 30, width: 30, height: 16, speed: 4 }
+        const player = { x: canvas.width / 2 - 15, y: canvas.height - 30, width: 30, height: 16, speed: 4 }
         let bullets: { x: number; y: number; dy: number; isPlayer: boolean }[] = []
         
         let ufo: { x: number; y: number; vx: number; value: number } | null = null

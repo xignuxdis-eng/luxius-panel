@@ -1,9 +1,9 @@
 // src/pages/XpressViewer/printsheeter/PrintSheeterStudio.tsx
 // Estudio Interactivo de Mosaicos, Nesting de Bobinas y Análisis de Materiales (PrintSheeter HD)
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './PrintSheeterStudio.css';
-import { ImageDataItem, MosaicPattern, LayoutResult, Placement } from './types';
+import { ImageDataItem, MosaicPattern, LayoutResult } from './types';
 import { MosaicEngine } from './mosaicEngine';
 import { NestingEngine } from './nestingEngine';
 import { Order } from '@/types/orden';
@@ -38,7 +38,6 @@ const PRESET_CANVAS_SIZES = [
 export const PrintSheeterStudio: React.FC<PrintSheeterStudioProps> = ({
     initialImageUrl,
     initialFileName,
-    order,
     onSendToViewer,
     onClose
 }) => {
@@ -140,7 +139,6 @@ export const PrintSheeterStudio: React.FC<PrintSheeterStudioProps> = ({
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
-        const newItems: ImageDataItem[] = [];
         Array.from(files).forEach((file, idx) => {
             const url = URL.createObjectURL(file);
             const htmlImg = new Image();

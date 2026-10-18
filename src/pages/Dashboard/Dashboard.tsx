@@ -306,7 +306,7 @@ function InkCoverageWidget() {
                         const jobs = await res.json()
                         if (Array.isArray(jobs) && jobs.length > 0) {
                             let totalM2 = 0
-                            let totalInk = { c: 0, m: 0, y: 0, k: 0 }
+                            const totalInk = { c: 0, m: 0, y: 0, k: 0 }
 
                             jobs.forEach((job: any) => {
                                 if (job && job.sizeM2 > 0 && job.ink) {

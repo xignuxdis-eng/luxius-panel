@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getMonedas, saveMoneda, fetchLiveDolarRates } from '@data/db'
 import type { MonedaConfig } from '@/types'
 import Button from '@components/ui/Button'
-import { RefreshCw, TrendingUp, DollarSign, ShieldAlert, ArrowRightLeft, Check, Edit2 } from 'lucide-react'
+import { RefreshCw, ShieldAlert, ArrowRightLeft, Check, Edit2 } from 'lucide-react'
 import './ABM.css'
 
 export default function MonedasView() {

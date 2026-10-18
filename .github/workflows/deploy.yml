@@ -45,7 +45,17 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci || npm install
+
+      - name: Typecheck
+        # Bloquea el deploy si `tsc` encuentra errores. Antes esto no corria:
+        # `vite build` no type-chequea, asi que los errores llegaban a produccion.
+        run: npm run typecheck
+
+      - name: Lint
+        # ESLint sale con codigo != 0 solo si hay errores; los warnings
+        # (react-hooks/exhaustive-deps) no bloquean el deploy.
+        run: npm run lint
 
       - name: Build
         run: npm run build

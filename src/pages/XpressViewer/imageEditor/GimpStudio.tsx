@@ -34,7 +34,6 @@ import {
     Redo2,
     Crop,
     Wand2,
-    Eraser,
     Pipette,
     Sliders,
     Layers,
@@ -48,11 +47,8 @@ import {
     RotateCcw,
     FlipHorizontal,
     FlipVertical,
-    Scissors,
-    ShieldAlert,
     ExternalLink,
     Check,
-    RefreshCw,
     FolderOpen,
     Save,
     ChevronDown,
@@ -82,8 +78,6 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
     initialFile,
     initialFileName,
     orderId,
-    order,
-    onOrderUpdated,
     onSendToRedrawer,
     onSendToPrintSheeter,
     onSendToViewer,
@@ -134,12 +128,10 @@ export const GimpStudio: React.FC<GimpStudioProps> = ({
 
     // Tool params
     const [wandTolerance, setWandTolerance] = useState<number>(30);
-    const [eraserSize, setEraserSize] = useState<number>(25);
     const [pickedColor, setPickedColor] = useState<{ rgb: [number, number, number]; hex: string; cmyk: string } | null>(null);
 
     // Crop box state
     const [cropBox, setCropBox] = useState<CropBox | null>(null);
-    const [cropPreset, setCropPreset] = useState<'free' | '1:1' | '4:3' | '16:9' | 'banner' | 'lona2x1'>('free');
 
     // Levels Adjustments
     const [levels, setLevels] = useState<LevelsAdjustment>({

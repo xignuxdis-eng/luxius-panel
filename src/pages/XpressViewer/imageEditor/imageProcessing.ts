@@ -11,7 +11,7 @@
  * - Layer compositing with native HTML5 canvas blend modes
  */
 
-import { BlendMode, Layer, LevelsAdjustment, MirrorBleedParams, ToneAdjustments, UnsharpMaskParams } from './types';
+import { Layer, LevelsAdjustment, MirrorBleedParams, ToneAdjustments, UnsharpMaskParams } from './types';
 
 export interface HistogramData {
     r: Uint32Array;
@@ -181,8 +181,6 @@ export function applyUnsharpMask(
     params: UnsharpMaskParams
 ): void {
     const { amount, radius, threshold } = params;
-    const width = src.width;
-    const height = src.height;
 
     // Fast separable gaussian approximation
     const blurred = fastGaussianBlur(src, radius);

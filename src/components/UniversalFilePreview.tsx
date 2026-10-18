@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL, resolveMediaUrl } from '../data/db';
+import { resolveMediaUrl } from '../data/db';
 import { extractCdrThumbnail } from '../utils/cdrPreview';
 import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '../utils/vectorPreview';
 import { FilePreviewModal } from './FilePreviewModal';
-import { XpressViewerModal } from './shared/XpressViewerModal';
 import * as pdfjsLib from 'pdfjs-dist';
 
 interface UniversalFilePreviewProps {
@@ -142,7 +141,7 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                             if (ctx) {
                                 ctx.fillStyle = '#ffffff';
                                 ctx.fillRect(0, 0, viewport.width, viewport.height);
-                                await page.render({ canvasContext: ctx, viewport }).promise;
+                                await page.render({ canvas: canvas, canvasContext: ctx, viewport }).promise;
                                 setImgSrc(canvas.toDataURL('image/webp', 0.85));
                                 return;
                             }
@@ -183,7 +182,7 @@ export const UniversalFilePreview: React.FC<UniversalFilePreviewProps> = ({
                             if (ctx) {
                                 ctx.fillStyle = '#ffffff';
                                 ctx.fillRect(0, 0, viewport.width, viewport.height);
-                                await page.render({ canvasContext: ctx, viewport }).promise;
+                                await page.render({ canvas: canvas, canvasContext: ctx, viewport }).promise;
                                 if (isMounted) {
                                     setImgSrc(canvas.toDataURL('image/webp', 0.92));
                                     return;

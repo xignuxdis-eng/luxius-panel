@@ -46,7 +46,10 @@ export async function extractCdrThumbnail(fileOrBuffer: File | ArrayBuffer): Pro
             mimeType = 'image/jpeg';
         }
 
-        const blob = new Blob([uint8], { type: mimeType });
+        // TS 5.7+ tipó los TypedArray genéricamente y `BlobPart` exige un
+// ArrayBuffer (no ArrayBufferLike). El array viene de JSZip y es un
+// Uint8Array real, así que el cast es seguro y no copia en runtime.
+const blob = new Blob([uint8 as BlobPart], { type: mimeType });
 
         // Convert blob to DataURL for maximum compatibility across all browsers
         const dataUrl = await new Promise<string>((resolve) => {

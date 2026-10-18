@@ -25,7 +25,7 @@ export const DonkeyKongGame: React.FC<GameProps> = ({ username: _username, name:
         let localLevel = 1
         let invulnerableTimer = 0
 
-        let mario = {
+        const mario = {
             x: 30,
             y: canvas.height - 40,
             width: 20,

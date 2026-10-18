@@ -112,6 +112,35 @@ Verificará:
 
 ---
 
+## 🧪 Verificación (TypeScript / Lint / Build)
+
+```bash
+npm run typecheck   # tsc --noEmit (modo strict)
+npm run lint        # ESLint — falla solo ante errores
+npm run lint:fix    # autofix (prefer-const, etc.)
+npm run verify      # typecheck + lint + build, en cadena
+```
+
+Los tres comandos corren en el workflow de GitHub Actions **antes** del deploy,
+de modo que un error de tipos bloquea la publicación en vez de llegar a producción.
+
+### ESLint
+
+Configuración en `eslint.config.js` (flat config, ESLint 9). Cubre solo `src/`;
+el resto del repo tiene `.js`/`.cjs`/`.py` legacy fuera del bundle de Vite.
+
+Reglas apagadas a propósito, con motivo documentado en el archivo:
+
+| Regla | Motivo |
+|---|---|
+| `no-undef` | `tsc` ya resuelve identificadores; la regla base marca tipos (`BlobPart`, `RequestInfo`) como no definidos |
+| `@typescript-eslint/no-require-imports` | Scripts y clases del juego arcade usan CommonJS |
+| `@typescript-eslint/no-explicit-any` | Casts necesarios frente a la API y libs de terceros |
+| `@typescript-eslint/no-unused-expressions` | Falso positivo en `cb && cb(x)` y `!guard && hacer()` |
+| `no-console` | El logueo a consola es intencional (diagnóstico de taller) |
+
+---
+
 ## 🔄 Endpoints Principales de la API
 
 | Método | Endpoint | Descripción |

@@ -39,7 +39,7 @@ const rgbToCmyk = (r: number, g: number, b: number) => {
     let c = 1 - (r / 255);
     let m = 1 - (g / 255);
     let y = 1 - (b / 255);
-    let k = Math.min(c, Math.min(m, y));
+    const k = Math.min(c, Math.min(m, y));
     
     if (k === 1) {
         return { c: 0, m: 0, y: 0, k: 100 };
@@ -469,7 +469,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
         try {
             // 1. Extraer Blob de imagen válido (incluso si el archivo original fue PDF o CDR)
             let imageBlob: Blob | null = null;
-            let filename = metadata?.name || 'arte.png';
+            const filename = metadata?.name || 'arte.png';
 
             if (file && file.type.startsWith('image/')) {
                 imageBlob = file;
@@ -546,15 +546,15 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         ? 'Ejecutando en GPU Vulkan local (AMD Radeon)...' 
                         : 'Conectando con Servidor Cloud...');
 
-                    const headers = isFormData ? {} : { 'Content-Type': 'application/json' };
+                    const headers: Record<string, string> = isFormData ? {} : { 'Content-Type': 'application/json' };
                     const token = localStorage.getItem('luxius_auth_token') || localStorage.getItem('token');
                     if (token) {
-                        (headers as any)['Authorization'] = `Bearer ${token}`;
+                        headers['Authorization'] = `Bearer ${token}`;
                     }
 
                     const response = await fetch(endpoint, {
                         method: 'POST',
-                        headers: isFormData ? (token ? { 'Authorization': `Bearer ${token}` } : undefined) : headers,
+                        headers: isFormData ? (token ? { 'Authorization': `Bearer ${token}` } : undefined) : headers as Record<string, string>,
                         body: bodyData,
                     });
 
@@ -766,7 +766,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
             const ext = uploadedFile.name.split('.').pop()?.toLowerCase();
             const format = ext?.toUpperCase() || 'Desconocido';
             let extractedPreview: string | null = null;
-            let meta: any = {
+            const meta: any = {
                 name: uploadedFile.name,
                 size: (uploadedFile.size / 1024 / 1024).toFixed(2) + ' MB',
                 format: format,
@@ -1136,7 +1136,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 
             {activeTab === 'redrawer' ? (
                 <RedrawerStudio 
-                    initialImageUrl={previewUrl}
+                    initialImageUrl={previewUrl ?? undefined}
                     initialFileName={file?.name ? file.name.replace(/\.[^/.]+$/, '') : (metadata?.name ? metadata.name.replace(/\.[^/.]+$/, '') : 'archivo')}
                     order={order}
                     onOrderUpdated={(savedOrder) => {
@@ -1163,7 +1163,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                 />
             ) : activeTab === 'printsheeter' ? (
                 <PrintSheeterStudio 
-                    initialImageUrl={previewUrl}
+                    initialImageUrl={previewUrl ?? undefined}
                     initialFileName={file?.name ? file.name.replace(/\.[^/.]+$/, '') : (metadata?.name ? metadata.name.replace(/\.[^/.]+$/, '') : 'diseno')}
                     order={order}
                     onSendToViewer={(composedUrl, newFileName) => {
@@ -1200,7 +1200,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                         newParams.set('tab', 'redrawer');
                         setSearchParams(newParams);
                     }}
-                    onSendToPrintSheeter={(dataUrl, name) => {
+                    onSendToPrintSheeter={(dataUrl) => {
                         setPreviewUrl(dataUrl);
                         setActiveTab('printsheeter');
                         const newParams = new URLSearchParams(searchParams);
@@ -1209,7 +1209,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     }}
                     onSendToViewer={(dataUrl, name) => {
                         setPreviewUrl(dataUrl);
-                        setMetadata(prev => ({
+                        setMetadata((prev: any) => ({
                             name: name || (file?.name ? `gimp_${file.name}` : 'diseno_retocado.png'),
                             format: 'PNG',
                             size: 'Editado HD',

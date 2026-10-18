@@ -354,7 +354,7 @@ export class MosaicEngine {
         const canvasWidthPx = Math.round((this.masterWidthMm / 25.4) * masterDpi);
         const canvasHeightPx = Math.round((this.masterHeightMm / 25.4) * masterDpi);
         const spacingPx = Math.round((spacingMm / 25.4) * masterDpi);
-        const { maxW, maxH } = this.getMaxDims(images, masterDpi);
+        const { maxW } = this.getMaxDims(images, masterDpi);
 
         const placements: Placement[] = [];
         const centerX = canvasWidthPx / 2;

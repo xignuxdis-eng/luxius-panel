@@ -21,7 +21,7 @@ try {
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
 import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS, isDesignerRole } from '@/types'
-import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, round2 } from '@/utils/pricingCalculator'
+import { calculateItemPriceDetailed as calcItemPriceDetailedUtil } from '@/utils/pricingCalculator'
 import './NuevoPedidoModal.css'
 
 
@@ -708,6 +708,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                 renderCtx.fillRect(0, 0, viewport.width, viewport.height);
 
                                 const renderTask = page.render({
+                                    canvas: renderCanvas,
                                     canvasContext: renderCtx,
                                     viewport: viewport
                                 });
@@ -856,7 +857,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     const startOfTiff = offset + 10;
                     const isLittleEndian = view.getUint16(startOfTiff) === 0x4949;
                     const ifd0Offset = isLittleEndian ? view.getUint32(startOfTiff + 4, true) : view.getUint32(startOfTiff + 4, false);
-                    let ifdOffset = startOfTiff + ifd0Offset;
+                    const ifdOffset = startOfTiff + ifd0Offset;
 
                     if (ifdOffset < view.byteLength - 2) {
                         const numEntries = isLittleEndian ? view.getUint16(ifdOffset, true) : view.getUint16(ifdOffset, false);
@@ -989,8 +990,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                             const sig = view.getUint32(bOff, false); // "8BIM"
                             if (sig !== 0x3842494D) break;
                             const id = view.getUint16(bOff + 4, false);
-                            let nameLen = view.getUint8(bOff + 6);
-                            let namePad = (nameLen + 1 + 1) & ~1; // Padded to even
+                            const nameLen = view.getUint8(bOff + 6);
+                            const namePad = (nameLen + 1 + 1) & ~1; // Padded to even
                             const dataLen = view.getUint32(bOff + 6 + namePad, false);
                             const dataOff = bOff + 6 + namePad + 4;
                             if (id === 1033 || id === 1036) { // Thumbnail (1033=standard, 1036=newer)
@@ -1088,7 +1089,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         fullText.match(/tiff:XResolution="([\d./]+)"/i);
                     if (xResMatch) {
                         const raw = xResMatch[1];
-                        let val = raw.includes('/') ? (parseFloat(raw.split('/')[0]) / parseFloat(raw.split('/')[1])) : parseFloat(raw);
+                        const val = raw.includes('/') ? (parseFloat(raw.split('/')[0]) / parseFloat(raw.split('/')[1])) : parseFloat(raw);
                         dpi = Math.round(val < 100 ? val * 2.54 : val);
                     }
                     if (fullText.includes('ColorMode>3') || fullText.includes('/DeviceRGB')) colorMode = 'RGB';
@@ -1428,7 +1429,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
         try {
             const meta = await extractMetadata(file, url);
-            if (meta.pageCount > 1) {
+            if ((meta.pageCount ?? 0) > 1) {
                 console.log(`[Luxius-UI] PDF multipágina detectado en extractMetadata (${meta.pageCount} páginas). Redirigiendo a Carga por Lote...`);
                 setSelectedFile(null);
                 setFileName('');
@@ -1657,7 +1658,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                     const [copiedPage] = await newDoc.copyPages(srcDoc, [p - 1]);
                                     newDoc.addPage(copiedPage);
                                     const pdfBytes = await newDoc.save();
-                                    pageFile = new File([pdfBytes], pageName, { type: 'application/pdf' });
+                                    // pdf-lib devuelve Uint8Array tipado como ArrayBufferLike; TS 5.7+ exige
+// ArrayBuffer en BlobPart. El contenido siempre es un Uint8Array válido.
+pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' });
                                     const pdfPage = srcDoc.getPage(p - 1);
                                     const { width: pW, height: pH } = pdfPage.getSize();
                                     wCm = parseFloat((pW * 2.54 / 72).toFixed(2));
@@ -2266,7 +2269,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 file={selectedFile || undefined}
                                                 fileUrl={previewUrl || undefined}
                                                 fileName={fileName}
-                                                dimensions={metadata ? { width: metadata.width, height: metadata.height } : undefined}
+                                                dimensions={metadata?.width != null && metadata?.height != null ? { width: metadata.width, height: metadata.height } : undefined}
                                                 dpi={metadata?.dpi}
                                                 colorMode={metadata?.colorMode}
                                                 fileSize={selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : undefined}
@@ -2518,7 +2521,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                 </div>
                                             ) : metadata ? (
                                                 <div className="meta-layout">
-                                                    {metadata.width > 0 ? (
+                                                    {(metadata.width ?? 0) > 0 ? (
                                                         <>
                                                             <div className="meta-item">
                                                                 <span className="meta-label">📏 DIMENSIONES</span>
@@ -3237,7 +3240,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                                                     file={selectedFile || undefined}
                                                     fileUrl={previewUrl || undefined}
                                                     fileName={fileName}
-                                                    dimensions={metadata ? { width: metadata.width, height: metadata.height } : undefined}
+                                                    dimensions={metadata?.width != null && metadata?.height != null ? { width: metadata.width, height: metadata.height } : undefined}
                                                     dpi={metadata?.dpi}
                                                     colorMode={metadata?.colorMode}
                                                     fileSize={selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : undefined}

@@ -30,15 +30,18 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
     const [saving, setSaving] = useState(false)
     const { user } = useAuthStore()
 
+    // Este useMemo debe declararse ANTES de cualquier return temprano: React
+    // exige el mismo orden de hooks en cada render y, si `order` pasa de null
+    // a definido, lanzaba "Rendered more hooks than during the previous render".
+    const artistas = useMemo(() => {
+        return getUsuarios().filter(u => u.rol === 'disenador' || u.rol === 'artista')
+    }, [])
+
     if (!order) return null
 
     const isBatch = Array.isArray(batchOrders) && batchOrders.length > 1
     const isAdmin = user?.role === 'principal' || (user?.role as string) === 'administrador' || (user?.role as string) === 'admin' || (user?.role as string) === 'sistema'
     const canBounce = user?.role === 'artista' || user?.role === 'impresion' || isAdmin
-
-    const artistas = useMemo(() => {
-        return getUsuarios().filter(u => u.rol === 'disenador' || u.rol === 'artista')
-    }, [])
 
     const handleStatusChange = async (newStatus: string) => {
         if (saving) return;

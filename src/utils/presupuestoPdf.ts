@@ -41,7 +41,7 @@ export function generatePresupuestoHTML(data: PresupuestoData): string {
         }
     };
 
-    const itemsRows = data.items.map((item, idx) => `
+    const itemsRows = data.items.map((item) => `
         <tr>
             <td style="padding: 10px 12px; text-align: left; color: #1e293b; font-weight: 500; border-bottom: 1px solid #e2e8f0;">${item.concepto}</td>
             <td style="padding: 10px 12px; text-align: center; color: #334155; border-bottom: 1px solid #e2e8f0;">${item.cantidad} ${unidadLabel(item.unidadMedida)}</td>

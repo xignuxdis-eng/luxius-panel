@@ -47,7 +47,7 @@ export const BombermanGame: React.FC<GameProps> = ({ username: _username, name: 
         }
 
         let map = buildGrid()
-        let player = { x: TILE_SIZE + 5, y: TILE_SIZE + 5, size: 26, speed: 3, maxBombs: 2, bombRange: 2 }
+        const player = { x: TILE_SIZE + 5, y: TILE_SIZE + 5, size: 26, speed: 3, maxBombs: 2, bombRange: 2 }
         let bombs: { r: number; c: number; timer: number; range: number }[] = []
         let explosions: { r: number; c: number; timer: number }[] = []
         let powerups: { r: number; c: number; type: 'bomb' | 'speed' | 'range' }[] = []

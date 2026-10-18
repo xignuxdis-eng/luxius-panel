@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Order } from '@/types';
-import { runNesting, getBobinaUsefulWidth, BOBINA_SPECS, type NestingItem, type NestingResult } from '@/utils/nestingEngine';
+import { runNesting, getBobinaUsefulWidth, type NestingItem, type NestingResult } from '@/utils/nestingEngine';
 import './NestingStudioModal.css';
 
 interface NestingStudioModalProps {
@@ -67,7 +67,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     const [gap, setGap] = useState<number>(0.01); // 10mm
     const [allowRotation, setAllowRotation] = useState<boolean>(true);
     const [showCropMarks, setShowCropMarks] = useState<boolean>(true);
-    const [showLabels, setShowLabels] = useState<boolean>(true);
+    const [showLabels] = useState<boolean>(true);
     const [zoom, setZoom] = useState<number>(1);
     const [batchName, setBatchName] = useState<string>(initialBatchName || 'Lote Unificado');
     const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -292,7 +292,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
             let canvasTitleFont = Math.min(28, Math.max(12, Math.round(canvasMinor * 0.16)));
             if (canvasMajor < 200) canvasTitleFont = Math.min(canvasTitleFont, 14);
 
-            let canvasDimsFont = Math.min(22, Math.max(10, Math.round(canvasTitleFont * 0.82)));
+            const canvasDimsFont = Math.min(22, Math.max(10, Math.round(canvasTitleFont * 0.82)));
             const maxCanvasTextWidth = Math.max(50, canvasMajor - 24);
 
             const isCanvasSingleLine = canvasMinor < 85 && canvasMajor >= 180;

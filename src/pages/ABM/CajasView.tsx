@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { getCajas, saveCaja, deleteCaja, getMovimientosCaja, saveMovimientoCaja } from '@data/db'
+import { getCajas, saveCaja, getMovimientosCaja, saveMovimientoCaja } from '@data/db'
 import type { Caja, MovimientoCaja } from '@/types'
 import Button from '@components/ui/Button'
-import { Wallet, PlusCircle, MinusCircle, CheckCircle2, DollarSign, History, AlertCircle, ArrowUpRight, ArrowDownLeft, Lock } from 'lucide-react'
+import { PlusCircle, MinusCircle, History } from 'lucide-react'
 import './ABM.css'
 
 export default function CajasView() {

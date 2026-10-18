@@ -44,7 +44,7 @@ export const DiggerGame: React.FC<GameProps> = ({ username: _username, name: _na
         }
 
         let map = buildDirt()
-        let digger = { x: TILE_SIZE + 5, y: TILE_SIZE + 5, size: 26, dir: 'right', speed: 3.2 }
+        const digger = { x: TILE_SIZE + 5, y: TILE_SIZE + 5, size: 26, dir: 'right', speed: 3.2 }
         let beam: { x: number; y: number; dx: number; dy: number; timer: number } | null = null
         
         let enemies = [

@@ -327,6 +327,8 @@ export function buildWorkerSheet(snapshot: Pick<WorkerSnapshot, 'id' | 'name' | 
                 'Sufre daño crítico cuando le dicen "te hago una transferencia mañana".',
                 'Se le eriza la piel ante comprobantes de pago borrosos o incompletos.'
             ], 2),
+            quote: 'Si el balance no me cierra, el problema lo tiene el balance.',
+            gear: 'Calculadora de contestadora + Carpeta de comprobantes + Taza de café Indefinida'
         };
     }
 

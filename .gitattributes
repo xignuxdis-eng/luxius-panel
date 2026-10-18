@@ -1,0 +1,29 @@
+# Normaliza finales de linea a LF en todo el proyecto.
+# Razon: `core.autocrlf=false` y no hay .gitattributes, asi que CRLF/LF se
+# guardan tal cual en el repo y producen diffs de hundreds de lineas en
+# archivos donde solo cambio una.
+* text=auto eol=lf
+
+# Binarios: nunca tocar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.mov binary
+*.apk binary
+*.zip binary
+*.pdf binary
+*.cdr binary
+*.ai binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.bin binary
+*.db binary
+*.sqlite binary

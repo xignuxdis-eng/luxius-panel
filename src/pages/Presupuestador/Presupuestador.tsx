@@ -13,7 +13,7 @@ export default function Presupuestador() {
 
     // Data lists
     const clientes = getClientes();
-    const combos = getCombos().filter(c => c.activo !== false);
+    const combos = getCombos().filter(c => c.habilitado !== false);
 
     // Unify printable materials filtering (matching NuevoPedidoModal: exclude inks, solvents, liquids)
     const printMaterials = useMemo(() => {
@@ -83,10 +83,11 @@ export default function Presupuestador() {
     const filteredCombos = useMemo(() => {
         return combos.filter(c => {
             const matchesCat = comboCategoria === 'Todas' || c.categoria === comboCategoria;
-            const matchesSearch = !comboSearch || 
-                c.nombre.toLowerCase().includes(comboSearch.toLowerCase()) || 
+            const matchesSearch = !comboSearch ||
+                c.nombre.toLowerCase().includes(comboSearch.toLowerCase()) ||
                 (c.descripcion || '').toLowerCase().includes(comboSearch.toLowerCase()) ||
-                (c.material || '').toLowerCase().includes(comboSearch.toLowerCase());
+                (c.materialCodigo || '').toLowerCase().includes(comboSearch.toLowerCase()) ||
+                (c.componentes || []).some(comp => (comp.nombre || '').toLowerCase().includes(comboSearch.toLowerCase()));
             return matchesCat && matchesSearch;
         });
     }, [combos, comboCategoria, comboSearch]);
@@ -138,9 +139,28 @@ export default function Presupuestador() {
         setItems([...items, newItem]);
     };
 
+    // Precio efectivo de un combo. `ComboModal` guarda `precioFinal` (con
+    // fallback a `precioSugerido`); antes se leía `combo.precio`, campo que
+    // nunca existió y hacía fallar el render con "undefined.toLocaleString".
+    const comboPrecio = (combo: ComboData): number =>
+        combo.precioFinal ?? combo.precioSugerido ?? 0;
+
+    // Material del combo: el código de material, o el nombre del primer
+    // componente de tipo material.
+    const comboMaterial = (combo: ComboData): string =>
+        combo.materialCodigo ||
+        (combo.componentes || []).find(comp => comp.tipo === 'material')?.nombre ||
+        '';
+
+    // Servicios incluidos en el combo.
+    const comboServicios = (combo: ComboData): string[] =>
+        (combo.componentes || [])
+            .filter(comp => comp.tipo === 'servicio')
+            .map(comp => comp.nombre);
+
     const handleSelectCombo = (combo: ComboData) => {
         setSelectedComboId(combo.id);
-        setComboCustomPrecio(combo.precio);
+        setComboCustomPrecio(comboPrecio(combo));
     };
 
     const handleAddComboItem = (e: React.FormEvent) => {
@@ -151,13 +171,15 @@ export default function Presupuestador() {
             return;
         }
 
-        const unitPrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : combo.precio;
+        const unitPrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : comboPrecio(combo);
         const qty = comboCopias > 0 ? comboCopias : 1;
         const subtotal = qty * unitPrice;
 
+        const serviciosIncluidos = comboServicios(combo);
+
         const newItem: PresupuestoItem = {
             id: `item-combo-${Date.now()}`,
-            concepto: `[PROMO] ${combo.nombre} (${combo.ancho}x${combo.alto}m - ${combo.material}${combo.servicios && combo.servicios.length > 0 ? ' + ' + combo.servicios.join(', ') : ''})`,
+            concepto: `[PROMO] ${combo.nombre} (${combo.ancho}x${combo.alto}m - ${comboMaterial(combo)}${serviciosIncluidos.length > 0 ? ' + ' + serviciosIncluidos.join(', ') : ''})`,
             unidadMedida: 'u',
             cantidad: qty,
             precioUnitario: unitPrice,
@@ -513,7 +535,7 @@ export default function Presupuestador() {
                                                 >
                                                     <div className="presupuesto-combo-header">
                                                         <h3 className="presupuesto-combo-name">
-                                                            {combo.icono || '🎁'} {combo.nombre}
+                                                            🎁 {combo.nombre}
                                                         </h3>
                                                         {combo.categoria && (
                                                             <span className="presupuesto-combo-badge">{combo.categoria}</span>
@@ -522,9 +544,9 @@ export default function Presupuestador() {
 
                                                     <div className="presupuesto-combo-details">
                                                         <div>📐 <strong>Medida:</strong> {combo.ancho}m x {combo.alto}m</div>
-                                                        <div>🎨 <strong>Material:</strong> {combo.material}</div>
-                                                        {combo.servicios && combo.servicios.length > 0 && (
-                                                            <div>⚙️ <strong>Incluye:</strong> {combo.servicios.join(', ')}</div>
+                                                        <div>🎨 <strong>Material:</strong> {comboMaterial(combo) || '—'}</div>
+                                                        {comboServicios(combo).length > 0 && (
+                                                            <div>⚙️ <strong>Incluye:</strong> {comboServicios(combo).join(', ')}</div>
                                                         )}
                                                         {combo.descripcion && (
                                                             <div style={{ fontStyle: 'italic', opacity: 0.8 }}>{combo.descripcion}</div>
@@ -533,7 +555,7 @@ export default function Presupuestador() {
 
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
                                                         <span className="presupuesto-combo-price">
-                                                            ${combo.precio.toLocaleString('es-AR')}
+                                                            ${comboPrecio(combo).toLocaleString('es-AR')}
                                                         </span>
                                                         <span style={{ fontSize: '12px', color: isSelected ? 'var(--primary-color, #6366f1)' : 'var(--text-secondary)', fontWeight: 600 }}>
                                                             {isSelected ? '✓ Seleccionado' : 'Seleccionar'}
@@ -548,7 +570,7 @@ export default function Presupuestador() {
                                 {selectedComboId && (() => {
                                     const currentCombo = combos.find(c => c.id === selectedComboId);
                                     if (!currentCombo) return null;
-                                    const effectivePrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : currentCombo.precio;
+                                    const effectivePrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : comboPrecio(currentCombo);
                                     const totalCombo = (comboCopias || 1) * effectivePrice;
                                     return (
                                         <form onSubmit={handleAddComboItem} className="presupuesto-combo-action-box">

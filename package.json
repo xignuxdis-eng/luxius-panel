@@ -8,7 +8,10 @@
     "build": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "sync:android": "npm run build && npx cap sync android",
     "build:apk": "npm run build && npx cap sync android && powershell -Command \"$env:JAVA_HOME = 'C:\\Program Files\\Android\\Android Studio\\jbr'; cd android; .\\gradlew.bat assembleDebug; cd ..; Copy-Item android\\app\\build\\outputs\\apk\\debug\\app-debug.apk LuXius-Taller-Mobile.apk -Force\"",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "verify": "npm run typecheck && npm run lint && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -34,7 +37,12 @@
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^17.13.0",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.71.2",
     "vite": "^5.0.8"
   }
 }

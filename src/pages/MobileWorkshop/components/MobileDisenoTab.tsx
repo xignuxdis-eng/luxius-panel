@@ -3,24 +3,17 @@ import { Order, Cliente } from '@/types'
 import { BOUNCE_REASONS, WhatsAppBounceReason } from '../types'
 import {
     Palette,
-    CheckSquare,
     AlertOctagon,
     ExternalLink,
     Send,
-    ThumbsUp,
     FileCheck,
-    MessageCircle,
-    Info,
     Crop,
-    Sliders,
     Layers,
     Sparkles,
     Copy,
     Rocket,
     AlertTriangle,
     CheckCircle2,
-    ZoomIn,
-    RefreshCw
 } from 'lucide-react'
 
 interface MobileDisenoTabProps {
@@ -46,7 +39,9 @@ export const MobileDisenoTab: React.FC<MobileDisenoTabProps> = ({
     }, [orders])
 
     const approvedTodayOrders = useMemo(() => {
-        return orders.filter(o => o.status === 'orden' || o.status === 'imprimiendo' || o.status === 'impreso')
+        // 'imprimiendo' se quitó: el backend solo lo emite en eventos WebSocket de
+        // cola de impresión, nunca como OrderStatus.
+        return orders.filter(o => o.status === 'orden' || o.status === 'impreso')
     }, [orders])
 
     const bouncedOrders = useMemo(() => {
@@ -115,7 +110,6 @@ export const MobileDisenoTab: React.FC<MobileDisenoTabProps> = ({
     }
 
     const handleCopyReboundMessage = (order: Order) => {
-        const cliente = clientes.find(c => String(c.id) === String(order.clientId))
         const msg = `Hola ${order.clienteNombre}! 👋 Te escribimos desde el taller de impresión LuXius / XignuX. Revisamos tu archivo para la OT #${order.ot || order.id} (${order.nombreTarea || order.material}) y detectamos: ${selectedReason.title}. ${selectedReason.description}. ¿Podrías reenviarlo corregido o autorizas ajuste asistido?`
         navigator.clipboard.writeText(msg)
         alert('Mensaje copiado al portapapeles listo para enviar por WhatsApp.')

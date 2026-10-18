@@ -69,7 +69,7 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
         }
 
         // Player
-        let pacman = { x: 9 * TILE_SIZE + TILE_SIZE / 2, y: 14 * TILE_SIZE + TILE_SIZE / 2, dx: 0, dy: 0, nextDx: 0, nextDy: 0, radius: 9 }
+        const pacman = { x: 9 * TILE_SIZE + TILE_SIZE / 2, y: 14 * TILE_SIZE + TILE_SIZE / 2, dx: 0, dy: 0, nextDx: 0, nextDy: 0, radius: 9 }
 
         // Ghosts
         const ghosts = [

@@ -16,7 +16,7 @@ export function sanitizeFileName(name: string): string {
  * Genera el nombre estandarizado de producción para un archivo de una orden
  * Formato: OT-{otNumber}_x{copias}_{material}_{servicios}_{ancho}x{alto} --- {nombreOriginal}
  */
-export function buildProductionFilename(order: Order, index: number, originalName: string): string {
+export function buildProductionFilename(order: Order, _index: number, originalName: string): string {
     let otRaw = String(order.ot || order.id || '0').trim()
     if (otRaw.toUpperCase().startsWith('OT-')) {
         otRaw = otRaw.slice(3).trim()
@@ -27,7 +27,7 @@ export function buildProductionFilename(order: Order, index: number, originalNam
     const copias = order.copias || 1
 
     // 1. Resolver código corto de material
-    let rawMat = (order.material || 'MAT').trim()
+    const rawMat = (order.material || 'MAT').trim()
     let materialCode = rawMat
     try {
         const allMaterials = getMateriales()

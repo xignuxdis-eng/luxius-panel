@@ -25,7 +25,7 @@ export const GalagaGame: React.FC<GameProps> = ({ username: _username, name: _na
         let localStage = 1
         let invulnerableTimer = 0
 
-        let ship = { x: canvas.width / 2 - 14, y: canvas.height - 35, width: 28, height: 24, speed: 5 }
+        const ship = { x: canvas.width / 2 - 14, y: canvas.height - 35, width: 28, height: 24, speed: 5 }
         let bullets: { x: number; y: number; dy: number; isPlayer: boolean }[] = []
         
         const createEnemies = () => {

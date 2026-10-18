@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { API_URL, getAuthHeaders } from '@data/db';
-import { 
-    Sun, Send, CheckCircle2, AlertTriangle, Clock, 
-    Layers, Truck, ShieldAlert, Sparkles, X, RefreshCw
+import {
+    Sun, Send, CheckCircle2, AlertTriangle,
+    Layers, ShieldAlert, Sparkles, X, RefreshCw
 } from 'lucide-react';
 import './MorningBriefingModal.css';
 

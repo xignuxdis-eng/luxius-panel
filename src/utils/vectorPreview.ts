@@ -30,7 +30,6 @@ export async function extractTiffThumbnail(file: File): Promise<string | null> {
             for (let i = 0; i < numEntries; i++) {
                 if (pos + 12 > view.byteLength) break;
                 const tag = le ? view.getUint16(pos, true) : view.getUint16(pos, false);
-                const type = le ? view.getUint16(pos + 2, true) : view.getUint16(pos + 2, false);
                 const count = le ? view.getUint32(pos + 4, true) : view.getUint32(pos + 4, false);
                 const val = le ? view.getUint32(pos + 8, true) : view.getUint32(pos + 8, false);
                 

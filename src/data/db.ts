@@ -467,7 +467,7 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
             // Re-read and update local storage so it has the backend UUID instead of the local ID
             try {
                 const currentLocalStr = localStorage.getItem('luxius_session_ordenes') || '[]';
-                let currentLocal: Order[] = JSON.parse(currentLocalStr);
+                const currentLocal: Order[] = JSON.parse(currentLocalStr);
                 const localIdx = currentLocal.findIndex(o => matchesOrderId(o, (serverOrder as any).uuid || serverOrder.id || serverOrder.ot || (newOrder as any).uuid || newOrder.id));
                 if (localIdx >= 0) {
                     currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverOrder };
@@ -922,7 +922,7 @@ export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {
             const serverCliente = await res.json();
             try {
                 const currentLocalStr = localStorage.getItem(SESSION_CLIENTES_KEY) || '[]';
-                let currentLocal: Cliente[] = JSON.parse(currentLocalStr);
+                const currentLocal: Cliente[] = JSON.parse(currentLocalStr);
                 const localIdx = currentLocal.findIndex(c => String(c.id) === String(result.id));
                 if (localIdx >= 0) {
                     currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverCliente };
@@ -1227,7 +1227,7 @@ export function getMateriales(): Material[] {
             else unidad = 'mts'
         }
 
-        let rawCalidad = (m.calidad || '').trim();
+        const rawCalidad = (m.calidad || '').trim();
         let calidad = defaultCalidadName;
         if (rawCalidad) {
             const lower = rawCalidad.toLowerCase();
@@ -1264,7 +1264,7 @@ export function saveMaterial(material: Partial<Material>): Material {
     const validCalidadesMap = new Map(calidadesList.map(c => [c.nombre.trim().toLowerCase(), c.nombre]));
     const defaultCalidadName = calidadesList.find(c => c.habilitado !== false)?.nombre || calidadesList[0]?.nombre || 'Solvente';
 
-    let rawCalidad = (material.calidad || '').trim();
+    const rawCalidad = (material.calidad || '').trim();
     let normalizedCalidad = defaultCalidadName;
     if (rawCalidad) {
         const lower = rawCalidad.toLowerCase();
