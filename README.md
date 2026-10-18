@@ -12,7 +12,8 @@ Sistema integral de gestión de presupuestos, órdenes de trabajo, clientes y si
 - **Backend**: API REST en Python Flask, SQLAlchemy ORM, Flask-CORS.
   - Producción: Desplegado en Render (`https://luxius-backend.onrender.com/api`).
   - Desarrollo local: `http://localhost:5000/api`.
-- **Base de Datos**: PostgreSQL alojado en **Neon.tech** (Serverless, alta disponibilidad y persistencia sin límite de 90 días).
+- **Base de Datos**: PostgreSQL alojado en **Supabase** (AWS us-east-1, connection pooler).
+  - Migrado desde Neon el 11/10/2026. Neon quedó desconectado y solo se conserva como respaldo histórico.
 - **Almacenamiento Multimedia**: Cloudflare R2 / Almacenamiento local en `server/uploads/`.
 
 ---
@@ -31,9 +32,11 @@ El backend carga automáticamente el archivo `.env` ubicado en la raíz del proy
 
 ```dotenv
 # ----------------------------------------------------
-# POSTGRESQL DATABASE CONFIGURATION (Neon)
+# POSTGRESQL DATABASE CONFIGURATION (Supabase)
 # ----------------------------------------------------
-DATABASE_URL=postgresql://<user>:<password>@<host>/neondb?sslmode=require&channel_binding=require
+# Usar el connection pooler de Supabase (puerto 5432), NO la conexión directa.
+# Settings > Database > Connection string > URI (Session pooler).
+DATABASE_URL=postgresql://<user>:<password>@aws-0-us-east-1.pooler.supabase.com:5432/postgres
 
 # ----------------------------------------------------
 # CLOUDFLARE R2 CONFIGURATION
@@ -47,10 +50,14 @@ R2_ENDPOINT_URL=https://<your_account_id>.r2.cloudflarestorage.com
 # ----------------------------------------------------
 # JWT / SEGURIDAD
 # ----------------------------------------------------
-JWT_SECRET_KEY=luxius-secret-key-change-in-production
+JWT_SECRET_KEY=<generar con: python -c "import secrets; print(secrets.token_hex(64))">
 ```
 
-> **Nota sobre SSL en Neon:** La cadena `DATABASE_URL` debe incluir siempre `?sslmode=require` (o `&channel_binding=require`). El backend automáticamente normaliza el prefijo `postgres://` a `postgresql://` para compatibilidad con SQLAlchemy 2.x.
+> **Notas de conexión (Supabase):**
+> - Usá el **Session pooler** (puerto `5432`). Supabase cierra conexiones ociosas del pool directo, lo que rompe llamadas largas de gunicorn.
+> - El backend normaliza automáticamente el prefijo `postgres://` a `postgresql://` y fuerza el driver `psycopg2` para SQLAlchemy 2.x.
+> - La cadena **no necesita** `?sslmode=require` con el pooler; si se conecta directo a la base, sí es obligatorio.
+> - ⚠️ **Nunca** pegues la URL con saltos de línea. Un `\n` pegado desde el dashboard broke el arranque del backend (`postgres\n does not exist`).
 
 ---
 
@@ -66,13 +73,16 @@ npm install
 pip install python-dotenv psycopg2-binary flask flask-sqlalchemy flask-cors sqlalchemy
 ```
 
-### 2. Inicializar / Verificar Base de Datos (Seed)
+### 2. Verificar la conexión a la base
 
-Ejecuta el script para verificar o crear las tablas y asegurar los registros base (vendedor y cliente inicial):
+Las tablas se crean solas al arrancar el backend (`db.create_all()`). Para comprobar la conexión sin levantar nada:
 
 ```bash
-python scripts/seed_neon.py
+cd server
+python -c "import app; print('BD OK')"
 ```
+
+El script histórico `scripts/seed_neon.py` fue renombrado a `scripts/seed_db.py` tras la migración. **No lo ejecutes contra producción**: opera sobre `DATABASE_URL` (Supabase) y escribe de verdad.
 
 ### 3. Iniciar Backend Local
 
@@ -81,7 +91,7 @@ cd server
 python app.py
 ```
 
-El servidor estará escuchando en `http://localhost:5000` y reportará en consola la conexión exitosa a PostgreSQL Neon.
+El servidor estará escuchando en `http://localhost:5000` y reportará en consola la conexión exitosa a PostgreSQL en Supabase.
 
 ### 4. Iniciar Frontend Local
 
@@ -104,7 +114,7 @@ python scripts/test_endpoints.py
 ```
 
 Verificará:
-1. `GET /api/health` — Conectividad a Neon y tablas existentes.
+1. `GET /api/health` — Conectividad a Supabase y tablas existentes.
 2. `GET /api/orders` — Listado de órdenes activas.
 3. `POST /api/orders` — Creación de orden con asignación automática de ID y código OT.
 4. `GET /api/sync/pull` — Endpoint de sincronización móvil / cloud.
@@ -159,5 +169,5 @@ Reglas apagadas a propósito, con motivo documentado en el archivo:
 
 ## 🛡️ Políticas de Respaldo y Resiliencia
 
-- **Neon Point-in-Time Recovery**: Neon realiza respaldos continuos automáticos del estado de la base de datos.
+- **Supabase Backups**: Supabase realiza respaldos automáticos del estado de la base de datos (PITR disponible según el plan). Programar dumps desde el panel o vía `supabase db dump` como red de seguridad.
 - **Fallback a SQLite**: Si la base de datos remota es inaccesible o no está configurada, el archivo `server/config.py` conmuta automáticamente a una base SQLite local (`server/luxius.db`) para evitar caídas totales durante desarrollo offline.

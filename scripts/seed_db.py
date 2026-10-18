@@ -1,9 +1,18 @@
 """
-Roadmap Neon — Fase 0: Seed & Migration Script
-Ejecutar con: python scripts/seed_neon.py
+Verificacion de esquema y seed basico — LU Xius
+Ejecutar con: python scripts/seed_db.py
 
 Crea las tablas en la base de datos configurada y agrega datos semilla
 (1 vendedor + 1 cliente) si no existen.
+
+⚠️ IMPORTANTE (renombrado el 18/10/2026):
+Antes era `seed_neon.py`. La base migro de Neon a Supabase el 11/10/2026.
+Este script opera sobre lo que apunte `DATABASE_URL`, que en produccion es
+SUPABASE. `db.create_all()` y los inserts escriben de verdad: NO lo ejecutes
+contra produccion salvo que sepas exactamente que hace falta.
+
+Las tablas se crean solas al arrancar el backend (`db.create_all()` en `app.py`),
+asi que normalmente este script es innecesario.
 """
 
 import sys

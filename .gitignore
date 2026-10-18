@@ -9,6 +9,10 @@ build/
 .env.local
 .env.*.local
 *.env
+# Respaldos de .env con timestamp (p.ej. .env.bak_20261018): contienen
+# credenciales y ningun patron anterior los cubria -> riesgo de commit.
+.env.bak*
+.env.*.bak*
 token.json
 client_secret*.json
 *.bak

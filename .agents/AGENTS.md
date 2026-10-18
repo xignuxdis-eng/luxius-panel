@@ -1,6 +1,8 @@
 # Reglas de Flujo de Trabajo - Luxius System
 
-- **Desarrollo Local y Despliegue Inmediato**: Cada modificación, corrección de bugs o nueva funcionalidad debe realizarse localmente en el código, verificarse y compilarse (`npm run build`), y subirse inmediatamente (`git push origin master`) a sus respectivos repositorios en GitHub (`luxius-panel`, `luXius-Backend`, `xignux-landing`) para que los cambios se reflejen instantáneamente en la web y servidores.
+- **Desarrollo Local y Despliegue Inmediato**: Cada modificación, corrección de bugs o nueva funcionalidad debe realizarse localmente en el código, verificarse y compilarse (`npm run verify` = `typecheck` + `lint` + `build`), y subirse inmediatamente (`git push origin master`) a sus respectivos repositorios en GitHub (`luxius-panel`, `luXius-Backend`, `xignux-landing`) para que los cambios se reflejen instantáneamente en la web y servidores.
+- **Verificación obligatoria antes de commitear**: `npm run typecheck` y `npm run lint` deben dar 0 errores. `npm run build` **no** type-chequea (Vite usa esbuild), por eso `tsc` es un paso aparte. El CI ejecuta los tres antes de desplegar.
+- **Base de datos**: **Supabase** (Session pooler `aws-0-us-east-1.pooler.supabase.com:5432/postgres`). Neon fue eliminada el 18/10/2026; no volver a usarla.
 - **Remoto único GitHub**: `origin` de `luxius-panel` apunta exclusivamente a `github.com/xignuxdis-eng/luxius-panel`. GitLab fue desvinculado el 02/10/2026.
 - **Git en terminales no interactivas**: exportar siempre `$env:GIT_TERMINAL_PROMPT = '0'` antes de `git fetch/pull/push` para que git falle rápido en vez de colgarse pidiendo credenciales.
 - **Memoria de cambios obligatoria**: todo cambio relevante (bugfix, arquitectura, decisión, roadmap) se asienta en `XANA_MEMORIA_SISTEMA.md` (bitácora sección 6 y plan sección 8) en el mismo commit, para que cualquier IDE o IA pueda continuar el contexto consultando cualquiera de los dos repositorios.

@@ -15,7 +15,7 @@
 * **Backend:** Python 3.12, Flask, Flask-CORS, SQLAlchemy 2.0, Gunicorn, Boto3, Pillow, PyPDFium2, Transferwee, Gdown. Alojado en **Render** (Web Service).
 * **Almacenamiento Primario (Operativo de Alta Velocidad):** **Cloudflare R2** (`luxius-media`) compatible con S3 (Zero Egress Fees).
 * **Almacenamiento Secundario (Bóveda Histórica Corporativa):** **Google Drive API v3** (Estructura organizada por Cliente / Año / Mes).
-* **Base de Datos Central:** **PostgreSQL en Neon Serverless** (Pooler con SSL activo).
+* **Base de Datos Central:** **PostgreSQL en Supabase** (Session pooler, AWS us-east-1, puerto 5432). Sustituye a Neon Serverless, eliminado el 18/10/2026 tras la migración del 11/10/2026.
 * **Base de Datos Local / Fallback:** SQLite (`luxius.db`).
 * **Inteligencia Artificial & Memoria:** Motor **Xana** (LangGraph / LangChain / Gemini) conectado a la base de conocimiento y tablas relacionales (`xana_knowledge`, `xana_decisions`, `xana_tasks`).
 
@@ -35,7 +35,7 @@
         │                       ┌────────┴────────┐                       │
         │                       ▼                 ▼                       ▼
         │             ┌─────────────────┐ ┌───────────────┐     ┌──────────────────┐
-        └────────────►│ Cloudflare R2   │ │ Neon Postgres │     │ RIP Software     │
+        └────────────►│ Cloudflare R2   │ │Supabase Postgres│    │ RIP Software     │
                       │ (Streaming R2)  │ │ (Base Central)│     │ PhotoPrint/Roland│
                       └─────────────────┘ └───────────────┘     └──────────────────┘
                                 │
@@ -87,7 +87,7 @@ sequenceDiagram
     participant Analyzer as Meta Parser (Pillow/PyPDFium2)
     participant Engine as Motor Cotizador (NuevoPedidoModal Logic)
     participant Storage as Cloudflare R2
-    participant DB as Neon PostgreSQL
+    participant DB as Supabase PostgreSQL
 
     Vendedor->>Chat: Pega link WeTransfer/Drive + "Cliente: AXIS, Vinilo Vehicular ECO, 2 copias"
     Chat->>API: POST { url, clientName, material, copies, prompt }

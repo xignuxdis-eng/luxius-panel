@@ -16,7 +16,7 @@ Para garantizar consistencia absoluta en el taller y en la nube, se establecen l
 ├─────────────────────────┬──────────────────────────────────────┬────────────────────────────────┤
 │ Capa                    │ Componente                           │ Rol en el Sistema              │
 ├─────────────────────────┼──────────────────────────────────────┼────────────────────────────────┤
-│ 1. Base de Datos Master │ Neon PostgreSQL (Serverless SSL)     │ Autoridad Única de Datos       │
+│ 1. Base de Datos Master │ Supabase PostgreSQL (AWS us-east-1)   │ Autoridad Única de Datos       │
 │ 2. Storage Operativo    │ Cloudflare R2 (`luxius-media`)       │ Master Operativo (Hot Storage) │
 │ 3. Storage Histórico    │ Google Workspace Shared Drive        │ Mirror / Bóveda (Cold Storage) │
 │ 4. Taller Físico        │ PC RIP Daemon (SQLite Local)         │ Receptor de Producción Atómico │
