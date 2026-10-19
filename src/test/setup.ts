@@ -1,8 +1,13 @@
+/// <reference types="vitest/globals" />
 /**
  * Setup global de Vitest.
  *
  * jsdom no implementa estas APIs y varios utilitarios las usan al importarse.
  * Los stubs son minimos: solo evitan que el import falle.
+ *
+ * La referencia `vitest/globals` de arriba es la que hace que `tsc --noEmit`
+ * conozca `describe`/`it`/`expect` dentro de los archivos `.test.ts`. Sin ella,
+ * los tests dan error de type-check aunque Vitest los ejecute bien.
  */
 
 import { beforeEach, vi } from 'vitest'

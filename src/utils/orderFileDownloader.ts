@@ -73,8 +73,13 @@ export function buildProductionFilename(order: Order, _index: number, originalNa
         dimString = `_${Number(order.ancho).toFixed(2)}x${Number(order.alto).toFixed(2)}`
     }
 
+    // Ancho de bobina asignado: le dice al operario qué rollo montar antes de
+    // imprimir. Se omite si no hay dato.
+    const bobinaAsig = order.bobinaAsignada ?? (order.precioDetalle as any)?.bobinaAncho ?? (order.precioDetalle as any)?.bobinaUsada
+    const bobinaStr = bobinaAsig ? `_bob${Number(bobinaAsig).toFixed(2).replace('.', '')}` : ''
+
     const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
-    const prefix = `OT-${otNumber}_x${copias}_${materialCode}${servicesStr}${dimString}`
+    const prefix = `OT-${otNumber}_x${copias}_${materialCode}${servicesStr}${dimString}${bobinaStr}`
 
     if (originalName.startsWith(`OT-${otNumber}`) || originalName.startsWith('OT-')) {
         return sanitizeFileName(originalName)

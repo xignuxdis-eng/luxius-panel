@@ -777,12 +777,26 @@ export default function Entrada() {
                 const savingsMeters = Math.max(0, rawTotalMl - totalMl);
                 const savingsPercent = rawTotalMl > 0 ? Math.round((savingsMeters / rawTotalMl) * 100) : 0;
 
+                // Orden de taller: primero las órdenes que entran en el rollo
+                // angosto (1.37 m), después las que exigen el ancho (1.52 m).
+                // Permite ver de un vistazo cómo se reparte el trabajo entre
+                // bobinas y facilita la impresión por bloques.
+                const batchListOrdenada = [...batchList].sort((a, b) => {
+                    const ba = parseFloat(String(getConsumption(a).bobina)) || 1.52;
+                    const bb = parseFloat(String(getConsumption(b).bobina)) || 1.52;
+                    if (ba !== bb) return ba - bb;                 // angosto primero
+                    const ma = String(a.material || '');
+                    const mb = String(b.material || '');
+                    if (ma !== mb) return ma.localeCompare(mb);   // luego por material
+                    return 0;                                      // preserva el orden original
+                });
+
                 result.push({
                     isBatch: true,
                     batchId: bInfo.key,
                     batchName: batchData.name,
-                    orders: batchList,
-                    primaryOrder: batchList[0],
+                    orders: batchListOrdenada,
+                    primaryOrder: batchListOrdenada[0],
                     totalPrice,
                     totalConsumption: {
                         m2: totalM2,
@@ -1060,7 +1074,18 @@ export default function Entrada() {
 
     const handleDownloadBatch = async (batchOrders: Order[], batchName?: string) => {
         try {
-            await downloadBatchOrdersZip(batchOrders, batchName, (p) => {
+            // Mismo criterio que la tabla: primero el rollo angosto (1.37),
+            // después el ancho (1.52). Así los PDFs salen del ZIP agrupados por
+            // bobina y el operario imprime por bloques sin tener que clasificar.
+            const paraImprimir = [...batchOrders].sort((a, b) => {
+                const ba = parseFloat(String(getConsumption(a).bobina)) || 1.52;
+                const bb = parseFloat(String(getConsumption(b).bobina)) || 1.52;
+                if (ba !== bb) return ba - bb;
+                const ma = String(a.material || '');
+                const mb = String(b.material || '');
+                return ma.localeCompare(mb);
+            });
+            await downloadBatchOrdersZip(paraImprimir, batchName, (p) => {
                 setDownloadProgress(p)
                 if (!p.active) {
                     setTimeout(() => setDownloadProgress(null), 3500)
@@ -1518,7 +1543,18 @@ export default function Entrada() {
                                                         <div className="composite-bottom-row">
                                                             {(() => {
                                                                 const desglose = Object.entries(item.totalConsumption.mlByBobina || {})
-                                                                    .filter(([, v]) => v > 0);
+                                                                    .filter(([, v]) => v > 0)
+                                                                    // Orden de taller: primero lo que entra en el rollo
+                                                                    // angosto (1.37), después el ancho (1.52). Así de un
+                                                                    // vistazo se ve qué se puede imprimir en el rollo
+                                                                    // chico y qué obliga a cambiar de bobina.
+                                                                    .sort((a, b) => {
+                                                                        const pa = a[0].split('|');
+                                                                        const pb = b[0].split('|');
+                                                                        const ba = parseFloat(pa[pa.length - 1] ?? '0') || 0;
+                                                                        const bb = parseFloat(pb[pb.length - 1] ?? '0') || 0;
+                                                                        return ba - bb;
+                                                                    });
                                                                 if (desglose.length === 0) {
                                                                     return item.totalConsumption.ml > 0 ? (
                                                                         <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.88rem' }}>
@@ -1534,6 +1570,15 @@ export default function Entrada() {
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
                                                                         {desglose.map(([key, mlVal]) => {
                                                                             const [matCode, bobinaLabel] = key.includes('|') ? key.split('|') : ['', key];
+                                                                            // Paños > 2.93m dentro de ESTA combinación material|ancho.
+                                                                            // Se cuenta por orden (no por copia) y con el mismo
+                                                                            // predicado que la píldora, para que no difieran.
+                                                                            const largosAqui = item.orders.filter((o: Order) => {
+                                                                                if ((o.material || 'SIN_MAT') !== matCode) return false;
+                                                                                const bc = parseFloat(bobinaLabel);
+                                                                                if (!isNaN(bc) && Math.abs((parseFloat(String(getConsumption(o).bobina)) || 0) - bc) > 0.001) return false;
+                                                                                return isSpecialLaminationOrder(o);
+                                                                            }).length;
                                                                             return (
                                                                                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                                                                     {matCode && (
@@ -1543,6 +1588,11 @@ export default function Entrada() {
                                                                                     <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.82rem' }}>
                                                                                         {mlVal.toFixed(2)} ml
                                                                                     </span>
+                                                                                    {largosAqui > 0 && (
+                                                                                        <span className="batch-special-lamination-pill" style={{ fontSize: '0.62rem', padding: '0 4px' }} title={`${largosAqui} paños > 2.93m en ${matCode} a ${bobinaLabel}`}>
+                                                                                            ⚡ {largosAqui}
+                                                                                        </span>
+                                                                                    )}
                                                                                 </div>
                                                                             );
                                                                         })}
