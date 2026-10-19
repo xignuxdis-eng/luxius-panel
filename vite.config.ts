@@ -5,31 +5,42 @@ import fs from 'fs'
 
 const buildTimestamp = new Date().toISOString()
 
+// SHA del commit que se esta compilando. Lo inyecta GitHub Actions en cada run
+// (GITHUB_SHA). En builds locales queda en null, porque el arbol de trabajo suele
+// tener cambios sin commitear y el SHA daria una sensacion de trazabilidad falsa.
+//
+// Sirve para que un deploy se verifique comparando SHAs y no marcas de tiempo: el
+// reloj de la maquina de desarrollo puede estar desfasado respecto del runner y del
+// CDN, y comparar horas daba falsos "PENDIENTE" sobre builds correctos.
+const buildCommitSha = process.env.GITHUB_SHA || null
+
+// Una sola fuente para las dos copias de version.json (la de public/ que se escribe
+// en buildStart y la que se emite en generateBundle). Antes cada una declaraba sus
+// propios campos y podian divergir sin que nada lo indicara.
+function buildVersionData(): string {
+    return JSON.stringify({
+        version: '1.1.0',
+        commitSha: buildCommitSha,
+        buildTime: buildTimestamp,
+        generatedAt: Date.now()
+    }, null, 2)
+}
+
 function versionGeneratorPlugin(): Plugin {
     return {
         name: 'version-generator',
         buildStart() {
-            const versionData = JSON.stringify({
-                version: '1.1.0',
-                buildTime: buildTimestamp,
-                generatedAt: Date.now()
-            }, null, 2)
-
             const publicDir = path.resolve(__dirname, 'public')
             if (!fs.existsSync(publicDir)) {
                 fs.mkdirSync(publicDir, { recursive: true })
             }
-            fs.writeFileSync(path.resolve(publicDir, 'version.json'), versionData)
+            fs.writeFileSync(path.resolve(publicDir, 'version.json'), buildVersionData())
         },
         generateBundle() {
             this.emitFile({
                 type: 'asset',
                 fileName: 'version.json',
-                source: JSON.stringify({
-                    version: '1.1.0',
-                    buildTime: buildTimestamp,
-                    generatedAt: Date.now()
-                }, null, 2)
+                source: buildVersionData()
             })
 
             // Inyectar nombre de cache único con timestamp de build en sw.js
