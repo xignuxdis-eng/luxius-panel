@@ -1063,6 +1063,23 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🧹 Limpieza de mantenimiento — 19/10/2026
+
+- **`.env.example` reconstruido**: le faltaban `JWT_SECRET_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` y `R2_ENDPOINT_URL`. Ahora cubre las 21 variables del `.env` real, con notas sobre Session pooler, el salto de línea en la URL y qué pasa si `JWT_SECRET_KEY` queda vacía.
+- **`scripts/update_pdf.py` ELIMINADO — era un peligro, no solo código muerto**: era un generador de un solo uso que **reescribe `src/utils/presupuestoPdf.ts`**. El archivo actual importa el logo de `./logoBase64Light`, pero el script genera una versión con el logo embebido en línea. Correrlo habría revertido un archivo sano. Nadie lo invocaba y no estaba en la documentación.
+- **`src/utils/logoBase64.txt` eliminado** (364 KB de base64 crudo). Solo lo leía `update_pdf.py`; al caer este, quedó sin consumidor.
+- **`src/utils/logoBase64.ts` SE CONSERVA a propósito**: `build_logo.py`, `generate_official_logo.py` y `compressLogo.mjs` lo leen o escriben. Es el eslabón intermedio del pipeline del logo, aunque la app no lo importe directamente. No confundir con el `.txt` que sí era basura.
+
+##### ⚠️ Pendiente que requiere decisión del usuario
+
+**`.githooks/post-commit` está muerto desde que se creó.** El archivo existe y está bien escrito (notifica cada commit a `https://luxius-backend.onrender.com/api/xana/commits`, que responde HTTP 200), pero **no se ejecuta** porque `core.hooksPath` está vacío en la configuración de git. Git solo mira `.git/hooks/` o lo que apunte esa variable.
+
+```powershell
+git config core.hooksPath .githooks   # activar (aplica a ESTE repo)
+```
+
+**No se activó automáticamente** a propósito: el hook haría un POST a producción en cada commit y lleva tiempo sin correr, así que nadie sabe si sigue funcionando. Conviene probarlo una vez y revisar que no ensucie el endpoint. Los hooks son locales (no se suben a git), así que hay que configurarlo también en cada máquina.
+
 ##### 🔧 Herramienta de verificación (creada 18/10/2026)
 
 ```bash
