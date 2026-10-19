@@ -1,0 +1,10 @@
+{
+    "_ayuda": "Editá este archivo para cambiar frases, visitas, mascotas y ajustes del Print Den SIN recompilar. Lo que falte queda de fábrica. Ver src/components/workshop/content/remote.ts",
+    "config": {},
+    "texts": {},
+    "orderTalk": {},
+    "guests": {},
+    "pets": {},
+    "roleShirt": {},
+    "lookOverrides": {}
+}
