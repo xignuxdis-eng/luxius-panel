@@ -1739,5 +1739,18 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - En la acción de descarga masiva de lote, se calculan y pasan en vivo `bobinaAsignada` y `consumoEstimado` derivados de `getConsumption()` para que el empaquetado refleje exactamente lo visible en la tabla de producción.
   - **Suite de Pruebas Automatizadas (`src/utils/orderFileDownloader.test.ts`)**:
     - 19 pruebas unitarias en Vitest que validan deducción de códigos, resolución de bobinas, cálculo del umbral de 2.93m (unitaria vs. múltiples copias), rutas relativas y colisiones en ZIP.
+- **Sincronización Reactiva en Vivo de Filtros de Estado y Pestañas en Entrada (19/10/2026)**:
+  - **Problema detectado**: Al cambiar el filtro desplegable de "Para Imprimir" a "Impreso" o "Entregado" en `Entrada.tsx`, la tabla no se actualizaba en vivo o aparecía completamente vacía requiriendo refrescar con F5.
+  - **Causa raíz identificada**:
+    1. Conflicto entre `statusFilter` y `viewTab`: mientras `viewTab` estuviera en `'active'` (por defecto), `displayedOrders` filtraba forzosamente `!['entregado', 'finalizado', 'eliminado'].includes(o.status)`, suprimiendo todas las órdenes entregadas aun cuando el usuario las hubiera seleccionado explícitamente en el desplegable.
+    2. En `results-count` se mostraba `filteredOrders.length` (ej. "15 órdenes"), mientras la tabla mostraba 0 filas debido al descarte de `displayedOrders`.
+    3. Al hacer clic en la pestaña "Historial", si `statusFilter` seguía con su valor inicial (`'orden'`), el historial quedaba vacío (0 órdenes).
+    4. El rol `impresion` no incluía `'entregado'` en su lista de relevancia (`isRelevantForImpresor`).
+  - **Solución implementada**:
+    - **Prioridad a filtros explícitos**: si `statusFilter !== ''`, `displayedOrders` respeta el estado seleccionado sin descartarlo por la pestaña activa.
+    - **Sincronización bidireccional inteligente**: al seleccionar "Entregado" en el desplegable, `viewTab` conmuta automáticamente a `'history'`; al seleccionar "Para Imprimir" o "Pre-Orden", conmuta a `'active'`.
+    - **Reset contextual en botones de pestaña**: al presionar la pestaña "Historial", si el filtro estaba en `'orden'` o `'preorden'`, se limpia a `'Todos los Estados'` para no bloquear los resultados históricos. Similarmente, al presionar "OTs Activas", limpia `'entregado'`.
+    - **Contadores coherentes**: los contadores de cada pestaña se calculan sobre `baseOrders` (independientes del `statusFilter`), y `results-count` refleja exactamente `displayedOrders.length`.
+    - **Actualización optimista y bypass de caché**: `handleBatchStatus` actualiza el estado de las órdenes en memoria en 0 ms antes de la sincronización remota y llama a `loadOrders(true)` para forzar la lectura autoritativa.
 
 ---

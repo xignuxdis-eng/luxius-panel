@@ -4,7 +4,7 @@ import Header from '@components/layout/Header'
 import Button from '@components/ui/Button'
 import { statusColors, statusLabels, PRESET_ORDER_TAGS, getOrderTag, isDesignerOwner } from '../../types/orden'
 import { isDesignerRole } from '../../types/auth'
-import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, resolveMediaUrl } from '@data/db'
+import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, resolveMediaUrl, matchesOrderId } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
 import StatusChangeModal from './StatusChangeModal'
@@ -147,10 +147,10 @@ export default function Entrada() {
     // DOWNLOAD PROGRESS STATE
     const [downloadProgress, setDownloadProgress] = useState<DownloadProgressState | null>(null)
 
-    const loadOrders = async () => {
+    const loadOrders = async (forceRefresh = false) => {
         try {
             setLoading(true)
-            const data = await getOrdenes()
+            const data = await getOrdenes(forceRefresh)
             setOrders(data)
         } catch (error) {
             console.error("Failed to load orders", error)
@@ -239,63 +239,78 @@ export default function Entrada() {
         }
     };
 
-    const filteredOrders = orders.filter(order => {
-        const matchesSearch =
-            (order.clienteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.ot?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.id?.toString() || '').includes(searchTerm) ||
-            (order.material?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.nombreTarea?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.loteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.descripcionItem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.observaciones?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (order.tags && order.tags.some(t => {
-                const def = getOrderTag(t);
-                return t.toLowerCase().includes(searchTerm.toLowerCase()) || (def && def.label.toLowerCase().includes(searchTerm.toLowerCase()));
-            }));
+    const baseOrders = useMemo(() => {
+        return orders.filter(order => {
+            const matchesSearch =
+                (order.clienteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.ot?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.id?.toString() || '').includes(searchTerm) ||
+                (order.material?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.nombreTarea?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.loteNombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.descripcionItem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.observaciones?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (order.tags && order.tags.some(t => {
+                    const def = getOrderTag(t);
+                    return t.toLowerCase().includes(searchTerm.toLowerCase()) || (def && def.label.toLowerCase().includes(searchTerm.toLowerCase()));
+                }));
 
-        const matchesStatus = statusFilter === '' || order.status === statusFilter;
-        const matchesCalidad = calidadFilter === '' || order.calidad === calidadFilter;
-        const matchesMaterial = materialFilter === '' || order.material === materialFilter;
-        const matchesCategory = categoryFilter === '' || order.category === categoryFilter;
-        const matchesTag = !tagFilter || (order.tags && order.tags.includes(tagFilter));
+            const matchesCalidad = calidadFilter === '' || order.calidad === calidadFilter;
+            const matchesMaterial = materialFilter === '' || order.material === materialFilter;
+            const matchesCategory = categoryFilter === '' || order.category === categoryFilter;
+            const matchesTag = !tagFilter || (order.tags && order.tags.includes(tagFilter));
 
-        const isArtista = isDesignerRole(user?.role);
-        const isImpresor = user?.role === 'impresion';
-        const isRelevantForImpresor = ['orden', 'impreso', 'post', 'completo'].includes(order.status);
+            const isArtista = isDesignerRole(user?.role);
+            const isImpresor = user?.role === 'impresion';
+            const isRelevantForImpresor = ['orden', 'impreso', 'post', 'completo', 'entregado'].includes(order.status);
 
-        if (user?.role === 'vendedor' && order.status !== 'relevamiento') return false;
+            if (user?.role === 'vendedor' && order.status !== 'relevamiento') return false;
 
-        if (user?.role === 'cliente') {
-            const linkedClient = allClientes.find(c =>
-                c.nombre.toLowerCase().includes(user.name.toLowerCase()) ||
-                user.name.toLowerCase().includes(c.nombre.toLowerCase())
-            );
+            if (user?.role === 'cliente') {
+                const linkedClient = allClientes.find(c =>
+                    c.nombre.toLowerCase().includes(user.name.toLowerCase()) ||
+                    user.name.toLowerCase().includes(c.nombre.toLowerCase())
+                );
 
-            const orderClientId = order.clientId || (order as any).clienteId;
-            const matchesLinked = linkedClient && (String(orderClientId) === String(linkedClient.id));
-            const matchesUser = String(orderClientId) === String(user.id);
+                const orderClientId = order.clientId || (order as any).clienteId;
+                const matchesLinked = linkedClient && (String(orderClientId) === String(linkedClient.id));
+                const matchesUser = String(orderClientId) === String(user.id);
 
-            if (!matchesLinked && !matchesUser) return false;
+                if (!matchesLinked && !matchesUser) return false;
+            }
+
+            // Regla de Oro para Diseñadores:
+            // Solo pueden visualizar y dar seguimiento a sus propios trabajos publicados en todas las etapas.
+            if (isArtista) {
+                if (!isDesignerOwner(order, user)) return false;
+            }
+
+            if (isImpresor && !isRelevantForImpresor) return false;
+
+            return matchesSearch && matchesCalidad && matchesMaterial && matchesCategory && matchesTag;
+        });
+    }, [orders, searchTerm, calidadFilter, materialFilter, categoryFilter, tagFilter, user, allClientes]);
+
+    const filteredOrders = useMemo(() => {
+        if (!statusFilter) return baseOrders;
+        return baseOrders.filter(order => order.status === statusFilter);
+    }, [baseOrders, statusFilter]);
+
+    const displayedOrders = useMemo(() => {
+        if (viewTab === 'trash') {
+            return baseOrders.filter(o => o.status === 'eliminado');
         }
-
-        // Regla de Oro para Diseñadores:
-        // No deben poder ver los trabajos subidos por otros diseñadores o por el sistema.
-        // Solo pueden visualizar y dar seguimiento a sus propios trabajos publicados en todas las etapas.
-        if (isArtista) {
-            if (!isDesignerOwner(order, user)) return false;
+        if (statusFilter !== '') {
+            // Si el usuario especificó un estado (ej. "orden", "impreso", "entregado", "preorden"),
+            // se muestran inmediatamente las órdenes que coinciden con dicho filtro
+            return filteredOrders.filter(o => o.status !== 'eliminado');
         }
-
-        if (isImpresor && !isRelevantForImpresor) return false;
-
-        return matchesSearch && matchesStatus && matchesCalidad && matchesMaterial && matchesCategory && matchesTag;
-    })
-
-    const displayedOrders = viewTab === 'trash'
-        ? filteredOrders.filter(o => o.status === 'eliminado')
-        : viewTab === 'history'
-            ? filteredOrders.filter(o => ['impreso', 'entregado', 'finalizado', 'completo'].includes(o.status))
-            : filteredOrders.filter(o => !['entregado', 'finalizado', 'eliminado'].includes(o.status));
+        if (viewTab === 'history') {
+            return baseOrders.filter(o => ['impreso', 'entregado', 'finalizado', 'completo'].includes(o.status));
+        }
+        // viewTab === 'active' por defecto
+        return baseOrders.filter(o => !['entregado', 'finalizado', 'eliminado'].includes(o.status));
+    }, [viewTab, statusFilter, filteredOrders, baseOrders]);
 
     const forecast = useMemo(() => computeStockForecast(orders, allMateriales), [orders, allMateriales])
     const canViewAlerts = canViewStockAlerts(user?.role)
@@ -841,7 +856,7 @@ export default function Entrada() {
     };
 
     const refreshOrders = async () => {
-        await loadOrders()
+        await loadOrders(true)
     }
 
     const handleNewOrder = () => {
@@ -1007,10 +1022,13 @@ export default function Entrada() {
             setLoading(true);
             const finalIds = Array.from(selectedIds);
 
+            // Actualización optimista en memoria para feedback instantáneo en vivo
+            setOrders(prev => prev.map(o => finalIds.some(id => matchesOrderId(o, id)) ? { ...o, status } : o));
+
             await saveBatchOrders('update', finalIds.map(String), { status });
 
             setSelectedIds(new Set());
-            await loadOrders();
+            await loadOrders(true);
         } catch (error) {
             console.error('Batch error:', error);
             alert('Hubo un error al procesar las órdenes');
@@ -1200,7 +1218,19 @@ export default function Entrada() {
                             />
                         </div>
 
-                        <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                        <select
+                            className="filter-select"
+                            value={statusFilter}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setStatusFilter(val);
+                                if (val === 'entregado') {
+                                    setViewTab('history');
+                                } else if (val === 'orden' || val === 'preorden') {
+                                    setViewTab('active');
+                                }
+                            }}
+                        >
                             <option value="">Todos los Estados</option>
                             <option value="preorden">Pre-Orden (Diseño)</option>
                             <option value="orden">Para Imprimir</option>
@@ -1213,7 +1243,7 @@ export default function Entrada() {
 
                     <div className="filter-actions">
                         <span className="results-count">
-                            {filteredOrders.length} ordenes
+                            {displayedOrders.length} ordenes
                         </span>
                         <Button variant="primary" onClick={handleNewOrder} size="sm" className="btn-glow">
                             + Nuevo Pedido
@@ -1251,7 +1281,10 @@ export default function Entrada() {
             {/* VIEW TABS */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                 <button
-                    onClick={() => setViewTab('active')}
+                    onClick={() => {
+                        setViewTab('active');
+                        if (statusFilter === 'entregado') setStatusFilter('');
+                    }}
                     style={{
                         padding: '0.5rem 1.2rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
                         fontWeight: viewTab === 'active' ? '700' : '400',
@@ -1260,10 +1293,13 @@ export default function Entrada() {
                         transition: 'all 0.2s ease'
                     }}
                 >
-                    📋 OTs Activas ({filteredOrders.filter(o => !['entregado', 'finalizado'].includes(o.status)).length})
+                    📋 OTs Activas ({baseOrders.filter(o => !['entregado', 'finalizado', 'eliminado'].includes(o.status)).length})
                 </button>
                 <button
-                    onClick={() => setViewTab('history')}
+                    onClick={() => {
+                        setViewTab('history');
+                        if (statusFilter === 'orden' || statusFilter === 'preorden') setStatusFilter('');
+                    }}
                     style={{
                         padding: '0.5rem 1.2rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
                         fontWeight: viewTab === 'history' ? '700' : '400',
@@ -1272,10 +1308,13 @@ export default function Entrada() {
                         transition: 'all 0.2s ease'
                     }}
                 >
-                    📜 Historial ({filteredOrders.filter(o => ['impreso', 'entregado', 'finalizado', 'completo'].includes(o.status)).length})
+                    📜 Historial ({baseOrders.filter(o => ['impreso', 'entregado', 'finalizado', 'completo'].includes(o.status)).length})
                 </button>
                 <button
-                    onClick={() => setViewTab('trash')}
+                    onClick={() => {
+                        setViewTab('trash');
+                        setStatusFilter('');
+                    }}
                     style={{
                         padding: '0.5rem 1.2rem', borderRadius: '8px', border: 'none', cursor: 'pointer',
                         fontWeight: viewTab === 'trash' ? '700' : '400',
@@ -1284,7 +1323,7 @@ export default function Entrada() {
                         transition: 'all 0.2s ease'
                     }}
                 >
-                    🗑️ Papelera ({filteredOrders.filter(o => o.status === 'eliminado').length})
+                    🗑️ Papelera ({baseOrders.filter(o => o.status === 'eliminado').length})
                 </button>
             </div>
 
