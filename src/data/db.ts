@@ -1465,22 +1465,11 @@ export function getCalidades(): Calidad[] {
     }
 
     if (!Array.isArray(sessionItems) || sessionItems.length === 0) {
+        // Solo usar defaults si no hay NINGÚN dato guardado (primera vez)
         sessionItems = [...DEFAULT_CALIDADES];
         try { localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems)) } catch (e) { }
-    } else {
-        // Enriquecer automáticamente si faltan opciones para que el usuario nunca quede atrapado
-        const existingNames = new Set(sessionItems.map(c => (c.nombre || '').toLowerCase().trim()));
-        let merged = false;
-        for (const def of DEFAULT_CALIDADES) {
-            if (!existingNames.has(def.nombre.toLowerCase().trim())) {
-                sessionItems.push(def);
-                merged = true;
-            }
-        }
-        if (merged) {
-            try { localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems)) } catch (e) { }
-        }
     }
+    // No re-insertar defaults si el usuario ya tiene datos: respeta ediciones y eliminaciones
 
     if (hiddenItemsJson) {
         try {
@@ -1536,7 +1525,15 @@ export function saveCalidad(calidad: Partial<Calidad>): Calidad {
 }
 
 export function deleteCalidad(id: number) {
-    let sessionItems = getCalidades();
+    // Leer directo de localStorage para evitar que getCalidades() reinserte defaults
+    let sessionItems: Calidad[] = [];
+    const raw = localStorage.getItem(SESSION_CALIDADES_KEY);
+    if (raw) {
+        try { sessionItems = JSON.parse(raw) as Calidad[]; } catch (e) { }
+    }
+    if (!Array.isArray(sessionItems) || sessionItems.length === 0) {
+        sessionItems = [...DEFAULT_CALIDADES];
+    }
     sessionItems = sessionItems.filter(c => c.id !== id);
     localStorage.setItem(SESSION_CALIDADES_KEY, JSON.stringify(sessionItems));
     syncDelete('calidades', id);
