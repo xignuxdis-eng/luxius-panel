@@ -554,7 +554,16 @@ export default function Reportes() {
                                             <td>
                                                 <div>{Number(order.ancho).toFixed(2)} x {Number(order.alto).toFixed(2)} m ({order.copias} cop)</div>
                                                 {(order.bobinaAsignada || order.consumoEstimado) && (() => {
-                                                    const isSpecial = (order.consumoEstimado && order.consumoEstimado > 2.93) || Math.max(Number(order.ancho) || 0, Number(order.alto) || 0) > 2.93;
+                                                    // El umbral de 2.93m aplica a UN pano. `consumoEstimado` viene del motor de
+                                                    // precios e incluye las copias: sin dividir, un pano de 1.55m con
+                                                    // 2 copias daba 3.10 y disparaba la alerta sin motivo.
+                                                    const rawW = Number(order.ancho) || 0;
+                                                    const rawH = Number(order.alto) || 0;
+                                                    const dimW = rawW > 20 ? rawW / 100 : rawW;
+                                                    const dimH = rawH > 20 ? rawH / 100 : rawH;
+                                                    const copias = Math.max(1, Number(order.copias) || 1);
+                                                    const largoDeUnPano = order.consumoEstimado ? order.consumoEstimado / copias : 0;
+                                                    const isSpecial = largoDeUnPano > 2.93 || Math.max(dimW, dimH) > 2.93;
                                                     if (isSpecial) {
                                                         return (
                                                             <div style={{ marginTop: '2px', display: 'flex', gap: '4px', alignItems: 'center' }} title="⚠️ Paño > 2.93m: Requiere laminado especial">

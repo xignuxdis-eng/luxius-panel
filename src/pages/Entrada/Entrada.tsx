@@ -500,9 +500,24 @@ export default function Entrada() {
 
     const isSpecialLaminationOrder = (order: Order, cons?: { value: number; unit: string; bobina: string | null }) => {
         const c = cons || getConsumption(order);
-        const w = Number(order.ancho) || 0;
-        const h = Number(order.alto) || 0;
-        return (c.unit === 'ml' && c.value > 2.93) || Math.max(w, h) > 2.93;
+        // El umbral de 2.93m aplica a UN paño, no al consumo del lote.
+        // `getConsumption` ya multiplica por copias (ver lineas 439-484) y
+        // `consumoEstimado` viene del motor de precios, que tambien las
+        // incluye: sin dividir, un pano de 1.55m x 2 copias daba 3.10ml y
+        // disparaba la alerta de laminado especial sin motivo.
+        const rawW = Number(order.ancho) || 0;
+        const rawH = Number(order.alto) || 0;
+        const w = round2(rawW > 20 ? rawW / 100 : rawW);
+        const h = round2(rawH > 20 ? rawH / 100 : rawH);
+
+        if (c.unit === 'ml') {
+            const copias = Math.max(1, Number(order.copias) || 1);
+            const largoDeUnPano = c.value / copias;
+            return largoDeUnPano > 2.93 || Math.max(w, h) > 2.93;
+        }
+
+        // En m² el consumo es area, no largo: se evalúa la dimension fisica.
+        return Math.max(w, h) > 2.93;
     };
 
     const renderConsumptionBadge = (order: Order, cons: { value: number; unit: string; bobina: string | null }) => {
@@ -716,17 +731,25 @@ export default function Entrada() {
 
                 // Si hay órdenes con consumo de bobina (ml), aplicar el Motor de Nesting 2D
                 if (mlOrders.length > 0) {
-                    const ordersByBobina = new Map<number, Order[]>();
+                    // Se agrupa por MATERIAL + ancho de bobina, no solo por bobina.
+                    // Dos sustratos distintos no se anidan juntos aunque midan
+                    // lo mismo: además de físicamente inválido, mezclaría los
+                    // metros de un material con los del otro.
+                    const ordersByGroup = new Map<string, { bNum: number; orders: Order[] }>();
                     mlOrders.forEach(o => {
                         const cons = getConsumption(o);
                         const bNum = Number(cons.bobina) || 1.52;
-                        if (!ordersByBobina.has(bNum)) {
-                            ordersByBobina.set(bNum, []);
+                        const matCode = o.material || 'SIN_MAT';
+                        const key = `${matCode}|${bNum}`;
+                        if (!ordersByGroup.has(key)) {
+                            ordersByGroup.set(key, { bNum, orders: [] });
                         }
-                        ordersByBobina.get(bNum)!.push(o);
+                        ordersByGroup.get(key)!.orders.push(o);
                     });
 
-                    ordersByBobina.forEach((bOrders, bobinaNum) => {
+                    ordersByGroup.forEach((group, key) => {
+                        const bobinaNum = group.bNum;
+                        const bOrders = group.orders;
                         if (bOrders.length > 1) {
                             const nestingItems: NestingItem[] = bOrders.map(o => ({
                                 id: o.id || o.ot,
@@ -741,12 +764,12 @@ export default function Entrada() {
                             const nResult = runNesting(nestingItems, { rollWidth: bobinaNum });
                             totalMl += nResult.linearMeters;
                             rawTotalMl += nResult.rawLinearMeters;
-                            mlByBobina[`${bobinaNum}m`] = (mlByBobina[`${bobinaNum}m`] || 0) + nResult.linearMeters;
+                            mlByBobina[key] = (mlByBobina[key] || 0) + nResult.linearMeters;
                         } else {
                             const singleCons = getConsumption(bOrders[0]);
                             totalMl += singleCons.value;
                             rawTotalMl += singleCons.value;
-                            mlByBobina[`${bobinaNum}m`] = (mlByBobina[`${bobinaNum}m`] || 0) + singleCons.value;
+                            mlByBobina[key] = (mlByBobina[key] || 0) + singleCons.value;
                         }
                     });
                 }
@@ -1493,15 +1516,47 @@ export default function Entrada() {
                                                             </span>
                                                         </div>
                                                         <div className="composite-bottom-row">
-                                                            {item.totalConsumption.ml > 0 ? (
-                                                                <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.88rem' }}>
-                                                                    {item.totalConsumption.ml.toFixed(2)} ml
-                                                                </span>
-                                                            ) : (
-                                                                <span className="m2-text font-mono" style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-                                                                    {item.totalConsumption.m2.toFixed(2)} m²
-                                                                </span>
-                                                            )}
+                                                            {(() => {
+                                                                const desglose = Object.entries(item.totalConsumption.mlByBobina || {})
+                                                                    .filter(([, v]) => v > 0);
+                                                                if (desglose.length === 0) {
+                                                                    return item.totalConsumption.ml > 0 ? (
+                                                                        <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.88rem' }}>
+                                                                            {item.totalConsumption.ml.toFixed(2)} ml
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="m2-text font-mono" style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                                                                            {item.totalConsumption.m2.toFixed(2)} m²
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                return (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
+                                                                        {desglose.map(([key, mlVal]) => {
+                                                                            const [matCode, bobinaLabel] = key.includes('|') ? key.split('|') : ['', key];
+                                                                            return (
+                                                                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                                                    {matCode && (
+                                                                                        <span className="material-tag-sm" style={{ fontSize: '0.68rem' }}>{matCode}</span>
+                                                                                    )}
+                                                                                    <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>⌀ {bobinaLabel}</span>
+                                                                                    <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.82rem' }}>
+                                                                                        {mlVal.toFixed(2)} ml
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                        {desglose.length > 1 && (
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '2px', marginTop: '1px' }}>
+                                                                                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>TOTAL</span>
+                                                                                <span className="m2-text font-mono" style={{ fontWeight: 800, color: 'var(--metric-cyan)', fontSize: '0.88rem' }}>
+                                                                                    {item.totalConsumption.ml.toFixed(2)} ml
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                             {item.totalConsumption.savingsPercent !== undefined && item.totalConsumption.savingsPercent > 0 && (
                                                                 <span style={{
                                                                     fontSize: '0.68rem',

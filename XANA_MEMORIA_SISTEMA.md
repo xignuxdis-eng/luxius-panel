@@ -1063,6 +1063,18 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🐛 Correcciones en Entrada/Reportes — laminado especial y desglose de ml — 19/10/2026
+
+**BUG 1 — la alerta de laminado especial (⚡ > 2.93m) se disparaba por las copias.**
+`isSpecialLaminationOrder` comparaba `consumo > 2.93`, pero `getConsumption` **multiplica el largo del paño por la cantidad de copias** (cinco ramas distintas, líneas 439-484) y `consumoEstimado` viene del motor de precios, que también las incluye. Un paño de 1,55 m con 2 copias daba 3,10 ml y disparaba la alerta sin que ningún paño individual superara el umbral. Además el `Math.max(w, h) > 2.93` no convertía de cm a m, así que cualquier dimensión guardada en centímetros hacía que **todo** se marcara como especial. Corregido en `Entrada.tsx` y `Reportes.tsx`: se divide por `copias` y se normaliza cm→m con la misma regla de `getConsumption`.
+
+**BUG 2 — el total de ml del encabezado de lote no distinguía material.**
+`mlByBobina` agrupaba solo por ancho de bobina, así que un lote con dos sustratos al mismo ancho mostraba un único número mezclando ambos. Ahora la clave es `material|anchoBobina` y el encabezado renderiza una línea por combinación, con total global cuando hay más de una.
+
+**Corrección adicional a la propuesta original (importante):** `ordersByBobina` agrupaba **solo por bobina, no por material**. La solución propuesta (usar `bOrders[0].material` como etiqueta) habría atribuido metros de un material al primero de la lista. Como además dos sustratos distintos **no pueden anidarse en el mismo rollo físico**, se cambió el agrupamiento a `material + ancho` antes de aplicar el motor de nesting. Esto corrige la atribución y de paso evita un anidamiento físicamente inválido.
+
+**Tests: 20 casos nuevos** en `src/pages/Entrada/laminacionEspecial.test.ts`, incluidos cuatro que replican la lógica **vieja** dentro del propio test para demostrar que el fix es real: sin el arreglo, 1,55 m × 2 copias dispara, y cualquier dimensión en cm dispara siempre. Suite total: **103 tests**.
+
 ##### 🧪 tests de caracterización de `db.ts` — 19/10/2026
 
 Segundo bloque de tests. Antes de intentar partir `db.ts` (2.752 líneas, 96 funciones, 29 constantes) se fijó el comportamiento de sus dos piezas más delicadas. Total de la suite: **83 tests**.
