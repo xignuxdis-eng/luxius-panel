@@ -1077,7 +1077,15 @@ export default function Entrada() {
             // Mismo criterio que la tabla: primero el rollo angosto (1.37),
             // después el ancho (1.52). Así los PDFs salen del ZIP agrupados por
             // bobina y el operario imprime por bloques sin tener que clasificar.
-            const paraImprimir = [...batchOrders].sort((a, b) => {
+            const paraImprimir = [...batchOrders].map(o => {
+                const cons = getConsumption(o);
+                const assigned = cons.bobina ? parseFloat(cons.bobina) : undefined;
+                return {
+                    ...o,
+                    bobinaAsignada: o.bobinaAsignada ?? assigned,
+                    consumoEstimado: o.consumoEstimado ?? cons.value,
+                };
+            }).sort((a, b) => {
                 const ba = parseFloat(String(getConsumption(a).bobina)) || 1.52;
                 const bb = parseFloat(String(getConsumption(b).bobina)) || 1.52;
                 if (ba !== bb) return ba - bb;

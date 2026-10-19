@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import { API_URL, resolveMediaUrl, getAuthHeaders, getMateriales, getServicios } from '@data/db'
 import type { Order } from '@/types'
+import { calculateItemPriceDetailed } from './pricingCalculator'
 
 /**
  * Sanitiza nombres de archivo eliminando caracteres ilegales en Windows/Linux/macOS
@@ -10,6 +11,147 @@ export function sanitizeFileName(name: string): string {
         .replace(/[\\/:*?"<>|]/g, '_')
         .replace(/\s+/g, ' ')
         .trim()
+}
+
+/**
+ * Determina el código corto limpio de material para nombrar carpetas y archivos
+ */
+export function resolveMaterialCode(order: Partial<Order>): string {
+    const rawMat = (order.material || 'MAT').trim()
+    let materialCode = rawMat
+    try {
+        const allMaterials = getMateriales()
+        const foundMat = allMaterials.find(m =>
+            (m.codigo && m.codigo.toLowerCase() === rawMat.toLowerCase()) ||
+            (m.descripcion && m.descripcion.toLowerCase() === rawMat.toLowerCase())
+        )
+        if (foundMat && foundMat.codigo) {
+            materialCode = foundMat.codigo.trim()
+        }
+    } catch { }
+    return materialCode.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '') || 'MAT'
+}
+
+/**
+ * Determina el ancho numérico de bobina asignado o deducido para una orden
+ */
+export function resolveOrderBobina(order: Partial<Order>): number | null {
+    // 1. Directamente asignada en la orden o en precioDetalle
+    const rawBobina = order.bobinaAsignada ?? (order.precioDetalle as any)?.bobinaAncho ?? (order.precioDetalle as any)?.bobinaUsada
+    const num = parseFloat(String(rawBobina))
+    if (!isNaN(num) && num > 0) {
+        return num
+    }
+
+    // 2. Intentar calcular vía motor unificado de precios
+    try {
+        const calc = calculateItemPriceDetailed(
+            order.material || '',
+            Number(order.ancho) || 0,
+            Number(order.alto) || 0,
+            Number(order.copias) || 1,
+            order.servicios as any,
+            order.clientId || order.clienteNombre
+        )
+        if (calc.bobinaAsignada && !isNaN(Number(calc.bobinaAsignada)) && Number(calc.bobinaAsignada) > 0) {
+            return Number(calc.bobinaAsignada)
+        }
+    } catch { }
+
+    // 3. Fallback evaluando bobinas configuradas en el material
+    try {
+        const allMaterials = getMateriales()
+        const mat = allMaterials.find(m =>
+            (m.codigo && m.codigo.toLowerCase() === String(order.material || '').toLowerCase()) ||
+            (m.descripcion && m.descripcion.toLowerCase() === String(order.material || '').toLowerCase())
+        )
+        if (mat?.bobinas && mat.bobinas.length > 0) {
+            const rawW = Number(order.ancho) || 0
+            const rawH = Number(order.alto) || 0
+            const w = rawW > 20 ? rawW / 100 : rawW
+            const h = rawH > 20 ? rawH / 100 : rawH
+            const available = mat.bobinas
+                .map((b: any) => ({ ancho: Number(b.ancho) || 0 }))
+                .filter((b: any) => b.ancho > 0)
+                .sort((a: any, b: any) => a.ancho - b.ancho)
+
+            for (const b of available) {
+                if (w <= b.ancho || h <= b.ancho) {
+                    return b.ancho
+                }
+            }
+            if (available.length > 0) {
+                return available[available.length - 1].ancho
+            }
+        }
+    } catch { }
+
+    // 4. Default estándar para vinilos conocidos (VV, VVP)
+    const matUpper = String(order.material || '').toUpperCase()
+    if (matUpper === 'VV' || matUpper === 'VVP') {
+        const rawW = Number(order.ancho) || 0
+        const rawH = Number(order.alto) || 0
+        const w = rawW > 20 ? rawW / 100 : rawW
+        const h = rawH > 20 ? rawH / 100 : rawH
+        return (w <= 1.365 || h <= 1.365) ? 1.37 : 1.52
+    }
+
+    return null
+}
+
+/**
+ * Evalúa si una orden excede el umbral de 2.93m (paño individual > 2.93m en cualquier eje o por consumo/copias)
+ */
+export function isOrderExceedingThreshold(
+    order: Partial<Order>,
+    threshold = 2.93,
+    consumoVal?: number,
+    consumoUnit?: string
+): boolean {
+    const rawW = Number(order.ancho) || 0
+    const rawH = Number(order.alto) || 0
+    const w = Math.round((rawW > 20 ? rawW / 100 : rawW) * 100) / 100
+    const h = Math.round((rawH > 20 ? rawH / 100 : rawH) * 100) / 100
+
+    if (Math.max(w, h) > threshold) {
+        return true
+    }
+
+    const copias = Math.max(1, Number(order.copias) || 1)
+    const val = consumoVal !== undefined ? consumoVal : order.consumoEstimado
+    const unit = consumoUnit || (order.precioDetalle?.tipoCobro === 'm2' ? 'm2' : 'ml')
+
+    if (unit === 'ml' && val !== undefined && val > 0) {
+        const largoDeUnPano = val / copias
+        if (largoDeUnPano > threshold) {
+            return true
+        }
+    }
+
+    return false
+}
+
+/**
+ * Determina la carpeta dentro del ZIP para una orden de lote/grupo:
+ * - Carpeta nivel 1: [CodigoMaterial] [AnchoBobina] (ej: "VV 1.52", "VIN-BRI 1.37")
+ *   Si el material no utiliza bobina (m² / rígido), se usa solo el [CodigoMaterial].
+ * - Subcarpeta nivel 2: Si el archivo supera 2.93m (largo de paño > 2.93m o cualquier dimensión > 2.93m),
+ *   se ubica dentro de la subcarpeta "Mayores a 2.93m" dentro de la carpeta del material/ancho correspondiente.
+ */
+export function getBatchOrderFolderPath(order: Partial<Order>): string {
+    const matCode = resolveMaterialCode(order)
+    const bobina = resolveOrderBobina(order)
+
+    const folderName = bobina !== null
+        ? `${matCode} ${bobina.toFixed(2)}`
+        : matCode
+
+    const isSpecial = isOrderExceedingThreshold(order, 2.93)
+    if (isSpecial) {
+        return `${folderName}/Mayores a 2.93m`
+    }
+
+    return folderName
 }
 
 /**
@@ -27,19 +169,7 @@ export function buildProductionFilename(order: Order, _index: number, originalNa
     const copias = order.copias || 1
 
     // 1. Resolver código corto de material
-    const rawMat = (order.material || 'MAT').trim()
-    let materialCode = rawMat
-    try {
-        const allMaterials = getMateriales()
-        const foundMat = allMaterials.find(m =>
-            (m.codigo && m.codigo.toLowerCase() === rawMat.toLowerCase()) ||
-            (m.descripcion && m.descripcion.toLowerCase() === rawMat.toLowerCase())
-        )
-        if (foundMat && foundMat.codigo) {
-            materialCode = foundMat.codigo.trim()
-        }
-    } catch (e) { }
-    materialCode = materialCode.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '')
+    const materialCode = resolveMaterialCode(order)
 
     // 2. Resolver códigos cortos de servicios/acabados
     const serviceCodes: string[] = []
@@ -62,7 +192,7 @@ export function buildProductionFilename(order: Order, _index: number, originalNa
                     }
                 }
             })
-        } catch (e) { }
+        } catch { }
     }
 
     const hasDimensionsRegex = /\d+[.,]?\d*\s*[xX]\s*\d+[.,]?\d*/
@@ -73,9 +203,8 @@ export function buildProductionFilename(order: Order, _index: number, originalNa
         dimString = `_${Number(order.ancho).toFixed(2)}x${Number(order.alto).toFixed(2)}`
     }
 
-    // Ancho de bobina asignado: le dice al operario qué rollo montar antes de
-    // imprimir. Se omite si no hay dato.
-    const bobinaAsig = order.bobinaAsignada ?? (order.precioDetalle as any)?.bobinaAncho ?? (order.precioDetalle as any)?.bobinaUsada
+    // Ancho de bobina asignado o deducido
+    const bobinaAsig = resolveOrderBobina(order)
     const bobinaStr = bobinaAsig ? `_bob${Number(bobinaAsig).toFixed(2).replace('.', '')}` : ''
 
     const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
@@ -199,25 +328,29 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
 }
 
 /**
- * Asegura nombres únicos dentro de un archivo ZIP para que no colisionen
+ * Asegura nombres y rutas únicas dentro de un archivo ZIP para que no colisionen
  */
-function getUniqueZipFileName(existingNames: Set<string>, desiredName: string): string {
-    const lower = desiredName.toLowerCase()
+export function getUniqueZipFileName(existingNames: Set<string>, desiredPath: string): string {
+    const lower = desiredPath.toLowerCase()
     if (!existingNames.has(lower)) {
         existingNames.add(lower)
-        return desiredName
+        return desiredPath
     }
-    const lastDot = desiredName.lastIndexOf('.')
-    const base = lastDot > 0 ? desiredName.slice(0, lastDot) : desiredName
-    const ext = lastDot > 0 ? desiredName.slice(lastDot) : ''
+    const lastSlash = desiredPath.lastIndexOf('/')
+    const dir = lastSlash >= 0 ? desiredPath.slice(0, lastSlash + 1) : ''
+    const filename = lastSlash >= 0 ? desiredPath.slice(lastSlash + 1) : desiredPath
+
+    const lastDot = filename.lastIndexOf('.')
+    const base = lastDot > 0 ? filename.slice(0, lastDot) : filename
+    const ext = lastDot > 0 ? filename.slice(lastDot) : ''
 
     let counter = 2
-    while (existingNames.has(`${base} (${counter})${ext}`.toLowerCase())) {
+    while (existingNames.has(`${dir}${base} (${counter})${ext}`.toLowerCase())) {
         counter++
     }
-    const finalName = `${base} (${counter})${ext}`
-    existingNames.add(finalName.toLowerCase())
-    return finalName
+    const finalPath = `${dir}${base} (${counter})${ext}`
+    existingNames.add(finalPath.toLowerCase())
+    return finalPath
 }
 
 /**
@@ -362,11 +495,13 @@ export async function downloadBatchOrdersZip(
     const existingNames = new Set<string>()
 
     for (const order of ordersWithFiles) {
+        const folderPath = getBatchOrderFolderPath(order)
         for (let i = 0; i < order.archivos!.length; i++) {
             const file = order.archivos![i]
             const orig = order.archivosOriginales?.[i] || file.split('/').pop()?.split('?')[0] || `archivo_${order.id}_${i + 1}`
             const prodName = buildProductionFilename(order, i, orig)
-            const uniqueName = getUniqueZipFileName(existingNames, prodName)
+            const targetPath = `${folderPath}/${prodName}`
+            const uniqueName = getUniqueZipFileName(existingNames, targetPath)
             queue.push({
                 order,
                 fileIndex: i,

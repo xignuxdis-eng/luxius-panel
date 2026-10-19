@@ -5,7 +5,7 @@
 
 ---
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 18/10/2026 11:53 (Resolución de Problemas Estáticos, Java 21 para Gradle Android y Compatibilidad CSS)  
+> **Última Actualización:** 19/10/2026 13:50 (Organización Inteligente de Descargas por Lotes / ZIP por Bobina y Subcarpetas > 2.93m)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -1726,9 +1726,18 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Estilos CSS (`MobileWorkshop.css` y `GimpStudio.css`)**:
     - Agregada propiedad estándar `background-clip: text` junto a `-webkit-background-clip: text`.
     - Agregada propiedad estándar `appearance: none` en `GimpStudio.css` para `input[type="range"]`.
+- **Organización Inteligente de Descargas por Lotes / ZIP por Bobina y Subcarpetas > 2.93m (19/10/2026)**:
+  - **Estructura Jerárquica de Carpetas (`src/utils/orderFileDownloader.ts`)**:
+    - **Nivel 1 (Material y Ancho)**: Los archivos de lote se organizan en carpetas como `[Material] [Ancho]` (ej: `VV 1.37`, `VV 1.52`). Para materiales rígidos o sin bobina (`POLYFAN`, chapas, etc.), se utiliza solo el código limpio del material.
+    - **Nivel 2 (Subcarpeta `Mayores a 2.93m`)**: Si un paño individual o la dimensión máxima de una orden supera los 2.93 metros (evaluando ancho, alto, o longitud de paño unitaria calculada en base a copias y consumo en metros lineales), el archivo se ubica automáticamente en la subcarpeta `Mayores a 2.93m` dentro de la carpeta de su bobina/material (ej. `VV 1.52/Mayores a 2.93m/OT-123...pdf`).
+    - Las órdenes que tienen varias copias pero cuyos paños individuales son cortos (ej: 2 copias de 1.55m) no se envían a la subcarpeta especial porque caben en mesas estándar sin requerir manipulación de paño largo.
+  - **Deducción y Resolución de Bobina**:
+    - Funciones `resolveMaterialCode` y `resolveOrderBobina` que extraen la bobina asignada, consultan `precioDetalle.bobinaAncho`/`bobinaUsada`, o deducen la bobina canónica adecuada según el ancho útil del pedido (<= 1.365m -> 1.37m, mayores -> 1.52m).
+  - **Prevención de Colisiones Multicarpeta (`getUniqueZipFileName`)**:
+    - Soporte completo para rutas relativas con carpetas dentro del ZIP. Se previene la sobreescritura de nombres agregando sufijo incremental `(2)` por carpeta, sin colisionar erróneamente entre carpetas distintas que compartan nombre de archivo.
+  - **Integración en Entrada (`src/pages/Entrada/Entrada.tsx`)**:
+    - En la acción de descarga masiva de lote, se calculan y pasan en vivo `bobinaAsignada` y `consumoEstimado` derivados de `getConsumption()` para que el empaquetado refleje exactamente lo visible en la tabla de producción.
+  - **Suite de Pruebas Automatizadas (`src/utils/orderFileDownloader.test.ts`)**:
+    - 19 pruebas unitarias en Vitest que validan deducción de códigos, resolución de bobinas, cálculo del umbral de 2.93m (unitaria vs. múltiples copias), rutas relativas y colisiones en ZIP.
 
 ---
-
-
-
-
