@@ -128,11 +128,30 @@ Verificará:
 npm run typecheck   # tsc --noEmit (modo strict)
 npm run lint        # ESLint — falla solo ante errores
 npm run lint:fix    # autofix (prefer-const, etc.)
-npm run verify      # typecheck + lint + build, en cadena
+npm run test        # Vitest — lógica pura
+npm run test:watch  # Vitest en modo interactivo
+npm run verify      # typecheck + lint + test + build, en cadena
 ```
 
-Los tres comandos corren en el workflow de GitHub Actions **antes** del deploy,
-de modo que un error de tipos bloquea la publicación en vez de llegar a producción.
+Los cuatro comandos corren en el workflow de GitHub Actions **antes** del deploy,
+de modo que un error de tipos, un error de lint o un test roto bloquean la
+publicación en vez de llegar a producción.
+
+### Tests
+
+Vitest con entorno `jsdom`. La configuración replica los alias de Vite
+(`vitest.config.ts`) y `src/test/setup.ts` resetea `localStorage` entre casos.
+
+Cobertura actual sobre **lógica pura**, donde un error silencioso tiene costo
+directo:
+
+| Archivo | Tests | Qué protege |
+|---|---:|---|
+| `src/utils/nestingEngine.test.ts` | 22 | Regla de bobinas (1.50m → 1.515m útiles), piezas dentro del ancho útil, ahorro del nesting |
+| `src/utils/pricingCalculator.test.ts` | 16 | Nunca NaN ni negativo, conversión cm→m, rotación que minimiza el avance lineal |
+
+Al agregar tests, priorizá invariantes (que no sea NaN, que respete límites) por
+encima de cifras exactas: así la suite no se rompe con cada cambio de tarifario.
 
 ### ESLint
 

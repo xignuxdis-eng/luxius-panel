@@ -57,6 +57,11 @@ jobs:
         # (react-hooks/exhaustive-deps) no bloquean el deploy.
         run: npm run lint
 
+      - name: Test
+        # Cubre la logica pura: motor de nesting y calculo de precios, donde
+        # un error silencioso significa cotizar mal o romper la regla de bobina.
+        run: npm run test
+
       - name: Build
         run: npm run build
 

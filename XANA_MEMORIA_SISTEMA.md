@@ -1063,6 +1063,16 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🧪 tests — 19/10/2026
+
+Se cierra el último hueco grande de la auditoría de higiene: el proyecto **no tenía un solo test**. Vitest 2.1.9 + jsdom, con `vitest.config.ts` replicando los alias de Vite y `src/test/setup.ts` para los stubs de jsdom.
+
+- **`nestingEngine.test.ts` — 22 tests.** Cubre la regla de taller que ya causó un bug real (la bitácora registra que piezas de 1.50m se forzaban a bobinas de 1.37m). Verifica: 1.50m → 1.515m útiles, 1.37m → 1.365m, rango 1.48–1.53, piso de 10cm, que ninguna pieza se coloque fuera del ancho útil, que el consumo nunca exceda la suma simple, y que un gap mayor nunca reduzca el consumo.
+- **`pricingCalculator.test.ts` — 16 tests.** Enfocado en invariantes y no en cifras exactas, para que un cambio de tarifario no rompa la suite: nunca NaN, nunca negativo, material inexistente no rompe, conversión cm→m, más copias nunca bajan el consumo, y **que el motor gire la pieza para minimizar el avance lineal** (0.5×1.2 → 0.5m en vez de 1.2m).
+- `npm run test` y `npm run test:watch`. El script `verify` ahora es typecheck + lint + **test** + build, y el CI corre `npm run test` antes del build.
+
+**Aprendizaje del proceso:** tres tests fallaron al escribirlos y en los tres casos **el código estaba bien y la expectativa mía estaba mal** — asumí `unplaced` en vez de `unplacedPieces`, asumí que un material `ml` sin bobinas daba precio, y asumí que más ancho = más consumo cuando el motor rota para minimizar. Vale la pena registrar esto: un test que se escribe suponiendo el comportamiento en vez de verificarlo produce ruido, y eso erosiona la confianza en la suite justo cuando sirve.
+
 ##### 🧹 Limpieza de mantenimiento — 19/10/2026
 
 - **`.env.example` reconstruido**: le faltaban `JWT_SECRET_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` y `R2_ENDPOINT_URL`. Ahora cubre las 21 variables del `.env` real, con notas sobre Session pooler, el salto de línea en la URL y qué pasa si `JWT_SECRET_KEY` queda vacía.
