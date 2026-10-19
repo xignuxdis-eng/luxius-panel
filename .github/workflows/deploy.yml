@@ -51,7 +51,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22 LTS. Antes era 20, pero jsdom 30 exige >=22.22.2 y hacia
+          # fallar el paso Test en cada run (los ultimos 400+ runs del workflow
+          # estaban en rojo por esto, sin que nadie lo notara porque el
+          # deploy seguia publicandose por el otro mecanismo).
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
