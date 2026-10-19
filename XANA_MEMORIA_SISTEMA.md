@@ -1063,6 +1063,14 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🎛️ Píldora de laminado especial con conteo de paños — 19/10/2026
+
+La píldora del encabezado de lote mostraba `⚡ Paños > 2.93m` sin decir **cuántos**. Ahora muestra `⚡ 3 paños > 2.93m` (o `⚡ 1 paño` en singular) y el `title` lista material, medidas y copias de cada paño que excede.
+
+El conteo usa **el mismo predicado `isSpecialLaminationOrder`** que la marca por fila, así que el número del encabezado y las marcas individuales no pueden divergir. Hay 5 tests que lo verifican, incluido uno que comprueba que 1,55 m × 4 copias cuenta **0** paños (no se infla por las copias) y otro que confirma que el total coincide con la suma de marcas por fila.
+
+**Verificación del desglose por material:** se confirmó que sí está en el bundle desplegado (`SIN_MAT`, `split('|')` y `TOTAL` presentes en el chunk de Entrada). Si un lote muestra solo la sumatoria, es porque tiene un único material: con una sola entrada el desglose colapsa al total, que es el comportamiento buscado.
+
 ##### 🐛 Correcciones en Entrada/Reportes — laminado especial y desglose de ml — 19/10/2026
 
 **BUG 1 — la alerta de laminado especial (⚡ > 2.93m) se disparaba por las copias.**

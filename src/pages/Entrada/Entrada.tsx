@@ -1571,11 +1571,22 @@ export default function Entrada() {
                                                                     ⚡ {item.totalConsumption.savingsPercent}% ahorro
                                                                 </span>
                                                             )}
-                                                            {item.orders.some(o => isSpecialLaminationOrder(o)) && (
-                                                                <span className="batch-special-lamination-pill" title="Este lote incluye paños > 2.93m con laminado especial">
-                                                                    ⚡ Paños &gt; 2.93m
-                                                                </span>
-                                                            )}
+                                                            {(() => {
+                                                                const panosLargos = item.orders.filter(o => isSpecialLaminationOrder(o));
+                                                                if (panosLargos.length === 0) return null;
+                                                                const n = panosLargos.length;
+                                                                const lista = panosLargos
+                                                                    .map(o => `${o.material || '?'} ${Number(o.ancho) || 0}x${Number(o.alto) || 0}m (${o.copias || 1} cop.)`)
+                                                                    .join('\n');
+                                                                return (
+                                                                    <span
+                                                                        className="batch-special-lamination-pill"
+                                                                        title={`${n} de ${item.orders.length} paños > 2.93m — requiere laminado especial:\n${lista}`}
+                                                                    >
+                                                                        ⚡ {n === 1 ? '1 paño' : `${n} paños`} &gt; 2.93m
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </td>

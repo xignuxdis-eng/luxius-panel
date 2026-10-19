@@ -124,6 +124,60 @@ describe('laminado especial — conversion cm a m', () => {
     })
 })
 
+describe('laminado especial — conteo de paños para la píldora del lote', () => {
+    // La píldora del encabezado usa exactamente el mismo filtro que la alerta
+    // por fila: si divergieran, el conteo y las marcas no coincidirían.
+    type Orden = { ancho: number; alto: number; copias: number; consumoEstimado?: number }
+
+    const cuentaPanosLargos = (orders: Orden[]) =>
+        orders.filter(o => isSpecialLaminationOrder(o)).length
+
+    it('cuenta 0 cuando ningún paño supera el umbral', () => {
+        const orders: Orden[] = [
+            { ancho: 0.5, alto: 1.0, copias: 1, consumoEstimado: 1 },
+            { ancho: 0.8, alto: 1.2, copias: 2, consumoEstimado: 2.4 },
+        ]
+        expect(cuentaPanosLargos(orders)).toBe(0)
+    })
+
+    it('cuenta 1 cuando solo un paño excede', () => {
+        const orders: Orden[] = [
+            { ancho: 0.5, alto: 1.0, copias: 1, consumoEstimado: 1 },
+            { ancho: 0.5, alto: 3.2, copias: 1, consumoEstimado: 3.2 },
+        ]
+        expect(cuentaPanosLargos(orders)).toBe(1)
+    })
+
+    it('cuenta varios cuando hay más de uno', () => {
+        const orders: Orden[] = [
+            { ancho: 0.5, alto: 3.2, copias: 1, consumoEstimado: 3.2 },
+            { ancho: 0.4, alto: 4.0, copias: 1, consumoEstimado: 4 },
+            { ancho: 0.5, alto: 1.0, copias: 1, consumoEstimado: 1 },
+        ]
+        expect(cuentaPanosLargos(orders)).toBe(2)
+    })
+
+    it('el conteo NO se infla por las copias de un paño corto', () => {
+        // 1.55m x 4 copias = 6.2ml totales, pero es UN solo paño y no excede.
+        const orders: Orden[] = [
+            { ancho: 0.8, alto: 1.55, copias: 4, consumoEstimado: 6.2 },
+        ]
+        expect(cuentaPanosLargos(orders)).toBe(0)
+    })
+
+    it('el conteo coincide con la suma de marcas por fila', () => {
+        const orders: Orden[] = [
+            { ancho: 0.5, alto: 3.1, copias: 1, consumoEstimado: 3.1 },
+            { ancho: 0.5, alto: 1.0, copias: 1, consumoEstimado: 1 },
+            { ancho: 0.5, alto: 2.0, copias: 1, consumoEstimado: 2 },
+            { ancho: 0.5, alto: 3.5, copias: 1, consumoEstimado: 3.5 },
+        ]
+        const porFila = orders.filter(o => isSpecialLaminationOrder(o)).length
+        expect(cuentaPanosLargos(orders)).toBe(porFila)
+        expect(porFila).toBe(2)
+    })
+})
+
 describe('laminado especial — la version vieja fallaba', () => {
     // Este bloque existe para demostrar que el test ATRAAPA el bug. Si alguien
     // revierte el fix en Entrada.tsx, este codigo vuelve a ser el problema.
