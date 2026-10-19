@@ -1063,6 +1063,24 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🧹 `react-hooks/exhaustive-deps`: de 39 a 28 — 19/10/2026
+
+Los 39 warnings se clasificaron en cuatro grupos. Se resolvieron los que eran accionables; el resto se documentó con su razón.
+
+**Resueltos (11):**
+- **3 "dependencia innecesaria: `isOpen`"** en `NuevoPedidoModal`. NO eran bugs: `isOpen` actúa como *cache buster* deliberado para releer `localStorage` al abrir el modal. Quitarlo haría que el modal mostrara combos viejos al reabrirse. Se documentó con `eslint-disable-next-line` y su justificación.
+- **2 "expresión compleja en las deps"**: era `watch('servicios')` **dentro del array de dependencias** de dos hooks. Eso sí era un bug real: `react-hook-form` devuelve un objeto nuevo en cada llamada a `watch()`, así que la memoización se invalidaba en cada render. Se extrajo a `watchedServicios` y se movió su declaración antes del `useEffect` que lo usa (el `tsc` detectó el uso antes de la declaración).
+- **6 "el ref probablemente cambió"** en `WorkshopCanvasPixi`: los 6 venían de **un solo efecto** de inicialización de PixiJS con deps `[]`, cuyo cleanup libera texturas y recursos de GPU al desmontar. Leer el ref ahí es obligatorio, y agregar dependencias reinicializaría Pixi. Se silenció el bloque del cleanup con `eslint-disable`/`eslint-enable` y explicación de por qué.
+
+**Documentados, no resueltos (28):** todos son el patrón "fetch on mount":
+
+```tsx
+const loadOrders = async () => {...}      // función nueva en cada render
+useEffect(() => { loadOrders() }, [])    // ESLint pide incluir loadOrders
+```
+
+Seguir la sugerencia de la regla provocaría un **bucle infinito de peticiones**, porque `loadOrders` cambia de identidad en cada render. El arreglo correcto es `useCallback` o mover la función dentro del efecto, y son 28 sitios con riesgo real de re-fetch en cadena. Quedan como `warn`, que no bloquea el CI, con el motivo escrito en `eslint.config.js` para que la decisión sea consciente.
+
 ##### 🎛️ Píldora de laminado especial con conteo de paños — 19/10/2026
 
 La píldora del encabezado de lote mostraba `⚡ Paños > 2.93m` sin decir **cuántos**. Ahora muestra `⚡ 3 paños > 2.93m` (o `⚡ 1 paño` en singular) y el `title` lista material, medidas y copias de cada paño que excede.

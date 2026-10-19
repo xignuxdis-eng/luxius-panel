@@ -114,6 +114,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const cats = new Set<string>();
         all.forEach(c => { if (c.categoria) cats.add(c.categoria); });
         return ['todas', ...Array.from(cats)];
+        // `isOpen` actúa como "cache buster" deliberado: al abrir el modal se
+        // relee localStorage para ver combos creados en otra pantalla. ESLint
+        // lo marca como innecesario porque el callback no lo referencia de
+        // forma explícita, pero quitarlo haría que el modal mostrara datos
+        // viejos al reabrirse.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
     const filteredPromos = useMemo(() => {
@@ -129,6 +135,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             }
             return true;
         });
+        // `isOpen` = cache buster: relee localStorage al abrir el modal.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [comboCategoriaFilter, comboSearch, isOpen]);
 
     // --- Seña & Financial Tracking State ---
@@ -407,6 +415,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             if (descKey) seen.add(descKey);
             return true;
         }).sort((a, b) => (a.descripcion || '').localeCompare(b.descripcion || ''));
+        // `isOpen` = cache buster: relee localStorage al abrir el modal.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
     // Auto-select initial default material if empty
@@ -462,13 +472,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         return calculateItemPriceDetailed(materialCode, w, h, c, services).subtotal
     }
 
+    // `watch('servicios')` inline dentro de un array de dependencias es un bug:
+    // react-hook-form devuelve un objeto NUEVO en cada llamada, así que la
+    // memoización se invalidaba en cada render. Además ESLint no puede verificar
+    // una expresión de llamada dentro de las deps. Se extrae a variable.
+    const watchedServicios = watch('servicios')
 
     useEffect(() => {
         if (activeTab === 'unitario') {
             const w = parseFloat(watchedAncho) || 0
             const h = parseFloat(watchedAlto) || 0
             const c = parseInt(watchedCopias) || 1
-            const services = watch('servicios')
+            const services = watchedServicios
             const price = calculateItemPrice(watchedMaterial, w, h, c, services)
             setValue('subtotal', price)
         } else if (activeTab === 'promos') {
@@ -478,7 +493,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setValue('subtotal', Math.round((currentCombo.precioFinal || 0) * c))
             }
         }
-    }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), activeTab, selectedComboId, setValue])
+    }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, activeTab, selectedComboId, setValue])
 
     // Dynamic calculated total according to pricing formulas
     const calculatedOrderTotal = useMemo(() => {
@@ -486,7 +501,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             const w = parseFloat(watchedAncho) || 0;
             const h = parseFloat(watchedAlto) || 0;
             const c = parseInt(watchedCopias) || 1;
-            const services = watch('servicios');
+            const services = watchedServicios;
             return calculateItemPrice(watchedMaterial, w, h, c, services);
         } else if (activeTab === 'promos') {
             const c = parseInt(watchedCopias) || 1;
@@ -503,7 +518,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 }, 0);
         }
         return 0;
-    }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watch('servicios'), selectedComboId, batchItems, watchedClientId]);
+    }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, selectedComboId, batchItems, watchedClientId]);
 
     // Dynamic total for current active tab (respeta monto manual personalizado si está activo)
     const orderTotal = useMemo(() => {

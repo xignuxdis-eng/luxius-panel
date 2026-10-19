@@ -47,12 +47,25 @@ export default tseslint.config(
             ...reactHooks.configs.recommended.rules,
             'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
-            // `exhaustive-deps` se deja en warn: 38 casos, la mayoria carga
-            // inicial ("montar una vez" / "refrescar al abrir el modal") donde
-            // agregar deps causaria re-fetches infinitos. Ademas marca como
-            // error leer un ref en el cleanup de un effect con `[]`, que es el
-            // patron correcto para liberar recursos de PixiJS al desmontar.
-            // Queda como aviso, no bloquea el CI.
+            // `exhaustive-deps` queda en warn, no en error, por una razón
+            // concreta: 28 de los casos restantes son el patrón "fetch on mount"
+            //
+            //     const loadOrders = async () => {...}      // nueva fn por render
+            //     useEffect(() => { loadOrders() }, [])     // falta loadOrders
+            //
+            // Agregar la dependencia que ESLint sugiere causaría un BUCLE
+            // INFINITO de peticiones: `loadOrders` es una función nueva en cada
+            // render, así que el efecto se re-dispararía siempre. El consejo de
+            // la regla es aquí activamente dañoso.
+            //
+            // El arreglo correcto es envolver en `useCallback` o mover la función
+            // dentro del efecto, y es un refactor por sitio con riesgo real de
+            // re-fetch en cadena. Se deja como aviso para que la decisión sea
+            // consciente y no un cambio masivo a ciegas.
+            //
+            // Los casos ya resueltos (cache-busters de `isOpen` en
+            // NuevoPedidoModal y el cleanup de PixiJS) llevan su propia
+            // supresión con la justificación en el código.
             'react-hooks/exhaustive-deps': 'warn',
 
             // --- Ruido deliberadamente permitido ---

@@ -884,6 +884,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
+        // Cleanup de un efecto que se monta UNA sola vez (deps []): libera los
+        // recursos de GPU y texturas de PixiJS al desmontar. Por eso lee
+        // `alertIconsRef.current`, `highlightsMapRef.current`, etc. — en un
+        // teardown, el valor vigente del ref es justamente el que hay que
+        // liberar. La regla exhaustive-deps avisa porque el valor puede cambiar
+        // entre renders, pero acá solo importa el de desmontaje. NO agregar
+        // dependencias: reinicializaría Pixi en cada cambio de ref.
+        /* eslint-disable react-hooks/exhaustive-deps */
         return () => {
             isCancelled = true;
             document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -965,6 +973,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 canvasHostRef.current.innerHTML = '';
             }
         };
+        /* eslint-enable react-hooks/exhaustive-deps */
     }, []);
 
     /**
