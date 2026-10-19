@@ -1070,6 +1070,18 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🎨 Layout inteligente y responsividad en celdas compuestas de Entrada — 19/10/2026
+
+**Problema:** En la tabla ergonómica de Entrada (`Entrada.tsx`), los datos se amontonaban o se cortaban de forma rígida porque las clases utilizadas para estructurar las celdas compuestas (`.composite-top-row`, `.composite-bottom-row`, `.composite-client`, `.composite-work-title`) no contaban con reglas CSS definidas en `Entrada.css`.
+
+**Solución:**
+- Se definieron los estilos para `.composite-top-row` y `.composite-bottom-row` con `display: flex`, `flex-wrap: wrap`, y `gap: 4px` garantizando que los chips y badges fluyan sin cortarse.
+- Se añadió truncado inteligente con ellipsis (`text-overflow: ellipsis`) a nombres de cliente (`.composite-client`) y títulos de trabajo (`.composite-work-title`), preservando el tooltip nativo (`title="..."`) para lectura completa al hover.
+- Se implementaron breakpoints adaptativos en CSS:
+  - **≤900px**: Ajuste proporcional de anchos mínimos y máximos.
+  - **≤768px (Tablet)**: Reducción tipográfica, envoltura fluida en doble línea para la fila inferior.
+  - **≤480px (Móvil)**: Ocultación estratégica de especificaciones técnicas redundantes en la fila inferior para priorizar legibilidad y espacio táctil.
+
 ##### 🔧 El workflow estaba en rojo desde hacía meses (y nadie lo notó) — 19/10/2026
 
 Al convertir Actions en la única fuente de publicación, el workflow dejó de ser decorativo y pasó a ser el camino real. Inmediatamente falló.

@@ -865,26 +865,144 @@
    ERGONOMIC V1.1.0 COMPOSITE CELLS & ACTION DOCK
    ============================================================ */
 
+/* --- Composite cell containers --- */
 .composite-cell-primary {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    min-width: 190px;
-    max-width: 280px;
+    gap: 4px;
+    /* Ocupa el espacio disponible de la columna sin desbordarse */
+    width: 100%;
+    min-width: 180px;
+    max-width: 300px;
 }
 
 .composite-cell-tech {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
+    width: 100%;
     min-width: 160px;
 }
 
 .composite-cell-status {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
+    width: 100%;
     min-width: 130px;
+}
+
+/* --- Filas dentro de cada celda compuesta --- */
+.composite-top-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;           /* chips se rompen en vez de esconderse */
+    gap: 4px;
+    width: 100%;
+    min-width: 0;              /* permite que hijos flexibles shrinkeen */
+}
+
+.composite-bottom-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+}
+
+/* --- Texto del cliente — trunca inteligentemente --- */
+.composite-client {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    /* Trunca con ellipsis cuando el nombre es muy largo */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    /* Tooltip nativo al hover para ver el nombre completo */
+    cursor: default;
+    transition: color 0.15s ease;
+}
+
+.composite-client:hover {
+    color: var(--text-primary);
+}
+
+/* --- Título del trabajo/archivo — idem --- */
+.composite-work-title {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Se encoge cuando no hay espacio; el OT text tiene prioridad */
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 180px;
+    cursor: default;
+}
+
+.composite-work-title:hover {
+    /* Muestra color más visible al pasar el mouse (el title="" ya da tooltip) */
+    color: var(--text-secondary);
+}
+
+/* --- Responsive ajustes para composite --- */
+@media (max-width: 900px) {
+    .composite-cell-primary {
+        min-width: 150px;
+        max-width: 220px;
+    }
+    .composite-client {
+        max-width: 160px;
+    }
+    .composite-work-title {
+        max-width: 130px;
+    }
+}
+
+@media (max-width: 768px) {
+    .composite-cell-primary {
+        min-width: 120px;
+        max-width: 180px;
+    }
+    .composite-cell-tech {
+        min-width: 130px;
+    }
+    .composite-cell-status {
+        min-width: 100px;
+    }
+    .composite-client {
+        max-width: 120px;
+        font-size: 0.72rem;
+    }
+    .composite-work-title {
+        max-width: 100px;
+        font-size: 0.68rem;
+    }
+    /* En tablet la bottom-row puede colapsar a dos líneas sin problema */
+    .composite-bottom-row {
+        flex-wrap: wrap;
+        gap: 3px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* En mobile ocultamos la bottom-row de especificaciones técnicas
+       para no saturar la pantalla — el usuario puede abrir el detalle */
+    .composite-cell-tech .composite-bottom-row {
+        display: none;
+    }
+    .composite-cell-primary {
+        min-width: 0;
+        max-width: 150px;
+    }
+    .composite-client {
+        font-size: 0.68rem;
+        max-width: 90px;
+    }
 }
 
 .work-desc-text {
