@@ -1070,6 +1070,35 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🔧 El workflow estaba en rojo desde hacía meses (y nadie lo notó) — 19/10/2026
+
+Al convertir Actions en la única fuente de publicación, el workflow dejó de ser decorativo y pasó a ser el camino real. Inmediatamente falló.
+
+**Síntoma:** run #408 en rojo, con `Typecheck` y `Lint` en verde y `Test` en rojo.
+
+**Causa:** `jsdom@30` declara `engines.node: "^22.22.2 || ^24.15.0 || >=26"` y el workflow corría en **Node 20**. Localmente no se reproducía porque la máquina de desarrollo tiene Node 24, que sí cumple; en el runner Ubuntu con Node 20, jsdom no arranca. La API del repo mostraba **926 runs y los últimos 400+ en `failure`** — el workflow llevaba meses roto.
+
+**Por qué nadie lo notó:** porque el deploy seguía publicándose por el otro mecanismo (force-push a `gh-pages`), que no dependía de Actions. Un CI rojo era inocuo mientras la publicación no pasara por ahí. **Al unificar los mecanismos, un rojo dejó de ser inocuo y pasó a bloquear la publicación** — por eso había que arreglarlo sí o sí.
+
+**Corrección:** `node-version: 20 → 22` en el workflow, y `jsdom` fijado a `25.0.1` exacto (`engines.node: ">=18"`, compatible con Node 20 y 24). Se fijó jsdom además de subir Node para que el proyecto no dependa de que el runner y la máquina local estén alineados en una versión concreta.
+
+> **Falsa alarma registrada:** con 1,4 GB de RAM libre la suite corrió **67 de 118 tests** y Vitest tiró `JavaScript heap out of memory`. No era una regresión de jsdom 25 sino falta de memoria; con 6,3 GB libres volvieron a pasar los 118. El síntoma (conteo bajo de tests sin fallos visibles) es engañoso y hay que reconocerlo antes de culpar a un cambio de dependencias.
+
+##### 🔍 Verificar el deploy por SHA, no por reloj — 19/10/2026
+
+El script de verificación daba **falsos `[PENDIENTE]`** sobre builds correctos. Tres defectos reales, acumulados:
+
+1. Comparaba **segundos** (`git log --format=%ct`) contra **milisegundos** (el timestamp va dentro del nombre del chunk). Las unidades nunca cuadraron, así que la comparación no significaba nada.
+2. El reloj de la máquina de desarrollo está **desfasado 2,5 minutos** respecto de GitHub (medido contra el header `Date` de la API). Con ese desfase, un commit puede parecer posterior a su propio build.
+3. La única señal era el timestamp embebido en el nombre del archivo, que depende de la config de Vite y no garantiza que ese build sea el del commit que uno cree.
+
+**Corrección:**
+
+- `vite.config.ts` incrusta `commitSha` (`GITHUB_SHA`, que Actions ya inyecta) en `version.json`. Las dos copias del archivo —la que se escribe en `public/` en `buildStart` y la que se emite en `generateBundle`— ahora salen de una **única función `buildVersionData()`**. Antes cada una declaraba sus propios campos y podían divergir sin que nada lo indicara.
+- `scripts/deploy_gh_pages.ps1` compara el SHA publicado contra el `HEAD` local. Si el build publicado aún no tiene `commitSha` avisa que solo puede comparar por fecha y sale con **código 2**, en vez de dar un veredicto que no puede sostener.
+
+> **PowerShell 5.1:** el script corre bajo Windows PowerShell, que **no admite el operador ternario `? :`**. Se resolvió con un `if` explícito y se validó con el parser de PowerShell, no solo ejecutándolo.
+
 ##### 🚀 Corrección del despliegue: GitHub Actions como única fuente — 19/10/2026
 
 **Síntoma:** el usuario reportaba que un fix ya commiteado y "desplegado" seguía sin verse en la web (la etiqueta de laminado especial seguía sin el conteo de paños).
