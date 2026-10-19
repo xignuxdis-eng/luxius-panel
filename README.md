@@ -149,6 +149,14 @@ directo:
 |---|---:|---|
 | `src/utils/nestingEngine.test.ts` | 22 | Regla de bobinas (1.50m → 1.515m útiles), piezas dentro del ancho útil, ahorro del nesting |
 | `src/utils/pricingCalculator.test.ts` | 16 | Nunca NaN ni negativo, conversión cm→m, rotación que minimiza el avance lineal |
+| `src/data/db.media.test.ts` | 22 | `resolveMediaUrl`: construcción de URLs y **que el JWT no se filtre a hosts externos** |
+| `src/data/db.materials.test.ts` | 23 | `deduplicateMaterials`: suma de stock, desempate de precio e ID, reglas de deduplicación |
+
+Los dos archivos de `db.ts` son **tests de caracterización**: fijan el
+comportamiento actual de las funciones más difíciles de refactorizar del archivo
+más grande del proyecto (2.752 líneas). Sirven para poder partirlo con confianza,
+y no para describir cómo debería funcionar. Cuando un test falla, primero
+verificá si el código cambió a propósito antes de "arreglar" el test.
 
 Al agregar tests, priorizá invariantes (que no sea NaN, que respete límites) por
 encima de cifras exactas: así la suite no se rompe con cada cambio de tarifario.

@@ -1063,6 +1063,19 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🧪 tests de caracterización de `db.ts` — 19/10/2026
+
+Segundo bloque de tests. Antes de intentar partir `db.ts` (2.752 líneas, 96 funciones, 29 constantes) se fijó el comportamiento de sus dos piezas más delicadas. Total de la suite: **83 tests**.
+
+- **`src/data/db.media.test.ts` (22 tests)** sobre `resolveMediaUrl` (96 líneas de condicionales). Es el punto donde se construyen todas las URLs de material que ve el usuario, así que la prioridad es una sola: **que el JWT no se filtre a hosts externos** (WeTransfer, Drive, terceros). También cubre entradas vacías, data URIs, normalización de host, y nombres con espacios/acentos/%.
+- **`src/data/db.materials.test.ts` (23 tests)** sobre `deduplicateMaterials`. Fija las reglas que deciden el stock real: los duplicados se fusionan por `codigo` (normalizado) y, **si el código no coincide, reintenta por `descripcion`**, sumando el stock de ambos y quedándose con el `stockMinimo` más alto y el precio/ID "oficial". Un error acá no rompe la app: cobra de más o de menos.
+
+**Tres comportamientos no obvios documentados en los tests** (eran suposiciones mías que los tests refutaron):
+
+1. `resolveMediaUrl('   ')` devuelve `${base}/uploads/` en vez de cadena vacía: el guard `if (!fileStr) return ''` corre **antes** del `.trim()`, así que una cadena de espacios es truthy. Genera un 404 por archivo en blanco, no un crash. **Fijado como comportamiento actual; es un fix pendiente de una línea.**
+2. En desarrollo (`host=localhost`), "reescribir localhost a la base activa" es una identidad: la base ya es `localhost:5000`. Solo `127.0.0.1` se normaliza de verdad. Los tests derivan la base de `API_URL` para ser independientes del entorno.
+3. `deduplicateMaterials` fusiona materiales con **códigos distintos** si comparten descripción, y les suma el stock. Es contraintuitivo pero probablemente intencional (códigos viejos migrados). Si alguna vez son productos distintos, hay que sacar ese fallback.
+
 ##### 🧪 tests — 19/10/2026
 
 Se cierra el último hueco grande de la auditoría de higiene: el proyecto **no tenía un solo test**. Vitest 2.1.9 + jsdom, con `vitest.config.ts` replicando los alias de Vite y `src/test/setup.ts` para los stubs de jsdom.
