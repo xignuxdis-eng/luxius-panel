@@ -21,5 +21,10 @@ export default defineConfig({
         // Los PDF y el canvas no existen en jsdom: se testean solo las funciones
         // puras. Lo que necesita DOM real queda para testing manual.
         setupFiles: ['./src/test/setup.ts'],
+        poolOptions: {
+            forks: {
+                singleFork: true,
+            },
+        },
     },
 })

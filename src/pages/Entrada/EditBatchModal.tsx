@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Modal from '@components/ui/Modal'
-import type { Order, Cliente } from '@/types'
-import { updateBatchGroup } from '@data/db'
+import type { Order, Cliente, Logistica } from '@/types'
+import { updateBatchGroup, getLogisticas } from '@data/db'
 import './EditBatchModal.css'
 
 interface EditBatchModalProps {
@@ -11,6 +11,7 @@ interface EditBatchModalProps {
     currentBatchName: string
     currentBatchId?: string
     clientes?: Cliente[]
+    logisticas?: Logistica[]
 }
 
 interface PieceState {
@@ -23,15 +24,6 @@ interface PieceState {
     copias?: number
     unlinked: boolean
 }
-
-const SHIPPING_OPTIONS = [
-    'Retira en Taller',
-    'Envío a Domicilio',
-    'Flete',
-    'Cadete / Moto',
-    'Expreso / Encomienda',
-    'Instalación en Obra'
-]
 
 function toInputDateFormat(dateStr?: string): string {
     if (!dateStr) return ''
@@ -53,7 +45,8 @@ export default function EditBatchModal({
     batchOrders,
     currentBatchName,
     currentBatchId,
-    clientes = []
+    clientes = [],
+    logisticas
 }: EditBatchModalProps) {
     const [batchName, setBatchName] = useState<string>('')
     const [clientId, setClientId] = useState<string | number>('')
@@ -63,6 +56,11 @@ export default function EditBatchModal({
     const [pieces, setPieces] = useState<PieceState[]>([])
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    const availableLogisticas = useMemo(() => {
+        const list = (logisticas && logisticas.length > 0) ? logisticas : getLogisticas()
+        return list.filter(l => l.habilitado !== false)
+    }, [logisticas])
 
     // Reset when modal opens or batch orders change
     useEffect(() => {
@@ -262,19 +260,23 @@ export default function EditBatchModal({
                         <label>
                             🚚 Forma de Envío / Logística
                         </label>
-                        <input
-                            type="text"
-                            list="shipping-presets"
-                            className="edit-batch-input"
+                        <select
+                            className="edit-batch-select"
                             value={envio}
                             onChange={(e) => setEnvio(e.target.value)}
-                            placeholder="Ej. Retira en Taller, Flete..."
-                        />
-                        <datalist id="shipping-presets">
-                            {SHIPPING_OPTIONS.map(opt => (
-                                <option key={opt} value={opt} />
+                        >
+                            <option value="">-- Retiro en Local / Sin especificar --</option>
+                            {availableLogisticas.map(l => (
+                                <option key={l.id} value={l.nombre}>
+                                    {l.nombre}
+                                </option>
                             ))}
-                        </datalist>
+                            {envio && !availableLogisticas.some(l => l.nombre.trim().toLowerCase() === envio.trim().toLowerCase()) && (
+                                <option value={envio}>
+                                    {envio} (Personalizado)
+                                </option>
+                            )}
+                        </select>
                     </div>
 
                     {/* Observaciones Generales */}

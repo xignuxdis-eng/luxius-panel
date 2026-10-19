@@ -1070,6 +1070,15 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
 
+##### 🚚 Unificación de opciones de logística en EditBatchModal desde la BD — 19/10/2026
+
+**Problema:** En el modal de edición de lote/grupo de órdenes (`EditBatchModal.tsx`), el campo "Forma de Envío / Logística" utilizaba una lista hardcodeada `SHIPPING_OPTIONS` (`Retira en Taller`, `Envío a Domicilio`, etc.) vinculada a un `<datalist>`, en lugar de consultar la colección oficial de logísticas configuradas en la base de datos y administradas desde ABM Logística.
+
+**Solución:**
+- Se eliminó la constante hardcodeada `SHIPPING_OPTIONS`.
+- Se integró `getLogisticas()` desde `@data/db` y el tipo `Logistica` para obtener en vivo las opciones habilitadas de la base de datos (`luxius_session_logisticas`).
+- Se reemplazó el `input` + `datalist` por un `<select className="edit-batch-select">` homogéneo con `NuevoPedidoModal.tsx`, manteniendo la preservación de valores personalizados preexistentes.
+
 ##### 🎨 Layout inteligente y responsividad en celdas compuestas de Entrada — 19/10/2026
 
 **Problema:** En la tabla ergonómica de Entrada (`Entrada.tsx`), los datos se amontonaban o se cortaban de forma rígida porque las clases utilizadas para estructurar las celdas compuestas (`.composite-top-row`, `.composite-bottom-row`, `.composite-client`, `.composite-work-title`) no contaban con reglas CSS definidas en `Entrada.css`.
