@@ -1,5 +1,13 @@
 name: Deploy Luxius Panel to GitHub Pages
 
+# ÚNICA fuente de publicación de GitHub Pages (decisión del 19/10/2026).
+# Antes coexistían dos mecanismos que se pisaban: este workflow (actions/deploy-pages)
+# y scripts/deploy_gh_pages.ps1 (force-push a la rama gh-pages). El workflow
+# corría en cada push y sobrescribía lo que el script publicaba, así que los
+# commits de gh-pages "tenían éxito" mientras la web seguía sirviendo un build viejo.
+#
+# REGLA: no volver a publicar en gh-pages por fuera de este workflow. El script
+# deploy_gh_pages.ps1 ahora solo VERIFICA que lo publicado corresponda al commit.
 on:
   push:
     branches: ["master", "main"]
@@ -12,7 +20,9 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  # Cancelar el deploy anterior si llega un push más nuevo: evita que dos builds
+  # se peleen por publicar y que quede el más viejo servido.
+  cancel-in-progress: true
 
 jobs:
   deploy:

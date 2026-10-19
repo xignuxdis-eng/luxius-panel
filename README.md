@@ -137,6 +137,29 @@ Los cuatro comandos corren en el workflow de GitHub Actions **antes** del deploy
 de modo que un error de tipos, un error de lint o un test roto bloquean la
 publicación en vez de llegar a producción.
 
+### Despliegue
+
+```
+código → git push origin master → GitHub Actions → GitHub Pages
+```
+
+**No hay paso manual de publicación.** El workflow compila y publica en cada push
+a `master`; tarda 2-4 minutos.
+
+Para comprobar si un deploy se publicó:
+
+```powershell
+.\scripts\deploy_gh_pages.ps1
+```
+
+Compara el build servido contra el commit actual y avisa `[OK]` o `[PENDIENTE]`.
+Si queda pendiente tras 10 minutos, el workflow falló: <https://github.com/xignuxdis-eng/luxius-panel/actions>.
+
+> **No publicar en la rama `gh-pages` por fuera del workflow.** Históricamente se hizo con un
+> force-push desde `scripts/deploy_gh_pages.ps1`, y competía con el workflow: este
+> último lo pisaba en cada push, dejando la web sirviendo builds viejos aunque todo
+> pareciera exitoso.
+
 ### Tests
 
 Vitest con entorno `jsdom`. La configuración replica los alias de Vite

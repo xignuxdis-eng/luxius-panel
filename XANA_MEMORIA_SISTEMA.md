@@ -31,23 +31,30 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
    - `git add -A && git commit -m "..." && git push origin master`
    - `origin` apunta exclusivamente a GitHub (`github.com/xignuxdis-eng/luxius-panel`). GitLab fue desvinculado el 02/10/2026.
    - Definir `$env:GIT_TERMINAL_PROMPT = '0'` antes de operaciones remotas en agentes/IDEs: evita que `git fetch/push` quede colgado esperando credenciales en una terminal no interactiva (incidente registrado en la bitácora, sección 6).
-4. **Despliegue a GitHub Pages**:
-   - Para que los cambios impacten en la versión web pública (`https://xignuxdis-eng.github.io/luxius-panel/`), la rama `gh-pages` debe actualizarse con el contenido de `dist/`. Desde la Fase 1 (22/09/2026) `dist/` **ya no se versiona en `master`**, por lo que `git subtree split` dejó de funcionar. Usar:
+4. **Despliegue a GitHub Pages — GitHub Actions es la ÚNICA fuente (cambiado el 19/10/2026)**:
+   - El ciclo es: `npm run verify` → `git push origin master` → **GitHub Actions publica solo** (2-4 minutos).
+   - **Prohibido publicar por fuera del workflow.** Antes se usaba `scripts/deploy_gh_pages.ps1`, que hacía force-push a la rama `gh-pages`; ese mecanismo COMPITÍA con `.github/workflows/deploy.yml` (que sube artefacto y publica con `actions/deploy-pages`). El workflow corría en cada push a `master` y pisaba lo que el script publicaba, así que los commits de `gh-pages` "tenían éxito" mientras la web seguía sirviendo un build viejo.
+   - **Cómo detectar un deploy a medias** (en vez de asumir que salió bien):
      ```powershell
-     npm run build; .\scripts\deploy_gh_pages.ps1
+     .\scripts\deploy_gh_pages.ps1
      ```
-     El script crea un commit huérfano con el contenido de `dist/` y lo fuerza a `gh-pages` en GitHub.
+     El script **ya no publica nada**: solo compara el build servido contra el commit de `master` y avisa `[OK]` o `[PENDIENTE]`. Comprobación manual equivalente:
+     ```powershell
+     (Invoke-WebRequest "https://xignuxdis-eng.github.io/luxius-panel/" -UseBasicParsing).Content | Select-String 'assets/index-'
+     ```
+   - Lección: **verificar un deploy mirando el sitio servido, no el hash que imprime el script ni el exit code.**
 5. **Sincronización Local (Nginx)**:
-   - Copiar el contenido de `dist/` al servidor Nginx local de producción:
+   - Copiar el contenido de `dist/` al servidor Nginx local:
      ```powershell
-     Copy-Item -Path "f:\Sitio XignuX\dist\*" -Destination "D:\XignuX\luxius-panel\dist\" -Recurse -Force
+     npm run build; Copy-Item -Path "f:\Sitio XignuX\dist\*" -Destination "D:\XignuX\luxius-panel\dist\" -Recurse -Force
      ```
+   - Esto es **solo para pruebas locales**: no publica nada en internet.
 6. **Políticas de Anti-Caché**: El frontend cuenta con un verificador de versiones (`versionCheck.ts` y `version.json` generado en build) que detecta nuevas versiones y fuerza la recarga de Service Workers y bundles.
 7. **Cero Secretos en Código o Repositorios**: Jamás commitear tokens, contraseñas, URLs de conexión o claves API (`.env`, `*.db`, archivos de credenciales). Todo secreto debe inyectarse por variables de entorno del hosting (`Render`) o `.env` local (estrictamente git-ignorado). En logs, enmascarar siempre contraseñas y connection strings.
 8. **Principio de Mínimo Privilegio en Endpoints (Flask)**: Todo nuevo endpoint en backend DEBE llevar decorador explícito (`@login_required`, `@operator_required` o `@admin_required`). Quedan terminantemente prohibidos los endpoints abiertos/públicos salvo justificación explícita de autenticación o assets estáticos con sanitización (ver lista blanca en Sección 4).
 9. **Prevención de SSRF y Path Traversal**: En toda descarga o procesamiento de URLs externas (ej. escalador, importador cloud) usar `services/security_utils.py:is_safe_url` en cada redirección para bloquear IPs privadas (127.0.0.1, 10.x, 169.254.x, etc.) y esquemas no HTTP(S). En `/uploads`, validar siempre con `_safe_upload_relpath` y servir SVGs con CSP `sandbox`.
 10. **Backend = solo `luXius-Backend` (privado)**: desde el 03/10/2026 la carpeta `server/` de `luxius-panel` **ya no se versiona** (está en `.gitignore`; queda solo como copia local en disco y en el historial viejo). Todo cambio de backend se hace y commitea en `f:\luXius-Backend\`. La carpeta legacy `luXius-Backend/server/` también fue eliminada (Render ejecuta `gunicorn app:app` desde la raíz). Antes de commitear cambios de rutas, correr `python scripts/tests/check_public_routes.py` (falla si aparece un endpoint público fuera de la lista blanca) y, con el backend local levantado, `python scripts/tests/test_security_suite.py` (33 pruebas).
-11. **Despliegue gh-pages sin Redirección de Errores**: Al invocar `.\scripts\deploy_gh_pages.ps1` en PowerShell, **NO** usar `2>&1` porque el script define `$ErrorActionPreference = 'Stop'` y cualquier warning no fatal en stderr aborta la ejecución. Ejecutarlo de forma directa: `.\scripts\deploy_gh_pages.ps1`.
+11. **Verificación obligatoria antes de commitear**: `npm run verify` (= `typecheck` + `lint` + `test` + `build`) debe dar 0 errores. `npm run build` **no** type-chequea (Vite usa esbuild), por eso `tsc` es un paso aparte. Ojo: con menos de ~4 GB de RAM libre el build falla con errores engañosos (`StackOverflowException`, OOM de zlib, procesos colgados al 0% de CPU); es falta de memoria, no un bug de código.
 
 ---
 
@@ -1062,6 +1069,35 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 | P0.4 | Habilitar acceso a **usuarios cliente** | 🟡 **ABIERTA** | 3 usuarios cliente sin `client_id` y todos sin `password_hash` | **Usuario** (ABM → Usuarios) |
 
 > **Prioridad si solo hacés una cosa: P0.1.** Es la única que deja acceso real a datos de clientes (los archivos en R2) mediante credenciales que están en commits públicos. P0.3 y P0.4 son de usabilidad, no de exposición.
+
+##### 🚀 Corrección del despliegue: GitHub Actions como única fuente — 19/10/2026
+
+**Síntoma:** el usuario reportaba que un fix ya commiteado y "desplegado" seguía sin verse en la web (la etiqueta de laminado especial seguía sin el conteo de paños).
+
+**Causa raíz: dos mecanismos de publicación compitiendo.**
+
+| Mecanismo | Comportamiento |
+|---|---|
+| `.github/workflows/deploy.yml` | Sube un artefacto y publica con `actions/deploy-pages`. Corre en **cada** push a `master`. |
+| `scripts/deploy_gh_pages.ps1` | Force-push de `dist/` a la rama `gh-pages`. |
+
+El workflow pisa al script en cada push. Los force-push a `gh-pages` "tenían éxito" (el script imprimía un hash y salía con 0), pero la web seguía sirviendo el build anterior. Se llegó a la conclusión por evidencia, no por suposición:
+
+- El `index.html` **servido** referenciaba `assets/index-DrERDTDG-1792401079388.js` (06:11).
+- La rama `gh-pages` referenciaba `assets/index-5vzlDg3E-1792408604402.js` (08:16).
+- El chunk viejo **no existía** en la rama → no podía venir de ahí: lo servía otro deploy.
+- `git ls-remote origin gh-pages` confirmaba que el push sí había llegado a GitHub: el problema estaba aguas arriba, en la publicación.
+
+**Lección central: un deploy se verifica mirando el sitio servido, no el hash que imprime el script ni el exit code.**
+
+**Cambios aplicados:**
+1. `deploy.yml` — se declara como única fuente en un comentario de cabecera, y `cancel-in-progress: true` para que un push nuevo cancele un deploy en curso en vez de pelearse por publicar.
+2. `scripts/deploy_gh_pages.ps1` — **dejó de publicar**. Ahora solo verifica que el build servido corresponda al commit de `master` (`[OK]` / `[PENDIENTE]`) y da la URL de Actions si el workflow falló.
+3. `.agents/AGENTS.md` — reescrito con el ciclo de despliegue correcto, la prohibición de force-push a `gh-pages`, verificación obligatoria y convenciones.
+4. `.agents/rules/xana_agent.md` — actualizado el flujo de despliegue y las referencias a bugs resueltos.
+5. `XANA_MEMORIA_SISTEMA.md` (sección 2, punto 4 y 11) — corregidas las reglas de despliegue y de verificación.
+
+**Nota para agentes y IDEs:** la copia a `D:\XignuX\luxius-panel\dist\` (Nginx local) se mantiene para pruebas, pero **no publica en internet**.
 
 ##### 🧹 `react-hooks/exhaustive-deps`: de 39 a 28 — 19/10/2026
 
