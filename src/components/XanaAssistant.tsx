@@ -24,7 +24,8 @@ const NORMALIZED_ROLES: Record<string, string> = {
     impresion: 'impresor',
     cliente: 'cliente',
     vendedor: 'vendedor',
-    artista: 'artista'
+    artista: 'artista',
+    visitante: 'visitante'
 };
 
 function normalizeRole(raw: string): string {
@@ -331,7 +332,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                 userRole: userInfo.role,
                 username: userInfo.username,
                 userId: userInfo.id,
-                clientLogs: capturedLogs,
+                clientLogs: userInfo.role === 'visitante' ? [] : capturedLogs,
                 currentUrl: window.location.pathname
             };
 

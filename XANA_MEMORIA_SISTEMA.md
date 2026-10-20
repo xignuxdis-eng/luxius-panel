@@ -1752,5 +1752,19 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - **Reset contextual en botones de pestaña**: al presionar la pestaña "Historial", si el filtro estaba en `'orden'` o `'preorden'`, se limpia a `'Todos los Estados'` para no bloquear los resultados históricos. Similarmente, al presionar "OTs Activas", limpia `'entregado'`.
     - **Contadores coherentes**: los contadores de cada pestaña se calculan sobre `baseOrders` (independientes del `statusFilter`), y `results-count` refleja exactamente `displayedOrders.length`.
     - **Actualización optimista y bypass de caché**: `handleBatchStatus` actualiza el estado de las órdenes en memoria en 0 ms antes de la sincronización remota y llama a `loadOrders(true)` para forzar la lectura autoritativa.
+- **Modo Sandbox / Acceso Visitante Interactivo para Demostraciones Comerciales (19/10/2026)**:
+  - **Motivación y Objetivo**: Permitir a potenciales clientes e interesados en adquirir o licenciar el sistema LuXius explorar todo su potencial visual y operativo (Entrada, Presupuestador con anidado dinámico, Xpress Viewer / Redrawer, Cola de Impresión, Stock de bobinas, App Móvil y Analíticas) sin comprometer bajo ningún concepto la información real, delicada o confidencial de XignuX (clientes reales, CUITs, teléfonos, saldos contables, fotos de producción ni el plano físico íntimo de planta en Pixel Art).
+  - **Arquitectura Sandbox Frontend-Only (`isDemoMode`)**:
+    - **Cero tráfico a producción**: Si el usuario activo es `visitante`, `src/data/db.ts` intercepta todas las llamadas de lectura y escritura (`getOrdenes`, `saveOrden`, `deleteOrden`, `getClientes`, `saveCliente`, `getMateriales`, `getMaquinas`, `getCalidades`, `refreshCollection`).
+    - **Persistencia Aislada en Navegador**: Todo cambio o creación de prueba realizado por el visitante se guarda exclusivamente en claves locales aisladas (`luxius_demo_orders`, `luxius_demo_clientes`, etc.). Ningún dato viaja a Supabase ni a la API de Render.
+    - **Dataset Modelo de Muestra (`src/data/demoSandboxData.ts`)**: 5 clientes de fantasía representativos del rubro gráfico/corporativo, bobinas y materiales reales calibrados para cálculo de nesting, y órdenes con fotos de alta resolución libres de derechos.
+  - **Protección de Datos Íntimos de XignuX**:
+    - **Canvas del Workshop PixiJS (`Dashboard.tsx`)**: Para el rol `visitante`, el botón de "Taller Pixel Art" no muestra el layout físico ni los puestos reales de trabajo de XignuX. En su lugar, despliega una tarjeta de presentación comercial que explica que el módulo interactivo PixiJS se confecciona a medida para la planta física de cada imprenta cliente.
+    - **QuickNotes Privadas**: Reemplazadas por una tarjeta informativa del bloc de turno colaborativo.
+    - **Usuarios de Planta Ocultos**: `getUsuarios()` en modo demo retorna únicamente el usuario visitante, impidiendo que se filtren los nombres de Adrián, Mirta o los operarios en desplegables o filtros.
+    - **Copiloto XANA (`XanaAssistant.tsx`)**: En rol `visitante`, `clientLogs` se envía siempre vacío para no transmitir errores ni rutas del entorno local de producción.
+  - **Control de Visibilidad del Acceso Demo (`src/config/demoConfig.ts`)**:
+    - Se creó la constante `SHOW_DEMO_BUTTON = true` (o `false`) para alternar fácilmente la visibilidad del botón "Acceso Demo / Visitante" en `Login.tsx` a requerimiento comercial.
+    - Login directo con credenciales `visitante / visitante` o `demo / demo` sin consulta de red ni demoras de servidor.
 
 ---

@@ -15,7 +15,8 @@ import MorningBriefingModal from '@components/workshop/MorningBriefingModal'
 export default function Dashboard() {
     const navigate = useNavigate()
     const user = useAuthStore((state) => state.user)
-    const [viewMode, setViewMode] = useState<'workshop' | 'standard'>('workshop')
+    const isVisitor = user?.role === 'visitante'
+    const [viewMode, setViewMode] = useState<'workshop' | 'standard'>(() => isVisitor ? 'standard' : 'workshop')
     const [showBriefing, setShowBriefing] = useState(false)
 
     // States for async data
@@ -212,7 +213,71 @@ export default function Dashboard() {
 
             {viewMode === 'workshop' ? (
                 <div style={{ marginBottom: '24px' }}>
-                    <WorkshopDashboard />
+                    {isVisitor ? (
+                        <div style={{
+                            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95))',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            borderRadius: '16px',
+                            padding: '36px 24px',
+                            textAlign: 'center',
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                            color: '#f8fafc'
+                        }}>
+                            <div style={{ fontSize: '44px', marginBottom: '12px' }}>🏭 🎮</div>
+                            <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '10px' }}>
+                                Módulo Taller Gamificado en Pixel Art (PixiJS v8)
+                            </h2>
+                            <p style={{ maxWidth: '640px', margin: '0 auto 18px auto', color: '#94a3b8', lineHeight: '1.6', fontSize: '14px' }}>
+                                Este módulo visualiza la distribución física exacta del taller, máquinas en línea, colas de impresión y operarios activos con sonido e interactividad en tiempo real.
+                            </p>
+                            <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                                border: '1px dashed #38bdf8',
+                                borderRadius: '8px',
+                                color: '#38bdf8',
+                                fontSize: '13px',
+                                fontWeight: 600
+                            }}>
+                                🔒 En la versión comercial, este plano interactivo se customiza con las máquinas y puestos de cada taller cliente.
+                            </div>
+                            <div style={{ marginTop: '22px', display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={() => navigate('/entrada')}
+                                    style={{
+                                        padding: '10px 18px',
+                                        backgroundColor: '#38bdf8',
+                                        color: '#0f172a',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Explorar Flujo de Pedidos 📥
+                                </button>
+                                <button
+                                    onClick={() => navigate('/presupuestador')}
+                                    style={{
+                                        padding: '10px 18px',
+                                        backgroundColor: 'rgba(255,255,255,0.08)',
+                                        color: '#f8fafc',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Probar Presupuestador y Anidado 💰
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <WorkshopDashboard />
+                    )}
                 </div>
             ) : null}
 
@@ -261,7 +326,24 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    <QuickNotes />
+                    {isVisitor ? (
+                        <div className="quick-notes-card" style={{
+                            padding: '16px',
+                            background: 'rgba(30, 41, 59, 0.7)',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            marginBottom: '16px'
+                        }}>
+                            <h3 style={{ fontSize: '13px', color: '#38bdf8', marginBottom: '8px', fontWeight: 600 }}>
+                                📝 Bloc de Turno del Taller
+                            </h3>
+                            <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5', margin: 0 }}>
+                                Espacio colaborativo rápido para que operarios, diseñadores y encargados coordinen prioridades diarias de producción.
+                            </p>
+                        </div>
+                    ) : (
+                        <QuickNotes />
+                    )}
 
                     {/* System Status - Discreet & Elegant */}
                     <div className="system-status-compact animate-fade-in" style={{ marginTop: 'auto' }}>

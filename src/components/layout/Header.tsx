@@ -59,7 +59,28 @@ export default function Header({ title, subtitle }: HeaderProps) {
     return (
         <header className="header">
             <div className="header-left">
-                <h1 className="header-title">{title}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h1 className="header-title">{title}</h1>
+                    {user?.role === 'visitante' && (
+                        <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '3px 10px',
+                            backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                            border: '1px solid rgba(234, 179, 8, 0.6)',
+                            borderRadius: '6px',
+                            color: '#fef08a',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase'
+                        }} title="Entorno Sandbox Protegido: Los datos son ficticios y ninguna acción afecta la base de datos real.">
+                            <span>🧪</span>
+                            <span>Demo Sandbox</span>
+                        </div>
+                    )}
+                </div>
                 {subtitle && <p className="header-subtitle">{subtitle}</p>}
             </div>
 

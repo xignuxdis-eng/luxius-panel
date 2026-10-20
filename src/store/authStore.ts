@@ -21,6 +21,11 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
 
             validateSession: async () => {
+                const currentUser = get().user;
+                if (currentUser?.role === 'visitante' || localStorage.getItem('luxius_auth_token') === 'luxius_demo_token_sandbox_2026') {
+                    return true;
+                }
+
                 const token = localStorage.getItem('luxius_auth_token');
                 if (!token) {
                     if (get().isAuthenticated) {
@@ -66,6 +71,24 @@ export const useAuthStore = create<AuthState>()(
             },
 
             login: async (credentials: LoginCredentials) => {
+                const userLower = (credentials.username || '').trim().toLowerCase();
+                const passLower = (credentials.password || '').trim().toLowerCase();
+
+                // Sandbox Mode para interesados y visitantes: 100% aislado del backend real
+                if ((userLower === 'visitante' || userLower === 'demo') && (passLower === 'visitante' || passLower === 'demo')) {
+                    const demoUser: User = {
+                        id: 99999,
+                        username: 'visitante',
+                        name: 'Visitante (Modo Demo)',
+                        role: 'visitante',
+                        level: 1,
+                        bio: 'Acceso de demostración interactiva - Sandbox protegido'
+                    };
+                    localStorage.setItem('luxius_auth_token', 'luxius_demo_token_sandbox_2026');
+                    set({ user: demoUser, isAuthenticated: true });
+                    return { success: true };
+                }
+
                 // Authenticate via secure backend API only
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for Render cold start

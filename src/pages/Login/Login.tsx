@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuthStore } from '@store/authStore'
 import { API_URL, isCapacitorNative, setCustomApiUrl } from '@/data/db'
+import { SHOW_DEMO_BUTTON } from '@/config/demoConfig'
 import type { LoginCredentials } from '@/types'
 import './Login.css'
 
@@ -174,6 +175,40 @@ export default function Login() {
                                 'Ingresar'
                             )}
                         </button>
+
+                        {SHOW_DEMO_BUTTON && (
+                            <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setIsLoading(true);
+                                        await login({ username: 'visitante', password: 'visitante' });
+                                        setIsLoading(false);
+                                        navigate('/');
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '9px 14px',
+                                        backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                                        borderRadius: '8px',
+                                        color: '#38bdf8',
+                                        fontWeight: 600,
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    title="Explorar todo el sistema con datos ficticios aislados en modo demostración"
+                                >
+                                    <span>🧪</span>
+                                    <span>Acceso Demo / Visitante</span>
+                                </button>
+                            </div>
+                        )}
 
                         {isWakingServer && (
                             <div style={{

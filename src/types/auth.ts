@@ -1,5 +1,5 @@
 // User roles matching IMPGESV2 system
-export type UserRole = 'principal' | 'administrador' | 'vendedor' | 'cliente' | 'impresion' | 'artista'
+export type UserRole = 'principal' | 'administrador' | 'vendedor' | 'cliente' | 'impresion' | 'artista' | 'visitante'
 
 export interface User {
     id: number
@@ -26,6 +26,7 @@ export const rolePermissions: Record<string, string[]> = {
     impresion: ['/', '/impresion', '/stock', '/utilidades', '/mobile'],
     artista: ['/', '/entrada', '/diseno', '/impresion', '/presupuestador', '/utilidades', '/xpress-viewer', '/mobile'],
     cliente: ['/', '/entrada', '/utilidades', '/mobile'],
+    visitante: ['/', '/entrada', '/presupuestador', '/xpress-viewer', '/diseno', '/impresion', '/stock', '/analiticas', '/utilidades', '/mobile'],
 }
 
 export function hasRolePermission(role: string | undefined, path: string): boolean {

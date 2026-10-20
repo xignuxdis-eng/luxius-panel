@@ -10,6 +10,29 @@
 // Types
 import type { Cliente, Material, Calidad, Maquina, Order, Servicio, Proveedor, Logistica, MonedaConfig, Caja, MovimientoCaja, MovimientoStock, Banco } from '@/types'
 import { isDesignerOwner } from '@/types'
+import { DEMO_CLIENTES, DEMO_MATERIALES, DEMO_MAQUINAS, DEMO_ORDENES, DEMO_CALIDADES } from './demoSandboxData'
+
+export const DEMO_ORDENES_KEY = 'luxius_demo_orders';
+export const DEMO_CLIENTES_KEY = 'luxius_demo_clientes';
+export const DEMO_MATERIALES_KEY = 'luxius_demo_materiales';
+export const DEMO_MAQUINAS_KEY = 'luxius_demo_maquinas';
+
+/**
+ * Detecta si el sistema se encuentra en Modo Demo / Visitante Sandbox
+ */
+export function isDemoMode(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        const token = localStorage.getItem('luxius_auth_token');
+        if (token === 'luxius_demo_token_sandbox_2026') return true;
+        const authData = localStorage.getItem('luxius-auth-v6');
+        if (authData) {
+            const parsed = JSON.parse(authData);
+            if (parsed?.state?.user?.role === 'visitante' || parsed?.state?.user?.username === 'visitante') return true;
+        }
+    } catch {}
+    return false;
+}
 
 import { Capacitor } from '@capacitor/core'
 
@@ -241,6 +264,23 @@ export const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs
 };
 
 export async function initializeData() {
+    if (isDemoMode()) {
+        console.log("🧪 [Sandbox Demo] Inicializando entorno aislado con datos ficticios...");
+        if (!localStorage.getItem(DEMO_ORDENES_KEY)) {
+            localStorage.setItem(DEMO_ORDENES_KEY, JSON.stringify(DEMO_ORDENES));
+        }
+        if (!localStorage.getItem(DEMO_CLIENTES_KEY)) {
+            localStorage.setItem(DEMO_CLIENTES_KEY, JSON.stringify(DEMO_CLIENTES));
+        }
+        if (!localStorage.getItem(DEMO_MATERIALES_KEY)) {
+            localStorage.setItem(DEMO_MATERIALES_KEY, JSON.stringify(DEMO_MATERIALES));
+        }
+        if (!localStorage.getItem(DEMO_MAQUINAS_KEY)) {
+            localStorage.setItem(DEMO_MAQUINAS_KEY, JSON.stringify(DEMO_MAQUINAS));
+        }
+        return;
+    }
+
     console.log("🔄 Syncing data from Server...");
 
     // Limpiar tumbas obsoletas de localStorage para evitar que filtren datos legítimos
@@ -274,6 +314,7 @@ export async function initializeData() {
 }
 
 export async function refreshCollection(endpoint: string) {
+    if (isDemoMode()) return;
     const config = COLLECTIONS_CONFIG.find(c => c.endpoint === endpoint);
     if (!config) return;
 
@@ -325,6 +366,18 @@ export function matchesOrderId(order: { id?: number | string, ot?: string, uuid?
 export const HIDDEN_ORDENES_KEY = 'luxius_deleted_ordenes';
 
 export async function getOrdenes(forceRefresh = false): Promise<Order[]> {
+    if (isDemoMode()) {
+        const demoOrdersJson = localStorage.getItem(DEMO_ORDENES_KEY);
+        if (demoOrdersJson) {
+            try {
+                const list = JSON.parse(demoOrdersJson);
+                if (Array.isArray(list) && list.length > 0) return list;
+            } catch (e) { }
+        }
+        localStorage.setItem(DEMO_ORDENES_KEY, JSON.stringify(DEMO_ORDENES));
+        return [...DEMO_ORDENES];
+    }
+
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     let localOrders: Order[] = [];
     try {
@@ -374,6 +427,73 @@ export function getNextSequentialId(existingOrders: Order[]): number {
 }
 
 export async function saveOrden(order: Partial<Order>): Promise<Order> {
+    if (isDemoMode()) {
+        const demoOrdersJson = localStorage.getItem(DEMO_ORDENES_KEY) || '[]';
+        let demoOrders: Order[] = [];
+        try { demoOrders = JSON.parse(demoOrdersJson); } catch (e) { }
+        if (!demoOrders.length) demoOrders = [...DEMO_ORDENES];
+
+        const targetLookup = (order as any).uuid || order.id || order.ot;
+        const existingIdx = targetLookup !== undefined && targetLookup !== null
+            ? demoOrders.findIndex(o => matchesOrderId(o, targetLookup))
+            : -1;
+
+        const nowIso = new Date().toISOString();
+        let saved: Order;
+
+        if (existingIdx >= 0) {
+            const existing = demoOrders[existingIdx];
+            saved = {
+                ...existing,
+                ...order,
+                updatedAt: nowIso,
+            } as Order;
+            demoOrders[existingIdx] = saved;
+        } else {
+            const nextSeqId = order.id || getNextSequentialId(demoOrders);
+            const otCode = order.ot || `OT-${nextSeqId}`;
+            saved = {
+                id: Number(nextSeqId),
+                ot: otCode,
+                nombreTarea: order.nombreTarea || (order as any).observaciones || 'Trabajo Demo',
+                descripcion: order.descripcion || order.nombreTarea || 'Trabajo Demo',
+                clientId: Number(order.clientId) || 90001,
+                clienteNombre: order.clienteNombre || 'Agencia Creativa Aurora',
+                material: order.material || 'Lona Frontlight 510g Brillante 3.20m',
+                calidad: order.calidad || 'Solvente Gran Formato',
+                ancho: Number(order.ancho) || 1.0,
+                alto: Number(order.alto) || 1.0,
+                copias: Number(order.copias) || 1,
+                subtotal: Number(order.subtotal) || 15000,
+                status: (order.status || 'orden') as any,
+                category: (order.category || 'impresion') as any,
+                accesorios: order.accesorios || [],
+                laminado: Boolean(order.laminado),
+                bordado: Boolean(order.bordado),
+                panelizado: Boolean(order.panelizado),
+                portabanners: Number(order.portabanners) || 0,
+                demasias: order.demasias || 0,
+                envio: order.envio || 'Retira por taller',
+                emergencia: Boolean(order.emergencia),
+                fechaCreacion: order.fechaCreacion || nowIso,
+                createdAt: (order as any).createdAt || nowIso,
+                fechaEntrega: order.fechaEntrega || nowIso.split('T')[0],
+                observaciones: order.observaciones || '',
+                observaciones2: order.observaciones2 || '',
+                archivos: order.archivos || ['https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&auto=format&fit=crop'],
+                archivosOriginales: order.archivosOriginales || ['archivo_demo.pdf'],
+                ...order,
+            } as Order;
+            demoOrders.unshift(saved);
+        }
+
+        try {
+            localStorage.setItem(DEMO_ORDENES_KEY, JSON.stringify(demoOrders));
+        } catch (e) { }
+
+        return saved;
+    }
+
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]'
     let localOrders: Order[] = []
     try { localOrders = JSON.parse(localOrdersJson); } catch (e) { }
@@ -504,6 +624,16 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 export async function deleteOrden(id: number | string): Promise<boolean> {
     if (id === undefined || id === null) return false;
 
+    if (isDemoMode()) {
+        const demoOrdersJson = localStorage.getItem(DEMO_ORDENES_KEY) || '[]';
+        try {
+            let demoOrders: Order[] = JSON.parse(demoOrdersJson);
+            demoOrders = demoOrders.filter(o => !matchesOrderId(o, id));
+            localStorage.setItem(DEMO_ORDENES_KEY, JSON.stringify(demoOrders));
+        } catch (e) { }
+        return true;
+    }
+
     // 1. Remove from local storage session orders
     const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
     try {
@@ -529,6 +659,29 @@ export async function saveBatchOrders(
     items?: (Partial<Order> & { id: number | string })[]
 ): Promise<{ success: boolean, count: number }> {
     if (!ids || ids.length === 0) return { success: true, count: 0 };
+
+    if (isDemoMode()) {
+        const demoOrdersJson = localStorage.getItem(DEMO_ORDENES_KEY) || '[]';
+        try {
+            let demoOrders: Order[] = JSON.parse(demoOrdersJson);
+            if (action === 'delete') {
+                demoOrders = demoOrders.filter(o => !ids.some(id => matchesOrderId(o, id)));
+            } else if (action === 'update') {
+                demoOrders = demoOrders.map(o => {
+                    if (items && items.length > 0) {
+                        const specific = items.find(it => matchesOrderId(o, it.id));
+                        if (specific) return { ...o, ...data, ...specific };
+                    }
+                    if (data && ids.some(targetId => matchesOrderId(o, targetId))) {
+                        return { ...o, ...data };
+                    }
+                    return o;
+                });
+            }
+            localStorage.setItem(DEMO_ORDENES_KEY, JSON.stringify(demoOrders));
+        } catch (e) { }
+        return { success: true, count: ids.length };
+    }
 
     if (action === 'delete') {
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
@@ -853,6 +1006,18 @@ export async function getOrdenesPendientes(): Promise<Order[]> {
 // ============================================================
 
 export function getClientes(): Cliente[] {
+    if (isDemoMode()) {
+        const demoClientesJson = localStorage.getItem(DEMO_CLIENTES_KEY);
+        if (demoClientesJson) {
+            try {
+                const list = JSON.parse(demoClientesJson) as Cliente[];
+                if (Array.isArray(list) && list.length > 0) return list;
+            } catch (e) { }
+        }
+        localStorage.setItem(DEMO_CLIENTES_KEY, JSON.stringify(DEMO_CLIENTES));
+        return [...DEMO_CLIENTES];
+    }
+
     const versionKey = 'luxius_db_clientes_v4';
     if (localStorage.getItem(versionKey) !== 'v4') {
         localStorage.removeItem(SESSION_CLIENTES_KEY);
@@ -876,6 +1041,44 @@ export function getClientes(): Cliente[] {
 }
 
 export async function saveCliente(cliente: Partial<Cliente>): Promise<Cliente> {
+    if (isDemoMode()) {
+        const demoClientesJson = localStorage.getItem(DEMO_CLIENTES_KEY) || '[]';
+        let demoClientes: Cliente[] = [];
+        try { demoClientes = JSON.parse(demoClientesJson); } catch (e) { }
+        if (!demoClientes.length) demoClientes = [...DEMO_CLIENTES];
+
+        const existingIndex = demoClientes.findIndex(c => String(c.id) === String(cliente.id));
+        let saved: Cliente;
+
+        if (existingIndex !== -1) {
+            saved = { ...demoClientes[existingIndex], ...cliente } as Cliente;
+            demoClientes[existingIndex] = saved;
+        } else {
+            saved = {
+                id: cliente.id || Math.floor(Math.random() * 900000) + 100000,
+                nombre: cliente.nombre || 'Nuevo Cliente Demo',
+                empresa: cliente.empresa || '',
+                cuit: cliente.cuit || '30-00000000-0',
+                telefono: cliente.telefono || '11 0000-0000',
+                email: cliente.email || 'demo@cliente.com',
+                direccion: cliente.direccion || '',
+                condVenta: cliente.condVenta || 'EFECTIVO',
+                habilitado: cliente.habilitado !== undefined ? cliente.habilitado : true,
+                vip: cliente.vip || false,
+                categoria: cliente.categoria || 'Agencia',
+                responsable: cliente.responsable || 'Mostrador',
+                ...cliente
+            } as Cliente;
+            demoClientes.unshift(saved);
+        }
+
+        try {
+            localStorage.setItem(DEMO_CLIENTES_KEY, JSON.stringify(demoClientes));
+        } catch (e) { }
+
+        return saved;
+    }
+
     const sessionItemsJson = localStorage.getItem(SESSION_CLIENTES_KEY)
     let sessionItems: Cliente[] = []
 
@@ -1181,6 +1384,18 @@ export function deduplicateMaterials(materials: Material[]): Material[] {
 }
 
 export function getMateriales(): Material[] {
+    if (isDemoMode()) {
+        const demoMatJson = localStorage.getItem(DEMO_MATERIALES_KEY);
+        if (demoMatJson) {
+            try {
+                const list = JSON.parse(demoMatJson) as Material[];
+                if (Array.isArray(list) && list.length > 0) return list;
+            } catch (e) { }
+        }
+        localStorage.setItem(DEMO_MATERIALES_KEY, JSON.stringify(DEMO_MATERIALES));
+        return [...DEMO_MATERIALES];
+    }
+
     const sessionItemsJson = localStorage.getItem(SESSION_MATERIALES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_MATERIALES_KEY)
 
@@ -1452,6 +1667,10 @@ export const DEFAULT_CALIDADES: Calidad[] = [
 ];
 
 export function getCalidades(): Calidad[] {
+    if (isDemoMode()) {
+        return [...DEMO_CALIDADES];
+    }
+
     const sessionItemsJson = localStorage.getItem(SESSION_CALIDADES_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_CALIDADES_KEY)
 
@@ -1550,6 +1769,18 @@ export function getCalidadById(id: number): Calidad | undefined {
 
 
 export function getMaquinas(): Maquina[] {
+    if (isDemoMode()) {
+        const demoMaqJson = localStorage.getItem(DEMO_MAQUINAS_KEY);
+        if (demoMaqJson) {
+            try {
+                const list = JSON.parse(demoMaqJson) as Maquina[];
+                if (Array.isArray(list) && list.length > 0) return list;
+            } catch (e) { }
+        }
+        localStorage.setItem(DEMO_MAQUINAS_KEY, JSON.stringify(DEMO_MAQUINAS));
+        return [...DEMO_MAQUINAS];
+    }
+
     const sessionItemsJson = localStorage.getItem(SESSION_MAQUINAS_KEY)
     const hiddenItemsJson = localStorage.getItem(HIDDEN_MAQUINAS_KEY)
 
@@ -1712,6 +1943,20 @@ const DEFAULT_USUARIOS: Usuario[] = [
 ];
 
 export function getUsuarios(): Usuario[] {
+    if (isDemoMode()) {
+        return [
+            {
+                id: 99999,
+                nombre: "Visitante (Modo Demo)",
+                username: "visitante",
+                rol: "visitante",
+                role: "visitante",
+                email: "visitante@luxius.com",
+                habilitado: true
+            }
+        ];
+    }
+
     const versionKey = 'luxius_db_users_v9';
     const sessionItemsJson = localStorage.getItem(SESSION_USUARIOS_KEY);
     let sessionItems: Usuario[] = [];
