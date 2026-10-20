@@ -11,8 +11,10 @@ import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '.
 import { extractCdrThumbnail } from '../../utils/cdrPreview';
 import { RedrawerStudio } from './RedrawerStudio';
 import { PrintSheeterStudio } from './printsheeter/PrintSheeterStudio';
-import { SuiteCraft } from './suitecraft/SuiteCraft';
+import { SuiteCraftTab } from './suitecraft/SuiteCraftTab';
 import { toAbsoluteFileUrl } from './suitecraft/tools';
+
+export type XpressViewerTab = 'viewer' | 'redrawer' | 'printsheeter' | 'photocraft' | 'vectorcraft';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -69,18 +71,33 @@ export interface XpressViewerProps {
 export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, initialOrderId, onClose }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : (searchParams.get('tab') === 'suitecraft' || searchParams.get('tab') === 'gimpstudio' || searchParams.get('tab') === 'editor' ? 'suitecraft' : 'viewer'));
-    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter' | 'suitecraft'>(initialTab);
+    const tabParam = searchParams.get('tab');
+    const initialTab: XpressViewerTab =
+        tabParam === 'redrawer' ? 'redrawer'
+        : (tabParam === 'printsheeter' || tabParam === 'mosaic') ? 'printsheeter'
+        : tabParam === 'vectorcraft' ? 'vectorcraft'
+        : (tabParam === 'photocraft' || tabParam === 'suitecraft' || tabParam === 'gimpstudio' || tabParam === 'editor') ? 'photocraft'
+        : 'viewer';
+    const [activeTab, setActiveTab] = useState<XpressViewerTab>(initialTab);
+    const [hasMountedPhotocraft, setHasMountedPhotocraft] = useState<boolean>(initialTab === 'photocraft');
+    const [hasMountedVectorcraft, setHasMountedVectorcraft] = useState<boolean>(initialTab === 'vectorcraft');
 
     useEffect(() => {
-        const tabParam = searchParams.get('tab');
-        if (tabParam === 'redrawer') setActiveTab('redrawer');
-        else if (tabParam === 'printsheeter' || tabParam === 'mosaic') setActiveTab('printsheeter');
-        // `gimpstudio` y `editor` se conservan como alias: hay enlaces viejos
-        // guardados en órdenes, WhatsApp y favoritos que deben seguir abriendo.
-        else if (tabParam === 'suitecraft' || tabParam === 'gimpstudio' || tabParam === 'editor') setActiveTab('suitecraft');
-        else if (!tabParam && activeTab !== 'viewer') setActiveTab('viewer');
-    }, [searchParams]);
+        const p = searchParams.get('tab');
+        if (p === 'redrawer') setActiveTab('redrawer');
+        else if (p === 'printsheeter' || p === 'mosaic') setActiveTab('printsheeter');
+        else if (p === 'vectorcraft') setActiveTab('vectorcraft');
+        else if (p === 'photocraft' || p === 'suitecraft' || p === 'gimpstudio' || p === 'editor') setActiveTab('photocraft');
+        else if (!p && activeTab !== 'viewer') setActiveTab('viewer');
+    }, [searchParams, activeTab]);
+
+    useEffect(() => {
+        if (activeTab === 'photocraft' && !hasMountedPhotocraft) {
+            setHasMountedPhotocraft(true);
+        } else if (activeTab === 'vectorcraft' && !hasMountedVectorcraft) {
+            setHasMountedVectorcraft(true);
+        }
+    }, [activeTab, hasMountedPhotocraft, hasMountedVectorcraft]);
 
     // Orden Vinculada (Fase 3 & 5)
     const orderIdParam = searchParams.get('orderId') || (initialOrderId ? String(initialOrderId) : null);
@@ -1112,16 +1129,30 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     </button>
                     <button 
                         type="button"
-                        className={`xpress-nav-tab ${activeTab === 'suitecraft' ? 'active' : ''}`}
+                        className={`xpress-nav-tab ${activeTab === 'photocraft' ? 'active' : ''}`}
                         onClick={() => {
-                            setActiveTab('suitecraft');
+                            setActiveTab('photocraft');
                             const newParams = new URLSearchParams(searchParams);
-                            newParams.set('tab', 'suitecraft');
+                            newParams.set('tab', 'photocraft');
                             setSearchParams(newParams);
                         }}
+                        title="PhotoCraft — Editor ráster y retoque de imágenes (Storytold)"
                     >
-                        🎨 SuiteCraft
-                        <span className="xpress-tab-pill" style={{ background: '#db2777', color: '#fff' }}>RASTER</span>
+                        🖼️ PhotoCraft
+                        <span className="xpress-tab-pill" style={{ background: '#db2777', color: '#fff' }}>RÁSTER</span>
+                    </button>
+                    <button 
+                        type="button"
+                        className={`xpress-nav-tab ${activeTab === 'vectorcraft' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('vectorcraft');
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.set('tab', 'vectorcraft');
+                            setSearchParams(newParams);
+                        }}
+                        title="VectorCraft — Editor vectorial, curvas Bézier y SVG (Storytold)"
+                    >
+                        ✒️ VectorCraft
                         <span className="xpress-tab-pill" style={{ background: '#0891b2', color: '#fff' }}>VECTOR</span>
                     </button>
                 </div>
@@ -1150,6 +1181,44 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     </button>
                 </div>
             </div>
+
+            {/* Pestañas de SuiteCraft (PhotoCraft + VectorCraft) con Lazy Mount + Keep-Alive */}
+            {hasMountedPhotocraft && (
+                <SuiteCraftTab
+                    toolId="photocraft"
+                    initialFileUrl={suiteCraftFileUrl}
+                    initialFileName={file?.name || paramFileName || metadata?.name || null}
+                    isActive={activeTab === 'photocraft'}
+                    onClose={() => {
+                        if (onClose) {
+                            onClose();
+                        } else {
+                            setActiveTab('viewer');
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.delete('tab');
+                            setSearchParams(newParams);
+                        }
+                    }}
+                />
+            )}
+            {hasMountedVectorcraft && (
+                <SuiteCraftTab
+                    toolId="vectorcraft"
+                    initialFileUrl={suiteCraftFileUrl}
+                    initialFileName={file?.name || paramFileName || metadata?.name || null}
+                    isActive={activeTab === 'vectorcraft'}
+                    onClose={() => {
+                        if (onClose) {
+                            onClose();
+                        } else {
+                            setActiveTab('viewer');
+                            const newParams = new URLSearchParams(searchParams);
+                            newParams.delete('tab');
+                            setSearchParams(newParams);
+                        }
+                    }}
+                />
+            )}
 
             {activeTab === 'redrawer' ? (
                 <RedrawerStudio 
@@ -1202,22 +1271,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     }}
                     onClose={onClose}
                 />
-            ) : activeTab === 'suitecraft' ? (
-                <SuiteCraft
-                    initialFileUrl={suiteCraftFileUrl}
-                    initialFileName={file?.name || paramFileName || metadata?.name || null}
-                    onClose={() => {
-                        if (onClose) {
-                            onClose();
-                        } else {
-                            setActiveTab('viewer');
-                            const newParams = new URLSearchParams(searchParams);
-                            newParams.delete('tab');
-                            setSearchParams(newParams);
-                        }
-                    }}
-                />
-            ) : (
+            ) : activeTab === 'photocraft' || activeTab === 'vectorcraft' ? null : (
                 <div className="xpress-main-layout">
                     <div className="xpress-viewport" {...getRootProps()}>
                         <input {...getInputProps()} />
@@ -1595,14 +1649,14 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 className="xpress-tool-btn" 
                                 onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    setActiveTab('suitecraft'); 
+                                    setActiveTab('photocraft'); 
                                     const p = new URLSearchParams(searchParams);
-                                    p.set('tab', 'suitecraft');
+                                    p.set('tab', 'photocraft');
                                     setSearchParams(p);
                                 }} 
-                                title="Abrir en SuiteCraft (Photocraft raster / Vectorcraft vectorial)"
+                                title="Abrir en PhotoCraft (Editor Ráster)"
                                 style={{
-                                    background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+                                    background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
                                     width: 'auto',
                                     padding: '0 12px',
                                     borderRadius: '18px',
@@ -1614,8 +1668,35 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                     boxShadow: '0 2px 10px rgba(236, 72, 153, 0.4)'
                                 }}
                             >
-                                <span>🎨</span>
-                                <span>SuiteCraft</span>
+                                <span>🖼️</span>
+                                <span>PhotoCraft</span>
+                            </button>
+                            <button 
+                                type="button"
+                                className="xpress-tool-btn" 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setActiveTab('vectorcraft'); 
+                                    const p = new URLSearchParams(searchParams);
+                                    p.set('tab', 'vectorcraft');
+                                    setSearchParams(p);
+                                }} 
+                                title="Abrir en VectorCraft (Editor Vectorial)"
+                                style={{
+                                    background: 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)',
+                                    width: 'auto',
+                                    padding: '0 12px',
+                                    borderRadius: '18px',
+                                    fontWeight: 700,
+                                    fontSize: '0.78rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: '0 2px 10px rgba(8, 145, 178, 0.4)'
+                                }}
+                            >
+                                <span>✒️</span>
+                                <span>VectorCraft</span>
                             </button>
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>

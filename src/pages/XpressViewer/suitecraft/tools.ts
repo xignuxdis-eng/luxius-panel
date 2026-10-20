@@ -1,17 +1,13 @@
 /**
- * SuiteCraft — Registro central de herramientas gráficas.
+ * SuiteCraft — Registro central de herramientas gráficas oficiales de Storytold:
+ * - PhotoCraft (ráster / mapas de bits): https://github.com/storytold/photocraft
+ * - VectorCraft (vectorial / SVG): https://github.com/storytold/vectorcraft
  *
- * Photocraft (raster) y Vectorcraft (vectorial) son aplicaciones externas que
- * se embeben con `<iframe>`. La URL de cada una puede sobreescribirse por
- * variables de entorno de Vite para apuntar a instancias propias:
- *
- *   VITE_PHOTOCRAFT_URL=https://photocraft.luxius.app
- *   VITE_VECTORCRAFT_URL=https://vectorcraft.luxius.app
- *
- * Los valores por defecto son Photopea y Vectorpea, que comparten el mismo
- * motor y entienden el protocolo de "Live URL": la lista de archivos a abrir
- * viaja en el hash del iframe (`#{"files":["<url>"]}`). Cualquier otro host
- * simplemente ignora ese hash, por lo que el fallback es seguro.
+ * Integradas como sub-aplicaciones estáticas aisladas en `public/suitecraft/{toolId}/index.html`
+ * para garantizar cero conflictos de dependencias, estilos Vanilla y máxima estabilidad.
+ * Las URLs pueden sobreescribirse opcionalmente por variables de entorno de Vite:
+ *   VITE_PHOTOCRAFT_URL=https://...
+ *   VITE_VECTORCRAFT_URL=https://...
  */
 
 export type CraftToolId = 'photocraft' | 'vectorcraft';
@@ -20,37 +16,68 @@ export interface CraftToolConfig {
     id: CraftToolId;
     name: string;
     subtitle: string;
-    url: string;
     badge: string;
+    url: string;
 }
+
+/**
+ * Resuelve la URL de la herramienta SuiteCraft.
+ * Prioriza variable de entorno si existe; de lo contrario resuelve la ruta relativa
+ * estática local en `suitecraft/{toolId}/index.html`.
+ */
+export const getSuitecraftToolUrl = (toolId: CraftToolId): string => {
+    const envUrl = toolId === 'photocraft'
+        ? import.meta.env.VITE_PHOTOCRAFT_URL
+        : import.meta.env.VITE_VECTORCRAFT_URL;
+
+    if (envUrl && envUrl.trim().length > 0) {
+        return envUrl.trim();
+    }
+
+    if (typeof window === 'undefined') {
+        return `./suitecraft/${toolId}/index.html`;
+    }
+
+    try {
+        const basePath = window.location.pathname.replace(/\/[^/]*$/, '/');
+        const resolved = new URL(`suitecraft/${toolId}/index.html`, `${window.location.origin}${basePath}`);
+        return resolved.href;
+    } catch {
+        return `./suitecraft/${toolId}/index.html`;
+    }
+};
 
 export const SUITE_CRAFT_TOOLS: Record<CraftToolId, CraftToolConfig> = {
     photocraft: {
         id: 'photocraft',
-        name: 'Photocraft',
-        subtitle: 'Edición de imágenes, retoque y mapas de bits',
-        url: import.meta.env.VITE_PHOTOCRAFT_URL || 'https://www.photopea.com',
-        badge: 'RASTER',
+        name: 'PhotoCraft',
+        subtitle: 'Editor ráster y mapas de bits (Storytold)',
+        badge: 'RÁSTER',
+        get url() {
+            return getSuitecraftToolUrl('photocraft');
+        },
     },
     vectorcraft: {
         id: 'vectorcraft',
-        name: 'Vectorcraft',
-        subtitle: 'Diseño vectorial, trazados y curvas de corte',
-        url: import.meta.env.VITE_VECTORCRAFT_URL || 'https://www.vectorpea.com',
+        name: 'VectorCraft',
+        subtitle: 'Editor vectorial, curvas Bézier y SVG (Storytold)',
         badge: 'VECTOR',
+        get url() {
+            return getSuitecraftToolUrl('vectorcraft');
+        },
     },
 };
 
-/** Orden de aparición de las herramientas en el conmutador superior. */
+/** Orden canónico de las herramientas SuiteCraft. */
 export const CRAFT_TOOL_IDS: readonly CraftToolId[] = ['photocraft', 'vectorcraft'];
 
-/** Esquemas que un editor remoto no puede descargar por sí mismo. */
+/** Esquemas que un editor remoto o sub-app no puede descargar directamente por red. */
 const NON_FETCHABLE_URL = /^(blob|data|file|javascript|about):/i;
 
 /**
  * Normaliza una referencia de archivo a una URL absoluta http(s) que un
- * tercero pueda descargar. Devuelve `null` para blobs, data URIs y cualquier
- * valor que no represente un recurso accesible por red.
+ * tercero o sub-app pueda descargar. Devuelve `null` para blobs, data URIs y
+ * esquemas no accesibles por red.
  */
 export const toAbsoluteFileUrl = (value?: string | null): string | null => {
     if (!value) return null;
@@ -70,9 +97,7 @@ export const toAbsoluteFileUrl = (value?: string | null): string | null => {
 
 /**
  * Construye la URL final del iframe. Si hay un archivo accesible por red se
- * entrega al editor mediante el protocolo Live URL, de modo que el operador
- * no tenga que volver a buscarlo a mano (los archivos de la OT viven detrás
- * de autenticación y no son navegables desde el disco del editor).
+ * entrega con el protocolo Live URL en el hash, permitiendo precarga inmediata.
  */
 export const buildCraftToolUrl = (tool: CraftToolConfig, fileUrl?: string | null): string => {
     const base = tool.url.trim().split('#')[0];

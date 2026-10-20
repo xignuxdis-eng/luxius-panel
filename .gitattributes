@@ -27,3 +27,5 @@
 *.bin binary
 *.db binary
 *.sqlite binary
+*.wasm binary
+*.part-* binary

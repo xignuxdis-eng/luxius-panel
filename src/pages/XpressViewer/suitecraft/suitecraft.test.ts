@@ -9,7 +9,7 @@ import {
 describe('SuiteCraft — registro de herramientas', () => {
     it('declara Photocraft (raster) y Vectorcraft (vector) en orden', () => {
         expect([...CRAFT_TOOL_IDS]).toEqual(['photocraft', 'vectorcraft']);
-        expect(SUITE_CRAFT_TOOLS.photocraft.badge).toBe('RASTER');
+        expect(SUITE_CRAFT_TOOLS.photocraft.badge).toBe('RÁSTER');
         expect(SUITE_CRAFT_TOOLS.vectorcraft.badge).toBe('VECTOR');
     });
 

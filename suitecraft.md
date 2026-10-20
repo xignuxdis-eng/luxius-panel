@@ -1,137 +1,73 @@
-# 🛠️ Roadmap de Implementación: SuiteCraft (Photocraft + Vectorcraft)
+# 🛠️ Documentación de Arquitectura: SuiteCraft en Xpress Viewer (PhotoCraft & VectorCraft)
 
-> **Archivo de guía estricta para Agente / IDE (`suitecraft.md`)**  
 > **Proyecto:** `luxius-panel` (`f:\Sitio XignuX`)  
-> **Objetivo:** Reemplazar la integración actual de **Gimp** por **Photocraft** (edición raster/mapa de bits) e incorporar **Vectorcraft** (edición vectorial), conformando una suite gráfica completa embebida mediante `<iframe>`.
+> **Estado:** Implementado y Verificado (20/10/2026)  
+> **Objetivo:** Reemplazar integraciones externas por las dos herramientas oficiales pedidas de la suite de Storytold:
+> 1. **PhotoCraft** (`https://github.com/storytold/photocraft`) — Editor de imágenes ráster / retoque fotográfico.
+> 2. **VectorCraft** (`https://github.com/storytold/vectorcraft`) — Editor de gráficos vectoriales / curvas Bézier / SVG.
 
 ---
 
-## ⛔ REGLAS INQUEBRANTABLES DE EJECUCIÓN (LEER PRIMERO)
+## 1. Arquitectura Técnica Seleccionada: Opción A (Sub-aplicaciones Estáticas Aisladas)
 
-1. **PROHIBIDO HACER COMMIT O PUSH:**
-   * **NO ejecutes** `git add`, `git commit` ni `git push` bajo ninguna circunstancia.
-   * Aunque `.agents/AGENTS.md` menciona autonomía para commitear y pushear, **esta orden directa del usuario anula esa sección para esta tarea**.
-   * Todo el desarrollo debe quedar únicamente en el directorio de trabajo local (*working tree*) para que el usuario lo inspeccione y pruebe localmente antes de subirlo.
-2. **NO ROMPER CONVENCIONES DEL REPOSITORIO:**
-   * **TypeScript Estricto:** `strict: true`, `noUnusedLocals`, `noUnusedParameters`. Cero `any` injustificados y cero variables o imports sobrantes de la antigua integración de Gimp.
-   * **CSS Vanilla Exclusivo:** **NO uses Tailwind CSS**. Usa clases CSS propias del proyecto o estilos inline válidos en React (`fontStyle`, `flexShrink`, etc.).
-3. **VERIFICACIÓN LOCAL OBLIGATORIA:**
-   * Antes de dar por terminada la tarea, debes correr `npm run verify` (`typecheck` + `lint` + `test` + `build`) y garantizar **0 errores**.
+Para preservar las normas inquebrantables de `luxius-panel` (**CSS Vanilla**, cero contaminación de reglas CSS globales, cero dependencias pesadas en `package.json` y prevención de picos de RAM / `StackOverflowException` durante la compilación), se implementó la **Opción A**:
 
----
+### Ubicación de artefactos estáticos:
+* `public/suitecraft/photocraft/` (contiene `index.html`, boot wasm y módulos WebAssembly de PhotoCraft).
+* `public/suitecraft/vectorcraft/` (contiene `index.html`, `vectorcraft-web-...js` y WebAssembly de VectorCraft).
 
-## 🔍 Fase 1: Relevamiento y Limpieza de "Gimp"
-
-1. **Localizar todas las referencias actuales:**
-   * Buscar en `src/` los términos `gimp`, `Gimp`, `GIMP` y localizar el componente, pestaña de navegación, íconos y estilos donde se renderiza actualmente el editor.
-2. **Identificar puntos de impacto:**
-   * **Menú / Sidebar / Navegación:** Identificar cómo se accede hoy a la sección.
-   * **Tipos de Vista / Rutas:** Revisar los union types de navegación (ej. `TabId`, `ViewMode`, etc.) para actualizar o mantener compatibilidad sin dejar código muerto.
-   * **Tests existentes:** Verificar en `src/**/*.test.ts(x)` si algún test unitario valida la existencia o renderizado de la sección anterior.
+### Ventajas clave:
+1. **Aislamiento Total de Estilos:** PhotoCraft y VectorCraft corren dentro de su propio contexto de navegación (`<iframe>`), sin afectar ni ser afectados por el CSS de Luxius.
+2. **Cero Dependencias en `package.json`:** No se requieren compiladores de Rust ni herramientas CLI de Trunk en la máquina de desarrollo o CI; los binarios estáticos optimizados se sirven directamente desde `public/` y se copian a `dist/` en tiempo de build.
+3. **MIME Types & Compatibilidad:** `.wasm` se sirve como `application/wasm` nativo; los archivos `.gitattributes` protegen binarios WebAssembly (`*.wasm binary`, `*.part-* binary`).
 
 ---
 
-## 🏗️ Fase 2: Arquitectura Recomendada (Iframe + UX Gráfica)
+## 2. Integración en `XpressViewer`
 
-Para que **Photocraft** y **Vectorcraft** funcionen como una verdadera estación de trabajo gráfica dentro de `luxius-panel`, el agente debe implementar un contenedor unificado con las siguientes especificaciones técnicas:
-
-### 1. Estrategia "Lazy Mount + Keep-Alive" (Crítico para no perder trabajo)
-* **Problema a evitar:** Si el operador está diseñando en **Photocraft**, cambia un momento a **Vectorcraft** para trazar un vector, y al cambiar de pestaña el componente desmonta el `<iframe>` (`{active === 'photocraft' && <iframe />}`), **el navegador destruirá la sesión del iframe y el usuario perderá todo su lienzo no guardado**.
-* **Solución obligatoria:**
-  1. **Lazy Mount:** Montar el `<iframe>` de cada herramienta recién la primera vez que el usuario la selecciona (usando un estado `loadedTools: Record<'photocraft' | 'vectorcraft', boolean>`).
-  2. **Keep-Alive con CSS:** Una vez montado un `<iframe>`, **mantenerlo en el DOM** y alternar su visibilidad con `display: activeTool === 'photocraft' ? 'block' : 'none'` (y `width: '100%'`, `height: '100%'`). Así el cambio entre **Photocraft** y **Vectorcraft** es instantáneo y conserva los archivos abiertos en memoria.
-
-### 2. Barra Superior de Control Compacta (Header de SuiteCraft)
-Implementar una barra superior compacta (40px–48px de alto) para maximizar el área útil del lienzo:
-* **Conmutador de Herramienta (Tabs internos):**
-  * 🖼️ **Photocraft** — *Edición Raster & Retoque Fotográfico*
-  * ✒️ **Vectorcraft** — *Diseño Vectorial, Curvas & Troqueles*
-* **Controles Operativos Derecha:**
-  * **Pantalla Completa (`Fullscreen`):** Botón que invoque `containerRef.current?.requestFullscreen()` (y `document.exitFullscreen()`) para trabajar a pantalla completa sin distracciones.
-  * **Recargar Editor (`Reload`):** Botón para forzar el recargado únicamente del iframe activo (incrementando una `key` individual por herramienta, ej. `reloadKey.photocraft`).
-  * **Abrir en Pestaña Nueva (`External Link`):** Enlace/botón con `window.open(activeUrl, '_blank', 'noopener,noreferrer')` para operadores que trabajen con doble monitor o si algún navegador bloquea recursos de terceros.
-
-### 3. Configuración Técnica de los `<iframe />`
-Los editores gráficos web requieren acceso a WebGL, portapapeles del sistema (pegar imágenes/vectores con `Ctrl+V`), descargas de archivos exportados y modales propios:
-
-```tsx
-<iframe
-  key={`${tool.id}-${reloadCount[tool.id]}`}
-  src={tool.url}
-  title={tool.name}
-  onLoad={() => handleIframeLoad(tool.id)}
-  style={{
-    width: '100%',
-    height: '100%',
-    border: 'none',
-    display: activeTool === tool.id ? 'block' : 'none',
-    backgroundColor: '#18181b',
-  }}
-  allow="clipboard-read; clipboard-write; fullscreen; accelerometer; autoplay; encrypted-media; gyroscope"
-  sandbox="allow-scripts allow-same-origin allow-downloads allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
-/>
-```
-
-### 4. Configuración Centralizada de URLs
-Definir un objeto de configuración limpio en la parte superior del módulo (permitiendo override por variables de entorno de Vite):
-
+### 2.1. Pestañas en la Barra de Navegación:
+El tipo de navegación del visor se configuró como:
 ```ts
-export type CraftToolId = 'photocraft' | 'vectorcraft';
-
-export interface CraftToolConfig {
-  id: CraftToolId;
-  name: string;
-  subtitle: string;
-  url: string;
-  badge: string;
-}
-
-export const SUITE_CRAFT_TOOLS: Record<CraftToolId, CraftToolConfig> = {
-  photocraft: {
-    id: 'photocraft',
-    name: 'Photocraft',
-    subtitle: 'Edición de imágenes, retoque y mapas de bits',
-    url: import.meta.env.VITE_PHOTOCRAFT_URL || 'https://www.photopea.com', // Ajustar a la URL definitiva de Photocraft
-    badge: 'RASTER',
-  },
-  vectorcraft: {
-    id: 'vectorcraft',
-    name: 'Vectorcraft',
-    subtitle: 'Diseño vectorial, trazados y curvas de corte',
-    url: import.meta.env.VITE_VECTORCRAFT_URL || 'https://www.vectorpea.com', // Ajustar a la URL definitiva de Vectorcraft
-    badge: 'VECTOR',
-  },
-};
+export type XpressViewerTab = 'viewer' | 'redrawer' | 'printsheeter' | 'photocraft' | 'vectorcraft';
 ```
+En el header de `XpressViewer.tsx`:
+* `👁️ Visor & Inspector` (inspección de medidas, preimpresión y DPI).
+* `✏️ Redrawer & Vectorizador` (vectorización IA).
+* `🧩 Mosaicos & Nesting HD` (panelizado y optimización de sustrato).
+* `🖼️ PhotoCraft` (`RÁSTER` badge `#db2777`) — Editor de mapa de bits.
+* `✒️ VectorCraft` (`VECTOR` badge `#0891b2`) — Editor vectorial y SVG.
+
+### 2.2. Estrategia "Lazy Mount + Keep-Alive" (Sin pérdida de trabajo)
+* **Lazy Mount:** El iframe de PhotoCraft o VectorCraft se monta únicamente cuando el operario hace clic en su respectiva pestaña por primera vez (`hasMountedPhotocraft` / `hasMountedVectorcraft`).
+* **Keep-Alive en DOM:** Una vez montado un editor, **permanece activo en el DOM** alternando `display: flex / none`. Si el operario cambia al Visor/Inspector para revisar medidas de la OT o DPI de entrada y regresa a PhotoCraft o VectorCraft, **el lienzo, historial de deshacer y capas continúan exactamente donde estaban sin reiniciarse**.
+
+### 2.3. Controles Operativos de Cabecera:
+Cada pestaña cuenta con un header superior compacto de 46px:
+* 📄 **Chip de archivo:** Nombre de producción del archivo activo.
+* 🔄 **Recargar lienzo:** Forzado manual del iframe mediante claves incrementales (`reloadKey`).
+* ↗️ **Abrir en pestaña nueva:** Para configuraciones multimonitor o ventanas auxiliares.
+* ⛶ **Pantalla completa:** Inmersión completa de trabajo gráfico (`requestFullscreen` / `exitFullscreen`).
+* ✕ **Volver al visor:** Cierra el editor y regresa a la inspección pre-prensa.
 
 ---
 
-## 📋 Fase 3: Plan de Trabajo Paso a Paso
+## 3. Guía de Actualización Futura de PhotoCraft y VectorCraft
 
-### Paso 1: Auditar el componente actual de Gimp
-1. Abrir el archivo donde actualmente se renderiza Gimp y revisar cómo se integra en el layout principal (`App.tsx` o router/sidebar correspondiente).
-2. Revisar las dimensiones del contenedor padre para asegurar que el contenedor del `<iframe>` ocupe el 100% del alto disponible (`flex: 1`, `display: flex`, `flexDirection: 'column'`, `minHeight: 0`, `overflow: 'hidden'`) sin generar doble barra de scroll.
+Para actualizar las sub-aplicaciones en el futuro sin tocar código del core:
 
-### Paso 2: Reemplazar Gimp por el módulo SuiteCraft (Photocraft + Vectorcraft)
-1. Reemplazar la vista/componente de Gimp por el nuevo contenedor que aloja **Photocraft** y **Vectorcraft**.
-2. Incluir un estado de carga visual (`loading` spinner/skeleton oscuro) mientras cada `<iframe>` dispara su evento `onLoad`.
-3. Asegurar que todos los estilos usen **CSS Vanilla** o inline styles tipados con `React.CSSProperties` respetando la estética oscura/industrial de **Luxius System**.
+1. **Descargar los últimos builds web estáticos de GitHub Releases:**
+   * PhotoCraft: `https://github.com/storytold/photocraft/releases` (descargar `photocraft-web-<version>.zip`)
+   * VectorCraft: `https://github.com/storytold/vectorcraft/releases` (descargar `vectorcraft-web-<version>.zip`)
 
-### Paso 3: Actualizar `XANA_MEMORIA_SISTEMA.md`
-1. De acuerdo con las reglas del proyecto, documentar en **`XANA_MEMORIA_SISTEMA.md`** (Sección 6 — Bitácora de cambios):
-   * El reemplazo del editor **Gimp** por **Photocraft** (edición raster).
-   * La incorporación de **Vectorcraft** (edición vectorial).
-   * La arquitectura de iframes persistentes (*Lazy Mount + Keep-Alive*) para evitar pérdida de trabajo al alternar entre herramientas.
+2. **Reemplazar los archivos en las carpetas públicas:**
+   * Descomprimir el contenido de PhotoCraft en `public/suitecraft/photocraft/`
+   * Descomprimir el contenido de VectorCraft en `public/suitecraft/vectorcraft/`
+   * Asegurar que existan `public/suitecraft/photocraft/index.html` y `public/suitecraft/vectorcraft/index.html`.
 
----
-
-## ✅ Fase 4: Verificación de Calidad (Obligatoria)
-
-Ejecutar en terminal los siguientes comandos en orden y corregir cualquier advertencia o error:
-
-1. `npm run typecheck` → **Debe dar 0 errores de TypeScript.**
-2. `npm run lint` → **Debe dar 0 errores de ESLint.**
-3. `npm run test` → **Todos los tests de Vitest deben pasar en verde.**
-4. `npm run build` → **El build de producción debe compilar limpio.**
-5. `npm run verify` → **Confirmación integral.**
-6. `git status` → **Confirmar que los cambios están en el árbol local y que NO se ejecutó `git commit` ni `git push`.**
+3. **Verificación y Deploy:**
+   ```bash
+   npm run verify
+   git add -A
+   git commit -m "chore(suitecraft): upgrade PhotoCraft / VectorCraft to latest release"
+   git push origin master
+   ```

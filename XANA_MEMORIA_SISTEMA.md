@@ -352,7 +352,7 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
 
-- [x] **SuiteCraft (Photocraft + Vectorcraft) en Xpress Viewer (20/10/2026)**: Reemplazo integral de GimpStudio por una estación gráfica profesional embebida mediante iframes persistentes (arquitectura Lazy Mount + Keep-Alive). Incorpora Photocraft para edición raster/mapas de bits y retoque fotográfico, y Vectorcraft para diseño vectorial, curvas y trazados de corte. Incluye barra de control de 46px, conmutador sin pérdida de sesión, controles de pantalla completa, recarga selectiva, apertura externa y soporte del protocolo Live URL.
+- [x] **SuiteCraft (PhotoCraft + VectorCraft de Storytold) en Xpress Viewer (20/10/2026)**: Integración oficial de PhotoCraft (ráster) y VectorCraft (vectorial) como sub-aplicaciones estáticas aisladas (Opción A) en Xpress Viewer con dos pestañas independientes en el header, arquitectura Lazy Mount + Keep-Alive en DOM para evitar pérdidas de sesión, controles de pantalla completa y recarga de lienzo.
 
 - [x] **GimpStudio HD Pre-Press Suite en Xpress Viewer (12/10/2026 - Reemplazado por SuiteCraft 20/10/2026)**: Editor de imágenes multicapa inicial; reemplazado por la suite gráfica Photocraft + Vectorcraft para mayor compatibilidad de formatos y herramientas de corte.
 
@@ -1768,25 +1768,27 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Control de Visibilidad del Acceso Demo (`src/config/demoConfig.ts`)**:
     - Se creó la constante `SHOW_DEMO_BUTTON = true` (o `false`) para alternar fácilmente la visibilidad del botón "Acceso Demo / Visitante" en `Login.tsx` a requerimiento comercial.
     - Login directo con credenciales `visitante / visitante` o `demo / demo` sin consulta de red ni demoras de servidor.
-- **SuiteCraft: Estación Gráfica Unificada (Photocraft + Vectorcraft) en Xpress Viewer (20/10/2026)**:
-  - **Motivación y Reemplazo de Gimp**:
-    - Reemplazo completo del módulo anterior (GimpStudio / `imageEditor`) por una estación de diseño profesional unificada conformada por **Photocraft** (edición raster/mapas de bits, retoque y preparación de artes fotográficas) y **Vectorcraft** (diseño vectorial, curvas Bezier y trazados de corte).
-  - **Arquitectura Lazy Mount + Keep-Alive (`src/pages/XpressViewer/suitecraft/SuiteCraft.tsx`)**:
-    - Para asegurar que los operadores no pierdan lienzos o trazados en curso al alternar entre raster y vector, los iframes se cargan perezosamente (`photocraft` activo inicial; `vectorcraft` se monta al primer clic) y **permanecen vivos en el DOM** alternando visibilidad únicamente con `display: activeTool === toolId ? 'block' : 'none'`.
-    - Configuración técnica de los iframes: soporte de aceleración WebGL, acceso al portapapeles (`allow="clipboard-read; clipboard-write; fullscreen..."`) y sandbox amplio (`allow-scripts allow-same-origin allow-downloads allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals`) para soportar exportaciones locales y atajos de teclado del sistema.
-  - **Barra Superior Compacta y Controles**:
-    - Cabecera compacta de 46px diseñada en CSS vanilla con paleta oscura industrial de Luxius System.
-    - Conmutador interno de pestañas con badges temáticos (`RASTER` rosa / `VECTOR` cian), chip de archivo con nombre de producción, recarga independiente forzada vía `reloadKeys`, apertura en pestaña externa para doble monitor (`window.open`) y conmutación de pantalla completa nativa (`requestFullscreen` / `exitFullscreen`).
-    - Estado de carga reactivo (`suitecraft-loading`) con animación de spinner y mensaje de fallback con botón para abrir en pestaña nueva si la red tarda en responder.
-  - **Protocolo Live URL y Configuración Centralizada (`tools.ts`)**:
-    - Detección y normalización de URLs absolutas con `toAbsoluteFileUrl()` y `buildCraftToolUrl()`. Los archivos remotos de la OT se inyectan en el hash `#{"files":["<url>"]}` para apertura directa en el editor remoto sin intervención manual. Rechazo estricto de blobs o data URIs locales incompatibles con orígenes remotos.
-    - Posibilidad de sobrescribir URLs de hosting de las herramientas mediante variables de entorno Vite (`VITE_PHOTOCRAFT_URL` y `VITE_VECTORCRAFT_URL`).
-  - **Limpieza y Reemplazo de Enlaces**:
-    - Actualización integral de navegación hacia `tab=suitecraft` en `XpressViewer.tsx`, `Entrada.tsx`, `FilePreviewModal.tsx` y `SharedFileViewerModal.tsx`.
-    - Eliminación completa de archivos legacy no utilizados (`GimpStudio.tsx`, `GimpStudio.css`, `imageProcessing.ts`, `types.ts`).
-    - Preservación de aliases en el visor (`gimpstudio` y `editor`) para asegurar que enlaces antiguos abran la nueva suite sin roturas.
-  - **Validación Automatizada (`suitecraft.test.ts`)**:
-    - Pruebas unitarias completas en Vitest para orden y metadatos de herramientas, construcción de URLs con protocolo Live URL, reemplazo de hashes preexistentes y filtrado de esquemas URL inválidos.
+- **SuiteCraft: Pestañas Oficiales PhotoCraft y VectorCraft (Storytold) en Xpress Viewer (20/10/2026)**:
+  - **Eliminación Total de Photopea / Vectorpea**:
+    - Se eliminaron todas las referencias a `photopea.com` y su integración temporal previa, sustituyéndola por las dos herramientas oficiales pedidas de la suite de Storytold: **PhotoCraft** (`storytold/photocraft`) para edición de mapas de bits/ráster y **VectorCraft** (`storytold/vectorcraft`) para diseño vectorial y curvas Bézier/SVG.
+  - **Arquitectura de Sub-aplicaciones Estáticas Aisladas (Opción A)**:
+    - Para proteger la convención de CSS Vanilla de Luxius, evitar conflictos de dependencias en `package.json` y prevenir desbordamientos de memoria (`StackOverflowException` / OOM) durante el build, se integraron como sub-aplicaciones estáticas precompiladas en:
+      - `public/suitecraft/photocraft/` (`index.html`, boot wasm y paquetes fragmentados de 20MB para máxima estabilidad).
+      - `public/suitecraft/vectorcraft/` (`index.html`, wasm-bindgen glue y binario WebAssembly).
+    - Reglas de binarios en `.gitattributes` (`*.wasm binary`, `*.part-* binary`).
+  - **Dos Pestañas Nativas en Xpress Viewer (`XpressViewer.tsx`)**:
+    - El tipo de pestaña activa se extendió a:
+      ```ts
+      export type XpressViewerTab = 'viewer' | 'redrawer' | 'printsheeter' | 'photocraft' | 'vectorcraft';
+      ```
+    - En el header principal conviven: `👁️ Visor & Inspector`, `✏️ Redrawer & Vectorizador`, `🧩 Mosaicos & Nesting HD`, `🖼️ PhotoCraft` (`RÁSTER` #db2777) y `✒️ VectorCraft` (`VECTOR` #0891b2).
+  - **Lazy Mount + Keep-Alive Persistente en DOM (`SuiteCraftTab.tsx`)**:
+    - Cada editor se monta únicamente al ser visitado por primera vez (`hasMountedPhotocraft`, `hasMountedVectorcraft`).
+    - Una vez montado, **permanece vivo en el DOM** alternando `display: flex / none`. Si el operario cambia al visor para inspeccionar DPI o medidas de la OT y regresa a PhotoCraft o VectorCraft, **el lienzo, historial de deshacer y capas se mantienen intactos sin reiniciarse**.
+    - Controles de cabecera compacta por pestaña: chip de archivo de producción, botón de recarga forzada (`reloadKey`), apertura en pestaña externa para monitores auxiliares y pantalla completa nativa.
+  - **Verificación Automatizada**:
+    - Tests en Vitest (`suitecraft.test.ts`) actualizados para verificar registro de herramientas, badges (`RÁSTER` / `VECTOR`), resolución de URLs locales (`getSuitecraftToolUrl`) y protocolo Live URL.
 
 ---
+
 
