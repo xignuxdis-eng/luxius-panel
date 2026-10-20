@@ -11,7 +11,8 @@ import { extractTiffThumbnail, extractEpsThumbnail, generateVectorCard } from '.
 import { extractCdrThumbnail } from '../../utils/cdrPreview';
 import { RedrawerStudio } from './RedrawerStudio';
 import { PrintSheeterStudio } from './printsheeter/PrintSheeterStudio';
-import { GimpStudio } from './imageEditor/GimpStudio';
+import { SuiteCraft } from './suitecraft/SuiteCraft';
+import { toAbsoluteFileUrl } from './suitecraft/tools';
 
 try {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -68,14 +69,16 @@ export interface XpressViewerProps {
 export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, initialFile, initialFileName, initialOrderId, onClose }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : (searchParams.get('tab') === 'gimpstudio' || searchParams.get('tab') === 'editor' ? 'gimpstudio' : 'viewer'));
-    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter' | 'gimpstudio'>(initialTab);
+    const initialTab = searchParams.get('tab') === 'redrawer' ? 'redrawer' : (searchParams.get('tab') === 'printsheeter' || searchParams.get('tab') === 'mosaic' ? 'printsheeter' : (searchParams.get('tab') === 'suitecraft' || searchParams.get('tab') === 'gimpstudio' || searchParams.get('tab') === 'editor' ? 'suitecraft' : 'viewer'));
+    const [activeTab, setActiveTab] = useState<'viewer' | 'redrawer' | 'printsheeter' | 'suitecraft'>(initialTab);
 
     useEffect(() => {
         const tabParam = searchParams.get('tab');
         if (tabParam === 'redrawer') setActiveTab('redrawer');
         else if (tabParam === 'printsheeter' || tabParam === 'mosaic') setActiveTab('printsheeter');
-        else if (tabParam === 'gimpstudio' || tabParam === 'editor') setActiveTab('gimpstudio');
+        // `gimpstudio` y `editor` se conservan como alias: hay enlaces viejos
+        // guardados en órdenes, WhatsApp y favoritos que deben seguir abriendo.
+        else if (tabParam === 'suitecraft' || tabParam === 'gimpstudio' || tabParam === 'editor') setActiveTab('suitecraft');
         else if (!tabParam && activeTab !== 'viewer') setActiveTab('viewer');
     }, [searchParams]);
 
@@ -255,6 +258,19 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
 
     const paramFileUrl = searchParams.get('fileUrl') || searchParams.get('url') || initialFileUrl;
     const paramFileName = searchParams.get('fileName') || searchParams.get('name') || initialFileName;
+
+    // Archivo que se entrega al editor externo de SuiteCraft. Un blob local
+    // (archivo elegido desde el disco) no es accesible desde un iframe de otro
+    // origen, así que sólo se propaga una referencia http(s) descargable.
+    const suiteCraftFileUrl = useMemo(() => {
+        const candidates = [paramFileUrl, order?.archivos?.[0], previewUrl];
+        for (const candidate of candidates) {
+            if (!candidate || /^(blob|data):/i.test(candidate)) continue;
+            const absolute = toAbsoluteFileUrl(resolveMediaUrl(candidate));
+            if (absolute) return absolute;
+        }
+        return null;
+    }, [paramFileUrl, order, previewUrl]);
 
     React.useEffect(() => {
         if (initialFile) {
@@ -1096,16 +1112,17 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     </button>
                     <button 
                         type="button"
-                        className={`xpress-nav-tab ${activeTab === 'gimpstudio' ? 'active' : ''}`}
+                        className={`xpress-nav-tab ${activeTab === 'suitecraft' ? 'active' : ''}`}
                         onClick={() => {
-                            setActiveTab('gimpstudio');
+                            setActiveTab('suitecraft');
                             const newParams = new URLSearchParams(searchParams);
-                            newParams.set('tab', 'gimpstudio');
+                            newParams.set('tab', 'suitecraft');
                             setSearchParams(newParams);
                         }}
                     >
-                        🎨 GimpStudio HD
-                        <span className="xpress-tab-pill" style={{ background: '#7c3aed', color: '#fff' }}>EDITOR</span>
+                        🎨 SuiteCraft
+                        <span className="xpress-tab-pill" style={{ background: '#db2777', color: '#fff' }}>RASTER</span>
+                        <span className="xpress-tab-pill" style={{ background: '#0891b2', color: '#fff' }}>VECTOR</span>
                     </button>
                 </div>
 
@@ -1185,45 +1202,10 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                     }}
                     onClose={onClose}
                 />
-            ) : activeTab === 'gimpstudio' ? (
-                <GimpStudio 
-                    initialImageUrl={previewUrl || paramFileUrl || undefined}
-                    initialFile={file || undefined}
-                    initialFileName={file?.name || paramFileName || metadata?.name || undefined}
-                    orderId={order?.id}
-                    order={order}
-                    onOrderUpdated={(savedOrder) => setOrder(savedOrder)}
-                    onSendToRedrawer={(dataUrl) => {
-                        setPreviewUrl(dataUrl);
-                        setActiveTab('redrawer');
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.set('tab', 'redrawer');
-                        setSearchParams(newParams);
-                    }}
-                    onSendToPrintSheeter={(dataUrl) => {
-                        setPreviewUrl(dataUrl);
-                        setActiveTab('printsheeter');
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.set('tab', 'printsheeter');
-                        setSearchParams(newParams);
-                    }}
-                    onSendToViewer={(dataUrl, name) => {
-                        setPreviewUrl(dataUrl);
-                        setMetadata((prev: any) => ({
-                            name: name || (file?.name ? `gimp_${file.name}` : 'diseno_retocado.png'),
-                            format: 'PNG',
-                            size: 'Editado HD',
-                            width: prev?.width || 1920,
-                            height: prev?.height || 1080,
-                            dpi: prev?.dpi || 150,
-                            colorMode: 'RGB (GimpStudio)',
-                            source: 'GimpStudio HD'
-                        }));
-                        setActiveTab('viewer');
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete('tab');
-                        setSearchParams(newParams);
-                    }}
+            ) : activeTab === 'suitecraft' ? (
+                <SuiteCraft
+                    initialFileUrl={suiteCraftFileUrl}
+                    initialFileName={file?.name || paramFileName || metadata?.name || null}
                     onClose={() => {
                         if (onClose) {
                             onClose();
@@ -1233,20 +1215,6 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                             newParams.delete('tab');
                             setSearchParams(newParams);
                         }
-                    }}
-                    onSaveToOrder={async (dataUrl) => {
-                        if (!order) return;
-                        const existing = order.archivos || [];
-                        const origExisting = order.archivosOriginales || [];
-                        const savedName = `gimp_${paramFileName || file?.name || 'diseno_retocado.png'}`;
-                        const saved = await saveOrden({
-                            id: order.id,
-                            ot: order.ot,
-                            archivos: [dataUrl, ...existing],
-                            archivosOriginales: [savedName, ...origExisting]
-                        });
-                        if (saved) setOrder(saved);
-                        alert(`¡Imagen editada guardada exitosamente en la Orden #${order.ot || order.id}!`);
                     }}
                 />
             ) : (
@@ -1627,12 +1595,12 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 className="xpress-tool-btn" 
                                 onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    setActiveTab('gimpstudio'); 
+                                    setActiveTab('suitecraft'); 
                                     const p = new URLSearchParams(searchParams);
-                                    p.set('tab', 'gimpstudio');
+                                    p.set('tab', 'suitecraft');
                                     setSearchParams(p);
                                 }} 
-                                title="Abrir en GimpStudio HD (Editor de Capas y Retoque)"
+                                title="Abrir en SuiteCraft (Photocraft raster / Vectorcraft vectorial)"
                                 style={{
                                     background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
                                     width: 'auto',
@@ -1647,7 +1615,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({ initialFileUrl, init
                                 }}
                             >
                                 <span>🎨</span>
-                                <span>GimpStudio</span>
+                                <span>SuiteCraft</span>
                             </button>
                             <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                             <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>

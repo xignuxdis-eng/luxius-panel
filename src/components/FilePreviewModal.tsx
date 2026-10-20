@@ -131,10 +131,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                                     onClose();
                                     const targetUrl = downloadUrl || imgSrc || '';
                                     const orderPart = orderId ? `&orderId=${orderId}` : '';
-                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(targetUrl)}&fileName=${encodeURIComponent(fileName)}${orderPart}&tab=gimpstudio`);
+                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(targetUrl)}&fileName=${encodeURIComponent(fileName)}${orderPart}&tab=suitecraft`);
                                 }}
                                 className="tool-btn"
-                                title="Abrir y editar en GIMP Studio (Capas, retoque y filtros)"
+                                title="Abrir y editar en SuiteCraft (Photocraft raster / Vectorcraft vectorial)"
                                 style={{ color: '#c084fc' }}
                             >
                                 <Palette size={16} />
@@ -208,7 +208,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                                     onClose();
                                     const targetUrl = downloadUrl || imgSrc || '';
                                     const orderPart = orderId ? `&orderId=${orderId}` : '';
-                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(targetUrl)}&fileName=${encodeURIComponent(fileName)}${orderPart}&tab=gimpstudio`);
+                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(targetUrl)}&fileName=${encodeURIComponent(fileName)}${orderPart}&tab=suitecraft`);
                                 }}
                                 style={{
                                     background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
@@ -224,9 +224,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                                     gap: '6px',
                                     boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
                                 }}
-                                title="Abrir imagen en el Editor GIMP"
+                                title="Abrir imagen en SuiteCraft (editor raster y vectorial)"
                             >
-                                🎨 Abrir en Editor GIMP
+                                🎨 Abrir en SuiteCraft
                             </button>
                         )}
                         <div className="preview-tip">

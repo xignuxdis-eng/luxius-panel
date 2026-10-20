@@ -279,7 +279,7 @@ export default function SharedFileViewerModal({
                                     const orig = order.archivosOriginales?.[0] || order.archivos[0].split('/').pop()?.split('?')[0] || 'diseno';
                                     const prod = buildProductionFilename(order, 0, orig);
                                     const orderParam = order?.id ? `&orderId=${order.id}` : '';
-                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}${orderParam}&tab=gimpstudio`);
+                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}${orderParam}&tab=suitecraft`);
                                 }}
                                 style={{
                                     background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
@@ -295,9 +295,9 @@ export default function SharedFileViewerModal({
                                     boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)',
                                     whiteSpace: 'nowrap'
                                 }}
-                                title="Abrir diseño principal en el Editor GIMP"
+                                title="Abrir diseño principal en SuiteCraft (raster + vector)"
                             >
-                                🎨 Abrir en GIMP
+                                🎨 Abrir en SuiteCraft
                             </button>
                         )}
                     </div>
@@ -331,11 +331,11 @@ export default function SharedFileViewerModal({
                                         {isImage ? (
                                             <div
                                                 style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-                                                title="Hacé clic para editar en GIMP Studio"
+                                                title="Hacé clic para editar en SuiteCraft"
                                                 onClick={() => {
                                                     onClose()
                                                     const orderParam = order?.id ? `&orderId=${order.id}` : ''
-                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=gimpstudio`)
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=suitecraft`)
                                                 }}
                                             >
                                                 <img
@@ -391,7 +391,7 @@ export default function SharedFileViewerModal({
                                                         boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
                                                     }}
                                                 >
-                                                    <span>🎨</span> Editar GIMP
+                                                    <span>🎨</span> Editar SuiteCraft
                                                 </div>
                                             </div>
                                         ) : isVideo ? (
@@ -458,7 +458,7 @@ export default function SharedFileViewerModal({
                                                 onClick={() => {
                                                     onClose()
                                                     const orderParam = order?.id ? `&orderId=${order.id}` : ''
-                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=gimpstudio`)
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=suitecraft`)
                                                 }}
                                                 style={{
                                                     background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
@@ -467,10 +467,10 @@ export default function SharedFileViewerModal({
                                                     cursor: 'pointer',
                                                     boxShadow: '0 2px 8px rgba(139, 92, 246, 0.35)'
                                                 }}
-                                                title="Abrir y editar en GIMP Studio (Retoque, capas, filtros, guardar a orden)"
+                                                title="Abrir y editar en SuiteCraft (raster y vectorial)"
                                             >
                                                 <span className="icon">🎨</span>
-                                                Editor GIMP
+                                                Editor SuiteCraft
                                             </button>
                                             <button
                                                 type="button"

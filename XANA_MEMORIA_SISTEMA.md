@@ -5,7 +5,7 @@
 
 ---
 # 🧠 XANA MEMORIA DEL SISTEMA - CONTEXTO MAESTRO DEL ECOSISTEMA LUXIUS
-> **Última Actualización:** 19/10/2026 13:50 (Organización Inteligente de Descargas por Lotes / ZIP por Bobina y Subcarpetas > 2.93m)  
+> **Última Actualización:** 20/10/2026 15:55 (SuiteCraft: Estación Gráfica Unificada Photocraft + Vectorcraft en Xpress Viewer)  
 > **Propósito:** Documento de contexto permanente para cualquier Asistente IA (Antigravity, Cursor, Windsurf, Claude Dev, Copilot) o desarrollador que continúe el trabajo en cualquier entorno o IDE.
 
 ---
@@ -352,7 +352,9 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
 
-- [x] **GimpStudio HD Pre-Press Suite en Xpress Viewer (12/10/2026)**: Editor de imágenes multicapa nativo con modos de fusión, histograma de 256 canales, niveles con LUT gamma, retoque de brillo/contraste/saturación/temperatura de virado, máscara de enfoque (*Unsharp Mask*) para gran formato, binarización 1-bit para plotter de corte, varita mágica para eliminación de fondo por tolerancia alfa, extensor de demasías por reflejo en espejo (*Mirror Bleed*) y puente directo a Redrawer y PrintSheeter.
+- [x] **SuiteCraft (Photocraft + Vectorcraft) en Xpress Viewer (20/10/2026)**: Reemplazo integral de GimpStudio por una estación gráfica profesional embebida mediante iframes persistentes (arquitectura Lazy Mount + Keep-Alive). Incorpora Photocraft para edición raster/mapas de bits y retoque fotográfico, y Vectorcraft para diseño vectorial, curvas y trazados de corte. Incluye barra de control de 46px, conmutador sin pérdida de sesión, controles de pantalla completa, recarga selectiva, apertura externa y soporte del protocolo Live URL.
+
+- [x] **GimpStudio HD Pre-Press Suite en Xpress Viewer (12/10/2026 - Reemplazado por SuiteCraft 20/10/2026)**: Editor de imágenes multicapa inicial; reemplazado por la suite gráfica Photocraft + Vectorcraft para mayor compatibilidad de formatos y herramientas de corte.
 
 - [x] **LuXius Mobile Suite / Taller Móvil Multi-Espacio (12/10/2026)**: PWA Web Share Target para interceptar enlaces WeTransfer/Drive/Dropbox desde WhatsApp en Android; parser inteligente de texto con auto-detección de medidas, materiales, copias y clientes; receptor rápido de órdenes express con 1-Tap WhatsApp; espacios de trabajo optimizados para Administración (caja, cobranzas express), Impresor (plotters con botones gigantes para taller, prueba de color con cámara del celular), Diseñador (pre-flight técnico interactivo, rebote a WhatsApp con motivo y solución) y Despacho (refilado y aviso de retiro); Super-Admin switcher de roles al vuelo en `/mobile`.
 
@@ -1766,5 +1768,25 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Control de Visibilidad del Acceso Demo (`src/config/demoConfig.ts`)**:
     - Se creó la constante `SHOW_DEMO_BUTTON = true` (o `false`) para alternar fácilmente la visibilidad del botón "Acceso Demo / Visitante" en `Login.tsx` a requerimiento comercial.
     - Login directo con credenciales `visitante / visitante` o `demo / demo` sin consulta de red ni demoras de servidor.
+- **SuiteCraft: Estación Gráfica Unificada (Photocraft + Vectorcraft) en Xpress Viewer (20/10/2026)**:
+  - **Motivación y Reemplazo de Gimp**:
+    - Reemplazo completo del módulo anterior (GimpStudio / `imageEditor`) por una estación de diseño profesional unificada conformada por **Photocraft** (edición raster/mapas de bits, retoque y preparación de artes fotográficas) y **Vectorcraft** (diseño vectorial, curvas Bezier y trazados de corte).
+  - **Arquitectura Lazy Mount + Keep-Alive (`src/pages/XpressViewer/suitecraft/SuiteCraft.tsx`)**:
+    - Para asegurar que los operadores no pierdan lienzos o trazados en curso al alternar entre raster y vector, los iframes se cargan perezosamente (`photocraft` activo inicial; `vectorcraft` se monta al primer clic) y **permanecen vivos en el DOM** alternando visibilidad únicamente con `display: activeTool === toolId ? 'block' : 'none'`.
+    - Configuración técnica de los iframes: soporte de aceleración WebGL, acceso al portapapeles (`allow="clipboard-read; clipboard-write; fullscreen..."`) y sandbox amplio (`allow-scripts allow-same-origin allow-downloads allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals`) para soportar exportaciones locales y atajos de teclado del sistema.
+  - **Barra Superior Compacta y Controles**:
+    - Cabecera compacta de 46px diseñada en CSS vanilla con paleta oscura industrial de Luxius System.
+    - Conmutador interno de pestañas con badges temáticos (`RASTER` rosa / `VECTOR` cian), chip de archivo con nombre de producción, recarga independiente forzada vía `reloadKeys`, apertura en pestaña externa para doble monitor (`window.open`) y conmutación de pantalla completa nativa (`requestFullscreen` / `exitFullscreen`).
+    - Estado de carga reactivo (`suitecraft-loading`) con animación de spinner y mensaje de fallback con botón para abrir en pestaña nueva si la red tarda en responder.
+  - **Protocolo Live URL y Configuración Centralizada (`tools.ts`)**:
+    - Detección y normalización de URLs absolutas con `toAbsoluteFileUrl()` y `buildCraftToolUrl()`. Los archivos remotos de la OT se inyectan en el hash `#{"files":["<url>"]}` para apertura directa en el editor remoto sin intervención manual. Rechazo estricto de blobs o data URIs locales incompatibles con orígenes remotos.
+    - Posibilidad de sobrescribir URLs de hosting de las herramientas mediante variables de entorno Vite (`VITE_PHOTOCRAFT_URL` y `VITE_VECTORCRAFT_URL`).
+  - **Limpieza y Reemplazo de Enlaces**:
+    - Actualización integral de navegación hacia `tab=suitecraft` en `XpressViewer.tsx`, `Entrada.tsx`, `FilePreviewModal.tsx` y `SharedFileViewerModal.tsx`.
+    - Eliminación completa de archivos legacy no utilizados (`GimpStudio.tsx`, `GimpStudio.css`, `imageProcessing.ts`, `types.ts`).
+    - Preservación de aliases en el visor (`gimpstudio` y `editor`) para asegurar que enlaces antiguos abran la nueva suite sin roturas.
+  - **Validación Automatizada (`suitecraft.test.ts`)**:
+    - Pruebas unitarias completas en Vitest para orden y metadatos de herramientas, construcción de URLs con protocolo Live URL, reemplazo de hashes preexistentes y filtrado de esquemas URL inválidos.
 
 ---
+

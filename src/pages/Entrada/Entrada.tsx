@@ -2055,11 +2055,11 @@ export default function Entrada() {
                                                                                         const firstFile = resolveMediaUrl(order.archivos[0]);
                                                                                         const orig = order.archivosOriginales?.[0] || order.archivos[0].split('/').pop()?.split('?')[0] || 'diseno';
                                                                                         const prod = buildProductionFilename(order, 0, orig);
-                                                                                        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${order.id}&tab=gimpstudio`);
+                                                                                        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${order.id}&tab=suitecraft`);
                                                                                     }}
                                                                                     style={{ color: '#c084fc', fontWeight: 600 }}
                                                                                 >
-                                                                                    <span>🎨</span> Editor GIMP
+                                                                                    <span>🎨</span> SuiteCraft
                                                                                 </button>
                                                                             )}
                                                                             <button
@@ -2351,11 +2351,11 @@ export default function Entrada() {
                                                                                 const firstFile = resolveMediaUrl(order.archivos[0]);
                                                                                 const orig = order.archivosOriginales?.[0] || order.archivos[0].split('/').pop()?.split('?')[0] || 'diseno';
                                                                                 const prod = buildProductionFilename(order, 0, orig);
-                                                                                navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${order.id}&tab=gimpstudio`);
+                                                                                navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${order.id}&tab=suitecraft`);
                                                                             }}
                                                                             style={{ color: '#c084fc', fontWeight: 600 }}
                                                                         >
-                                                                            <span>🎨</span> Editor GIMP
+                                                                            <span>🎨</span> SuiteCraft
                                                                         </button>
                                                                     )}
                                                                     <button

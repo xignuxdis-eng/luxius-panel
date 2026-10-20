@@ -1,0 +1,347 @@
+/* ============================================================================
+   SuiteCraft — Photocraft + Vectorcraft
+   Estación gráfica embebida (iframes persistentes) con estética industrial
+   oscura de Luxius System. CSS vanilla: sin Tailwind.
+   ========================================================================== */
+
+.suitecraft-root {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #0b0f16;
+    color: #e2e8f0;
+    overflow: hidden;
+}
+
+.suitecraft-root:fullscreen,
+.suitecraft-root.is-fullscreen {
+    height: 100vh;
+    width: 100vw;
+    background: #05070b;
+}
+
+/* ------------------------------------------------------------------ Header */
+
+.suitecraft-header {
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 10px 0 12px;
+    background: linear-gradient(180deg, #131c2e 0%, #0b0f16 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+}
+
+.suitecraft-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.suitecraft-brand-mark {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(168, 85, 247, 0.35));
+    border: 1px solid rgba(129, 140, 248, 0.45);
+}
+
+.suitecraft-brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+    min-width: 0;
+}
+
+.suitecraft-brand-text strong {
+    font-size: 0.86rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #f8fafc;
+}
+
+.suitecraft-brand-text span {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+/* ------------------------------------------------- Conmutador de herramienta */
+
+.suitecraft-tool-switch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.suitecraft-tool-tab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.suitecraft-tool-tab:hover {
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.suitecraft-tool-tab.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(139, 92, 246, 0.85));
+    border-color: rgba(165, 180, 252, 0.45);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+}
+
+.suitecraft-tool-emoji {
+    font-size: 0.9rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.suitecraft-tool-label {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.15;
+    min-width: 0;
+}
+
+.suitecraft-tool-label strong {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.suitecraft-tool-label small {
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: inherit;
+    opacity: 0.72;
+    max-width: 230px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.suitecraft-tool-badge {
+    flex-shrink: 0;
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 1px 5px;
+    border-radius: 999px;
+    color: #ffffff;
+}
+
+.suitecraft-tool-badge.badge-photocraft {
+    background: #db2777;
+}
+
+.suitecraft-tool-badge.badge-vectorcraft {
+    background: #0891b2;
+}
+
+/* ------------------------------------------------------- Controles derecha */
+
+.suitecraft-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.suitecraft-file-chip {
+    max-width: 200px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    background: rgba(148, 163, 184, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.suitecraft-icon-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(148, 163, 184, 0.08);
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.suitecraft-icon-btn:hover {
+    background: rgba(99, 102, 241, 0.22);
+    border-color: rgba(129, 140, 248, 0.55);
+    color: #ffffff;
+}
+
+.suitecraft-icon-btn.active {
+    background: rgba(99, 102, 241, 0.35);
+    border-color: rgba(165, 180, 252, 0.65);
+    color: #ffffff;
+}
+
+.suitecraft-icon-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: rgba(248, 113, 113, 0.6);
+    color: #fecaca;
+}
+
+/* ----------------------------------------------------------------- Escena */
+
+.suitecraft-stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: #18181b;
+    overflow: hidden;
+}
+
+.suitecraft-frame {
+    position: absolute;
+    inset: 0;
+    background: #18181b;
+}
+
+/* --------------------------------------------------------------- Cargando */
+
+.suitecraft-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 38%, #16203a 0%, #0b0f16 72%);
+    pointer-events: none;
+}
+
+.suitecraft-loading strong {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #e2e8f0;
+}
+
+.suitecraft-loading > span {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.suitecraft-spinner {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 4px;
+    border-radius: 50%;
+    border: 3px solid rgba(99, 102, 241, 0.22);
+    border-top-color: #6366f1;
+    animation: suitecraft-spin 0.9s linear infinite;
+}
+
+@keyframes suitecraft-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.suitecraft-loading-hint {
+    pointer-events: auto;
+    max-width: 380px;
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.suitecraft-loading-hint p {
+    margin: 0 0 10px;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: #94a3b8;
+}
+
+.suitecraft-loading-hint button {
+    padding: 7px 12px;
+    border-radius: 7px;
+    border: 1px solid rgba(129, 140, 248, 0.55);
+    background: rgba(99, 102, 241, 0.25);
+    color: #e0e7ff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.suitecraft-loading-hint button:hover {
+    background: rgba(99, 102, 241, 0.4);
+}
+
+/* ------------------------------------------------------------- Responsive */
+
+@media (max-width: 980px) {
+    .suitecraft-brand-text span,
+    .suitecraft-tool-label small,
+    .suitecraft-file-chip {
+        display: none;
+    }
+
+    .suitecraft-header {
+        gap: 8px;
+        padding: 0 8px;
+    }
+}
+
+@media (max-width: 640px) {
+    .suitecraft-brand-text {
+        display: none;
+    }
+
+    .suitecraft-tool-tab {
+        padding: 4px 7px;
+    }
+
+    .suitecraft-tool-badge {
+        display: none;
+    }
+}
