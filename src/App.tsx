@@ -8,7 +8,6 @@ import { useSessionInactivity } from '@/hooks/useSessionInactivity'
 
 // Layouts (static — always needed)
 import MainLayout from '@components/layout/MainLayout'
-import XanaAssistant from '@components/XanaAssistant'
 
 // Pages (lazy-loaded — code splitting per route)
 const Login = lazy(() => import('@pages/Login/Login'))
@@ -172,7 +171,6 @@ function App() {
                     }
                 />
             </Routes>
-            <XanaAssistant />
         </Suspense>
     )
 }

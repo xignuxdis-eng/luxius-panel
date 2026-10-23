@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useAuthStore } from '@store/authStore';
 import { 
     X, Send, Bot, Sparkles, AlertTriangle, Database, 
     Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle, Mic, MicOff, Palette, Printer
@@ -33,6 +34,7 @@ function normalizeRole(raw: string): string {
 }
 
 export default function XanaAssistant() {
+    const { isAuthenticated, user } = useAuthStore();
     const [isOpen, setIsOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
@@ -53,20 +55,13 @@ const inputRef = useRef<HTMLInputElement>(null);
 const menuRef = useRef<HTMLDivElement>(null);
 
     const getUserInfo = () => {
-        try {
-            const authRaw = localStorage.getItem('luxius-auth-v6');
-            if (authRaw) {
-                const parsed = JSON.parse(authRaw);
-                const user = parsed?.state?.user;
-                if (user) {
-                    return {
-                        role: normalizeRole(String(user.rol || user.role || 'cliente')),
-                        username: user.nombre || user.username || user.name || 'Usuario',
-                        id: user.id || 0
-                    };
-                }
-            }
-        } catch (_) {}
+        if (user) {
+            return {
+                role: normalizeRole(String(user.role || 'cliente')),
+                username: user.name || user.username || 'Usuario',
+                id: user.id || 0
+            };
+        }
         return { role: 'cliente', username: 'Usuario', id: 0 };
     };
 
@@ -416,6 +411,10 @@ const menuRef = useRef<HTMLDivElement>(null);
             );
         });
     };
+
+    if (!isAuthenticated || !user) {
+        return null;
+    }
 
     return (
         <>
