@@ -2,7 +2,7 @@
  * Luxius System - Pricing Calculation Pure Engine
  */
 
-import { getMateriales, getClientes, getServicios } from '@/data/db';
+import { getMateriales, getClientes, getServicios, getTarifasXignuxSync } from '@/data/db';
 import type { DemasiasConfig } from '@/types';
 import { getBobinaUsefulWidth } from '../nestingEngine';
 import type { PriceCalculationResult } from './pricingTypes';
@@ -11,7 +11,8 @@ export const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) 
 
 /**
  * Motor oficial unificado de calculo de precios y metros lineales de LuXius
- * Evalua orientacion normal vs rotada, margen de seguridad de 1cm, precios por bobina y precios especiales por cliente.
+ * Evalua orientacion normal vs rotada, margen de seguridad de 1cm, precios por bobina,
+ * precios especiales por cliente y multiplicador para cliente particular.
  */
 export function calculateItemPriceDetailed(
     materialCode: string,
@@ -20,7 +21,8 @@ export function calculateItemPriceDetailed(
     c: number = 1,
     services?: Record<string, boolean>,
     clientIdParam?: string | number,
-    demasiasConfig?: DemasiasConfig
+    demasiasConfig?: DemasiasConfig,
+    isParticular?: boolean
 ): PriceCalculationResult {
     const mat = getMateriales().find(m => 
         m.codigo === materialCode || 
@@ -170,15 +172,36 @@ export function calculateItemPriceDetailed(
         linearMeters = 0;
     }
 
+    // Si se aplica modalidad de Cliente Particular, aplicar recargo porcentual personalizado
+    let particularMarkupPct = 0;
+    if (isParticular) {
+        const tarifas = getTarifasXignuxSync();
+        const matKey = mat.codigo?.toLowerCase() || materialCode.toLowerCase();
+        if (tarifas[matKey] && typeof tarifas[matKey].recargoParticularPct === 'number') {
+            particularMarkupPct = tarifas[matKey].recargoParticularPct || 0;
+        } else {
+            particularMarkupPct = 30; // 30% sugerido estándar si no está configurado
+        }
+        basePrice = Math.round(basePrice * (1 + particularMarkupPct / 100));
+    }
+
     // Servicios adicionales
     let servicesTotal = 0;
     if (services) {
         const availableServices = getServicios();
+        const tarifas = isParticular ? getTarifasXignuxSync() : {};
         Object.entries(services).forEach(([sId, active]) => {
             if (active) {
                 const s = availableServices.find(serv => String(serv.id) === sId);
                 if (s) {
-                    const priceBase = parseFloat(s.precioBase as any) || 0;
+                    let priceBase = parseFloat(s.precioBase as any) || 0;
+                    if (isParticular) {
+                        const sKey = s.codigo?.toLowerCase() || s.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                        const sPct = (tarifas[sKey] && typeof tarifas[sKey].recargoParticularPct === 'number')
+                            ? (tarifas[sKey].recargoParticularPct || 0)
+                            : particularMarkupPct;
+                        priceBase = priceBase * (1 + sPct / 100);
+                    }
                     let multiplier = c;
                     if (s.unidad === 'm2') {
                         multiplier = round2(w * h * c);
@@ -199,6 +222,8 @@ export function calculateItemPriceDetailed(
         bobinaAsignada: assignedBobina,
         precioMl: appliedPriceMl,
         rotated,
+        esParticular: !!isParticular,
+        recargoParticularPct: isParticular ? particularMarkupPct : 0,
         precioDetalle: tipoCobro === 'ml' ? {
             tipoCobro: 'ml',
             bobinaAncho: assignedBobina,
@@ -206,11 +231,15 @@ export function calculateItemPriceDetailed(
             precioML: appliedPriceMl,
             rotated,
             consumoML: linearMeters,
-            costoBase: basePrice
+            costoBase: basePrice,
+            esParticular: !!isParticular,
+            recargoParticularPct: isParticular ? particularMarkupPct : 0
         } : {
             tipoCobro: 'm2',
             precioM2: specialPrice || precioM2 || 0,
-            costoBase: basePrice
+            costoBase: basePrice,
+            esParticular: !!isParticular,
+            recargoParticularPct: isParticular ? particularMarkupPct : 0
         }
     };
 }

@@ -101,25 +101,29 @@ El sistema opera bajo el modelo de seguridad `luxius-auth-v6` y control de acces
 
 ### 3.1 Perfiles del Sistema y Asignación de Funciones
 - **Administrador / Principal (`ADMIN_ROLES`)**:
-  - *Usuarios Clave*: Adrian (Administración / Sistema), Mirta (Administración / Finanzas).
+  - *Roles Clave*: Administración del Sistema, Finanzas y Dirección Operativa.
   - *Alcance*: Control irrestricto del sistema (`*`), altas de usuarios, configuración de tarifarios, conciliación de cuentas bancarias y parámetros del modelo Xana.
 - **Vendedor (`vendedor`)**:
   - *Alcance*: Carga de pedidos en `/entrada`, cotización en `/presupuestador`, visualización de cartera en `/abm/clientes` y seguimiento de órdenes propias.
 - **Diseñador / Artista (`artista`, `disenador`)**:
   - *Alcance*: Acceso a `/diseno`, `/xpress-viewer` (SuiteCraft: inspección de DPI, sangrado perimetral y vectorizado automático en Redrawer Studio), aprobación técnica y pasaje a cola de impresión.
 - **Operario de Taller / Impresor (`impresion`, `impresor`)**:
-  - *Personal Asociado*: Carlos (Plotters de Impresión). [SUPUESTO LIMITADO: Quique cumple funciones en planta de impresión/maquinista].
+  - *Rol de Planta*: Impresor / Maquinista de Plotters de Producción.
   - *Alcance*: Gestión de `/impresion`, visualización de bobinas en `/taller`, descarga de archivos listos para RIP y cambio de estado a `impreso`.
 - **Operario de Terminaciones / Refilador (`cortador`, `refilado`)**:
-  - *Personal Asociado*: Agustín (Mesa de Corte y Terminaciones).
+  - *Rol de Planta*: Operario de Terminaciones / Refilador en Mesa de Corte y Acabados.
   - *Alcance*: Refilado a medida, colocación de ojalillos, costura de dobladillos, laminado y cambio de estado a `post`.
 - **Técnico / Colocador de Campo (`tecnico`, `operario`)**:
-  - *Personal Asociado*: [SUPUESTO LIMITADO: Tincho cumple funciones de relevamiento en vía pública y montaje final en cliente].
+  - *Rol de Campo*: Técnico Instalador / Cuadrilla de Relevamiento en Vía Pública y Montaje.
   - *Alcance*: Operación en `Workfield Manager`, consulta de tareas `/api/tasks`, registro de medidas y fotos.
 - **Cliente (`cliente`)**:
   - *Alcance*: Acceso de mínimo privilegio estricto; solo puede visualizar y consultar el estado de presupuestos vinculados a su identificador único (`Usuario.client_id == Presupuesto.cliente_id`).
 
-### 3.2 Matriz de Autorización de Rutas y Endpoints
+### 3.2 Política de Caducidad y Timeout de Inactividad de Sesión
+- **Tiempo Límite de Inactividad**: Toda sesión autenticada en el panel web cuenta con un límite estricto de **15 minutos de inactividad**.
+- **Comportamiento**: Si el operador no interactúa con el sistema (sin eventos de teclado, ratón, scroll o toques de pantalla) durante 15 minutos continuos, la sesión se cierra preventivamente (`logout()`), purgando los tokens en memoria y redirigiendo a la pantalla de acceso seguro.
+
+### 3.3 Matriz de Autorización de Rutas y Endpoints
 
 | Módulo / Recurso | Ruta Frontend | Endpoint Backend | Admin | Vendedor | Artista | Impresor | Técnico Campo | Cliente |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -193,7 +197,7 @@ Cubre desde la inspección física en el domicilio del cliente por parte del té
 ```mermaid
 sequenceDiagram
     autonumber
-    actor T as Técnico de Campo (Tincho)
+    actor T as Técnico de Campo
     participant APP as Workfield Manager (Móvil)
     participant API as luXius-Backend (/api/tasks)
     participant DB as Supabase PostgreSQL
@@ -413,7 +417,7 @@ flowchart TD
 
 ### 📋 SOP-01: Relevamiento en Campo y Carga de Medidas (`Workfield Manager`)
 - **Propósito**: Estandarizar la captura física de especificaciones gráficas en vía pública o local comercial para evitar discrepancias milimétricas en taller.
-- **Responsable Operativo**: Técnico Instalador / Cuadrilla de Campo (Personal asociado: Tincho).
+- **Responsable Operativo**: Técnico Instalador / Cuadrilla de Campo.
 - **Precondiciones**:
   - Dispositivo móvil Android con `XignuX Workfield Manager` v2.5.1 instalado.
   - Sesión activa con credenciales de operario/técnico (`token JWT` válido).
@@ -449,7 +453,7 @@ flowchart TD
 
 ### 📋 SOP-02: Inspección Previa y Aprobación Técnica (`Xpress Viewer / Diseno`)
 - **Propósito**: Validar la fidelidad gráfica, resolución real (DPI 1:1), demasías de corte y ausencia de fallas de color antes del envío a los cabezales del plotter.
-- **Responsable Operativo**: Diseñador Gráfico / Operador de Preimpresión (Personal asociado: Adrian / Rol Artista).
+- **Responsable Operativo**: Diseñador Gráfico / Operador de Preimpresión (Rol Artista).
 - **Precondiciones**:
   - Orden en estado `diseno` en el panel web.
   - Archivo de producción adjunto (PDF vectorial, TIFF, JPG alta calidad).
@@ -487,7 +491,7 @@ flowchart TD
 
 ### 📋 SOP-03: Imposición en Bobina y Creación de Lote (`Nesting Studio 2D`)
 - **Propósito**: Agrupar múltiples trabajos de igual sustrato minimizando el desperdicio de material y automatizando el cálculo de metros lineales gastados.
-- **Responsable Operativo**: Operario de Taller / Maquinista (Personal asociado: Carlos / Quique).
+- **Responsable Operativo**: Operario de Taller / Maquinista de Plotter.
 - **Precondiciones**:
   - Dos o más órdenes en estado `orden` que compartan el mismo material (ej. *Vinilo Vehicular VV*).
 
@@ -520,7 +524,7 @@ flowchart TD
 
 ### 📋 SOP-04: Ejecución de Impresión y Control Físico en Plotter
 - **Propósito**: Transferir el archivo validado a la cola del software RIP (Roland VersaWorks) y registrar el inicio y fin del tiraje físico en planta.
-- **Responsable Operativo**: Impresor de Planta (Personal asociado: Carlos / Quique).
+- **Responsable Operativo**: Impresor de Planta / Maquinista.
 - **Precondiciones**:
   - Orden en estado `orden`.
   - Plotter calibrado con nivel de tintas suficiente (> 20% en todos los cartuchos).
@@ -541,7 +545,7 @@ flowchart TD
 
 - **Resultado Producido (Salida)**:
   - La orden sale de la cola de impresión y pasa a la cola de la estación de terminaciones y refilado.
-  - En el visualizador WorkshopCanvas, el operario Carlos camina hacia la estación de despacho llevando el rollo impreso.
+  - En el visualizador WorkshopCanvas, el operario maquinista se desplaza hacia la estación de despacho llevando el rollo impreso.
 - **Controles y Validaciones**:
   - Ante rotura de material o falta de tinta durante el tiraje, el operario debe colocar inmediatamente la orden en estado **`standby`** o **`rebotado`** indicando la causa para solicitar reposición urgente de rollo.
 
@@ -549,7 +553,7 @@ flowchart TD
 
 ### 📋 SOP-05: Terminaciones, Refilado y Empaque
 - **Propósito**: Realizar cortes perimetrales, refuerzos mecánicos y embalaje protector identificando el bulto con su rótulo industrial oficial.
-- **Responsable Operativo**: Operario de Terminaciones / Empaque (Personal asociado: Agustín en refilado / Mirta en empaque).
+- **Responsable Operativo**: Operario de Terminaciones / Empaque y Despacho.
 - **Precondiciones**:
   - Orden en estado `impreso`.
   - Sustrato seco y reposado en mesa de trabajo.
@@ -563,7 +567,7 @@ flowchart TD
 2. Al finalizar las tareas mecánicas, cambie el estado de la orden a **`post`**.
 3. El empaquetador enrolla el trabajo con la cara impresa hacia afuera y envuelve con film stretch protector.
 4. En `luxius-panel`, haga clic en el botón **🏷️ Etiqueta de Producción**:
-   - El sistema abrirá la utilidad de generación de rótulos térmicos en PDF (`generateLabelPdf.ts`).
+   - El sistema generará el rótulo térmico en formato **PDF estándar de Windows** (`generateLabelPdf.ts`), compatible con cualquier controlador o cola de impresión estándar del sistema operativo.
    - Imprima la etiqueta adhesiva que contiene: Código de OT (`OT-XXXXXXXX`), Nombre del Cliente, Medidas, Fecha de Entrega y Código QR de auditoría.
 5. Pegue la etiqueta visible en el bulto y cambie el estado a **`completo`**.
 
@@ -575,7 +579,7 @@ flowchart TD
 
 ### 📋 SOP-06: Entrega, Despacho y Cobro Final
 - **Propósito**: Formalizar la entrega material al cliente o comisionista y liquidar los saldos financieros pendientes.
-- **Responsable Operativo**: Administrador / Mostrador (Personal asociado: Mirta).
+- **Responsable Operativo**: Administrador / Operador de Mostrador y Caja.
 - **Precondiciones**:
   - Orden en estado `completo`.
 
@@ -671,18 +675,18 @@ Para evitar que consultas estadísticas complejas bloqueen el hilo de Flask en p
 
 ---
 
-## 9. Inventario de Elementos Pendientes de Validar
+## 9. Inventario de Resoluciones Homologadas y Elementos del Sistema
 
-En cumplimiento estricto con la Regla de Oro Anti-Invención, a continuación se consolida la totalidad de vacíos técnicos, supuestos limitados y parámetros pendientes de confirmación definitiva por el equipo directivo de XignuX:
+A continuación se consolida la totalidad de resoluciones directivas y homologaciones técnicas del ecosistema XignuX, cerrando los antiguos vacíos preliminares:
 
-| ID Referencia | Módulo / Componente | Elemento Registrado | Clasificación | Supuesto Limitado Aplicado en este Manual | Acción Requerida para Homologación |
-| :---: | :--- | :--- | :---: | :--- | :--- |
-| **VAL-001** | Recursos Humanos / Roles | Responsabilidad nominal de "Tincho" | `[SUPUESTO LIMITADO / PENDIENTE DE VALIDACIÓN]` | Asignado como Técnico / Instalador en campo, responsable principal de la captura en `Workfield Manager`. | Confirmar denominación de puesto y rol exacto en el sistema. |
-| **VAL-002** | Recursos Humanos / Roles | Responsabilidad nominal de "Quique" | `[SUPUESTO LIMITADO / PENDIENTE DE VALIDACIÓN]` | Asignado como Maquinista / Operario de impresión física y corte en taller. | Confirmar denominación de puesto y rol exacto en el sistema. |
-| **VAL-003** | Auth / Sesiones | Timeout exacto de inactividad JWT en Panel | `[VACÍO TÉCNICO / PENDIENTE DE VALIDACIÓN]` | Supuesto de expiración de token en 8 horas laborales continuas. | Definir parámetro de expiración de JWT en variable de entorno backend (`JWT_EXPIRATION_DELTA`). |
-| **VAL-004** | Taller / Imposición | Automatización de Hot Folder Roland VersaWorks | `[ESTADO PAUSADO]` | Declarado en pausa técnica hasta realizar pruebas físicas in situ frente a la máquina en planta. | Desarrollar Daemon local de copia automática tras validación de `docs/roland/VERSAWORKS_4_NOTAS.md`. |
-| **VAL-005** | Móvil / Hardware | Modelo exacto de impresora térmica de etiquetas | `[VACÍO TÉCNICO / PENDIENTE DE VALIDACIÓN]` | Generación genérica de PDF térmica estándar en 100x150 mm. | Especificar fabricante y protocolo (Zebra ZPL, ESC/POS o Driver Windows) para etiquetas en bultos. |
-| **VAL-006** | Precios / Ventas | Multiplicador porcentual por Categoría de Cliente | `[VACÍO TÉCNICO / PENDIENTE DE VALIDACIÓN]` | Tarifario base sin multiplicador automático por gremio en frontend (solo precios especiales puntuales). | Formalizar tabla de coeficientes: Gremio, Corporativo, Particular en `config_global`. |
+| ID Referencia | Módulo / Componente | Elemento Registrado | Clasificación | Resolución Oficial Homologada | Estado de Implementación |
+| :---: | :--- | :--- | :---: | :--- | :---: |
+| **VAL-001** | Recursos Humanos / Roles | Responsabilidad en relevamiento y campo | `[HOMOLOGADO]` | Uso exclusivo de roles funcionales: **Técnico Instalador / Cuadrilla de Campo** en `Workfield Manager`. Sin ataduras a nombres individuales. | ✅ Incorporado al Manual |
+| **VAL-002** | Recursos Humanos / Roles | Responsabilidad en maquinaria y taller | `[HOMOLOGADO]` | Uso exclusivo de roles funcionales: **Impresor / Maquinista de Plotter** en impresión física y **Operario de Terminaciones / Refilador** en mesa de corte. | ✅ Incorporado al Manual |
+| **VAL-003** | Auth / Sesiones | Timeout exacto de inactividad de sesión | `[HOMOLOGADO]` | Sesión activa con temporizador de **15 minutos de inactividad**. Desconexión y logout preventivo automático tras 15 minutos sin interacción del usuario. | ✅ Implementado en Frontend/Auth |
+| **VAL-004** | Taller / Imposición | Automatización de Hot Folder Roland VersaWorks | `[PAUSA TÉCNICA ASENTADA]` | Mantenido en pausa técnica hasta disponer del equipo físico en planta. Registrado como pendiente en memoria del sistema (`XANA_MEMORIA_SISTEMA.md`). | ⏸️ Pausado en Memoria |
+| **VAL-005** | Etiquetas / Hardware | Formato de impresión de rótulos | `[HOMOLOGADO]` | Generación en formato **PDF estándar de Windows** a través de `generateLabelPdf.ts`, compatible con cualquier controlador de impresión local. | ✅ Estandarizado |
+| **VAL-006** | Precios / Ventas | Multiplicador porcentual para Cliente Particular | `[HOMOLOGADO]` | Incorporación de checkbox **"Cliente Particular"** en el modal de Nuevo Pedido con recálculo automático, y porcentaje de recargo personalizado/global configurable en `/abm/tarifas`. | ✅ Implementado en UI/Precios |
 
 ---
 *Manual confeccionado bajo estrictos lineamientos de fidelidad técnica e integridad documental para el ecosistema XignuX / LuXius.*

@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { hasRolePermission } from '@/types/auth'
 import { initializeData, isCapacitorNative } from '@/data/db'
+import { useSessionInactivity } from '@/hooks/useSessionInactivity'
 
 // Layouts (static — always needed)
 import MainLayout from '@components/layout/MainLayout'
@@ -72,6 +73,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 
 function App() {
+    useSessionInactivity()
     const [isInitializing, setIsInitializing] = useState(true)
 
     useEffect(() => {

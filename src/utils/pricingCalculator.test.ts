@@ -142,4 +142,13 @@ describe('calculateItemPriceDetailed — invariantes', () => {
         expect(Number.isFinite(r.subtotal)).toBe(true)
         expect(r.subtotal).toBeGreaterThanOrEqual(0)
     })
+
+    it('aplica recargo para cliente particular respecto a tarifa base', () => {
+        sembrarMaterial('TST')
+        const base = calculateItemPriceDetailed('TST', 0.8, 0.5, 1, undefined, undefined, undefined, false)
+        const part = calculateItemPriceDetailed('TST', 0.8, 0.5, 1, undefined, undefined, undefined, true)
+        expect(part.esParticular).toBe(true)
+        expect(part.subtotal).toBeGreaterThan(base.subtotal)
+        expect(part.recargoParticularPct).toBeGreaterThan(0)
+    })
 })

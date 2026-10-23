@@ -56,6 +56,11 @@ export default function Login() {
 
     useEffect(() => {
         checkServerHealth()
+        const reason = sessionStorage.getItem('luxius_session_expired_reason')
+        if (reason === 'inactivity') {
+            setError('⏱️ Tu sesión ha expirado tras 15 minutos de inactividad.')
+            sessionStorage.removeItem('luxius_session_expired_reason')
+        }
     }, [])
 
     const { register, handleSubmit, formState: { errors } } = useForm<LoginCredentials>()

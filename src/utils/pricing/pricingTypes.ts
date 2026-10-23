@@ -8,6 +8,8 @@ export interface PriceCalculationResult {
     bobinaAsignada?: number;
     precioMl?: number;
     rotated: boolean;
+    esParticular?: boolean;
+    recargoParticularPct?: number;
     precioDetalle?: {
         tipoCobro: 'ml' | 'm2';
         bobinaAncho?: number;
@@ -17,5 +19,7 @@ export interface PriceCalculationResult {
         rotated?: boolean;
         consumoML?: number;
         costoBase?: number;
+        esParticular?: boolean;
+        recargoParticularPct?: number;
     };
 }

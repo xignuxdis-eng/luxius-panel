@@ -50,6 +50,19 @@ export async function getTarifasXignux(): Promise<TarifasXignux> {
     return {};
 }
 
+/**
+ * Lectura sincrona del tarifario para calculos inmediatos de precios en cliente
+ */
+export function getTarifasXignuxSync(): TarifasXignux {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('luxius_tarifas_xignux') : null;
+    if (stored) {
+        try {
+            return JSON.parse(stored) as TarifasXignux;
+        } catch (e) { }
+    }
+    return {};
+}
+
 export async function saveTarifasXignux(tarifas: TarifasXignux): Promise<boolean> {
     localStorage.setItem('luxius_tarifas_xignux', JSON.stringify(tarifas));
 

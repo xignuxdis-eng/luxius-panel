@@ -75,6 +75,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const watchedCalidad = watch('calidad')
     const watchedClientId = watch('clienteId')
 
+    const [isParticular, setIsParticular] = useState<boolean>(() => {
+        return !!(order as any)?.esParticular;
+    })
+
     const [activeTab, setActiveTab] = useState<TabType>('unitario')
     const [fileName, setFileName] = useState('')
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -207,6 +211,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         setValue('clienteId', String(c.id), { shouldValidate: true, shouldDirty: true });
         setClientSearch(`${c.nombre} (${c.empresa || 'Particular'})`);
         setShowClientDropdown(false);
+        if (!c.empresa || c.empresa.toLowerCase().trim() === 'particular') {
+            setIsParticular(true);
+        }
     };
 
     const handleClearClient = () => {
@@ -457,7 +464,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
 
     const calculateItemPriceDetailed = (materialCode: string, rawW: number, rawH: number, c: number, services?: Record<string, boolean>, clientIdParam?: string | number) => {
-        const res = calcItemPriceDetailedUtil(materialCode, rawW, rawH, c, services, clientIdParam || watchedClientId, getValues('demasiasConfig'));
+        const res = calcItemPriceDetailedUtil(materialCode, rawW, rawH, c, services, clientIdParam || watchedClientId, getValues('demasiasConfig'), isParticular);
         const mat = getMateriales().find(m => m.codigo === materialCode);
         if (mat) {
             (mat as any)._lastRotation = res.rotated;
@@ -492,7 +499,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setValue('subtotal', Math.round((currentCombo.precioFinal || 0) * c))
             }
         }
-    }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, activeTab, selectedComboId, setValue])
+    }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, activeTab, selectedComboId, setValue, isParticular])
 
     // Dynamic calculated total according to pricing formulas
     const calculatedOrderTotal = useMemo(() => {
@@ -517,7 +524,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 }, 0);
         }
         return 0;
-    }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, selectedComboId, batchItems, watchedClientId]);
+    }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, selectedComboId, batchItems, watchedClientId, isParticular]);
 
     // Dynamic total for current active tab (respeta monto manual personalizado si está activo)
     const orderTotal = useMemo(() => {
@@ -1367,6 +1374,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 fechaCreacion: new Date().toString(),
                                 fechaEntrega: data.fechaEntrega || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                 tags: selectedTags,
+                                esParticular: isParticular,
                             }
 
                             const saved = await saveOrden(orderData)
@@ -1458,6 +1466,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                         archivos: finalArchivos,
                         archivosOriginales: finalArchivosOriginales,
                         demasiasConfig: isLonaOrNotVinilo(data.material) ? data.demasiasConfig : { top: false, bottom: false, left: false, right: false },
+                        esParticular: isParticular,
                         imgMetadata: metadata || order?.imgMetadata,
                         status: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') && numericData.status === 'orden') ? 'diseno' : (numericData.status || (order ? order.status : (currentDefaultStatus as any))),
                         category: ((order?.origen === 'mobile' || (data as any).origen === 'mobile') || numericData.status === 'relevamiento' || numericData.status === 'diseno') ? 'diseno' : 'impresion',
@@ -1650,6 +1659,35 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                         )}
                                     </div>
                                 )}
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '2px', marginBottom: '6px' }}>
+                                <label style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    cursor: 'pointer',
+                                    background: isParticular ? 'rgba(234, 179, 8, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                                    border: isParticular ? '1px solid rgba(234, 179, 8, 0.45)' : '1px solid var(--border)',
+                                    padding: '6px 12px',
+                                    borderRadius: '6px',
+                                    userSelect: 'none',
+                                    transition: 'all 0.2s ease'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isParticular}
+                                        onChange={(e) => setIsParticular(e.target.checked)}
+                                        style={{ width: '16px', height: '16px', accentColor: '#eab308', cursor: 'pointer' }}
+                                    />
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: isParticular ? '#eab308' : 'var(--text-primary)' }}>
+                                        👤 Cliente Particular
+                                    </span>
+                                    {isParticular && (
+                                        <span style={{ fontSize: '10px', background: '#eab308', color: '#000', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px' }}>
+                                            RECARGO PARTICULAR ACTIVO
+                                        </span>
+                                    )}
+                                </label>
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>🏷️ Proyecto / Etiqueta / Nombre Trabajo</label>

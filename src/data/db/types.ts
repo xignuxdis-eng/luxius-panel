@@ -102,6 +102,7 @@ export interface Config {
 export interface TarifaEntry {
     precio: number;
     rebajaMaxPct: number;
+    recargoParticularPct?: number;
 }
 
 export type TarifasXignux = Record<string, TarifaEntry>;

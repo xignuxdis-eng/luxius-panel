@@ -46,6 +46,8 @@ export default function TarifasXignuxView() {
         setLoading(false)
     }
 
+    const [globalRecargoInput, setGlobalRecargoInput] = useState<string>('30')
+
     const handlePrecioChange = (key: string, value: string) => {
         const num = parseFloat(value) || 0
         setTarifas(prev => ({
@@ -66,12 +68,41 @@ export default function TarifasXignuxView() {
         setSaved(false)
     }
 
+    const handleRecargoParticularChange = (key: string, value: string) => {
+        const num = Math.max(0, parseFloat(value) || 0)
+        setTarifas(prev => ({
+            ...prev,
+            [key]: { ...getEntry(prev, key), recargoParticularPct: num }
+        }))
+        setDirty(true)
+        setSaved(false)
+    }
+
+    const handleApplyGlobalRecargo = () => {
+        const pct = Math.max(0, parseFloat(globalRecargoInput) || 0)
+        setTarifas(prev => {
+            const next: TarifasXignux = {}
+            Object.keys(prev).forEach(k => {
+                next[k] = { ...getEntry(prev, k), recargoParticularPct: pct }
+            })
+            return next
+        })
+        setDirty(true)
+        setSaved(false)
+    }
+
     const getEntry = (t: TarifasXignux, key: string): TarifaEntry => {
         const e = t[key]
-        if (e && typeof e === 'object' && 'precio' in e) return e
+        if (e && typeof e === 'object' && 'precio' in e) {
+            return {
+                precio: e.precio,
+                rebajaMaxPct: e.rebajaMaxPct ?? 0,
+                recargoParticularPct: typeof e.recargoParticularPct === 'number' ? e.recargoParticularPct : 30
+            }
+        }
         // Legacy fallback: plain number
-        if (typeof e === 'number') return { precio: e, rebajaMaxPct: 0 }
-        return { precio: 0, rebajaMaxPct: 0 }
+        if (typeof e === 'number') return { precio: e, rebajaMaxPct: 0, recargoParticularPct: 30 }
+        return { precio: 0, rebajaMaxPct: 0, recargoParticularPct: 30 }
     }
 
     const handleSave = async () => {
@@ -88,6 +119,11 @@ export default function TarifasXignuxView() {
     const calcPiso = (precio: number, pct: number) => {
         if (pct <= 0) return 0
         return Math.round(precio * (1 - pct / 100))
+    }
+
+    const calcPrecioParticular = (precio: number, pct: number = 30) => {
+        if (pct <= 0) return precio
+        return Math.round(precio * (1 + pct / 100))
     }
 
     const tarifaGroups = [
@@ -151,7 +187,7 @@ export default function TarifasXignuxView() {
     return (
         <div className="abm-list-view" style={{ padding: 0 }}>
             {/* Header */}
-            <div className="abm-actions-header">
+            <div className="abm-actions-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Button
                         variant="primary"
@@ -167,9 +203,31 @@ export default function TarifasXignuxView() {
                         </span>
                     )}
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Estos precios se sincronizan automáticamente con la app móvil
-                </span>
+
+                {/* Control rapido de recargo particular */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '4px 10px', borderRadius: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#eab308' }}>👤 Recargo Particular Sugerido:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                            type="number"
+                            min="0"
+                            max="300"
+                            value={globalRecargoInput}
+                            onChange={(e) => setGlobalRecargoInput(e.target.value)}
+                            className="input-field sm"
+                            style={{ width: '55px', padding: '3px 6px', fontSize: '12px', textAlign: 'center' }}
+                        />
+                        <span style={{ fontSize: '12px', color: '#eab308' }}>%</span>
+                    </div>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleApplyGlobalRecargo}
+                        style={{ fontSize: '11px', padding: '3px 8px' }}
+                    >
+                        ⚡ Aplicar a Todo
+                    </Button>
+                </div>
             </div>
 
             {/* Groups */}
@@ -193,23 +251,26 @@ export default function TarifasXignuxView() {
                     <table className="abm-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '40%' }}>Concepto</th>
-                                <th style={{ width: '20%' }}>Precio Base ($)</th>
-                                <th style={{ width: '15%' }}>Rebaja Máx (%)</th>
-                                <th style={{ width: '15%' }}>Piso Vendedor</th>
-                                <th style={{ width: '10%' }}>Unidad</th>
+                                <th style={{ width: '28%' }}>Concepto</th>
+                                <th style={{ width: '18%' }}>Base Gremio ($)</th>
+                                <th style={{ width: '13%' }}>+ Part. (%)</th>
+                                <th style={{ width: '16%' }}>Precio Particular</th>
+                                <th style={{ width: '11%' }}>Rebaja Máx</th>
+                                <th style={{ width: '14%' }}>Piso Vendedor</th>
                             </tr>
                         </thead>
                         <tbody>
                             {group.items.map((item: any) => {
                                 const entry = getEntry(tarifas, item.key)
                                 const piso = calcPiso(entry.precio, entry.rebajaMaxPct)
+                                const recargoPart = typeof entry.recargoParticularPct === 'number' ? entry.recargoParticularPct : 30
+                                const precioParticular = calcPrecioParticular(entry.precio, recargoPart)
                                 return (
                                     <tr key={item.key}>
                                         <td>
                                             <div className="name-cell">
                                                 <span className="name">{item.label}</span>
-                                                <span className="sub" style={{ fontFamily: 'monospace', fontSize: '10px' }}>{item.key}</span>
+                                                <span className="sub" style={{ fontFamily: 'monospace', fontSize: '10px' }}>{item.key} · {item.unit}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -219,7 +280,7 @@ export default function TarifasXignuxView() {
                                                     type="number"
                                                     step="0.01"
                                                     className="input-field sm"
-                                                    style={{ maxWidth: '130px', padding: '6px 8px', fontFamily: 'monospace', fontSize: '13px' }}
+                                                    style={{ maxWidth: '115px', padding: '6px 8px', fontFamily: 'monospace', fontSize: '13px' }}
                                                     value={entry.precio}
                                                     onChange={(e) => handlePrecioChange(item.key, e.target.value)}
                                                 />
@@ -231,9 +292,37 @@ export default function TarifasXignuxView() {
                                                     type="number"
                                                     step="1"
                                                     min="0"
+                                                    max="300"
+                                                    className="input-field sm"
+                                                    style={{ maxWidth: '60px', padding: '6px 8px', fontFamily: 'monospace', fontSize: '13px', borderColor: 'rgba(234, 179, 8, 0.4)' }}
+                                                    value={recargoPart}
+                                                    onChange={(e) => handleRecargoParticularChange(item.key, e.target.value)}
+                                                />
+                                                <span style={{ color: '#eab308', fontSize: '12px' }}>%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                fontFamily: 'monospace',
+                                                fontSize: '13px',
+                                                color: '#eab308',
+                                                fontWeight: 700
+                                            }}>
+                                                ${precioParticular.toLocaleString('es-AR')}
+                                            </span>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                                                {item.unit}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <input
+                                                    type="number"
+                                                    step="1"
+                                                    min="0"
                                                     max="100"
                                                     className="input-field sm"
-                                                    style={{ maxWidth: '70px', padding: '6px 8px', fontFamily: 'monospace', fontSize: '13px' }}
+                                                    style={{ maxWidth: '60px', padding: '6px 8px', fontFamily: 'monospace', fontSize: '13px' }}
                                                     value={entry.rebajaMaxPct}
                                                     onChange={(e) => handleRebajaChange(item.key, e.target.value)}
                                                 />
@@ -253,9 +342,6 @@ export default function TarifasXignuxView() {
                                             ) : (
                                                 <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Sin límite</span>
                                             )}
-                                        </td>
-                                        <td>
-                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.unit}</span>
                                         </td>
                                     </tr>
                                 )
