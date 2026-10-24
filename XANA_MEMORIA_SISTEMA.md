@@ -319,6 +319,11 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 
 - **11/10/2026 - Cartel DEN V2.0 (taller pixel art)**: el cartel `sign_den` del taller (`workshopSprites.ts`) ahora dice "DEN V2.0" (evolución del print anterior); sprite ensanchado de 46 a 56 px y reposicionado en `WorkshopCanvasPixi.tsx` (x=212) para mantenerlo centrado.
 
+### Arcade (24/10/2026): Tetris, Arkanoid y flujo común de juegos
+- Nuevos juegos `TetrisGame.tsx` y `ArkanoidGame.tsx` en `src/components/arcade/games/` (canvas 2D, sin dependencias).
+- Nuevo `arcade/GameShell.tsx`: envuelve a TODOS los juegos con pantalla de instrucciones, inicio, pausa (P/Esc, auto-pausa al perder foco), game over con reinicio y volver a la galería. Intercepta teclas de juego en fase de captura (evita scroll de la página) y congela las teclas mientras está en pausa.
+- Los 6 juegos existentes reciben `pauseRef` (`if (!pauseRef?.current) update()`). El callback `onGameOver` es ahora estable y se reporta una sola vez (antes podía guardar puntajes duplicados y reiniciar el efecto del juego en cada render del modal).
+- Pendiente: no se rediseñó la jugabilidad interna de Pac-Man/Galaga/etc. (ver bugs de lógica propios en cada archivo); verificación visual manual recomendada.
 ## 7. 🚀 Guía Rápida para Continuar en Cualquier Otro IDE / Máquina
 
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:

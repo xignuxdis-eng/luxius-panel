@@ -9,6 +9,9 @@ import { GalagaGame } from './games/GalagaGame'
 import { BombermanGame } from './games/BombermanGame'
 import { DiggerGame } from './games/DiggerGame'
 import { DonkeyKongGame } from './games/DonkeyKongGame'
+import { TetrisGame } from './games/TetrisGame'
+import { ArkanoidGame } from './games/ArkanoidGame'
+import { GameShell } from './GameShell'
 
 interface ArcadeModalProps {
     isOpen: boolean
@@ -22,15 +25,35 @@ interface GameInfo {
     year: string
     genre: string
     color: string
+    objective: string
+    controls: string[]
 }
 
 const GAMES: GameInfo[] = [
-    { id: 'pacman', name: 'Pac-Man', icon: '🟡', year: '1980', genre: 'Maze / Action', color: '#ffc700' },
-    { id: 'spaceinvaders', name: 'Space Invaders', icon: '👾', year: '1978', genre: 'Space Shooter', color: '#00f0ff' },
-    { id: 'galaga', name: 'Galaga', icon: '🚀', year: '1981', genre: 'Space Shooter', color: '#ff2a8d' },
-    { id: 'bomberman', name: 'Bomberman', icon: '💣', year: '1983', genre: 'Action / Maze', color: '#ff7700' },
-    { id: 'digger', name: 'Digger / Dig Dug', icon: '⛏️', year: '1982', genre: 'Digging / Action', color: '#00e676' },
-    { id: 'donkeykong', name: 'Donkey Kong', icon: '🦍', year: '1981', genre: 'Platformer', color: '#3d5afe' },
+    { id: 'tetris', name: 'Tetris', icon: '🧱', year: '1984', genre: 'Puzzle', color: '#b44bff',
+        objective: 'Encaja las piezas para completar líneas. Cada 10 líneas sube el nivel y la velocidad.',
+        controls: ['← → / A D: mover', '↑ / W / X: girar · Z: girar inverso', '↓ / S: bajar rápido', 'Espacio: caída instantánea'] },
+    { id: 'arkanoid', name: 'Arkanoid', icon: '🏓', year: '1986', genre: 'Breakout', color: '#00f0ff',
+        objective: 'Rompe todos los ladrillos con la bola. Atrapa cápsulas: W ancha, M multibola, S lenta, ♥ vida.',
+        controls: ['← → / A D o mouse: mover la pala', 'Espacio / click: lanzar la bola'] },
+    { id: 'pacman', name: 'Pac-Man', icon: '🟡', year: '1980', genre: 'Maze / Action', color: '#ffc700',
+        objective: 'Come todos los puntos del laberinto y evita a los fantasmas.',
+        controls: ['Flechas / WASD: mover'] },
+    { id: 'spaceinvaders', name: 'Space Invaders', icon: '👾', year: '1978', genre: 'Space Shooter', color: '#00f0ff',
+        objective: 'Destruye a los invasores antes de que lleguen abajo.',
+        controls: ['← → / A D: mover', 'Espacio / ↑ / W: disparar'] },
+    { id: 'galaga', name: 'Galaga', icon: '🚀', year: '1981', genre: 'Space Shooter', color: '#ff2a8d',
+        objective: 'Elimina la formación enemiga y esquiva los ataques en picada.',
+        controls: ['← → / A D: mover', 'Espacio / ↑: disparar'] },
+    { id: 'bomberman', name: 'Bomberman', icon: '💣', year: '1983', genre: 'Action / Maze', color: '#ff7700',
+        objective: 'Coloca bombas para abrir camino y eliminar enemigos sin quedar en la explosión.',
+        controls: ['Flechas / WASD: mover', 'Espacio / B: poner bomba'] },
+    { id: 'digger', name: 'Digger / Dig Dug', icon: '⛏️', year: '1982', genre: 'Digging / Action', color: '#00e676',
+        objective: 'Cava túneles, recoge tesoros y evita o derrota a los enemigos.',
+        controls: ['Flechas / WASD: mover y cavar', 'Espacio / F: disparar'] },
+    { id: 'donkeykong', name: 'Donkey Kong', icon: '🦍', year: '1981', genre: 'Platformer', color: '#3d5afe',
+        objective: 'Sube por las plataformas esquivando barriles hasta llegar arriba.',
+        controls: ['← → / A D: mover', '↑ ↓ / W S: escaleras', 'Espacio: saltar'] },
 ]
 
 export const ArcadeModal: React.FC<ArcadeModalProps> = ({ isOpen, onClose }) => {
@@ -51,7 +74,7 @@ export const ArcadeModal: React.FC<ArcadeModalProps> = ({ isOpen, onClose }) => 
         const isSaved = saveHighScore(selectedGame.id, selectedGame.name, username, name, score, level)
         if (isSaved) {
             setScores(getHighScores())
-            setLastScoreNotice(`🏆 ¡NUEVO RÉCORD REGISTRADO! ${name}: ${score} pts en ${selectedGame.name}!`)
+            setLastScoreNotice(`🏆 Puntaje registrado: ${name} — ${score} pts en ${selectedGame.name}`)
         }
     }
 
@@ -148,16 +171,30 @@ export const ArcadeModal: React.FC<ArcadeModalProps> = ({ isOpen, onClose }) => 
                             </span>
                         </div>
 
-                        {selectedGame.id === 'pacman' && <PacmanGame username={user?.username || 'guest'} name={user?.name || 'Operario'} onGameOver={handleGameOver} />}
-                        {selectedGame.id === 'spaceinvaders' && <SpaceInvadersGame username={user?.username || 'guest'} name={user?.name || 'Operario'} onGameOver={handleGameOver} />}
-                        {selectedGame.id === 'galaga' && <GalagaGame username={user?.username || 'guest'} name={user?.name || 'Operario'} onGameOver={handleGameOver} />}
-                        {selectedGame.id === 'bomberman' && <BombermanGame username={user?.username || 'guest'} name={user?.name || 'Operario'} onGameOver={handleGameOver} />}
-                        {selectedGame.id === 'digger' && <DiggerGame username={user?.username || 'guest'} name={user?.name || 'Operario'} onGameOver={handleGameOver} />}
-                        {selectedGame.id === 'donkeykong' && <DonkeyKongGame username={user?.username || 'guest'} name={user?.name || 'Operario'} onGameOver={handleGameOver} />}
-
-                        <div style={{ fontFamily: 'var(--font-pixel-body)', fontSize: '12px', color: 'var(--pixel-text-dim)', textAlign: 'center' }}>
-                            🎮 Controles: Flechas o WASD para mover | Barra espaciadora para disparar / bomba / saltar.
-                        </div>
+                        <GameShell
+                            key={selectedGame.id}
+                            title={selectedGame.name}
+                            color={selectedGame.color}
+                            objective={selectedGame.objective}
+                            controls={selectedGame.controls}
+                            onBack={() => setSelectedGame(null)}
+                            onGameOver={handleGameOver}
+                        >
+                            {({ onGameOver, pauseRef }) => {
+                                const common = { username: user?.username || 'guest', name: user?.name || 'Operario', onGameOver, pauseRef }
+                                switch (selectedGame.id) {
+                                    case 'tetris': return <TetrisGame {...common} />
+                                    case 'arkanoid': return <ArkanoidGame {...common} />
+                                    case 'pacman': return <PacmanGame {...common} />
+                                    case 'spaceinvaders': return <SpaceInvadersGame {...common} />
+                                    case 'galaga': return <GalagaGame {...common} />
+                                    case 'bomberman': return <BombermanGame {...common} />
+                                    case 'digger': return <DiggerGame {...common} />
+                                    case 'donkeykong': return <DonkeyKongGame {...common} />
+                                    default: return null
+                                }
+                            }}
+                        </GameShell>
                     </div>
                 )}
 

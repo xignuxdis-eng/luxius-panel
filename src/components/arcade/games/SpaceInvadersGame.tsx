@@ -4,9 +4,10 @@ interface GameProps {
     username: string
     name: string
     onGameOver: (score: number, level: number) => void
+    pauseRef?: React.MutableRefObject<boolean>
 }
 
-export const SpaceInvadersGame: React.FC<GameProps> = ({ username: _username, name: _name, onGameOver }) => {
+export const SpaceInvadersGame: React.FC<GameProps> = ({ username: _username, name: _name, onGameOver, pauseRef }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const [score, setScore] = useState(0)
     const [lives, setLives] = useState(3)
@@ -256,7 +257,7 @@ export const SpaceInvadersGame: React.FC<GameProps> = ({ username: _username, na
         }
 
         const loop = () => {
-            update()
+            if (!pauseRef?.current) update()
             draw()
             animationFrameId = requestAnimationFrame(loop)
         }
