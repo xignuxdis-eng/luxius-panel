@@ -579,3 +579,161 @@ export function deleteCalidad(id: number) {
 export function getCalidadById(id: number): Calidad | undefined {
     return getCalidades().find(c => c.id === id);
 }
+
+/**
+ * Deduce automáticamente el stock correspondiente a una orden (impreso / entregado).
+ * Soporta cálculo por mL (metros lineales de bobina) o por m² según tipoCobro.
+ */
+export function deductStockForOrder(order: {
+    id?: number | string;
+    ot?: string;
+    material?: string;
+    ancho?: number;
+    alto?: number;
+    copias?: number;
+    status?: string;
+    stockDescontado?: boolean;
+}, trigger: 'impreso' | 'entregado' | 'auto' = 'impreso'): boolean {
+    if (!order || order.stockDescontado) return false;
+    if (!order.material) return false;
+
+    const matName = String(order.material).trim().toLowerCase();
+    const materiales = getMateriales();
+
+    // 1. Buscar coincidencia exacta o por descripción / código
+    const mat = materiales.find(m =>
+        (m.descripcion && m.descripcion.trim().toLowerCase() === matName) ||
+        (m.codigo && m.codigo.trim().toLowerCase() === matName) ||
+        (m.descripcion && matName.includes(m.descripcion.trim().toLowerCase())) ||
+        (m.codigo && matName.includes(m.codigo.trim().toLowerCase()))
+    );
+
+    if (!mat) {
+        console.warn(`[stock] No se encontró material coincidente para "${order.material}" en orden #${order.ot || order.id}`);
+        return false;
+    }
+
+    const rawW = Number(order.ancho) || 1.0;
+    const rawH = Number(order.alto) || 1.0;
+    const realW = rawW > 20 ? rawW / 100 : rawW;
+    const realH = rawH > 20 ? rawH / 100 : rawH;
+    const copias = Math.max(1, Number(order.copias) || 1);
+
+    const m2Total = Number((realW * realH * copias).toFixed(2));
+    const mlTotal = Number((Math.max(realW, realH) * copias).toFixed(2));
+
+    // Determinar cantidad a descontar:
+    // Si el material tiene bobinas o se cobra por mL, descontamos metros lineales; si no, m2.
+    const isMl = mat.tipoCobro === 'ml' || (mat.bobinas && mat.bobinas.length > 0);
+    const cantidadADescontar = isMl ? mlTotal : m2Total;
+    const unidadStr = isMl ? 'mL' : 'm²';
+
+    const stockPrev = mat.stockActual || 0;
+    const stockNuevo = Math.max(0, Number((stockPrev - cantidadADescontar).toFixed(2)));
+
+    // Si tiene bobinas, intentar descontar de la bobina con ancho más cercano
+    let bobinasActualizadas = mat.bobinas;
+    let bobinaDesc = '';
+    if (mat.bobinas && mat.bobinas.length > 0) {
+        const orderWidth = Math.min(realW, realH);
+        // Buscar bobina cuyo ancho sea >= ancho del trabajo
+        let targetBobina = mat.bobinas
+            .filter(b => Number(b.ancho) >= orderWidth - 0.05)
+            .sort((a, b) => Number(a.ancho) - Number(b.ancho))[0];
+
+        if (!targetBobina) {
+            targetBobina = mat.bobinas[0];
+        }
+
+        if (targetBobina) {
+            bobinaDesc = ` (Bobina ${targetBobina.ancho}m)`;
+            const bStockPrev = targetBobina.stockActual ?? 0;
+            const bStockNuevo = Math.max(0, Number((bStockPrev - cantidadADescontar).toFixed(2)));
+            bobinasActualizadas = mat.bobinas.map(b =>
+                b === targetBobina ? { ...b, stockActual: bStockNuevo } : b
+            );
+        }
+    }
+
+    // Actualizar material
+    saveMaterial({
+        ...mat,
+        stockActual: stockNuevo,
+        bobinas: bobinasActualizadas
+    });
+
+    // Registrar auditoría de movimiento
+    saveMovimientoStock({
+        materialId: mat.id,
+        materialCodigo: mat.codigo,
+        materialDescripcion: `${mat.descripcion}${bobinaDesc}`,
+        tipo: 'egreso',
+        cantidad: cantidadADescontar,
+        stockAnterior: stockPrev,
+        stockNuevo: stockNuevo,
+        usuario: `Taller (Auto: ${trigger.toUpperCase()})`
+    });
+
+    console.log(`[stock] Descontado automático: ${cantidadADescontar} ${unidadStr} de "${mat.descripcion}" para OT #${order.ot || order.id}. Stock resultante: ${stockNuevo}`);
+    return true;
+}
+
+/**
+ * Reembolsa o revierte el stock si una orden previamente descontada es rebotada o cancelada.
+ */
+export function revertStockForOrder(order: {
+    id?: number | string;
+    ot?: string;
+    material?: string;
+    ancho?: number;
+    alto?: number;
+    copias?: number;
+    stockDescontado?: boolean;
+}): boolean {
+    if (!order || !order.stockDescontado) return false;
+    if (!order.material) return false;
+
+    const matName = String(order.material).trim().toLowerCase();
+    const materiales = getMateriales();
+
+    const mat = materiales.find(m =>
+        (m.descripcion && m.descripcion.trim().toLowerCase() === matName) ||
+        (m.codigo && m.codigo.trim().toLowerCase() === matName) ||
+        (m.descripcion && matName.includes(m.descripcion.trim().toLowerCase()))
+    );
+
+    if (!mat) return false;
+
+    const rawW = Number(order.ancho) || 1.0;
+    const rawH = Number(order.alto) || 1.0;
+    const realW = rawW > 20 ? rawW / 100 : rawW;
+    const realH = rawH > 20 ? rawH / 100 : rawH;
+    const copias = Math.max(1, Number(order.copias) || 1);
+
+    const isMl = mat.tipoCobro === 'ml' || (mat.bobinas && mat.bobinas.length > 0);
+    const m2Total = Number((realW * realH * copias).toFixed(2));
+    const mlTotal = Number((Math.max(realW, realH) * copias).toFixed(2));
+    const cantidadARevertir = isMl ? mlTotal : m2Total;
+
+    const stockPrev = mat.stockActual || 0;
+    const stockNuevo = Number((stockPrev + cantidadARevertir).toFixed(2));
+
+    saveMaterial({
+        ...mat,
+        stockActual: stockNuevo
+    });
+
+    saveMovimientoStock({
+        materialId: mat.id,
+        materialCodigo: mat.codigo,
+        materialDescripcion: `${mat.descripcion} [REVERSIÓN]`,
+        tipo: 'ingreso',
+        cantidad: cantidadARevertir,
+        stockAnterior: stockPrev,
+        stockNuevo: stockNuevo,
+        usuario: 'Taller (Reversión OT)'
+    });
+
+    return true;
+}
+

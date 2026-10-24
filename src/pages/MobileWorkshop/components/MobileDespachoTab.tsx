@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Order, Cliente } from '@/types'
+import { deductStockForOrder } from '@data/db'
 import {
     PackageCheck,
     Truck,
@@ -77,10 +78,16 @@ export const MobileDespachoTab: React.FC<MobileDespachoTabProps> = ({
     // Update to 'entregado'
     const handleSetDelivered = async (order: Order) => {
         try {
+            let stockDescontado = order.stockDescontado || false
+            if (!stockDescontado) {
+                stockDescontado = deductStockForOrder(order, 'entregado')
+            }
+
             await onSaveOrder({
                 id: order.id,
                 ot: order.ot,
                 status: 'entregado',
+                stockDescontado,
                 observaciones: `${order.observaciones || ''}\n[Entregado al cliente el ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR')}]`.trim()
             })
             alert(`¡Orden ${order.ot || order.id} registrada como entregada!`)

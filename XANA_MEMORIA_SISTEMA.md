@@ -1802,6 +1802,48 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Verificación Automatizada**:
     - Tests en Vitest (`suitecraft.test.ts`) actualizados para verificar registro de herramientas, badges (`RÁSTER` / `VECTOR`), resolución de URLs locales (`getSuitecraftToolUrl`) y protocolo Live URL.
 
+- **Galería Arcade: Incorporación de Tetris & Arkanoid y Motor Físico 60Hz (24/10/2026)**:
+  - **Nuevos Juegos Implementados**:
+    - `TetrisGame.tsx`: Sistema SRS completo con matriz 10x20, 7 tetrominós con colores canónicos, wall-kicks, rotación bidireccional, soft/hard drop, ghost piece (sombra de caída), retención de pieza (HOLD), puntuación estándar por líneas (single, double, triple, tetris), niveles progresivos y aumento de velocidad.
+    - `ArkanoidGame.tsx`: Simulación completa de Vaus con 4 niveles prediseñados, rebote dinámico en la paleta según punto de impacto, física de ángulos clamp, bloques multicolor con vidas, y 5 power-ups (Láser, Pegamento, Expansión, Multibola, Vida Extra).
+  - **Unificación y Reingeniería de Físicas a 60 Hz (`GameShell.tsx`)**:
+    - Reemplazo de timers heterogéneos y desincronizados por un bucle de simulación a paso fijo (60Hz fixed timestep accumulator con `requestAnimationFrame`).
+    - Donkey Kong: Física de salto rediseñada con gravedad constante, coyote time (100ms), jump buffering (120ms), supresión de saltos infinitos en aire y bonificación de puntos al saltar barriles rodantes.
+    - Pac-Man: Detección predictiva de esquinas (cornering pre-turn) y estados de fantasmas (Chase / Scatter / Frightened) con retorno al nido al ser comidos.
+    - Bomberman: Deslizamiento automático en esquinas de bloques para evitar atascos y reacciones en cadena de bombas.
+    - Digger: Movimiento encarrilado en túneles excavados y navegación de fantasmas hacia el jugador mediante algoritmo BFS (Breadth-First Search).
+
+- **Deducción Automática de Stock en Impresión y Entrega con Reversión (24/10/2026)**:
+  - **Problema detectado**: El stock de materiales y bobinas no se descontaba de forma automática al completar la impresión o realizar la entrega de pedidos, requiriendo intervención manual y provocando desfases en el inventario.
+  - **Solución implementada**:
+    - `src/types/orden.ts`: Agregado flag `stockDescontado?: boolean` en la interfaz `Order` para prevenir descuentos dobles o repetidos.
+    - `src/data/db/inventory.db.ts`: Creadas las funciones maestras `deductStockForOrder(order, trigger)` y `revertStockForOrder(order)`:
+      - Calcula con exactitud el consumo según el tipo de cobro del material (`m²` vs `ml`).
+      - Si el material tiene bobinas configuradas, descuenta los metros lineales consumidos de la bobina específica asignada en la OT.
+      - Descuenta el total de `stockActual` del material y registra el asiento formal en `MovimientoStock` (`egreso` al descontar, `ingreso` al revertir).
+      - Dispara el evento reactivo `luxius-materials-updated` para refrescar inventario en toda la UI.
+    - `src/pages/Impresion/Impresion.tsx`: `handleMarkAsPrinted` descuenta el stock automáticamente al marcar una orden como `impreso`; `handleRevert` y `handleBounce` revierten la deducción de inmediato.
+    - `src/components/workshop/WorkshopDashboard.tsx`: Al cambiar el estado a `impreso` o `entregado`, deduce el stock si no fue descontado previamente; al rebotar o devolver a diseño, revierte la deducción.
+    - `src/pages/MobileWorkshop/components/MobileDespachoTab.tsx`: Al marcar como entregado en la app móvil del taller, valida y descuenta el stock pendiente.
+
+- **LuXius Printer Monitor V2.5: Telemetría en Vivo de Roland VersaWorks y Despliegue en PC de Impresora (24/10/2026)**:
+  - **Módulo Cliente en PC de Impresora (`F:\Backup sistema Imprima\Xignux Monitor\`)**:
+    - `core/cloud_sync.py`: Cliente de sincronización en segundo plano con cola de eventos resiliente a cortes de red e hilo de Heartbeat cada 45 segundos para reportar estado `ONLINE`.
+    - `core/config.py`: Agregados parámetros de configuración `cloud_sync_enabled`, `cloud_api_url`, `machine_id` y `machine_name`.
+    - `main.py`: Integración del cliente en vivo, pestaña de configuración con switch de transmisión en tiempo real y selector de impresora.
+    - **Paquete de Instalación en 1 Clic**:
+      - `install_luxius_monitor.bat`: Verificación automática de Python, instalación de dependencias (`customtkinter`, `pystray`, `pillow`), creación de acceso directo en el Escritorio y registro en Inicio Automático de Windows (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`).
+      - `start_silent.vbs`: Lanzador silencioso en segundo plano sin ventana de consola negra, ejecutando directamente a la bandeja del sistema (System Tray).
+      - `README_INSTALACION.md`: Manual operativo para instalar en la PC de taller.
+  - **Backend API (`luXius-Backend/routes/printer.py`)**:
+    - Blueprint `printer_bp` registrado en `/api/printer`.
+    - `POST /api/printer/telemetry`: Recibe eventos en tiempo real (Heartbeats, inicio de impresión, fin `SUCCESS`, errores `dwErrorCode`), almacena telemetría en `ConfigGlobal` con buffer circular de los últimos 50 eventos y asocia automáticamente con OTs activas por nombre de archivo, actualizando telemetría y estado.
+    - `GET /api/printer/status`: Reporta el estado operativo de todas las impresoras (Online, Offline, Imprimiendo, Error, En Espera), último trabajo impreso, m², tiempo neto y consumo de tintas Cyan, Magenta, Yellow y Black en nanolitros/mililitros.
+  - **Frontend Live HUD (`src/pages/Impresion/Impresion.tsx` y `Impresion.css`)**:
+    - Polling continuo cada 4 segundos a `/api/printer/status`.
+    - Tarjeta viva de Roland VersaWorks con indicador visual de presencia online (pulso verde neón), estado de máquina, trabajo en curso o último trabajo completado.
+    - Modal de Telemetría en Vivo `📡 Log en Vivo`: Permite a los operarios inspeccionar la lista completa de trabajos procesados por el RIP, dimensiones, velocidad efectiva en m²/h y consumo exacto de tinta por color.
+
 ---
 
 

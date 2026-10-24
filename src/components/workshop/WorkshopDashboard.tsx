@@ -1,6 +1,6 @@
 // WorkshopDashboard.tsx - Main Gamified Workshop View for Luxius
 import React, { useState, useEffect } from 'react';
-import { getOrdenes, saveOrden } from '@/data/db';
+import { getOrdenes, saveOrden, deductStockForOrder, revertStockForOrder } from '@/data/db';
 import { Order, OrderStatus } from '@/types/orden';
 import { WorkshopCanvas } from './WorkshopCanvas';
 import { WorkshopCanvasPixi } from './WorkshopCanvasPixi';
@@ -89,9 +89,22 @@ export const WorkshopDashboard: React.FC = () => {
             const targetOrder = orders.find(o => o.id === orderId);
             if (!targetOrder) return;
 
-            const updated = {
+            let stockDescontado = targetOrder.stockDescontado || false;
+
+            // 1. Si pasa a impreso o entregado y no estaba descontado, descontamos
+            if ((newStatus === 'impreso' || newStatus === 'entregado') && !stockDescontado) {
+                stockDescontado = deductStockForOrder(targetOrder, newStatus);
+            }
+            // 2. Si se cancela o rebota y ya estaba descontado, revertimos
+            else if ((newStatus === 'rebotado' || newStatus === 'anulado' || newStatus === 'diseno' || newStatus === 'preorden') && stockDescontado) {
+                revertStockForOrder(targetOrder);
+                stockDescontado = false;
+            }
+
+            const updated: Order = {
                 ...targetOrder,
                 status: newStatus,
+                stockDescontado,
                 updatedAt: new Date().toISOString()
             };
 

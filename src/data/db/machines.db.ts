@@ -89,3 +89,43 @@ export function deleteMaquina(id: number) {
     localStorage.setItem(SESSION_MAQUINAS_KEY, JSON.stringify(sessionItems));
     syncDelete('maquinas', id);
 }
+
+export interface PrinterLiveEvent {
+    job_name: string;
+    event_type: string;
+    size_str: string;
+    area_m2: number;
+    ink_ml: string;
+    speed_str: string;
+    time_str: string;
+    error_code: string;
+    timestamp: string;
+}
+
+export interface PrinterLiveStatus {
+    machine_id: string;
+    machine_name: string;
+    status: 'online' | 'offline' | 'printing' | 'error' | 'idle' | 'ready';
+    is_online: boolean;
+    last_seen: string | null;
+    current_job: PrinterLiveEvent | null;
+    last_completed_job?: PrinterLiveEvent | null;
+    recent_events: PrinterLiveEvent[];
+}
+
+import { API_URL, fetchWithTimeout } from './client';
+
+export async function fetchPrinterLiveStatus(): Promise<PrinterLiveStatus[]> {
+    try {
+        const res = await fetchWithTimeout(`${API_URL}/printer/status`, {}, 8000);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.ok && Array.isArray(data.printers)) {
+                return data.printers;
+            }
+        }
+    } catch {
+        // Silencioso si no hay conexión o offline
+    }
+    return [];
+}

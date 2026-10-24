@@ -87,6 +87,7 @@ export interface Order {
     // Logistics
     envio: string
     emergencia: boolean
+    stockDescontado?: boolean // Bandera para deducción automática en stock (impreso / entregado)
 
     // Dates
     fechaCreacion: string
