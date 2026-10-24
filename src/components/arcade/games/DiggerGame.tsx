@@ -48,17 +48,59 @@ export const DiggerGame: React.FC<GameProps> = ({ username: _username, name: _na
         const digger = { x: TILE_SIZE + 5, y: TILE_SIZE + 5, size: 26, dir: 'right', speed: 3.2 }
         let beam: { x: number; y: number; dx: number; dy: number; timer: number } | null = null
         
-        let enemies = [
-            { x: 5 * TILE_SIZE + 5, y: 5 * TILE_SIZE + 5, speed: 1.5, alive: true },
-            { x: 9 * TILE_SIZE + 5, y: 8 * TILE_SIZE + 5, speed: 1.5, alive: true },
-            { x: 2 * TILE_SIZE + 5, y: 9 * TILE_SIZE + 5, speed: 1.5, alive: true }
+        interface Enemy {
+            x: number; y: number; speed: number; alive: boolean
+            tr: number; tc: number // tile the enemy currently occupies
+            ntr: number; ntc: number; moving: boolean; digging: boolean
+        }
+        const makeEnemy = (c: number, r: number, speed: number): Enemy => ({
+            x: c * TILE_SIZE + 5, y: r * TILE_SIZE + 5, speed, alive: true,
+            tr: r, tc: c, ntr: r, ntc: c, moving: false, digging: false
+        })
+        let enemies: Enemy[] = [
+            makeEnemy(5, 5, 1.5),
+            makeEnemy(9, 8, 1.5),
+            makeEnemy(2, 9, 1.5)
         ]
+        enemies.forEach(e => { map[e.tr][e.tc] = 0 }) // spawn pockets are open
+
+        // BFS over dug tunnels: returns the first step towards the goal tile, or null if unreachable
+        const pathStep = (sr: number, sc: number, gr: number, gc: number): { r: number; c: number } | null => {
+            if (sr === gr && sc === gc) return null
+            const prev = new Map<number, number>()
+            const key = (r: number, c: number) => r * GRID_SIZE + c
+            const queue: [number, number][] = [[sr, sc]]
+            prev.set(key(sr, sc), -1)
+            while (queue.length) {
+                const [r, c] = queue.shift() as [number, number]
+                if (r === gr && c === gc) {
+                    let k = key(r, c)
+                    while (prev.get(k) !== key(sr, sc)) k = prev.get(k) as number
+                    return { r: Math.floor(k / GRID_SIZE), c: k % GRID_SIZE }
+                }
+                for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    const nr = r + dr, nc = c + dc
+                    if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE || prev.has(key(nr, nc))) continue
+                    if (map[nr][nc] !== 0 && !(nr === gr && nc === gc)) continue
+                    prev.set(key(nr, nc), key(r, c))
+                    queue.push([nr, nc])
+                }
+            }
+            return null
+        }
 
         const keys: Record<string, boolean> = {}
+        // Most recently pressed direction wins, so diagonals never happen and turning feels instant.
+        const DIR_KEYS: Record<string, 'left' | 'right' | 'up' | 'down'> = {
+            ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
+            ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down'
+        }
+        let dirStack: string[] = []
 
         const handleKeyDown = (e: KeyboardEvent) => {
             keys[e.code] = true
-            if ((e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyK') && !beam) {
+            if (DIR_KEYS[e.code] && !dirStack.includes(e.code)) dirStack.push(e.code)
+            if ((e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyK') && !beam && !e.repeat) {
                 let dx = 0, dy = 0
                 if (digger.dir === 'left') dx = -9
                 if (digger.dir === 'right') dx = 9
@@ -70,6 +112,7 @@ export const DiggerGame: React.FC<GameProps> = ({ username: _username, name: _na
 
         const handleKeyUp = (e: KeyboardEvent) => {
             keys[e.code] = false
+            dirStack = dirStack.filter(k => k !== e.code)
         }
 
         window.addEventListener('keydown', handleKeyDown)
@@ -80,14 +123,18 @@ export const DiggerGame: React.FC<GameProps> = ({ username: _username, name: _na
 
             if (invulnerableTimer > 0) invulnerableTimer--
 
-            // Move Digger
+            // Move Digger along one axis; the other axis eases onto the tunnel lane centre
             let nextX = digger.x
             let nextY = digger.y
+            const active = dirStack.length ? DIR_KEYS[dirStack[dirStack.length - 1]] : null
+            const laneX = (Math.floor((digger.x + 13) / TILE_SIZE)) * TILE_SIZE + 5
+            const laneY = (Math.floor((digger.y + 13) / TILE_SIZE)) * TILE_SIZE + 5
+            const ease = (cur: number, target: number) => cur + Math.sign(target - cur) * Math.min(Math.abs(target - cur), digger.speed)
 
-            if (keys['ArrowLeft'] || keys['KeyA']) { nextX -= digger.speed; digger.dir = 'left' }
-            if (keys['ArrowRight'] || keys['KeyD']) { nextX += digger.speed; digger.dir = 'right' }
-            if (keys['ArrowUp'] || keys['KeyW']) { nextY -= digger.speed; digger.dir = 'up' }
-            if (keys['ArrowDown'] || keys['KeyS']) { nextY += digger.speed; digger.dir = 'down' }
+            if (active === 'left') { nextX -= digger.speed; nextY = ease(digger.y, laneY); digger.dir = 'left' }
+            else if (active === 'right') { nextX += digger.speed; nextY = ease(digger.y, laneY); digger.dir = 'right' }
+            else if (active === 'up') { nextY -= digger.speed; nextX = ease(digger.x, laneX); digger.dir = 'up' }
+            else if (active === 'down') { nextY += digger.speed; nextX = ease(digger.x, laneX); digger.dir = 'down' }
 
             digger.x = Math.max(5, Math.min(canvas.width - TILE_SIZE + 5, nextX))
             digger.y = Math.max(5, Math.min(canvas.height - TILE_SIZE + 5, nextY))
@@ -140,21 +187,48 @@ export const DiggerGame: React.FC<GameProps> = ({ username: _username, name: _na
                 digger.x = TILE_SIZE + 5
                 digger.y = TILE_SIZE + 5
                 enemies = [
-                    { x: 5 * TILE_SIZE + 5, y: 5 * TILE_SIZE + 5, speed: 1.5 + localStage * 0.2, alive: true },
-                    { x: 9 * TILE_SIZE + 5, y: 8 * TILE_SIZE + 5, speed: 1.5 + localStage * 0.2, alive: true },
-                    { x: 2 * TILE_SIZE + 5, y: 9 * TILE_SIZE + 5, speed: 1.5 + localStage * 0.2, alive: true }
+                    makeEnemy(5, 5, 1.5 + localStage * 0.2),
+                    makeEnemy(9, 8, 1.5 + localStage * 0.2),
+                    makeEnemy(2, 9, 1.5 + localStage * 0.2)
                 ]
+                enemies.forEach(en => { map[en.tr][en.tc] = 0 })
                 invulnerableTimer = 60
                 return
             }
 
             // Update Enemies safely
             aliveEnemies.forEach(e => {
-                // Seek player
-                if (e.x < digger.x) e.x += e.speed
-                if (e.x > digger.x) e.x -= e.speed
-                if (e.y < digger.y) e.y += e.speed
-                if (e.y > digger.y) e.y -= e.speed
+                // Tunnel-following chase: walk the dug tunnels towards the player; if the player is
+                // unreachable, tunnel through the dirt slowly (classic Dig Dug "ghost" behaviour).
+                if (!e.moving) {
+                    const gr = Math.min(GRID_SIZE - 1, Math.max(0, Math.floor((digger.y + 13) / TILE_SIZE)))
+                    const gc = Math.min(GRID_SIZE - 1, Math.max(0, Math.floor((digger.x + 13) / TILE_SIZE)))
+                    const step = pathStep(e.tr, e.tc, gr, gc)
+                    if (step) {
+                        e.ntr = step.r; e.ntc = step.c; e.digging = false; e.moving = true
+                    } else if (e.tr !== gr || e.tc !== gc) {
+                        const dr = gr - e.tr, dc = gc - e.tc
+                        const vertical = Math.abs(dr) > Math.abs(dc)
+                        e.ntr = e.tr + (vertical ? Math.sign(dr) : 0)
+                        e.ntc = e.tc + (vertical ? 0 : Math.sign(dc))
+                        e.digging = map[e.ntr][e.ntc] !== 0
+                        e.moving = true
+                    }
+                }
+                if (e.moving) {
+                    const spd = e.digging ? e.speed * 0.5 : e.speed
+                    const tx = e.ntc * TILE_SIZE + 5
+                    const ty = e.ntr * TILE_SIZE + 5
+                    const ddx = tx - e.x, ddy = ty - e.y
+                    const dist = Math.hypot(ddx, ddy)
+                    if (dist <= spd) {
+                        e.x = tx; e.y = ty; e.tr = e.ntr; e.tc = e.ntc; e.moving = false
+                        if (map[e.tr][e.tc] === 1) map[e.tr][e.tc] = 0
+                    } else {
+                        e.x += (ddx / dist) * spd
+                        e.y += (ddy / dist) * spd
+                    }
+                }
 
                 // Beam hits enemy
                 if (beam) {
@@ -236,13 +310,22 @@ export const DiggerGame: React.FC<GameProps> = ({ username: _username, name: _na
             })
         }
 
-        const loop = () => {
-            if (!pauseRef?.current) update()
+        // Fixed 60 Hz simulation step: game speed no longer depends on monitor refresh rate.
+        const STEP = 1000 / 60
+        let lastTs = 0
+        let acc = 0
+        const loop = (ts: number) => {
+            acc += lastTs ? Math.min(ts - lastTs, 100) : STEP
+            lastTs = ts
+            while (acc >= STEP) {
+                if (!pauseRef?.current) update()
+                acc -= STEP
+            }
             draw()
             animationFrameId = requestAnimationFrame(loop)
         }
 
-        loop()
+        animationFrameId = requestAnimationFrame(loop)
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown)

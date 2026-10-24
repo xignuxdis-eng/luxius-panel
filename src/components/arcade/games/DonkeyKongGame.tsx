@@ -60,18 +60,21 @@ export const DonkeyKongGame: React.FC<GameProps> = ({ username: _username, name:
 
         const keys: Record<string, boolean> = {}
 
+        // Jump feel helpers (frames at 60 Hz)
+        let jumpBuffer = 0 // key pressed slightly before landing still counts
+        let coyote = 0 // can still jump a few frames after leaving a ledge
+        const jumpedBarrels = new WeakSet<object>()
+        const isJumpKey = (code: string) => code === 'Space' || code === 'KeyK'
+
         const handleKeyDown = (e: KeyboardEvent) => {
             keys[e.code] = true
-            if (e.code === 'Space' || e.code === 'KeyK') {
-                if (!mario.isJumping && !mario.isClimbing) {
-                    mario.vy = -7.2
-                    mario.isJumping = true
-                }
-            }
+            if (isJumpKey(e.code) && !e.repeat) jumpBuffer = 7
         }
 
         const handleKeyUp = (e: KeyboardEvent) => {
             keys[e.code] = false
+            // Releasing early gives a short hop (variable jump height)
+            if (isJumpKey(e.code) && mario.vy < -2.6) mario.vy = -2.6
         }
 
         window.addEventListener('keydown', handleKeyDown)
@@ -129,21 +132,47 @@ export const DonkeyKongGame: React.FC<GameProps> = ({ username: _username, name:
                 mario.x += mario.vx
                 mario.x = Math.max(0, Math.min(canvas.width - mario.width, mario.x))
 
-                // Gravity & Falling
-                mario.vy += 0.38
+                // Gravity & Falling (terminal velocity prevents tunnelling through girders)
+                const prevBottom = mario.y + mario.height
+                mario.vy = Math.min(mario.vy + 0.38, 10)
                 mario.y += mario.vy
 
-                // Platform Collisions
+                // Platform Collisions: crossing the girder surface from above counts as landing
+                let grounded = false
                 for (const p of platforms) {
                     const cx = mario.x + mario.width / 2
                     if (cx >= p.x && cx <= p.x + p.w) {
                         const platY = getPlatformY(p, cx)
-                        if (mario.y + mario.height >= platY && mario.y + mario.height <= platY + 12 && mario.vy >= 0) {
+                        const bottom = mario.y + mario.height
+                        if (mario.vy >= 0 && prevBottom <= platY + 6 && bottom >= platY) {
                             mario.y = platY - mario.height
                             mario.vy = 0
                             mario.isJumping = false
+                            grounded = true
                             break
                         }
+                    }
+                }
+                coyote = grounded ? 6 : Math.max(0, coyote - 1)
+
+                if (jumpBuffer > 0 && coyote > 0) {
+                    mario.vy = -7.4
+                    mario.isJumping = true
+                    jumpBuffer = 0
+                    coyote = 0
+                }
+            }
+            if (jumpBuffer > 0) jumpBuffer--
+
+            // Bonus for leaping over a barrel
+            if (mario.isJumping) {
+                for (const b of barrels) {
+                    if (jumpedBarrels.has(b)) continue
+                    const bx = b.x - (mario.x + mario.width / 2)
+                    if (Math.abs(bx) < 10 && mario.y + mario.height < b.y - b.radius + 2 && mario.y + mario.height > b.y - b.radius - 40) {
+                        jumpedBarrels.add(b)
+                        localScore += 100
+                        setScore(localScore)
                     }
                 }
             }
@@ -297,13 +326,22 @@ export const DonkeyKongGame: React.FC<GameProps> = ({ username: _username, name:
             })
         }
 
-        const loop = () => {
-            if (!pauseRef?.current) update()
+        // Fixed 60 Hz simulation step: game speed no longer depends on monitor refresh rate.
+        const STEP = 1000 / 60
+        let lastTs = 0
+        let acc = 0
+        const loop = (ts: number) => {
+            acc += lastTs ? Math.min(ts - lastTs, 100) : STEP
+            lastTs = ts
+            while (acc >= STEP) {
+                if (!pauseRef?.current) update()
+                acc -= STEP
+            }
             draw()
             animationFrameId = requestAnimationFrame(loop)
         }
 
-        loop()
+        animationFrameId = requestAnimationFrame(loop)
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown)

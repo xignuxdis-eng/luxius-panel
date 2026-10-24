@@ -95,16 +95,43 @@ export const BombermanGame: React.FC<GameProps> = ({ username: _username, name: 
 
             if (invulnerableTimer > 0) invulnerableTimer--
 
-            // Move Player
-            let nextX = player.x
-            let nextY = player.y
-            if (keys['ArrowLeft'] || keys['KeyA']) nextX -= player.speed
-            if (keys['ArrowRight'] || keys['KeyD']) nextX += player.speed
-            if (keys['ArrowUp'] || keys['KeyW']) nextY -= player.speed
-            if (keys['ArrowDown'] || keys['KeyS']) nextY += player.speed
+            // Move player: one axis at a time. If a wall blocks us but we are only slightly out of
+            // line with the corridor, slide towards its centre (corner assist) instead of stopping dead.
+            const left = keys['ArrowLeft'] || keys['KeyA']
+            const right = keys['ArrowRight'] || keys['KeyD']
+            const up = keys['ArrowUp'] || keys['KeyW']
+            const down = keys['ArrowDown'] || keys['KeyS']
+            const dirX = (right ? 1 : 0) - (left ? 1 : 0)
+            const dirY = (down ? 1 : 0) - (up ? 1 : 0)
+            const half = player.size / 2
+            const assist = 12
 
-            if (canMoveTo(nextX, player.y)) player.x = nextX
-            if (canMoveTo(player.x, nextY)) player.y = nextY
+            if (dirX !== 0 && dirY === 0) {
+                const nx = player.x + dirX * player.speed
+                if (canMoveTo(nx, player.y)) player.x = nx
+                else {
+                    const target = (Math.floor((player.y + half) / TILE_SIZE) + 0.5) * TILE_SIZE - half
+                    const diff = target - player.y
+                    if (Math.abs(diff) <= assist && canMoveTo(player.x + dirX * player.speed, target)) {
+                        player.y += Math.sign(diff) * Math.min(Math.abs(diff), player.speed)
+                    }
+                }
+            } else if (dirY !== 0 && dirX === 0) {
+                const ny = player.y + dirY * player.speed
+                if (canMoveTo(player.x, ny)) player.y = ny
+                else {
+                    const target = (Math.floor((player.x + half) / TILE_SIZE) + 0.5) * TILE_SIZE - half
+                    const diff = target - player.x
+                    if (Math.abs(diff) <= assist && canMoveTo(target, player.y + dirY * player.speed)) {
+                        player.x += Math.sign(diff) * Math.min(Math.abs(diff), player.speed)
+                    }
+                }
+            } else if (dirX !== 0 && dirY !== 0) {
+                // Diagonal input: keep speed constant (no faster diagonal) and allow sliding on walls
+                const s = player.speed * Math.SQRT1_2
+                if (canMoveTo(player.x + dirX * s, player.y)) player.x += dirX * s
+                if (canMoveTo(player.x, player.y + dirY * s)) player.y += dirY * s
+            }
 
             // Collect Powerups
             const pr = Math.floor((player.y + player.size / 2) / TILE_SIZE)
@@ -139,6 +166,8 @@ export const BombermanGame: React.FC<GameProps> = ({ username: _username, name: 
                             if (map[tr][tc] === 1) break // Stop at solid wall
                             
                             explosions.push({ r: tr, c: tc, timer: 25 })
+                            // Chain reaction: other bombs caught in the blast go off right away
+                            bombs.forEach(o => { if (o !== b && o.r === tr && o.c === tc) o.timer = Math.min(o.timer, 1) })
 
                             if (map[tr][tc] === 2) {
                                 map[tr][tc] = 0 // Destroy brick
@@ -198,19 +227,29 @@ export const BombermanGame: React.FC<GameProps> = ({ username: _username, name: 
                     return
                 }
 
-                // Move Enemy
-                const nextX = en.x + en.dx
-                const nextY = en.y + en.dy
-                const r = Math.floor((nextY + 14) / TILE_SIZE)
-                const c = Math.floor((nextX + 14) / TILE_SIZE)
-
-                if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE && map[r][c] === 0) {
-                    en.x = nextX
-                    en.y = nextY
-                } else {
-                    en.dx = -en.dx
-                    en.dy = -en.dy
+                // Move Enemy (grid-aligned: enemies decide direction only when centred on a tile)
+                const aligned = (en.x - 5) % TILE_SIZE === 0 && (en.y - 5) % TILE_SIZE === 0
+                const open = (rr: number, cc: number) => rr >= 0 && rr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE && map[rr][cc] === 0
+                if (aligned) {
+                    const tr0 = Math.round((en.y - 5) / TILE_SIZE)
+                    const tc0 = Math.round((en.x - 5) / TILE_SIZE)
+                    if (map[tr0]?.[tc0] === 2) map[tr0][tc0] = 0 // never spawn embedded in a brick
+                    const dirs = [{ dx: 2, dy: 0 }, { dx: -2, dy: 0 }, { dx: 0, dy: 2 }, { dx: 0, dy: -2 }]
+                        .filter(d => open(tr0 + Math.sign(d.dy), tc0 + Math.sign(d.dx)))
+                    const forward = dirs.some(d => d.dx === en.dx && d.dy === en.dy)
+                    const noBack = dirs.filter(d => !(d.dx === -en.dx && d.dy === -en.dy))
+                    if (dirs.length > 0 && (!forward || (noBack.length > 1 && Math.random() < 0.35))) {
+                        const pool = noBack.length > 0 ? noBack : dirs
+                        const pick = pool[Math.floor(Math.random() * pool.length)]
+                        en.dx = pick.dx
+                        en.dy = pick.dy
+                    } else if (dirs.length === 0) {
+                        en.dx = 0
+                        en.dy = 0
+                    }
                 }
+                en.x += en.dx
+                en.y += en.dy
 
                 // Hit Player
                 if (invulnerableTimer <= 0) {
@@ -313,13 +352,22 @@ export const BombermanGame: React.FC<GameProps> = ({ username: _username, name: 
             })
         }
 
-        const loop = () => {
-            if (!pauseRef?.current) update()
+        // Fixed 60 Hz simulation step: game speed no longer depends on monitor refresh rate.
+        const STEP = 1000 / 60
+        let lastTs = 0
+        let acc = 0
+        const loop = (ts: number) => {
+            acc += lastTs ? Math.min(ts - lastTs, 100) : STEP
+            lastTs = ts
+            while (acc >= STEP) {
+                if (!pauseRef?.current) update()
+                acc -= STEP
+            }
             draw()
             animationFrameId = requestAnimationFrame(loop)
         }
 
-        loop()
+        animationFrameId = requestAnimationFrame(loop)
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown)

@@ -110,11 +110,31 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
 
             if (invulnerableTimer > 0) invulnerableTimer--
 
-            // Try change direction
+            // Cornering: a queued turn is accepted when Pac-Man is within a few pixels of the tile
+            // centre (and snapped onto it), so turns feel forgiving instead of pixel-perfect.
             if (pacman.nextDx !== 0 || pacman.nextDy !== 0) {
-                if (canMove(pacman.x + pacman.nextDx, pacman.y + pacman.nextDy, pacman.radius - 1)) {
+                const reverse = pacman.nextDx === -pacman.dx && pacman.nextDy === -pacman.dy
+                const stopped = pacman.dx === 0 && pacman.dy === 0
+                if (reverse && canMove(pacman.x + pacman.nextDx, pacman.y + pacman.nextDy, pacman.radius - 1)) {
                     pacman.dx = pacman.nextDx
                     pacman.dy = pacman.nextDy
+                } else {
+                    const col = Math.floor(pacman.x / TILE_SIZE)
+                    const row = Math.floor(pacman.y / TILE_SIZE)
+                    const cx = col * TILE_SIZE + TILE_SIZE / 2
+                    const cy = row * TILE_SIZE + TILE_SIZE / 2
+                    const along = pacman.dx !== 0 ? pacman.x - cx : pacman.dy !== 0 ? pacman.y - cy : 0
+                    if (stopped || Math.abs(along) <= 4) {
+                        const nr = row + Math.sign(pacman.nextDy)
+                        const nc = col + Math.sign(pacman.nextDx)
+                        const blocked = nr >= 0 && nr < grid.length && nc >= 0 && nc < grid[0].length && grid[nr][nc] === 1
+                        if (!blocked) {
+                            pacman.x = cx
+                            pacman.y = cy
+                            pacman.dx = pacman.nextDx
+                            pacman.dy = pacman.nextDy
+                        }
+                    }
                 }
             }
 
@@ -167,27 +187,40 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
 
             // Update Ghosts
             ghosts.forEach(ghost => {
-                const gSpeed = frightenedTimer > 0 ? 1 : 2
-                const nextX = ghost.x + (ghost.dx > 0 ? gSpeed : ghost.dx < 0 ? -gSpeed : 0)
-                const nextY = ghost.y + (ghost.dy > 0 ? gSpeed : ghost.dy < 0 ? -gSpeed : 0)
+                // Tile-based movement: ghosts only decide at tile centres, never reverse unless
+                // cornered, and chase Pac-Man (or flee when frightened).
+                const gSpeed = frightenedTimer > 0 ? 1 : (localLevel >= 3 ? 2 : 1.5)
+                const col = Math.floor(ghost.x / TILE_SIZE)
+                const row = Math.floor(ghost.y / TILE_SIZE)
+                const cx = col * TILE_SIZE + TILE_SIZE / 2
+                const cy = row * TILE_SIZE + TILE_SIZE / 2
+                const atCenter = Math.abs(ghost.x - cx) < gSpeed && Math.abs(ghost.y - cy) < gSpeed
+                const isWall = (r: number, c: number) =>
+                    r >= 0 && r < grid.length && c >= 0 && c < grid[0].length && grid[r][c] === 1
 
-                if (!canMove(nextX, nextY, 7) || Math.random() < 0.03) {
-                    const dirs = [
-                        { dx: 2, dy: 0 },
-                        { dx: -2, dy: 0 },
-                        { dx: 0, dy: 2 },
-                        { dx: 0, dy: -2 }
-                    ]
-                    const validDirs = dirs.filter(d => canMove(ghost.x + d.dx * 3, ghost.y + d.dy * 3, 7))
-                    if (validDirs.length > 0) {
-                        const randomDir = validDirs[Math.floor(Math.random() * validDirs.length)]
-                        ghost.dx = randomDir.dx
-                        ghost.dy = randomDir.dy
+                if (atCenter) {
+                    ghost.x = cx
+                    ghost.y = cy
+                    const dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }]
+                    let options = dirs.filter(d => !isWall(row + d.dy, col + d.dx) && !(d.dx === -Math.sign(ghost.dx) && d.dy === -Math.sign(ghost.dy) && (ghost.dx !== 0 || ghost.dy !== 0)))
+                    if (options.length === 0) options = dirs.filter(d => !isWall(row + d.dy, col + d.dx))
+                    if (options.length > 0) {
+                        let pick = options[Math.floor(Math.random() * options.length)]
+                        const chase = frightenedTimer > 0 || Math.random() < 0.35 + Math.min(localLevel, 5) * 0.1 // some randomness keeps it fair
+                        if (chase) {
+                            const flee = frightenedTimer > 0
+                            const score = (d: { dx: number; dy: number }) =>
+                                Math.hypot(pacman.x - (cx + d.dx * TILE_SIZE), pacman.y - (cy + d.dy * TILE_SIZE))
+                            pick = options.reduce((best, d) => (flee ? score(d) > score(best) : score(d) < score(best)) ? d : best, options[0])
+                        }
+                        ghost.dx = pick.dx
+                        ghost.dy = pick.dy
                     }
-                } else {
-                    ghost.x = nextX
-                    ghost.y = nextY
                 }
+                ghost.x += ghost.dx * gSpeed
+                ghost.y += ghost.dy * gSpeed
+                if (ghost.x < 0) ghost.x = canvas.width
+                if (ghost.x > canvas.width) ghost.x = 0
 
                 // Collision with Pacman
                 if (invulnerableTimer <= 0) {
@@ -275,13 +308,22 @@ export const PacmanGame: React.FC<GameProps> = ({ username: _username, name: _na
             })
         }
 
-        const loop = () => {
-            if (!pauseRef?.current) update()
+        // Fixed 60 Hz simulation step: game speed no longer depends on monitor refresh rate.
+        const STEP = 1000 / 60
+        let lastTs = 0
+        let acc = 0
+        const loop = (ts: number) => {
+            acc += lastTs ? Math.min(ts - lastTs, 100) : STEP
+            lastTs = ts
+            while (acc >= STEP) {
+                if (!pauseRef?.current) update()
+                acc -= STEP
+            }
             draw()
             animationFrameId = requestAnimationFrame(loop)
         }
 
-        loop()
+        animationFrameId = requestAnimationFrame(loop)
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown)

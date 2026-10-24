@@ -323,7 +323,8 @@ El sistema LuXius está compuesto por 3 repositorios centrales interconectados:
 - Nuevos juegos `TetrisGame.tsx` y `ArkanoidGame.tsx` en `src/components/arcade/games/` (canvas 2D, sin dependencias).
 - Nuevo `arcade/GameShell.tsx`: envuelve a TODOS los juegos con pantalla de instrucciones, inicio, pausa (P/Esc, auto-pausa al perder foco), game over con reinicio y volver a la galería. Intercepta teclas de juego en fase de captura (evita scroll de la página) y congela las teclas mientras está en pausa.
 - Los 6 juegos existentes reciben `pauseRef` (`if (!pauseRef?.current) update()`). El callback `onGameOver` es ahora estable y se reporta una sola vez (antes podía guardar puntajes duplicados y reiniciar el efecto del juego en cada render del modal).
-- Pendiente: no se rediseñó la jugabilidad interna de Pac-Man/Galaga/etc. (ver bugs de lógica propios en cada archivo); verificación visual manual recomendada.
+- Física/controles (24/10/2026, 2ª pasada): bucle a paso fijo de 60 Hz en los 6 juegos (antes la velocidad dependía de los Hz del monitor). Donkey Kong: sin doble salto en el aire, coyote time, buffer de salto, salto variable, aterrizaje robusto y bonus por saltar barriles. Pac-Man: giros con asistencia de esquina y fantasmas con persecución por casillas. Bomberman: deslizamiento en esquinas, diagonal normalizada, bombas en cadena, enemigos que giran en cruces. Digger: movimiento por ejes alineado al túnel y enemigos que siguen túneles (BFS) o excavan.
+- Sin probar en navegador (solo typecheck/lint/tests/build): afinar valores jugando.
 ## 7. 🚀 Guía Rápida para Continuar en Cualquier Otro IDE / Máquina
 
 Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra PC:

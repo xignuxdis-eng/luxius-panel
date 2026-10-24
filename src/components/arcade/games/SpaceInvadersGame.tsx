@@ -256,13 +256,22 @@ export const SpaceInvadersGame: React.FC<GameProps> = ({ username: _username, na
             })
         }
 
-        const loop = () => {
-            if (!pauseRef?.current) update()
+        // Fixed 60 Hz simulation step: game speed no longer depends on monitor refresh rate.
+        const STEP = 1000 / 60
+        let lastTs = 0
+        let acc = 0
+        const loop = (ts: number) => {
+            acc += lastTs ? Math.min(ts - lastTs, 100) : STEP
+            lastTs = ts
+            while (acc >= STEP) {
+                if (!pauseRef?.current) update()
+                acc -= STEP
+            }
             draw()
             animationFrameId = requestAnimationFrame(loop)
         }
 
-        loop()
+        animationFrameId = requestAnimationFrame(loop)
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown)
