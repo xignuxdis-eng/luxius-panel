@@ -5,6 +5,11 @@
  * optimizar el tiempo de laminado continuo.
  */
 
+import { runNesting } from './nestingAlgorithm';
+import { getBobinaUsefulWidth, type NestingItem } from './nestingTypes';
+
+export const MAX_VEHICULAR_ROLL_WIDTH = 1.515;
+
 export interface NestingCandidateItem {
     id: string | number;
     fileName?: string;
@@ -80,17 +85,22 @@ export function detectVehicularNestingSuggestions(
     interface ItemOrientation {
         item: NestingCandidateItem;
         width: number;
+        heightSingle: number;
+        copias: number;
         lengthMl: number;
         rotated: boolean;
     }
 
     // 2. Extraer anchos candidatos únicos (tolerancia de ±2cm)
+    // REGLA FÍSICA CRÍTICA: En taller, un ancho sobre la bobina NUNCA puede exceder
+    // el ancho útil de la bobina de vinilo vehicular más ancha (1.52m -> útil 1.515m).
+    // Si una cota supera 1.515m, forzosamente debe ir en el sentido del avance (largo).
     const distinctWidths: number[] = [];
     vehicularItems.forEach(it => {
         const w = normalizeDimension(it.ancho);
         const h = normalizeDimension(it.alto);
         [w, h].forEach(dim => {
-            if (dim > 0 && !distinctWidths.some(dw => Math.abs(dw - dim) < 0.02)) {
+            if (dim > 0 && dim <= MAX_VEHICULAR_ROLL_WIDTH && !distinctWidths.some(dw => Math.abs(dw - dim) < 0.02)) {
                 distinctWidths.push(dim);
             }
         });
@@ -107,13 +117,19 @@ export function detectVehicularNestingSuggestions(
             const h = normalizeDimension(it.alto);
             const copias = Math.max(1, Number(it.copias) || 1);
 
-            const matchesDirect = Math.abs(w - targetWidth) < 0.02;
-            const matchesRotated = Math.abs(h - targetWidth) < 0.02;
+            // Una pieza solo puede orientarse con una cota si esa cota entra físicamente en la bobina
+            const fitsDirect = w <= MAX_VEHICULAR_ROLL_WIDTH;
+            const fitsRotated = h <= MAX_VEHICULAR_ROLL_WIDTH;
+
+            const matchesDirect = fitsDirect && Math.abs(w - targetWidth) < 0.02;
+            const matchesRotated = fitsRotated && Math.abs(h - targetWidth) < 0.02;
 
             if (matchesDirect && (!matchesRotated || (h * copias <= w * copias))) {
                 matchingOrientations.push({
                     item: it,
                     width: w,
+                    heightSingle: h,
+                    copias,
                     lengthMl: Math.round(h * copias * 100) / 100,
                     rotated: false
                 });
@@ -121,6 +137,8 @@ export function detectVehicularNestingSuggestions(
                 matchingOrientations.push({
                     item: it,
                     width: h,
+                    heightSingle: w,
+                    copias,
                     lengthMl: Math.round(w * copias * 100) / 100,
                     rotated: true
                 });
@@ -128,12 +146,28 @@ export function detectVehicularNestingSuggestions(
         });
 
         if (matchingOrientations.length >= 2) {
-            const totalMl = Math.round(
-                matchingOrientations.reduce((sum, o) => sum + o.lengthMl, 0) * 100
-            ) / 100;
+            // Simular el acomodo e imposición sobre la bobina requerida para determinar el consumo lineal real
+            const rollW = targetWidth <= 1.365 ? 1.37 : 1.52;
+            const nestingItems: NestingItem[] = matchingOrientations.map(o => ({
+                id: o.item.id,
+                width: o.width,
+                height: o.heightSingle,
+                copies: o.copias,
+                allowRotation: false // Orientación fija para garantizar el mismo ancho en bobina
+            }));
+
+            const nestingResult = runNesting(nestingItems, {
+                rollWidth: rollW,
+                usefulWidth: getBobinaUsefulWidth(rollW),
+                gap: 0,
+                safetyMarginStart: 0,
+                allowRotation: false
+            });
+
+            const totalMl = Math.round(nestingResult.linearMeters * 100) / 100;
 
             if (totalMl <= maxLinearMeters && totalMl > 0) {
-                const totalCopies = matchingOrientations.reduce((sum, o) => sum + (Number(o.item.copias) || 1), 0);
+                const totalCopies = matchingOrientations.reduce((sum, o) => sum + o.copias, 0);
                 const itemIds = matchingOrientations.map(o => o.item.id);
 
                 const key = itemIds.slice().sort().join('-');

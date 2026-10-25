@@ -104,5 +104,25 @@ describe('nestingSuggestions - Vinilo Vehicular y Ahorro de Laminado', () => {
             expect(suggestions[0].matchingWidth).toBe(1.30);
             expect(suggestions[0].totalLinearMeters).toBe(2.20);
         });
+
+        it('NO debe sugerir si las piezas miden 1.23 x 1.91m porque 1.91m no entra como ancho y el largo real es 3.82m > 2.90m', () => {
+            const items: NestingCandidateItem[] = [
+                { id: 'p1', ancho: 1.23, alto: 1.91, copias: 1, material: 'VV' },
+                { id: 'p2', ancho: 1.23, alto: 1.91, copias: 1, material: 'VV' }
+            ];
+            // 1.91m no entra en la bobina de 1.52m como ancho; en sentido directo el largo es 1.91 + 1.91 = 3.82m > 2.90m
+            const suggestions = detectVehicularNestingSuggestions(items);
+            expect(suggestions.length).toBe(0);
+        });
+
+        it('NO debe considerar dimensiones > 1.515m como anchos válidos de bobina para vinilo vehicular', () => {
+            const items: NestingCandidateItem[] = [
+                { id: 'a', ancho: 1.80, alto: 1.00, copias: 1, material: 'VV' },
+                { id: 'b', ancho: 1.80, alto: 1.20, copias: 1, material: 'VV' }
+            ];
+            // Ancho 1.80m excede la bobina máxima de 1.52m; rotadas miden 1.00m y 1.20m (distinto ancho)
+            const suggestions = detectVehicularNestingSuggestions(items);
+            expect(suggestions.length).toBe(0);
+        });
     });
 });
