@@ -495,6 +495,31 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     // una expresión de llamada dentro de las deps. Se extrae a variable.
     const watchedServicios = watch('servicios')
 
+    // Sincronización entre selector de corte y servicios adicionales (Medio corte / Corte completo)
+    useEffect(() => {
+        if (!availableServices.length) return;
+        const medioServ = availableServices.find(s => s.codigo === 'MEDC' || s.nombre.toLowerCase().includes('medio corte'));
+        const compServ = availableServices.find(s => s.codigo === 'CORT' || s.nombre.toLowerCase().includes('corte completo'));
+
+        const isMedioChecked = !!(medioServ && watchedServicios?.[medioServ.id]);
+        const isCompChecked = !!(compServ && watchedServicios?.[compServ.id]);
+
+        if (watchedCorteTipo === 'medio') {
+            if (medioServ && !isMedioChecked) setValue(`servicios.${medioServ.id}`, true);
+            if (compServ && isCompChecked) setValue(`servicios.${compServ.id}`, false);
+        } else if (watchedCorteTipo === 'completo') {
+            if (compServ && !isCompChecked) setValue(`servicios.${compServ.id}`, true);
+            if (medioServ && isMedioChecked) setValue(`servicios.${medioServ.id}`, false);
+        } else if (watchedCorteTipo === 'ninguno' || !watchedCorteTipo) {
+            if (isMedioChecked && watchedCorteTipo !== 'medio') setValue('corteTipo', 'medio');
+            else if (isCompChecked && watchedCorteTipo !== 'completo') setValue('corteTipo', 'completo');
+            else {
+                if (medioServ && isMedioChecked) setValue(`servicios.${medioServ.id}`, false);
+                if (compServ && isCompChecked) setValue(`servicios.${compServ.id}`, false);
+            }
+        }
+    }, [watchedCorteTipo, watchedServicios, availableServices, setValue]);
+
     useEffect(() => {
         if (activeTab === 'unitario') {
             const w = parseFloat(watchedAncho) || 0
@@ -2183,7 +2208,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                             )}
                                         </div>
 
-                                        {/* Plotter de Corte (Mimaki CG-60SR) */}
+                                        {/* Servicio de Corte */}
                                         <div style={{
                                             background: 'var(--bg-card)',
                                             border: '1px solid var(--border)',
@@ -2191,7 +2216,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                             padding: '10px 12px'
                                         }}>
                                             <label style={{ margin: '0 0 6px 0', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span>📐</span> Servicio de Plotter de Corte (Mimaki CG-60SR)
+                                                <span>📐</span> Servicio de Corte
                                             </label>
                                             <select
                                                 {...register('corteTipo')}
@@ -2203,8 +2228,8 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                 <option value="completo">⚡ Corte completo (Troquelado total pieza por pieza)</option>
                                             </select>
                                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                {watchedCorteTipo === 'medio' && 'Se asignará al sector Plotter de Corte para medio corte (kiss-cut).'}
-                                                {watchedCorteTipo === 'completo' && 'Se asignará al sector Plotter de Corte para troquelado total pasante (die-cut).'}
+                                                {watchedCorteTipo === 'medio' && 'Se asignará al sector de plotter de corte para medio corte (kiss-cut).'}
+                                                {watchedCorteTipo === 'completo' && 'Se asignará al sector de plotter de corte para troquelado total pasante (die-cut).'}
                                                 {(!watchedCorteTipo || watchedCorteTipo === 'ninguno') && 'El trabajo irá directamente a mesa de refilado manual tras la impresión.'}
                                             </div>
                                         </div>

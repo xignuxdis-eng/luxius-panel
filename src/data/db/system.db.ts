@@ -382,11 +382,66 @@ export function getEmpresa(): Config['empresa'] {
 // Servicios
 // ============================================================
 
+export const DEFAULT_SERVICIOS: Servicio[] = [
+    {
+        id: 1,
+        codigo: 'MEDC',
+        nombre: 'Medio corte',
+        descripcion: 'Troquelado superficial / semicorte para stickers y calcomanías en pliego',
+        precioBase: 0,
+        unidad: 'm2',
+        categoria: 'corte',
+        habilitado: true
+    },
+    {
+        id: 2,
+        codigo: 'CORT',
+        nombre: 'Corte completo',
+        descripcion: 'Troquelado pasante / corte total de piezas y figuras en plotter de corte',
+        precioBase: 0,
+        unidad: 'm2',
+        categoria: 'corte',
+        habilitado: true
+    },
+    {
+        id: 3,
+        codigo: 'LAM',
+        nombre: 'Laminado Protector',
+        descripcion: 'Laminado mate o brillante para protección UV y raspaduras',
+        precioBase: 0,
+        unidad: 'm2',
+        categoria: 'acabados',
+        habilitado: true
+    },
+    {
+        id: 4,
+        codigo: 'OJA',
+        nombre: 'Ojalillos Metálicos',
+        descripcion: 'Colocación de ojalillos perimetrales para sujeción',
+        precioBase: 0,
+        unidad: 'unidad',
+        categoria: 'acabados',
+        habilitado: true
+    },
+    {
+        id: 5,
+        codigo: 'COL',
+        nombre: 'Colocación / Montaje',
+        descripcion: 'Instalación y montaje de cartelería y vinilos en obra',
+        precioBase: 0,
+        unidad: 'unidad',
+        categoria: 'instalacion',
+        habilitado: true
+    }
+];
+
 function inferServicioCodigo(s: Partial<Servicio>): string {
     if (s.codigo && s.codigo.trim() !== '') {
         return s.codigo.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 4);
     }
     const name = (s.nombre || '').toUpperCase();
+    if (name.includes('MEDIO') && name.includes('CORTE')) return 'MEDC';
+    if (name.includes('CORTE') && name.includes('COMPL')) return 'CORT';
     if (name.includes('TENSA')) return 'TEN';
     if (name.includes('ROTULA')) return 'ROT';
     if (name.includes('LAMINA')) return 'LAM';
@@ -398,25 +453,67 @@ function inferServicioCodigo(s: Partial<Servicio>): string {
 export function getServicios(): Servicio[] {
     const sessionItemsJson = localStorage.getItem(SESSION_SERVICIOS_KEY);
 
+    let items: Servicio[] = [];
     if (sessionItemsJson) {
         try {
-            const items = JSON.parse(sessionItemsJson) as Servicio[];
-            let hasChanges = false;
-            const sanitized = items.map(s => {
-                if (!s.codigo || s.codigo.trim() === '') {
-                    hasChanges = true;
-                    return { ...s, codigo: inferServicioCodigo(s) };
-                }
-                return s;
-            });
-            if (hasChanges) {
-                localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(sanitized));
-            }
-            return sanitized;
+            items = JSON.parse(sessionItemsJson) as Servicio[];
         } catch (e) { }
     }
 
-    return [];
+    if (!Array.isArray(items) || items.length === 0) {
+        items = [...DEFAULT_SERVICIOS];
+        try {
+            localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(items));
+        } catch (_) {}
+        return items;
+    }
+
+    let hasChanges = false;
+    const sanitized = items.map(s => {
+        if (!s.codigo || s.codigo.trim() === '') {
+            hasChanges = true;
+            return { ...s, codigo: inferServicioCodigo(s) };
+        }
+        return s;
+    });
+
+    // Auto-heal: asegurar que existan los servicios de Medio corte y Corte completo
+    const hasMedioCorte = sanitized.some(s => s.codigo === 'MEDC' || s.nombre.toLowerCase().includes('medio corte'));
+    if (!hasMedioCorte) {
+        sanitized.push({
+            id: 1,
+            codigo: 'MEDC',
+            nombre: 'Medio corte',
+            descripcion: 'Troquelado superficial / semicorte para stickers y calcomanías en pliego',
+            precioBase: 0,
+            unidad: 'm2',
+            categoria: 'corte',
+            habilitado: true
+        });
+        hasChanges = true;
+    }
+
+    const hasCorteCompleto = sanitized.some(s => s.codigo === 'CORT' || (s.nombre.toLowerCase().includes('corte') && s.nombre.toLowerCase().includes('completo')));
+    if (!hasCorteCompleto) {
+        sanitized.push({
+            id: 2,
+            codigo: 'CORT',
+            nombre: 'Corte completo',
+            descripcion: 'Troquelado pasante / corte total de piezas y figuras en plotter de corte',
+            precioBase: 0,
+            unidad: 'm2',
+            categoria: 'corte',
+            habilitado: true
+        });
+        hasChanges = true;
+    }
+
+    if (hasChanges) {
+        try {
+            localStorage.setItem(SESSION_SERVICIOS_KEY, JSON.stringify(sanitized));
+        } catch (_) {}
+    }
+    return sanitized;
 }
 
 export function getServicioById(id: number): Servicio | undefined {

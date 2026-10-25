@@ -113,7 +113,7 @@ export interface Order {
 
     // Production
     maquinaId?: number // Plotter de impresión asignado (RS640 / SolJet Pro III)
-    /** Servicio de corte (plotter de corte CG-60SR). `estado` pendiente hasta que se marca cortado. */
+    /** Servicio de corte (plotter de corte: Medio corte o Corte completo). `estado` pendiente hasta que se marca cortado. */
     corte?: {
         tipo: 'completo' | 'medio'
         estado?: 'pendiente' | 'cortado'

@@ -57,7 +57,7 @@ export const StationModal: React.FC<StationModalProps> = ({
             case 'diseno': return '🖥️ ÁREA DE DISEÑO & PRE-PRENSA';
             case 'plotter1': return `🖨️ ${m1}`;
             case 'plotter2': return `🖨️ ${m2}`;
-            case 'plotter_corte': return '📐 PLOTTER DE CORTE MIMAKI CG-60SR';
+            case 'plotter_corte': return '📐 PLOTTER DE CORTE';
             case 'insumos': return '🎨 STOCK DE INSUMOS & MATERIALES';
             case 'corte': return '✂️ MESA DE REFILADO & CORTE';
             case 'empaque': return '📦 MESA DE EMPAQUETADO';
@@ -452,7 +452,7 @@ export const StationModal: React.FC<StationModalProps> = ({
                                                     cursor: 'pointer',
                                                     fontWeight: 'bold'
                                                 }}
-                                                title="Marcar corte en Mimaki CG-60SR como completado"
+                                                title="Marcar corte en plotter como completado"
                                             >
                                                 {order.corte?.estado === 'cortado' ? '✅ Cortado' : '⚡ Marcar Cortado'}
                                             </button>

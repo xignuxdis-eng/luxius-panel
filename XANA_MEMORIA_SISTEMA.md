@@ -1845,6 +1845,19 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - Tarjeta viva de Roland VersaWorks con indicador visual de presencia online (pulso verde neón), estado de máquina, trabajo en curso o último trabajo completado.
     - Modal de Telemetría en Vivo `📡 Log en Vivo`: Permite a los operarios inspeccionar la lista completa de trabajos procesados por el RIP, dimensiones, velocidad efectiva en m²/h y consumo exacto de tinta por color.
 
+- **Servicios Oficiales de Medio corte y Corte completo & Desacople de Marca en Modal de Pedido (25/10/2026)**:
+  - **Servicios de Corte Oficiales en Base de Datos (`src/data/db/system.db.ts`)**:
+    - Incorporados en `DEFAULT_SERVICIOS` los servicios oficiales de pre-impresión y terminación:
+      - `Medio corte` (código: `MEDC`, unidad: `m2`, categoría: `corte`, precioBase: `$2.500`) para stickers y calcos troquelados en pliego (kiss-cut).
+      - `Corte completo` (código: `CORT`, unidad: `m2`, categoría: `corte`, precioBase: `$3.500`) para troquelado total pasante pieza por pieza (die-cut).
+    - Actualizado `inferServicioCodigo()` para inferir con precisión `MEDC` y `CORT` según el nombre o descripción.
+    - Mecanismo de auto-healing reactivo en `getServicios()`: detecta si `localStorage` (`SESSION_SERVICIOS_KEY`) carece de `MEDC` o `CORT` y los inyecta conservando la personalización del usuario y persistiendo los cambios de inmediato.
+  - **Limpieza y Desacople de Hardware en UI de Pedidos (`src/pages/Entrada/NuevoPedidoModal.tsx`)**:
+    - Removida la mención del modelo de hardware del plotter (`Mimaki CG-60SR`) en el selector del servicio, estandarizándolo como `📐 Servicio de Corte`.
+    - Sincronización bidireccional reactiva entre el selector `corteTipo` (`medio`, `completo`, `ninguno`) y los checkboxes de la lista de servicios adicionales (`servicios.${medioServ.id}` / `servicios.${compServ.id}`): seleccionar el tipo de corte activa automáticamente su servicio cotizable correspondiente y desmarca el alternativo, reflejando el cálculo de precio exacto por m² en el subtotal del pedido.
+  - **Estandarización en Estación de Taller (`src/components/workshop/StationModal.tsx`)**:
+    - Título unificado como `📐 PLOTTER DE CORTE` y acción simplificada a `Marcar corte en plotter como completado`, desacoplando la marca física de la interfaz del operario.
+
 ---
 
 
