@@ -1259,13 +1259,14 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             p.progressText.y = Math.floor(barH / 2);
 
             // Nameplate
+            const npW = Math.max(90, Math.round(p.nameText.width + 16));
             p.nameplate.x = Math.round((p.baseX + (p.plotterOffsetX + 12) * PS_PLOT) * scale);
             p.nameplate.y = Math.round((p.baseY + 0) * scale);
             p.nameplateBg.clear();
-            p.nameplateBg.roundRect(0, 0, 104, 22, 3);
+            p.nameplateBg.roundRect(0, 0, npW, 22, 3);
             p.nameplateBg.fill({ color: 0x090d16, alpha: 1.0 });
-            p.nameplateBg.stroke({ width: 1, color: 0x06b6d4 });
-            p.nameText.style.fontSize = 13;
+            p.nameplateBg.stroke({ width: 1, color: p.isOffline ? 0x64748b : (p.id === 'plotter2' ? 0x06b6d4 : 0x22c55e) });
+            p.nameText.style.fontSize = 12;
             p.nameText.x = 8;
             p.nameText.y = 3;
         });
@@ -1698,14 +1699,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 // 1. Cartel con el nombre "Plotter" en UILayer (B0.2: Native resolution, fondo oscuro opaco)
                 const nameplate = new Container();
                 const nameplateBg = new Graphics();
-                nameplateBg.roundRect(0, 0, 104, 22, 3);
-                nameplateBg.fill({ color: 0x090d16, alpha: 1.0 }); // fondo oscuro sólido
-                nameplateBg.stroke({ width: 1, color: isOffline ? 0x64748b : 0x06b6d4 });
                 nameplate.addChild(nameplateBg);
 
                 const nameStyle = new TextStyle({
                     fontFamily: 'monospace',
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: 'bold',
                     fill: isOffline ? '#94a3b8' : '#ffffff'
                 });
@@ -1713,6 +1711,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 nameText.x = 8;
                 nameText.y = 3;
                 nameplate.addChild(nameText);
+
+                const initNpW = Math.max(90, Math.round(nameText.width + 16));
+                nameplateBg.roundRect(0, 0, initNpW, 22, 3);
+                nameplateBg.fill({ color: 0x090d16, alpha: 1.0 }); // fondo oscuro sólido
+                nameplateBg.stroke({ width: 1, color: isOffline ? 0x64748b : (id === 'plotter2' ? 0x06b6d4 : 0x22c55e) });
                 uiLayer.addChild(nameplate);
 
                 // 2. Cartel con el texto "SIGUIENTE EN COLA" en UILayer (B0.2: Native resolution, fondo oscuro opaco, borde nítido)

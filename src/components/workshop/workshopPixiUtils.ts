@@ -129,7 +129,7 @@ export const getPixiStations = (): StationConfig[] => {
         baseStations.push(
             {
                 id: 'plotter1',
-                title: m1.nombre && m1.nombre.length <= 14 ? m1.nombre : 'RS-640 (1.6m)',
+                title: 'RS-640',
                 description: `${m1.nombre || 'Roland RS-640'} (${m1.anchoMaximo || 1.60}m) - Status: ${(m1.estado || 'online').toUpperCase()}`,
                 x: 126,
                 y: 36,
@@ -142,7 +142,7 @@ export const getPixiStations = (): StationConfig[] => {
             },
             {
                 id: 'plotter2',
-                title: m2.nombre && m2.nombre.length <= 14 ? m2.nombre : 'SolJet (1.9m)',
+                title: 'SolJet Pro III',
                 description: `${m2.nombre || 'Roland SolJet Pro III'} (${m2.anchoMaximo || 1.90}m) - Status: ${(m2.estado || 'online').toUpperCase()}`,
                 x: 258,
                 y: 36,

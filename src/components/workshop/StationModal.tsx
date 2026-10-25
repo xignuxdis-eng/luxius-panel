@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { StationId } from './types';
 import { Order } from '@/types/orden';
 import { audioEngine } from './AudioEngine';
-import { getMaquinas, getMateriales } from '@/data/db';
+import { getMaquinas, getMateriales, isCutMachine } from '@/data/db';
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal';
 
 interface StationModalProps {
@@ -49,8 +49,9 @@ export const StationModal: React.FC<StationModalProps> = ({
             if (m) return `🖨️ ${m.nombre.toUpperCase()}`;
         }
 
-        const m1 = (maquinas[0]?.nombre || 'ROLAND RS-640 (1.60M)').toUpperCase();
-        const m2 = (maquinas[1]?.nombre || 'ROLAND SOLJET PRO III (1.90M)').toUpperCase();
+        const printMs = maquinas.filter(m => !isCutMachine(m));
+        const m1 = (maquinas.find(m => m.id === 1)?.nombre || printMs[0]?.nombre || 'ROLAND RS-640 (1.60M)').toUpperCase();
+        const m2 = (maquinas.find(m => m.id === 2)?.nombre || printMs[1]?.nombre || 'ROLAND SOLJET PRO III (1.90M)').toUpperCase();
 
         switch (stationId) {
             case 'diseno': return '🖥️ ÁREA DE DISEÑO & PRE-PRENSA';

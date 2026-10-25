@@ -729,7 +729,7 @@ function buildVinylCutter(w: number, h: number): StationProps {
     box(base, px + 26, py + 16, 8, 4, 0xeab308, 0.9);
     box(base, px + 38, py + 16, 8, 4, 0x06b6d4, 0.9);
 
-    const tick = makeThrottle(60);
+    const tick = makeThrottle(30);
     const range = pw - 24;
 
     return {
@@ -750,22 +750,121 @@ function buildVinylCutter(w: number, h: number): StationProps {
             if (!tick(t)) return;
             anim.clear();
 
-            // Carro cabezal de corte (movimiento rápido estilo plotter de cuchilla)
-            const phase = (t / 1400) % 2;
-            const ratio = phase < 1 ? phase : 2 - phase;
-            const jitter = Math.sin(t / 80) * 1.5;
-            const kx = px + 8 + Math.round(ratio * range + jitter);
+            // Ciclo de corte vectorial por contorno (8.4 segundos por ciclo completo)
+            // A diferencia de una impresora con pasadas uniformes de vaivén, un plotter de corte
+            // realiza trayectorias angulares, paradas de giro tangencial, saltos pen-up rápidos
+            // y lectura óptica de marcas OPOS.
+            const cycle = t % 8400;
+            let ratio = 0.5;
+            let isCutting = true;
+            let isSensorOpos = false;
 
-            // Cabezal y portacuchillas
+            if (cycle < 1200) {
+                // FASE 1: Lectura de marcas de registro ópticas OPOS (sensor óptico láser rojo)
+                isSensorOpos = true;
+                isCutting = false;
+                if (cycle < 400) {
+                    // Marca 1 (esquina izquierda): búsqueda y fijación
+                    ratio = 0.12 + Math.sin(t / 25) * 0.008;
+                } else if (cycle < 550) {
+                    // Salto rápido de transporte a marca derecha (pen-up rápido)
+                    const k = (cycle - 400) / 150;
+                    ratio = 0.12 + (0.86 - 0.12) * (k * k * (3 - 2 * k));
+                } else if (cycle < 900) {
+                    // Marca 2 (esquina derecha): lectura óptica
+                    ratio = 0.86 + Math.sin(t / 25) * 0.008;
+                } else if (cycle < 1050) {
+                    // Salto rápido al punto de inicio de corte
+                    const k = (cycle - 900) / 150;
+                    ratio = 0.86 + (0.24 - 0.86) * (k * k * (3 - 2 * k));
+                } else {
+                    ratio = 0.24;
+                }
+            } else if (cycle < 3400) {
+                // FASE 2: Troquelado de Sticker 1 (izquierdo) - Movimientos angulares y vectoriales rápidos
+                const localT = (cycle - 1200) / 2200;
+                const segT = (localT * 6) % 1;
+                // Ángulos y radios que simulan corte de contorno de sticker redondo/oval
+                const strokeAmp = 0.12;
+                const strokeOffset = Math.sin(localT * Math.PI * 8) * strokeAmp;
+                const jitter = (Math.floor(t / 60) % 2 === 0 ? 0.015 : -0.015);
+                // Pausas microscópicas en esquinas (rotación de cuchilla tangencial)
+                const isPivoting = segT < 0.10;
+                ratio = 0.24 + (isPivoting ? Math.sin(Math.floor(localT * 6) * 1.7) * 0.08 : strokeOffset + jitter);
+            } else if (cycle < 3700) {
+                // FASE 3: Pen-Up rápido (salto de reposicionamiento entre calcos)
+                isCutting = false;
+                const k = (cycle - 3400) / 300;
+                const ease = k * k * (3 - 2 * k);
+                ratio = 0.24 + (0.76 - 0.24) * ease;
+            } else if (cycle < 6000) {
+                // FASE 4: Troquelado de Sticker 2 (derecho - forma de estrella / vector complejo)
+                const localT = (cycle - 3700) / 2300;
+                // Frecuencia rápida con cambios bruscos de dirección (puntas de estrella)
+                const starPoints = 5;
+                const starAngle = localT * Math.PI * 2 * starPoints;
+                const rStar = 0.14 * (0.6 + 0.4 * Math.sin(starAngle * 2));
+                const cornerSnap = Math.cos(starAngle) > 0.7 ? 0.025 : -0.015;
+                ratio = 0.74 + rStar * Math.cos(starAngle) + cornerSnap;
+            } else if (cycle < 6300) {
+                // FASE 5: Pen-Up rápido hacia calcomanía central
+                isCutting = false;
+                const k = (cycle - 6000) / 300;
+                const ease = k * k * (3 - 2 * k);
+                ratio = 0.74 + (0.48 - 0.74) * ease;
+            } else if (cycle < 7700) {
+                // FASE 6: Corte de letras y tipografía fina (micro-cuchilladas rápidas de 2 a 4px de alta frecuencia)
+                const localT = (cycle - 6300) / 1400;
+                const letterIdx = Math.floor(localT * 6);
+                const letterX = 0.38 + letterIdx * 0.035;
+                // Vibración y trazos cortantes de las letras
+                const letterStroke = (Math.sin(t / 35) * 0.018) + (Math.cos(t / 20) * 0.012);
+                ratio = letterX + letterStroke;
+            } else {
+                // FASE 7: Retorno / Standby y avance de pliego
+                isCutting = false;
+                if (cycle < 8000) {
+                    const k = (cycle - 7700) / 300;
+                    ratio = 0.48 + (0.12 - 0.48) * (k * k * (3 - 2 * k));
+                } else {
+                    ratio = 0.12;
+                }
+            }
+
+            // Limitar al rango del riel de corte
+            ratio = Math.max(0.04, Math.min(0.96, ratio));
+            const kx = px + 8 + Math.round(ratio * range);
+
+            // Carro cabezal Mimaki y portacuchillas
             box(anim, kx - 1, py + 7, 7, 8, OUTLINE, 0.95);
             box(anim, kx, py + 8, 5, 6, 0x0284c7);
             box(anim, kx + 1, py + 9, 3, 2, 0x38bdf8);
-            // Punta de cuchilla / haz óptico sensor OPOS
-            box(anim, kx + 2, py + 14, 1, 2, 0xffffff, 0.9);
 
-            // LED de estado: parpadeo rápido al cortar
-            const ledBlink = Math.floor(t / 250) % 2 === 0;
-            box(anim, px + pw - 5, py + 2, 2, 2, ledBlink ? 0x10b981 : 0x059669);
+            // Sensor OPOS / Cuchilla activa:
+            if (isSensorOpos) {
+                // Haz óptico láser rojo del sensor de marcas OPOS
+                const laserPulse = (Math.floor(t / 80) % 2 === 0);
+                box(anim, kx + 2, py + 14, 2, 2, laserPulse ? 0xef4444 : 0xb91c1c, 0.95);
+                box(anim, kx + 2, py + 16, 2, 1, 0xff0000, 0.6); // punto láser en vinilo
+            } else if (isCutting) {
+                // Cuchilla bajada troquelando vinilo: destello y micro-trazo de corte
+                box(anim, kx + 2, py + 14, 1, 2, 0xffffff, 0.95);
+                box(anim, kx + 1, py + 15, 2, 1, 0x090d16, 0.85); // ranura de corte del vinilo
+            } else {
+                // Cuchilla subida (Pen-up en tránsito de salto)
+                box(anim, kx + 2, py + 13, 1, 2, 0x94a3b8, 0.8);
+            }
+
+            // LED de estado del plotter:
+            // Rojo al calibrar marcas OPOS, azul/verde titilando rápido al troquelar, verde fijo en standby
+            if (isSensorOpos) {
+                box(anim, px + pw - 5, py + 2, 2, 2, 0xef4444);
+            } else if (isCutting) {
+                const ledFastBlink = Math.floor(t / 110) % 2 === 0;
+                box(anim, px + pw - 5, py + 2, 2, 2, ledFastBlink ? 0x22c55e : 0x06b6d4);
+            } else {
+                box(anim, px + pw - 5, py + 2, 2, 2, 0x10b981);
+            }
         }
     };
 }

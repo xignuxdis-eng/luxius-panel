@@ -9,7 +9,6 @@ import {
     SESSION_MAQUINAS_KEY,
     HIDDEN_MAQUINAS_KEY
 } from './cache';
-import { DEMO_MAQUINAS } from '../demoSandboxData';
 import { syncSave, syncDelete } from './client';
 
 export const DEFAULT_MAQUINAS: Maquina[] = [
@@ -57,17 +56,79 @@ export function getCutMachines(): Maquina[] {
     return getMaquinas().filter(m => isCutMachine(m));
 }
 
+function healMaquinasList(list: Maquina[]): { list: Maquina[], changed: boolean } {
+    if (!Array.isArray(list) || list.length === 0) {
+        return { list: [...DEFAULT_MAQUINAS], changed: true };
+    }
+    let changed = false;
+    const cloned = list.map(m => ({ ...m }));
+
+    // Identificar impresoras (no de corte)
+    const printMachines = cloned.filter(m => !isCutMachine(m));
+
+    // Si la segunda impresora tiene ID 2 o repite el nombre de la primera o dice RS-640:
+    if (printMachines.length >= 2) {
+        const m1 = printMachines[0];
+        const m2 = printMachines[1];
+        if (m2.id === 2 || m2.nombre === m1.nombre || m2.nombre.toLowerCase().includes('640') || m2.anchoMaximo === 1.90) {
+            if (m2.nombre !== 'Roland SolJet Pro III' || m2.anchoMaximo !== 1.90) {
+                m2.nombre = 'Roland SolJet Pro III';
+                m2.anchoMaximo = 1.90;
+                m2.ancho = 1.90;
+                m2.tipo = 'Plotter Gran Formato';
+                m2.categoria = 'impresion';
+                changed = true;
+            }
+        }
+    }
+
+    // Asegurar que la primera impresora sea RS-640 (1.60m)
+    if (printMachines.length >= 1) {
+        const m1 = printMachines[0];
+        if (!m1.nombre || m1.nombre.includes('SolJet')) {
+            m1.nombre = 'Roland RS-640';
+            m1.anchoMaximo = 1.60;
+            m1.ancho = 1.60;
+            changed = true;
+        }
+    }
+
+    // Asegurar que el Plotter de corte Mimaki CG-60SR esté presente
+    const hasCutter = cloned.some(m => isCutMachine(m) || m.id === 3 || m.nombre.toLowerCase().includes('mimaki'));
+    if (!hasCutter) {
+        cloned.push({
+            id: 3,
+            nombre: 'Mimaki CG-60SR',
+            tipo: 'Plotter de Corte',
+            categoria: 'corte',
+            anchoMaximo: 0.60,
+            ancho: 0.60,
+            estado: 'online',
+            habilitada: true
+        });
+        changed = true;
+    }
+
+    return { list: cloned, changed };
+}
+
 export function getMaquinas(): Maquina[] {
     if (isDemoMode()) {
         const demoMaqJson = localStorage.getItem(DEMO_MAQUINAS_KEY);
         if (demoMaqJson) {
             try {
                 const list = JSON.parse(demoMaqJson) as Maquina[];
-                if (Array.isArray(list) && list.length > 0) return list;
+                if (Array.isArray(list) && list.length > 0) {
+                    const { list: healed, changed } = healMaquinasList(list);
+                    if (changed) {
+                        try { localStorage.setItem(DEMO_MAQUINAS_KEY, JSON.stringify(healed)); } catch (_) {}
+                    }
+                    return healed;
+                }
             } catch (e) { }
         }
-        localStorage.setItem(DEMO_MAQUINAS_KEY, JSON.stringify(DEMO_MAQUINAS));
-        return [...DEMO_MAQUINAS];
+        localStorage.setItem(DEMO_MAQUINAS_KEY, JSON.stringify(DEFAULT_MAQUINAS));
+        return [...DEFAULT_MAQUINAS];
     }
 
     const sessionItemsJson = localStorage.getItem(SESSION_MAQUINAS_KEY);
@@ -82,7 +143,11 @@ export function getMaquinas(): Maquina[] {
         try {
             const items = JSON.parse(sessionItemsJson) as Maquina[];
             if (items && Array.isArray(items) && items.length > 0) {
-                return items.filter(m => !hiddenIds.includes(m.id));
+                const { list: healed, changed } = healMaquinasList(items);
+                if (changed) {
+                    try { localStorage.setItem(SESSION_MAQUINAS_KEY, JSON.stringify(healed)); } catch (_) {}
+                }
+                return healed.filter(m => !hiddenIds.includes(m.id));
             }
         } catch (e) { }
     }
