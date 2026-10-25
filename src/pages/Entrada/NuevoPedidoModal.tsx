@@ -21,6 +21,7 @@ import { blobStore } from '@/data/blobStore'
 import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS, isDesignerRole } from '@/types'
 import { calculateItemPriceDetailed as calcItemPriceDetailedUtil } from '@/utils/pricingCalculator'
 import { extractMetadata, getPdfThumbnail, type FileMetadata } from './utils/fileMetadataParser'
+import { detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nesting'
 import './NuevoPedidoModal.css'
 
 
@@ -569,6 +570,22 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
         return calculatedOrderTotal;
     }, [isPriceOverridden, priceOverride, calculatedOrderTotal]);
+
+    // Sugerencia de anidado para vinilo vehicular en carga de lotes (Laminado continuo <= 2.90m)
+    const vehicularNestingSuggestions = useMemo(() => {
+        if (activeTab !== 'lote' || batchItems.length < 2) return [];
+        const candidates: NestingCandidateItem[] = batchItems
+            .filter(item => item.confirmed !== false)
+            .map(item => ({
+                id: item.id,
+                fileName: item.fileName,
+                ancho: Number(item.metadata.width) || 0,
+                alto: Number(item.metadata.height) || 0,
+                copias: item.copias || 1,
+                material: item.material || watchedMaterial || 'VV'
+            }));
+        return detectVehicularNestingSuggestions(candidates, 2.90);
+    }, [activeTab, batchItems, watchedMaterial]);
 
     const handleSetSenaPreset = (preset: '0' | '50' | '100') => {
         setSenaPorcentajeOption(preset);
@@ -2479,6 +2496,67 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                     📦 {batchItems.length} ítem(s) en lote
                                                 </span>
                                             </div>
+
+                                            {/* SUGERENCIA DE ANIDADO PARA VINILO VEHICULAR (LAMINADO <= 2.90m) */}
+                                            {vehicularNestingSuggestions.length > 0 && (
+                                                <div style={{
+                                                    marginTop: '12px',
+                                                    padding: '12px 16px',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(6, 182, 212, 0.10) 100%)',
+                                                    border: '1px solid rgba(245, 158, 11, 0.5)',
+                                                    boxShadow: '0 0 16px rgba(245, 158, 11, 0.15)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '8px'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ fontSize: '1.4rem', filter: 'drop-shadow(0 0 6px #f59e0b)' }}>💡</span>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                <span>Sugerencia de Anidado — Ahorro en Tiempo de Laminado</span>
+                                                                <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.25)', color: '#fef3c7', fontWeight: 700 }}>
+                                                                    ≤ 2.90 ml
+                                                                </span>
+                                                            </div>
+                                                            <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>
+                                                                {vehicularNestingSuggestions[0].message}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{
+                                                        background: 'rgba(0, 0, 0, 0.35)',
+                                                        padding: '8px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        flexWrap: 'wrap',
+                                                        gap: '8px'
+                                                    }}>
+                                                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                                            ⏱️ <strong>Beneficio:</strong> {vehicularNestingSuggestions[0].benefitText}
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                            {vehicularNestingSuggestions[0].items.map(it => (
+                                                                <span key={it.id} style={{
+                                                                    fontSize: '0.7rem',
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '4px',
+                                                                    background: 'rgba(6, 182, 212, 0.15)',
+                                                                    color: '#67e8f9',
+                                                                    border: '1px solid rgba(6, 182, 212, 0.3)',
+                                                                    fontFamily: 'monospace'
+                                                                }}>
+                                                                    📄 {it.fileName || `Ítem #${it.id}`} ({it.copias || 1}x)
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             <div className="batch-grid" style={{
                                                 marginTop: '14px',

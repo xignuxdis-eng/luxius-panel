@@ -18,6 +18,7 @@ export interface FloatingBatchDockProps {
     onBatchStatus: (status: 'impreso' | 'entregado') => void;
     onBatchRestore: () => void;
     onBatchDelete: () => void;
+    vehicularSuggestion?: import('@/utils/nesting').VehicularNestingSuggestion;
 }
 
 export function FloatingBatchDock({
@@ -36,7 +37,8 @@ export function FloatingBatchDock({
     viewTab,
     onBatchStatus,
     onBatchRestore,
-    onBatchDelete
+    onBatchDelete,
+    vehicularSuggestion
 }: FloatingBatchDockProps) {
     if (selectedIds.size === 0) return null;
 
@@ -47,11 +49,29 @@ export function FloatingBatchDock({
                     <span style={{ fontWeight: 800, color: 'var(--primary-color)', whiteSpace: 'nowrap' }}>{selectedIds.size} seleccionados</span>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} style={{ fontSize: '0.8rem', padding: '2px 8px' }}>✕</Button>
                 </div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-color)', display: 'flex', gap: '0.75rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-color)', display: 'flex', gap: '0.75rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem', whiteSpace: 'nowrap', alignItems: 'center' }}>
                     {selectedTotals.m2 > 0 && <span>m²: <strong>{selectedTotals.m2.toFixed(2)}</strong></span>}
                     {selectedTotals.ml > 0 && <span>ml: <strong>{selectedTotals.ml.toFixed(2)}</strong></span>}
                     {isAdmin && (
                         <span>$: <strong>{selectedTotals.price.toLocaleString()}</strong></span>
+                    )}
+                    {vehicularSuggestion && (
+                        <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            color: '#fbbf24',
+                            background: 'rgba(245, 158, 11, 0.22)',
+                            border: '1px solid rgba(245, 158, 11, 0.6)',
+                            boxShadow: '0 0 10px rgba(245, 158, 11, 0.3)',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }} title={`💡 ${vehicularSuggestion.message}\n${vehicularSuggestion.benefitText}`}>
+                            💡 Sugerencia: Anidar para laminar ({vehicularSuggestion.totalLinearMeters.toFixed(2)} ml)
+                        </span>
                     )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem', flexWrap: 'nowrap' }}>
@@ -76,10 +96,21 @@ export function FloatingBatchDock({
                             variant="primary"
                             size="sm"
                             onClick={onOpenNesting}
-                            style={{ background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.8rem' }}
-                            title="Optimizar acomodo e imposición 2D en bobina para las órdenes seleccionadas"
+                            style={{
+                                background: vehicularSuggestion
+                                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                                    : 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                                color: vehicularSuggestion ? '#000' : '#fff',
+                                border: vehicularSuggestion ? '1px solid #fef08a' : 'none',
+                                fontWeight: 800,
+                                fontSize: '0.8rem',
+                                boxShadow: vehicularSuggestion ? '0 0 14px rgba(245, 158, 11, 0.55)' : 'none'
+                            }}
+                            title={vehicularSuggestion
+                                ? `💡 Sugerencia de Anidado (Ahorro de Laminado):\n${vehicularSuggestion.message}\n${vehicularSuggestion.benefitText}`
+                                : "Optimizar acomodo e imposición 2D en bobina para las órdenes seleccionadas"}
                         >
-                            📐 Nesting ({selectedIds.size})
+                            {vehicularSuggestion ? '💡' : '📐'} Nesting ({selectedIds.size})
                         </Button>
                         <Button
                             variant="secondary"

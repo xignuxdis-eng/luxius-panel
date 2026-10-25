@@ -19,6 +19,7 @@ import PdfModeModal from '@components/PdfModeModal'
 import NestingStudioModal from '@components/workshop/NestingStudioModal'
 import { runNesting, type NestingItem } from '@/utils/nestingEngine'
 import { downloadSingleOrderFiles, downloadBatchOrdersZip, buildProductionFilename, type DownloadProgressState } from '@/utils/orderFileDownloader'
+import { detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nesting'
 import './Entrada.css'
 import { FloatingBatchDock } from './components/FloatingBatchDock'
 import { EntradaToolbar } from './components/EntradaToolbar'
@@ -466,6 +467,23 @@ export default function Entrada() {
         }, 0)
     };
 
+    const selectedVehicularNesting = useMemo(() => {
+        if (selectedIds.size < 2) return undefined;
+        const selectedOrders = Array.from(selectedIds)
+            .map(id => orders.find(x => String(x.id || x.ot) === String(id)))
+            .filter((o): o is Order => !!o);
+        const candidates: NestingCandidateItem[] = selectedOrders.map(o => ({
+            id: o.id,
+            fileName: o.nombreArchivo || (o.archivos && o.archivos[0]) || o.descripcionItem || o.nombreTarea || `OT-${o.id}`,
+            ancho: Number(o.ancho) || 0,
+            alto: Number(o.alto) || 0,
+            copias: Number(o.copias) || 1,
+            material: o.material
+        }));
+        const sugs = detectVehicularNestingSuggestions(candidates, 2.90);
+        return sugs.length > 0 ? sugs[0] : undefined;
+    }, [selectedIds, orders]);
+
     const refreshOrders = async () => {
         await loadOrders(true)
     }
@@ -848,6 +866,7 @@ export default function Entrada() {
                 onBatchStatus={handleBatchStatus}
                 onBatchRestore={handleBatchRestore}
                 onBatchDelete={handleBatchDelete}
+                vehicularSuggestion={selectedVehicularNesting}
             />
 
             {/* TABLE */}

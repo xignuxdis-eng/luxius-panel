@@ -6,6 +6,7 @@ import { OrderTagBadges } from './OrderTagBadges'
 import { OrderConsumptionBadge } from './OrderConsumptionBadge'
 import { calculateOrderPrice, getConsumption, isSpecialLaminationOrder } from '../utils/entradaCalculations'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
+import { detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nesting'
 
 export interface BatchRowMasterProps {
     item: GroupedBatch;
@@ -74,6 +75,19 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
     onSoftDeleteSingle
 }: BatchRowMasterProps) {
     const batchMenuId = `batch:${item.batchId}`;
+
+    const vehicularSuggestions = React.useMemo(() => {
+        if (!item.orders || item.orders.length < 2) return [];
+        const candidates: NestingCandidateItem[] = item.orders.map(o => ({
+            id: o.id,
+            fileName: o.nombreArchivo || (o.archivos && o.archivos[0]) || o.nombreTarea || `OT-${o.id}`,
+            ancho: Number(o.ancho) || 0,
+            alto: Number(o.alto) || 0,
+            copias: Number(o.copias) || 1,
+            material: o.material
+        }));
+        return detectVehicularNestingSuggestions(candidates, 2.90);
+    }, [item.orders]);
 
     return (
         <>
@@ -244,6 +258,18 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                     </span>
                                 );
                             })()}
+                            {vehicularSuggestions.length > 0 && (
+                                <span
+                                    className="batch-vehicular-nesting-pill"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenNestingModal(item.orders, item.batchName);
+                                    }}
+                                    title={`💡 Sugerencia de Anidado (Ahorro de Laminado):\n${vehicularSuggestions.map(s => s.message).join('\n')}\n${vehicularSuggestions.map(s => s.benefitText).join('\n')}\nClic para anidar en Nesting Studio.`}
+                                >
+                                    💡 Sugerencia: Laminar juntos (≤ 2.90m)
+                                </span>
+                            )}
                         </div>
                     </div>
                 </td>
@@ -407,6 +433,51 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                     </div>
                 </td>
             </tr>
+
+            {/* EXPANDED VEHICULAR NESTING SUGGESTION BANNER */}
+            {isExpanded && vehicularSuggestions.length > 0 && (
+                <tr className="batch-vehicular-nesting-row">
+                    <td colSpan={5}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '1.35rem', filter: 'drop-shadow(0 0 5px #f59e0b)' }}>💡</span>
+                                <div>
+                                    <div style={{ fontWeight: 800, color: '#fbbf24', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span>Sugerencia de Anidado — Ahorro en Tiempo de Laminado</span>
+                                        <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.25)', color: '#fef3c7' }}>
+                                            ≤ 2.90 ml
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>
+                                        {vehicularSuggestions[0].message} {vehicularSuggestions[0].benefitText}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => onOpenNestingModal(item.orders, item.batchName)}
+                                style={{
+                                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                    color: '#000',
+                                    fontWeight: 800,
+                                    border: 'none',
+                                    padding: '6px 14px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 0 10px rgba(245, 158, 11, 0.35)',
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                <span>📐</span> Anidar en Nesting Studio
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            )}
 
             {/* EXPANDED CHILD ROWS */}
             {isExpanded && item.orders.map(order => {

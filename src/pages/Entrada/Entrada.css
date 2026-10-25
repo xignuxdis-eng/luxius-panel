@@ -636,6 +636,38 @@
     border-left: 3px solid #c084fc;
 }
 
+.batch-vehicular-nesting-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fde68a;
+    border: 1px solid rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+    margin-top: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.batch-vehicular-nesting-pill:hover {
+    background: rgba(245, 158, 11, 0.35);
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.55);
+    transform: translateY(-1px);
+}
+
+.batch-vehicular-nesting-row td {
+    padding: 10px 16px !important;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(6, 182, 212, 0.08) 100%) !important;
+    border-top: 1px solid rgba(245, 158, 11, 0.3) !important;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+
 /* ================================================================
    OPERATIONAL TAGS (OTs)
    ================================================================ */

@@ -37,6 +37,7 @@ export interface Order {
     batchId?: string; // ID único del lote para agrupar
     loteNombre?: string; // Nombre del lote (ej. "Hilux Dixtron")
     descripcionItem?: string; // Sub-descripción del archivo (ej. "Lateral Izquierdo")
+    nombreArchivo?: string; // Nombre del archivo asignado o procesado
     /** Vendedor asignado. El backend lo devuelve en el listado de órdenes
      *  (`vendedorId`); se usa al reabrir una orden en el modal. */
     vendedorId?: number;

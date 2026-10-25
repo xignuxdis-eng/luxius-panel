@@ -5,3 +5,4 @@
 export * from './nestingTypes';
 export * from './nestingAlgorithm';
 export * from './rollOrderCalculator';
+export * from './nestingSuggestions';

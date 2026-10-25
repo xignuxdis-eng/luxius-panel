@@ -1,7 +1,7 @@
 // src/components/workshop/NestingStudioModal.tsx
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Order } from '@/types';
-import { runNesting, getBobinaUsefulWidth, type NestingItem, type NestingResult } from '@/utils/nestingEngine';
+import { runNesting, getBobinaUsefulWidth, type NestingItem, type NestingResult, detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nestingEngine';
 import './NestingStudioModal.css';
 import { NestingMetricsBar } from './nesting/NestingMetricsBar';
 import { NestingPiecesList } from './nesting/NestingPiecesList';
@@ -62,6 +62,19 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
         if (allFitIn137) return 1.37;
 
         return 1.52;
+    }, [orders]);
+
+    const vehicularSuggestions = useMemo(() => {
+        if (!orders || orders.length < 2) return [];
+        const candidates: NestingCandidateItem[] = orders.map(o => ({
+            id: o.id,
+            fileName: o.nombreArchivo || (o.archivos && o.archivos[0]) || o.descripcionItem || o.nombreTarea || `OT-${o.id}`,
+            ancho: Number(o.ancho) || 0,
+            alto: Number(o.alto) || 0,
+            copias: Number(o.copias) || 1,
+            material: o.material
+        }));
+        return detectVehicularNestingSuggestions(candidates, 2.90);
     }, [orders]);
 
     const [rollWidth, setRollWidth] = useState<number>(defaultRollWidth);
@@ -342,6 +355,40 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                     </div>
                     <button className="nesting-close-btn" onClick={onClose} title="Cerrar modal">✕</button>
                 </div>
+
+                {/* Banner de Sugerencia para Laminado */}
+                {vehicularSuggestions.length > 0 && (
+                    <div style={{
+                        background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.16) 0%, rgba(6, 182, 212, 0.12) 100%)',
+                        borderBottom: '1px solid rgba(245, 158, 11, 0.45)',
+                        padding: '8px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.82rem',
+                        color: '#fde68a',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 0 4px #f59e0b)' }}>💡</span>
+                            <span>
+                                <strong>Sugerencia de Producción:</strong> {vehicularSuggestions[0].message} Se laminarán juntas en un solo paso continuo de laminadora (≤ 2.90m).
+                            </span>
+                        </div>
+                        <span style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            background: 'rgba(245, 158, 11, 0.25)',
+                            border: '1px solid rgba(245, 158, 11, 0.5)',
+                            color: '#fef3c7'
+                        }}>
+                            ⚡ Ahorro de Laminado
+                        </span>
+                    </div>
+                )}
 
                 {/* Body */}
                 <div className="nesting-body">
