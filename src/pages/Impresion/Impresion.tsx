@@ -193,8 +193,8 @@ export default function Impresion() {
                         <div key={m.id} className="machine-badge animate-fade-in">
                             <span className={`status-indicator ${m.habilitada ? 'online' : 'offline'}`} />
                             <div className="machine-info">
-                                <span className="m-name">{m.nombre}</span>
-                                <span className="m-capacity">Ancho: {m.ancho}mm</span>
+                                <span className="m-name">{m.categoria === 'corte' ? '📐' : '🖨️'} {m.nombre}</span>
+                                <span className="m-capacity">Ancho: {m.anchoMaximo ? `${m.anchoMaximo}m` : `${m.ancho}mm`} ({m.categoria === 'corte' ? 'Corte' : 'Impresión'})</span>
                             </div>
                         </div>
                     ))}
@@ -213,7 +213,7 @@ export default function Impresion() {
                                 <th>OT / ID</th>
                                 <th>Estado</th>
                                 <th>Cliente</th>
-                                <th>Material</th>
+                                <th>Material / Plotter</th>
                                 <th>Medidas</th>
                                 <th>Cant.</th>
                                 <th>m²</th>
@@ -243,7 +243,33 @@ export default function Impresion() {
                                         </div>
                                     </td>
                                     <td>
-                                        <span className="material-tag-sm">{order.material}</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                            <span className="material-tag-sm">{order.material}</span>
+                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                <span style={{
+                                                    fontSize: '9px',
+                                                    padding: '1px 5px',
+                                                    borderRadius: '3px',
+                                                    backgroundColor: (order.maquinaId === 2 || (order.ancho && Number(order.ancho) > 1.60)) ? '#0284c7' : '#166534',
+                                                    color: '#fff',
+                                                    fontWeight: 700
+                                                }}>
+                                                    {(order.maquinaId === 2 || (order.ancho && Number(order.ancho) > 1.60)) ? 'SolJet 1.9m' : 'RS-640 1.6m'}
+                                                </span>
+                                                {order.corte && (
+                                                    <span style={{
+                                                        fontSize: '9px',
+                                                        padding: '1px 5px',
+                                                        borderRadius: '3px',
+                                                        backgroundColor: order.corte.estado === 'cortado' ? '#059669' : '#0369a1',
+                                                        color: '#fff',
+                                                        fontWeight: 700
+                                                    }}>
+                                                        📐 {order.corte.tipo === 'medio' ? 'Medio Corte' : 'Corte Completo'}{order.corte.estado === 'cortado' ? ' ✓' : ''}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         {(() => {

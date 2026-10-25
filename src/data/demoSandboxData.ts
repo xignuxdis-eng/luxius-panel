@@ -88,28 +88,31 @@ export const DEMO_CALIDADES: Calidad[] = [
 export const DEMO_MAQUINAS: Maquina[] = [
     {
         id: 901,
-        nombre: 'Plotter Gran Formato 3.20m (Solvente)',
-        tipo: 'Plotter Solvente',
-        anchoMaximo: 3.20,
-        ancho: 3.20,
-        estado: 'online',
-        habilitada: true
-    },
-    {
-        id: 902,
-        nombre: 'Plotter Ecosolvente 1.60m (Fotográfico)',
+        nombre: 'Roland RS-640',
         tipo: 'Plotter Ecosolvente',
+        categoria: 'impresion',
         anchoMaximo: 1.60,
         ancho: 1.60,
         estado: 'online',
         habilitada: true
     },
     {
+        id: 902,
+        nombre: 'Roland SolJet Pro III',
+        tipo: 'Plotter Gran Formato',
+        categoria: 'impresion',
+        anchoMaximo: 1.90,
+        ancho: 1.90,
+        estado: 'online',
+        habilitada: true
+    },
+    {
         id: 903,
-        nombre: 'Mesa UV Cama Plana 2.50m x 1.30m',
-        tipo: 'Cama Plana UV',
-        anchoMaximo: 2.50,
-        ancho: 2.50,
+        nombre: 'Mimaki CG-60SR',
+        tipo: 'Plotter de Corte',
+        categoria: 'corte',
+        anchoMaximo: 0.60,
+        ancho: 0.60,
         estado: 'online',
         habilitada: true
     }

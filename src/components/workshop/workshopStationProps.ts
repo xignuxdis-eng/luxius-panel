@@ -680,6 +680,96 @@ function buildBreakRoom(w: number, _h: number): StationProps {
     };
 }
 
+/* -------------------------- PLOTTER DE CORTE MIMAKI CG-60SR -------------------------- */
+function buildVinylCutter(w: number, h: number): StationProps {
+    const c = new Container();
+    const base = new Graphics();
+    const pile = new Graphics();
+    const anim = new Graphics();
+    c.addChild(base);
+    c.addChild(pile);
+    c.addChild(anim);
+
+    const cx = Math.floor(w / 2);
+    const pw = Math.min(68, w - 8);
+    const px = cx - Math.floor(pw / 2);
+    const py = 24;
+
+    // Sombra del pedestal en el piso
+    floorShadow(base, px + 4, h - 8, pw - 8, 3, 0.4);
+
+    // Pedestal / patas de soporte de metal oscuro
+    obj(base, px + 8, py + 18, 4, h - py - 24, 0x334155);
+    obj(base, px + pw - 12, py + 18, 4, h - py - 24, 0x334155);
+    // Travesaño central del stand
+    obj(base, px + 10, py + 34, pw - 20, 3, 0x1e293b);
+    // Patas inferiores con ruedas de bloqueo
+    obj(base, px + 4, h - 10, 12, 3, 0x0f172a);
+    obj(base, px + pw - 16, h - 10, 12, 3, 0x0f172a);
+
+    // Cesta de tela para caída de vinilos (catch basket)
+    box(base, px + 12, py + 22, pw - 24, 16, 0x1e293b, 0.85);
+    box(base, px + 12, py + 37, pw - 24, 1, 0x334155);
+
+    // Chasis superior del Plotter de Corte (Mimaki CG-60SR)
+    obj(base, px, py, pw, 18, 0xe2e8f0);
+    // Franja de acento Mimaki Cyan
+    box(base, px, py + 4, pw, 2, 0x0284c7);
+    // Ranura de corte y rodillos de presión (pinch rollers)
+    box(base, px + 6, py + 8, pw - 12, 6, 0x0f172a);
+    obj(base, px + 8, py + 7, 4, 3, 0x94a3b8);
+    obj(base, px + pw - 12, py + 7, 4, 3, 0x94a3b8);
+    // Panel de control digital y pantalla LCD
+    obj(base, px + pw - 18, py + 2, 14, 5, 0x0f172a);
+    box(base, px + pw - 16, py + 3, 10, 3, 0x38bdf8); // LCD azul
+
+    // Vinilo que sobresale hacia la cesta
+    obj(base, px + 12, py + 14, pw - 24, 8, 0xf8fafc);
+    box(base, px + 14, py + 16, 8, 4, 0xec4899, 0.9); // sticker impreso
+    box(base, px + 26, py + 16, 8, 4, 0xeab308, 0.9);
+    box(base, px + 38, py + 16, 8, 4, 0x06b6d4, 0.9);
+
+    const tick = makeThrottle(60);
+    const range = pw - 24;
+
+    return {
+        container: c,
+        setCount(n) {
+            pile.clear();
+            const count = Math.min(10, Math.floor(n || 0));
+            if (count > 0) {
+                // Pliegos y rollitos de calcomanías terminadas a los pies del plotter
+                for (let i = 0; i < count; i++) {
+                    const bx = px + 2 + (i % 3) * 6;
+                    const by = h - 14 - Math.floor(i / 3) * 3;
+                    obj(pile, bx, by, 7, 3, i % 2 === 0 ? 0x38bdf8 : 0xfde047);
+                }
+            }
+        },
+        update(t) {
+            if (!tick(t)) return;
+            anim.clear();
+
+            // Carro cabezal de corte (movimiento rápido estilo plotter de cuchilla)
+            const phase = (t / 1400) % 2;
+            const ratio = phase < 1 ? phase : 2 - phase;
+            const jitter = Math.sin(t / 80) * 1.5;
+            const kx = px + 8 + Math.round(ratio * range + jitter);
+
+            // Cabezal y portacuchillas
+            box(anim, kx - 1, py + 7, 7, 8, OUTLINE, 0.95);
+            box(anim, kx, py + 8, 5, 6, 0x0284c7);
+            box(anim, kx + 1, py + 9, 3, 2, 0x38bdf8);
+            // Punta de cuchilla / haz óptico sensor OPOS
+            box(anim, kx + 2, py + 14, 1, 2, 0xffffff, 0.9);
+
+            // LED de estado: parpadeo rápido al cortar
+            const ledBlink = Math.floor(t / 250) % 2 === 0;
+            box(anim, px + pw - 5, py + 2, 2, 2, ledBlink ? 0x10b981 : 0x059669);
+        }
+    };
+}
+
 /** Props de una estación hechos con una imagen PNG (content/sprites.ts): estática, sin animaciones ni pilas de cajas. */
 function buildImageProps(id: string, width: number, height: number): StationProps | null {
     const img = getStationImage(id);
@@ -707,6 +797,8 @@ export function createStationProps(id: string, width: number, height: number): S
             return buildSupplies(width, height);
         case 'corte':
             return buildCutting(width, height);
+        case 'plotter_corte':
+            return buildVinylCutter(width, height);
         case 'empaque':
             return buildPacking(width, height);
         case 'despacho':

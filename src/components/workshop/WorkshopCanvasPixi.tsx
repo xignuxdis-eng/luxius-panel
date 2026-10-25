@@ -1764,21 +1764,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
                 // 4. Bobina de vinilo trasera ancha
                 const rollSprite = new Sprite(getPlotterVinylRollTexture());
-                rollSprite.x = plotterOffsetX + 28;
+                rollSprite.x = plotterOffsetX + 24;
                 rollSprite.y = plotterOffsetY + 2;
+                rollSprite.width = Math.max(40, plotterActualW - 44);
                 visualContainer.addChild(rollSprite);
 
                 // 5. Hoja impresa en bandeja delantera (Unrolling Printed Vinyl Sheet)
                 const sheetGfx = new Graphics();
-                sheetGfx.x = plotterOffsetX + 32;
+                sheetGfx.x = plotterOffsetX + 28;
                 sheetGfx.y = plotterOffsetY + 22;
                 sheetGfx.alpha = 0;
                 visualContainer.addChild(sheetGfx);
 
-                // 6. Chasis Roland VG2 Gran Formato (204x48 px)
+                // 6. Chasis Roland VG2 Gran Formato (escalado al ancho del plotter)
                 const chassisSprite = new Sprite(getPlotterChassisTexture(isOffline));
                 chassisSprite.x = plotterOffsetX;
                 chassisSprite.y = plotterOffsetY;
+                chassisSprite.width = plotterActualW;
                 visualContainer.addChild(chassisSprite);
 
                 // 7. Carro de cabezales móvil

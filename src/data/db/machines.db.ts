@@ -12,6 +12,51 @@ import {
 import { DEMO_MAQUINAS } from '../demoSandboxData';
 import { syncSave, syncDelete } from './client';
 
+export const DEFAULT_MAQUINAS: Maquina[] = [
+    {
+        id: 1,
+        nombre: 'Roland RS-640',
+        tipo: 'Plotter Ecosolvente',
+        categoria: 'impresion',
+        anchoMaximo: 1.60,
+        ancho: 1.60,
+        estado: 'online',
+        habilitada: true
+    },
+    {
+        id: 2,
+        nombre: 'Roland SolJet Pro III',
+        tipo: 'Plotter Gran Formato',
+        categoria: 'impresion',
+        anchoMaximo: 1.90,
+        ancho: 1.90,
+        estado: 'online',
+        habilitada: true
+    },
+    {
+        id: 3,
+        nombre: 'Mimaki CG-60SR',
+        tipo: 'Plotter de Corte',
+        categoria: 'corte',
+        anchoMaximo: 0.60,
+        ancho: 0.60,
+        estado: 'online',
+        habilitada: true
+    }
+];
+
+export function isCutMachine(m: Maquina): boolean {
+    return m.categoria === 'corte' || (!!m.tipo && m.tipo.toLowerCase().includes('corte'));
+}
+
+export function getPrintMachines(): Maquina[] {
+    return getMaquinas().filter(m => !isCutMachine(m));
+}
+
+export function getCutMachines(): Maquina[] {
+    return getMaquinas().filter(m => isCutMachine(m));
+}
+
 export function getMaquinas(): Maquina[] {
     if (isDemoMode()) {
         const demoMaqJson = localStorage.getItem(DEMO_MAQUINAS_KEY);
@@ -36,14 +81,14 @@ export function getMaquinas(): Maquina[] {
     if (sessionItemsJson) {
         try {
             const items = JSON.parse(sessionItemsJson) as Maquina[];
-            if (items && Array.isArray(items)) {
+            if (items && Array.isArray(items) && items.length > 0) {
                 return items.filter(m => !hiddenIds.includes(m.id));
             }
         } catch (e) { }
     }
 
-    // Sin datos mock — devolver vacío. El usuario agrega máquinas manualmente.
-    return [];
+    // Default: Roland RS-640 (1.60m), Roland SolJet Pro III (1.90m) y Mimaki CG-60SR (0.60m)
+    return DEFAULT_MAQUINAS.filter(m => !hiddenIds.includes(m.id));
 }
 
 export function getMaquinaById(id: number): Maquina | undefined {
@@ -69,6 +114,7 @@ export function saveMaquina(maquina: Partial<Maquina>): Maquina {
             nombre: maquina.nombre || 'Nueva Máquina',
             tipo: maquina.tipo || 'Impresora',
             anchoMaximo: maquina.anchoMaximo || 1.60,
+            categoria: maquina.categoria || (maquina.tipo?.toLowerCase().includes('corte') ? 'corte' : 'impresion'),
             estado: maquina.estado || 'online',
             habilitada: maquina.habilitada !== undefined ? maquina.habilitada : true
         };

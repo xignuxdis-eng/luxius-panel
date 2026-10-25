@@ -74,6 +74,17 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const watchedMaterial = watch('material')
     const watchedCalidad = watch('calidad')
     const watchedClientId = watch('clienteId')
+    const watchedMaquinaId = watch('maquinaId')
+    const watchedCorteTipo = watch('corteTipo')
+
+    // Verificación de escala de plotters (RS-640: 1.60m máx | SolJet Pro III: 1.90m máx)
+    const numW = Number(watchedAncho) || 0
+    const numH = Number(watchedAlto) || 0
+    const realW = numW > 20 ? numW / 100 : numW
+    const realH = numH > 20 ? numH / 100 : numH
+    const minDim = (realW > 0 && realH > 0) ? Math.min(realW, realH) : (realW || realH || 0)
+    const exceedsRS640 = minDim > 1.60
+    const exceedsSoljet = minDim > 1.90
 
     const [isParticular, setIsParticular] = useState<boolean>(() => {
         return !!(order as any)?.esParticular;
@@ -619,6 +630,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 clienteId: orderClientId ? String(orderClientId) : '',
                 vendedorId: order.vendedorId ? String(order.vendedorId) : '1',
                 status: order.status || currentDefaultStatus,
+                maquinaId: order.maquinaId || 1,
+                corteTipo: order.corte?.tipo || 'ninguno',
             });
             if (orderClientId) {
                 const foundClient = clientes.find(c => String(c.id) === String(orderClientId)) || getClientes().find(c => String(c.id) === String(orderClientId));
@@ -681,6 +694,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 ancho: '',
                 alto: '',
                 copias: 1,
+                maquinaId: 1,
+                corteTipo: 'ninguno',
                 notas: '',
                 subtotal: 0,
                 demasiasConfig: { top: false, bottom: false, left: false, right: false }
@@ -1375,6 +1390,12 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 fechaEntrega: data.fechaEntrega || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                 tags: selectedTags,
                                 esParticular: isParticular,
+                                maquinaId: (itemAncho && itemAncho > 1.60) ? 2 : (Number(data.maquinaId) || 1),
+                                corte: (data.corteTipo && data.corteTipo !== 'ninguno') ? {
+                                    tipo: data.corteTipo,
+                                    estado: 'pendiente',
+                                    maquinaId: 3
+                                } : undefined,
                             }
 
                             const saved = await saveOrden(orderData)
@@ -1477,6 +1498,12 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                         usuarioId: (order as any)?.usuarioId || user?.id,
                         servicios: data.servicios,
                         tags: selectedTags,
+                        maquinaId: exceedsRS640 ? 2 : (Number(data.maquinaId) || 1),
+                        corte: (data.corteTipo && data.corteTipo !== 'ninguno') ? {
+                            tipo: data.corteTipo,
+                            estado: order?.corte?.estado || 'pendiente',
+                            maquinaId: order?.corte?.maquinaId || 3
+                        } : undefined,
                     })
                     onClose(true)
 
@@ -2115,6 +2142,73 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Selector de Plotter de Impresión y Servicio de Corte Mimaki */}
+                                    <div className="form-group" style={{ gridColumn: 'span 4', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginTop: '6px' }}>
+                                        {/* Plotter de Impresión */}
+                                        <div style={{
+                                            background: 'var(--bg-card)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: 'var(--radius-md)',
+                                            padding: '10px 12px'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                <label style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span>🖨️</span> Plotter de Impresión
+                                                </label>
+                                                {exceedsRS640 && (
+                                                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#0284c7', color: '#fff', fontWeight: 700 }}>
+                                                        Ancho &gt; 1.60m: SolJet Pro III
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <select
+                                                {...register('maquinaId', { valueAsNumber: true })}
+                                                value={exceedsRS640 ? 2 : (watchedMaquinaId || 1)}
+                                                onChange={(e) => setValue('maquinaId', Number(e.target.value))}
+                                                className="input-field"
+                                                style={{ width: '100%', fontSize: '0.85rem' }}
+                                            >
+                                                <option value={1} disabled={exceedsRS640}>
+                                                    Roland VersaArt RS-640 (Ancho máx: 1.60m){exceedsRS640 ? ' — No cabe' : ''}
+                                                </option>
+                                                <option value={2}>
+                                                    Roland SolJet Pro III (Ancho máx: 1.90m)
+                                                </option>
+                                            </select>
+                                            {exceedsSoljet && (
+                                                <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px' }}>
+                                                    ⚠️ Medida ({minDim.toFixed(2)}m) supera 1.90m. Requerirá armado por paños/soldadura.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Plotter de Corte (Mimaki CG-60SR) */}
+                                        <div style={{
+                                            background: 'var(--bg-card)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: 'var(--radius-md)',
+                                            padding: '10px 12px'
+                                        }}>
+                                            <label style={{ margin: '0 0 6px 0', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>📐</span> Servicio de Plotter de Corte (Mimaki CG-60SR)
+                                            </label>
+                                            <select
+                                                {...register('corteTipo')}
+                                                className="input-field"
+                                                style={{ width: '100%', fontSize: '0.85rem' }}
+                                            >
+                                                <option value="ninguno">Sin corte en plotter (Refilado manual)</option>
+                                                <option value="medio">✂️ Medio corte (Stickers / Calcos troquelados en pliego)</option>
+                                                <option value="completo">⚡ Corte completo (Troquelado total pieza por pieza)</option>
+                                            </select>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                {watchedCorteTipo === 'medio' && 'Se asignará al sector Plotter de Corte para medio corte (kiss-cut).'}
+                                                {watchedCorteTipo === 'completo' && 'Se asignará al sector Plotter de Corte para troquelado total pasante (die-cut).'}
+                                                {(!watchedCorteTipo || watchedCorteTipo === 'ninguno') && 'El trabajo irá directamente a mesa de refilado manual tras la impresión.'}
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     {/* Línea 5: Servicios Unitario (Reactive) */}
                                     <div className="form-group" style={{ gridColumn: 'span 4', marginTop: '10px' }}>

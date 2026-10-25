@@ -58,8 +58,11 @@ export interface Maquina {
     id: number
     nombre: string
     ancho?: number // max width in mm (deprecated, use anchoMaximo)
+    /** Ancho máximo de impresión/corte en metros (RS640 = 1.60, SolJet Pro III = 1.90, CG-60SR = 0.60). */
     anchoMaximo?: number
     tipo: string
+    /** 'impresion' (default) o 'corte'. Si falta, se deduce del `tipo` (ver machines.db.ts#isCutMachine). */
+    categoria?: 'impresion' | 'corte'
     habilitada: boolean
     estado?: 'online' | 'offline' | 'mantenimiento'
 }

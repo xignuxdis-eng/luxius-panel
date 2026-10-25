@@ -29,6 +29,7 @@ export const StationModal: React.FC<StationModalProps> = ({
     const getStationRoute = (id: StationId): { path: string; label: string } => {
         if (id === 'diseno') return { path: '/diseno', label: 'Área de Diseño' };
         if (id === 'plotter1' || id === 'plotter2' || id.startsWith('maquina_')) return { path: '/impresion', label: 'Listado de Impresión' };
+        if (id === 'plotter_corte') return { path: '/impresion', label: 'Plotter de Corte' };
         if (id === 'insumos') return { path: '/stock', label: 'Stock & Materiales' };
         if (id === 'corte') return { path: '/impresion', label: 'Refilado / Impresión' };
         if (id === 'empaque') return { path: '/entrada', label: 'Empaque / Órdenes' };
@@ -48,13 +49,14 @@ export const StationModal: React.FC<StationModalProps> = ({
             if (m) return `🖨️ ${m.nombre.toUpperCase()}`;
         }
 
-        const m1 = (maquinas[0]?.nombre || 'PLOTTER PRINCIPAL').toUpperCase();
-        const m2 = (maquinas[1]?.nombre || 'PLOTTER SECUNDARIO').toUpperCase();
+        const m1 = (maquinas[0]?.nombre || 'ROLAND RS-640 (1.60M)').toUpperCase();
+        const m2 = (maquinas[1]?.nombre || 'ROLAND SOLJET PRO III (1.90M)').toUpperCase();
 
         switch (stationId) {
             case 'diseno': return '🖥️ ÁREA DE DISEÑO & PRE-PRENSA';
             case 'plotter1': return `🖨️ ${m1}`;
             case 'plotter2': return `🖨️ ${m2}`;
+            case 'plotter_corte': return '📐 PLOTTER DE CORTE MIMAKI CG-60SR';
             case 'insumos': return '🎨 STOCK DE INSUMOS & MATERIALES';
             case 'corte': return '✂️ MESA DE REFILADO & CORTE';
             case 'empaque': return '📦 MESA DE EMPAQUETADO';
@@ -66,17 +68,39 @@ export const StationModal: React.FC<StationModalProps> = ({
 
     const getStationOrders = () => {
         if (stationId.startsWith('maquina_')) {
-            return orders.filter(o => o.status === 'orden');
+            const mId = parseInt(stationId.replace('maquina_', ''), 10);
+            return orders.filter(o => o.status === 'orden' && o.maquinaId === mId);
         }
 
         switch (stationId) {
             case 'diseno':
                 return orders.filter(o => o.status === 'diseno' || o.status === 'rebotado' || o.status === 'relevamiento');
             case 'plotter1':
+                return orders.filter(o => {
+                    if (o.status !== 'orden') return false;
+                    if (o.maquinaId === 1 || o.maquinaId === 901) return true;
+                    if (o.maquinaId === 2 || o.maquinaId === 902) return false;
+                    const w = Math.min(Number(o.ancho) || 0, Number(o.alto) || 0);
+                    const realW = w > 20 ? w / 100 : w;
+                    return realW <= 1.60;
+                });
             case 'plotter2':
-                return orders.filter(o => o.status === 'orden');
+                return orders.filter(o => {
+                    if (o.status !== 'orden') return false;
+                    if (o.maquinaId === 2 || o.maquinaId === 902) return true;
+                    if (o.maquinaId === 1 || o.maquinaId === 901) return false;
+                    const w = Math.min(Number(o.ancho) || 0, Number(o.alto) || 0);
+                    const realW = w > 20 ? w / 100 : w;
+                    return realW > 1.60;
+                });
+            case 'plotter_corte':
+                return orders.filter(o => o.corte && (o.corte.tipo === 'medio' || o.corte.tipo === 'completo') && (o.status === 'impreso' || o.status === 'orden' || o.status === 'post'));
             case 'corte':
-                return orders.filter(o => o.status === 'impreso' || o.status === 'post');
+                return orders.filter(o => {
+                    const hasCorte = o.corte && (o.corte.tipo === 'medio' || o.corte.tipo === 'completo');
+                    if (hasCorte && o.corte?.estado !== 'cortado') return false;
+                    return o.status === 'impreso' || o.status === 'post';
+                });
             case 'empaque':
                 return orders.filter(o => o.status === 'completo');
             case 'despacho':
@@ -301,8 +325,22 @@ export const StationModal: React.FC<StationModalProps> = ({
                                         style={{ cursor: 'pointer', flex: 1, marginRight: '10px' }}
                                         title="Hacer clic para ver detalles y archivos de esta orden"
                                     >
-                                        <div style={{ fontWeight: 'bold', color: '#fbbf24', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            OT #{order.ot || order.id} - {order.clienteNombre} <span style={{ fontSize: '9px', opacity: 0.8 }}>👁️</span>
+                                        <div style={{ fontWeight: 'bold', color: '#fbbf24', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                            <span>OT #{order.ot || order.id} - {order.clienteNombre}</span>
+                                            <span style={{ fontSize: '9px', opacity: 0.8 }}>👁️</span>
+                                            {order.corte && (
+                                                <span style={{
+                                                    marginLeft: '4px',
+                                                    padding: '1px 5px',
+                                                    borderRadius: '3px',
+                                                    backgroundColor: order.corte.estado === 'cortado' ? '#059669' : '#0284c7',
+                                                    color: '#fff',
+                                                    fontSize: '8px',
+                                                    fontWeight: 'bold'
+                                                }}>
+                                                    📐 {order.corte.tipo === 'medio' ? 'Medio Corte' : 'Corte Completo'}{order.corte.estado === 'cortado' ? ' (Cortado)' : ''}
+                                                </span>
+                                            )}
                                         </div>
                                         <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '4px' }}>
                                             {order.material} ({order.ancho}x{order.alto}m) | Copias: {order.copias}
@@ -387,6 +425,35 @@ export const StationModal: React.FC<StationModalProps> = ({
                                                 }}
                                             >
                                                 🖨️ Imprimir
+                                            </button>
+                                        )}
+
+                                        {stationId === 'plotter_corte' && (
+                                            <button
+                                                onClick={async () => {
+                                                    audioEngine.playScissorsCut();
+                                                    const updatedCorte = {
+                                                        tipo: order.corte?.tipo || 'medio',
+                                                        estado: (order.corte?.estado === 'cortado' ? 'pendiente' : 'cortado') as any,
+                                                        maquinaId: order.corte?.maquinaId || 3
+                                                    };
+                                                    const { saveOrden } = await import('@/data/db');
+                                                    await saveOrden({ ...order, corte: updatedCorte });
+                                                    if (onUpdateOrderStatus) onUpdateOrderStatus(order.id, order.status);
+                                                }}
+                                                style={{
+                                                    backgroundColor: order.corte?.estado === 'cortado' ? '#10b981' : '#0284c7',
+                                                    color: '#fff',
+                                                    border: '1px solid #ffffff',
+                                                    padding: '6px 8px',
+                                                    borderRadius: '3px',
+                                                    fontSize: '8px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold'
+                                                }}
+                                                title="Marcar corte en Mimaki CG-60SR como completado"
+                                            >
+                                                {order.corte?.estado === 'cortado' ? '✅ Cortado' : '⚡ Marcar Cortado'}
                                             </button>
                                         )}
 
