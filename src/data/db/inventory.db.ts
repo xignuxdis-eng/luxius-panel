@@ -601,12 +601,31 @@ export function deductStockForOrder(order: {
     const materiales = getMateriales();
 
     // 1. Buscar coincidencia exacta o por descripción / código
-    const mat = materiales.find(m =>
+    let mat = materiales.find(m =>
         (m.descripcion && m.descripcion.trim().toLowerCase() === matName) ||
         (m.codigo && m.codigo.trim().toLowerCase() === matName) ||
         (m.descripcion && matName.includes(m.descripcion.trim().toLowerCase())) ||
         (m.codigo && matName.includes(m.codigo.trim().toLowerCase()))
     );
+
+    // 2. Búsqueda por alias industriales si no hubo coincidencia directa
+    if (!mat) {
+        if (matName.includes('vehicular') || matName.includes('3651') || matName.includes('orajet') || matName === 'vv' || matName === 'vvp') {
+            mat = materiales.find(m => m.codigo === 'VV') || materiales.find(m => m.descripcion?.toLowerCase().includes('3651'));
+        } else if (matName.includes('micro') || matName === 'vm') {
+            mat = materiales.find(m => m.codigo === 'VM') || materiales.find(m => m.descripcion?.toLowerCase().includes('micro'));
+        } else if (matName.includes('front') || matName === 'fl' || matName.includes('frontlight')) {
+            mat = materiales.find(m => m.codigo === 'FL') || materiales.find(m => m.descripcion?.toLowerCase().includes('front'));
+        } else if (matName.includes('back') || matName === 'bl' || matName.includes('backlight')) {
+            mat = materiales.find(m => m.codigo === 'BL') || materiales.find(m => m.descripcion?.toLowerCase().includes('back'));
+        } else if (matName.includes('base blanca') || matName === 'vbb') {
+            mat = materiales.find(m => m.codigo === 'VBB') || materiales.find(m => m.descripcion?.toLowerCase().includes('base blanca'));
+        } else if (matName.includes('transparente') || matName === 'vt') {
+            mat = materiales.find(m => m.codigo === 'VT') || materiales.find(m => m.descripcion?.toLowerCase().includes('transparente'));
+        } else if (matName.includes('blackout') || matName === 'bo') {
+            mat = materiales.find(m => m.codigo === 'BO') || materiales.find(m => m.descripcion?.toLowerCase().includes('blackout'));
+        }
+    }
 
     if (!mat) {
         console.warn(`[stock] No se encontró material coincidente para "${order.material}" en orden #${order.ot || order.id}`);
@@ -620,7 +639,27 @@ export function deductStockForOrder(order: {
     const copias = Math.max(1, Number(order.copias) || 1);
 
     const m2Total = Number((realW * realH * copias).toFixed(2));
-    const mlTotal = Number((Math.max(realW, realH) * copias).toFixed(2));
+
+    // Determinar metros lineales con soporte de anidado por filas o consumo calculado previo
+    let mlTotal = (order as any).consumoEstimado !== undefined && Number((order as any).consumoEstimado) > 0
+        ? Number((order as any).consumoEstimado)
+        : ((order as any).precioDetalle?.consumoML !== undefined && Number((order as any).precioDetalle.consumoML) > 0
+            ? Number((order as any).precioDetalle.consumoML)
+            : 0);
+
+    if (mlTotal <= 0) {
+        const rollWidth = mat.bobinas && mat.bobinas.length > 0 ? Number(mat.bobinas[0].ancho) : 1.37;
+        const usefulWidth = rollWidth - 0.01;
+        const fitsNormal = Math.max(1, Math.floor(usefulWidth / (realW || 1)));
+        const rowsNormal = Math.ceil(copias / fitsNormal);
+        const mlNormal = rowsNormal * realH;
+
+        const fitsRotated = Math.max(1, Math.floor(usefulWidth / (realH || 1)));
+        const rowsRotated = Math.ceil(copias / fitsRotated);
+        const mlRotated = rowsRotated * realW;
+
+        mlTotal = Number(Math.min(mlNormal, mlRotated).toFixed(2));
+    }
 
     // Determinar cantidad a descontar:
     // Si el material tiene bobinas o se cobra por mL, descontamos metros lineales; si no, m2.
@@ -696,11 +735,23 @@ export function revertStockForOrder(order: {
     const matName = String(order.material).trim().toLowerCase();
     const materiales = getMateriales();
 
-    const mat = materiales.find(m =>
+    let mat = materiales.find(m =>
         (m.descripcion && m.descripcion.trim().toLowerCase() === matName) ||
         (m.codigo && m.codigo.trim().toLowerCase() === matName) ||
         (m.descripcion && matName.includes(m.descripcion.trim().toLowerCase()))
     );
+
+    if (!mat) {
+        if (matName.includes('vehicular') || matName.includes('3651') || matName.includes('orajet') || matName === 'vv' || matName === 'vvp') {
+            mat = materiales.find(m => m.codigo === 'VV') || materiales.find(m => m.descripcion?.toLowerCase().includes('3651'));
+        } else if (matName.includes('micro') || matName === 'vm') {
+            mat = materiales.find(m => m.codigo === 'VM') || materiales.find(m => m.descripcion?.toLowerCase().includes('micro'));
+        } else if (matName.includes('front') || matName === 'fl' || matName.includes('frontlight')) {
+            mat = materiales.find(m => m.codigo === 'FL') || materiales.find(m => m.descripcion?.toLowerCase().includes('front'));
+        } else if (matName.includes('back') || matName === 'bl' || matName.includes('backlight')) {
+            mat = materiales.find(m => m.codigo === 'BL') || materiales.find(m => m.descripcion?.toLowerCase().includes('back'));
+        }
+    }
 
     if (!mat) return false;
 
@@ -712,7 +763,27 @@ export function revertStockForOrder(order: {
 
     const isMl = mat.tipoCobro === 'ml' || (mat.bobinas && mat.bobinas.length > 0);
     const m2Total = Number((realW * realH * copias).toFixed(2));
-    const mlTotal = Number((Math.max(realW, realH) * copias).toFixed(2));
+
+    let mlTotal = (order as any).consumoEstimado !== undefined && Number((order as any).consumoEstimado) > 0
+        ? Number((order as any).consumoEstimado)
+        : ((order as any).precioDetalle?.consumoML !== undefined && Number((order as any).precioDetalle.consumoML) > 0
+            ? Number((order as any).precioDetalle.consumoML)
+            : 0);
+
+    if (mlTotal <= 0) {
+        const rollWidth = mat.bobinas && mat.bobinas.length > 0 ? Number(mat.bobinas[0].ancho) : 1.37;
+        const usefulWidth = rollWidth - 0.01;
+        const fitsNormal = Math.max(1, Math.floor(usefulWidth / (realW || 1)));
+        const rowsNormal = Math.ceil(copias / fitsNormal);
+        const mlNormal = rowsNormal * realH;
+
+        const fitsRotated = Math.max(1, Math.floor(usefulWidth / (realH || 1)));
+        const rowsRotated = Math.ceil(copias / fitsRotated);
+        const mlRotated = rowsRotated * realW;
+
+        mlTotal = Number(Math.min(mlNormal, mlRotated).toFixed(2));
+    }
+
     const cantidadARevertir = isMl ? mlTotal : m2Total;
 
     const stockPrev = mat.stockActual || 0;

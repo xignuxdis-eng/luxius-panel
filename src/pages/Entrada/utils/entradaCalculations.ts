@@ -49,11 +49,15 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
                 const priceToUse = specialPriceWidth || specialPrice || b.precioML;
 
                 if (w <= b.usefulWidth) {
-                    const ml = round2(h * c);
+                    const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (w || 1)));
+                    const rows = Math.ceil(c / fitsPerRow);
+                    const ml = round2(rows * h);
                     candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml), rotated: false });
                 }
                 if (h <= b.usefulWidth) {
-                    const ml = round2(w * c);
+                    const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (h || 1)));
+                    const rows = Math.ceil(c / fitsPerRow);
+                    const ml = round2(rows * w);
                     candidates.push({ bobina: b.ancho, ml, cost: Math.round(priceToUse * ml), rotated: true });
                 }
             }
@@ -83,7 +87,9 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
                 const widest = availableWidths[availableWidths.length - 1];
                 const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${widest.ancho}`] : null;
                 const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
-                const ml = round2(h * c);
+                const fitsPerRow = Math.max(1, Math.floor(widest.usefulWidth / (w || 1)));
+                const rows = Math.ceil(c / fitsPerRow);
+                const ml = round2(rows * h);
                 return Math.round(priceToUse * ml);
             }
         }
@@ -137,10 +143,14 @@ export function getConsumption(order: Order, allMateriales: Material[]): Consump
 
                 for (const b of availableWidths) {
                     if (w <= b.usefulWidth) {
-                        candidates.push({ bobina: b.ancho, ml: round2(h * c), rotated: false });
+                        const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (w || 1)));
+                        const rows = Math.ceil(c / fitsPerRow);
+                        candidates.push({ bobina: b.ancho, ml: round2(rows * h), rotated: false });
                     }
                     if (h <= b.usefulWidth) {
-                        candidates.push({ bobina: b.ancho, ml: round2(w * c), rotated: true });
+                        const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (h || 1)));
+                        const rows = Math.ceil(c / fitsPerRow);
+                        candidates.push({ bobina: b.ancho, ml: round2(rows * w), rotated: true });
                     }
                 }
 
@@ -163,26 +173,38 @@ export function getConsumption(order: Order, allMateriales: Material[]): Consump
                     val = candidates[0].ml;
                     assignedBobina = candidates[0].bobina;
                 } else {
-                    val = round2(h * c);
-                    assignedBobina = availableWidths[availableWidths.length - 1]?.ancho;
+                    const widest = availableWidths[availableWidths.length - 1];
+                    const fitsPerRow = Math.max(1, Math.floor((widest?.usefulWidth || 1.36) / (w || 1)));
+                    const rows = Math.ceil(c / fitsPerRow);
+                    val = round2(rows * h);
+                    assignedBobina = widest?.ancho;
                 }
             } else {
                 // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
                 if (is150Piece) {
                     assignedBobina = 1.52;
-                    val = (w <= 1.515) ? round2(h * c) : round2(w * c);
+                    const fitsW = Math.max(1, Math.floor(1.515 / (w || 1)));
+                    const fitsH = Math.max(1, Math.floor(1.515 / (h || 1)));
+                    val = (w <= 1.515) ? round2(Math.ceil(c / fitsW) * h) : round2(Math.ceil(c / fitsH) * w);
                 } else if (w <= 1.365) {
                     assignedBobina = 1.37;
-                    val = round2(h * c);
+                    const fits = Math.max(1, Math.floor(1.365 / (w || 1)));
+                    val = round2(Math.ceil(c / fits) * h);
                 } else if (h <= 1.365 && round2(w * c) <= round2(h * c)) {
                     assignedBobina = 1.37;
-                    val = round2(w * c);
+                    const fits = Math.max(1, Math.floor(1.365 / (h || 1)));
+                    val = round2(Math.ceil(c / fits) * w);
                 } else if (w <= 1.515 || h <= 1.515) {
                     assignedBobina = 1.52;
-                    val = (h <= 1.515 && round2(w * c) < round2(h * c)) ? round2(w * c) : round2(h * c);
+                    const fitsW = Math.max(1, Math.floor(1.515 / (w || 1)));
+                    const fitsH = Math.max(1, Math.floor(1.515 / (h || 1)));
+                    val = (h <= 1.515 && round2(Math.ceil(c / fitsH) * w) < round2(Math.ceil(c / fitsW) * h))
+                        ? round2(Math.ceil(c / fitsH) * w)
+                        : round2(Math.ceil(c / fitsW) * h);
                 } else {
                     assignedBobina = 1.52;
-                    val = round2(h * c);
+                    const fits = Math.max(1, Math.floor(1.515 / (w || 1)));
+                    val = round2(Math.ceil(c / fits) * h);
                 }
             }
         }

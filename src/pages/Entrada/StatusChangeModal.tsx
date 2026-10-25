@@ -1,7 +1,7 @@
 import Modal from '@components/ui/Modal'
 import { statusColors, statusLabels, type OrderStatus } from '../../types/orden'
 import type { Order } from '@/types'
-import { saveOrden, getUsuarios, deleteOrden, saveBatchOrders } from '@data/db'
+import { saveOrden, getUsuarios, deleteOrden, saveBatchOrders, deductStockForOrder, revertStockForOrder } from '@data/db'
 import { useState, useMemo } from 'react'
 import { useAuthStore } from '@store/authStore'
 
@@ -47,18 +47,40 @@ export default function StatusChangeModal({ isOpen, onClose, order, batchOrders 
         if (saving) return;
         setSaving(true);
         try {
+            const isPrintedOrDelivered = newStatus === 'impreso' || newStatus === 'entregado';
+            const isReverting = ['relevamiento', 'diseno', 'preorden', 'orden', 'rebotado', 'anulado'].includes(newStatus);
+
             if (isBatch && batchOrders) {
+                batchOrders.forEach(o => {
+                    if (isPrintedOrDelivered && !o.stockDescontado) {
+                        const ok = deductStockForOrder(o, newStatus as any);
+                        if (ok) o.stockDescontado = true;
+                    } else if (isReverting && o.stockDescontado) {
+                        revertStockForOrder(o);
+                        o.stockDescontado = false;
+                    }
+                });
                 const ids = batchOrders.map(o => (o as any).uuid || o.id || o.ot);
                 await saveBatchOrders('update', ids, {
                     status: newStatus as any,
+                    stockDescontado: isPrintedOrDelivered ? true : (isReverting ? false : undefined),
                     artistaId: selectedArtistaId,
                     category: selectedCategory,
                     fechaEntrega: selectedFechaEntrega
                 });
             } else {
+                let stockDescontado = order.stockDescontado;
+                if (isPrintedOrDelivered && !stockDescontado) {
+                    const ok = deductStockForOrder(order, newStatus as any);
+                    if (ok) stockDescontado = true;
+                } else if (isReverting && stockDescontado) {
+                    revertStockForOrder(order);
+                    stockDescontado = false;
+                }
                 await saveOrden({
                     id: (order as any).uuid || order.id,
                     status: newStatus as any,
+                    stockDescontado,
                     artistaId: selectedArtistaId,
                     category: selectedCategory,
                     fechaEntrega: selectedFechaEntrega

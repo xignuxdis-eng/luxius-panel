@@ -99,7 +99,9 @@ export function calculateItemPriceDetailed(
 
             // 1. Orientacion Normal (Ancho de la pieza a lo ancho de la bobina)
             if (w <= usefulWidth) {
-                const ml = round2(h * c);
+                const fitsPerRow = Math.max(1, Math.floor(usefulWidth / (w || 1)));
+                const rows = Math.ceil(c / fitsPerRow);
+                const ml = round2(rows * h);
                 const cost = Math.round(priceToUse * ml);
                 candidates.push({
                     bobina: bobinaAncho,
@@ -112,7 +114,9 @@ export function calculateItemPriceDetailed(
 
             // 2. Orientacion Rotada 90° (Alto de la pieza a lo ancho de la bobina)
             if (h <= usefulWidth) {
-                const ml = round2(w * c);
+                const fitsPerRow = Math.max(1, Math.floor(usefulWidth / (h || 1)));
+                const rows = Math.ceil(c / fitsPerRow);
+                const ml = round2(rows * w);
                 const cost = Math.round(priceToUse * ml);
                 candidates.push({
                     bobina: bobinaAncho,
@@ -157,7 +161,9 @@ export function calculateItemPriceDetailed(
             const widest = availableWidths[availableWidths.length - 1];
             const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${widest.ancho}`] : null;
             const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
-            const ml = round2(h * c);
+            const fitsPerRow = Math.max(1, Math.floor(widest.usefulWidth / (w || 1)));
+            const rows = Math.ceil(c / fitsPerRow);
+            const ml = round2(rows * h);
             bestCost = Math.round(priceToUse * ml);
             assignedBobina = widest.ancho;
             appliedPriceMl = priceToUse;

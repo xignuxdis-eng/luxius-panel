@@ -58,6 +58,7 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
     const isMobile = order.origen === 'mobile';
     const operarioNombre = order.operarioNombre || order.vendedorNombre || (order as any).vendedor?.nombre || (order as any).vendedorName || '';
     const otDisplay = order.ot || `OT-${order.id}`;
+    const [openUpwards, setOpenUpwards] = React.useState(false);
     let cleanDesc = (order.nombreTarea || order.observaciones || '').trim();
     if (cleanDesc.startsWith('Proyecto #') || cleanDesc.startsWith('Proyecto OT-') || cleanDesc === 'Nuevo Pedido' || cleanDesc === 'Trabajo de Impresión') {
         cleanDesc = '';
@@ -247,6 +248,9 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                                     className={`btn-icon-action action-menu-trigger ${actionMenuOrderId === orderIdKey ? 'active' : ''}`}
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        const btnRect = e.currentTarget.getBoundingClientRect();
+                                        const spaceBelow = window.innerHeight - btnRect.bottom;
+                                        setOpenUpwards(spaceBelow < 280);
                                         setActionMenuOrderId(prev => prev === orderIdKey ? null : orderIdKey);
                                     }}
                                     title="Más opciones de orden"
@@ -254,7 +258,7 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                                     <span style={{ pointerEvents: 'none', letterSpacing: '-1px', fontWeight: 900 }}>•••</span>
                                 </button>
                                 {actionMenuOrderId === orderIdKey && (
-                                    <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                    <div className={`action-menu-popover ${openUpwards ? 'open-upwards' : ''}`} onClick={(e) => e.stopPropagation()}>
                                         <button
                                             type="button"
                                             className="action-menu-item"

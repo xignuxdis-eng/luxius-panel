@@ -75,6 +75,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
     onSoftDeleteSingle
 }: BatchRowMasterProps) {
     const batchMenuId = `batch:${item.batchId}`;
+    const [openUpwards, setOpenUpwards] = React.useState(false);
 
     const vehicularSuggestions = React.useMemo(() => {
         if (!item.orders || item.orders.length < 2) return [];
@@ -362,6 +363,9 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                 className={`btn-icon-action action-menu-trigger ${actionMenuOrderId === batchMenuId ? 'active' : ''}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    const btnRect = e.currentTarget.getBoundingClientRect();
+                                    const spaceBelow = window.innerHeight - btnRect.bottom;
+                                    setOpenUpwards(spaceBelow < 280);
                                     setActionMenuOrderId(prev => prev === batchMenuId ? null : batchMenuId);
                                 }}
                                 title="Más opciones del lote"
@@ -369,7 +373,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                 <span style={{ pointerEvents: 'none', letterSpacing: '-1px', fontWeight: 900 }}>•••</span>
                             </button>
                             {actionMenuOrderId === batchMenuId && (
-                                <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                <div className={`action-menu-popover ${openUpwards ? 'open-upwards' : ''}`} onClick={(e) => e.stopPropagation()}>
                                     <button
                                         type="button"
                                         className="action-menu-item"
@@ -649,6 +653,9 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                         className={`btn-icon-action action-menu-trigger ${actionMenuOrderId === orderKey ? 'active' : ''}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            const btnRect = e.currentTarget.getBoundingClientRect();
+                                            const spaceBelow = window.innerHeight - btnRect.bottom;
+                                            setOpenUpwards(spaceBelow < 280);
                                             setActionMenuOrderId(prev => prev === orderKey ? null : orderKey);
                                         }}
                                         title="Más opciones de orden"
@@ -656,7 +663,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                         <span style={{ pointerEvents: 'none', letterSpacing: '-1px', fontWeight: 900 }}>•••</span>
                                     </button>
                                     {actionMenuOrderId === orderKey && (
-                                        <div className="action-menu-popover" onClick={(e) => e.stopPropagation()}>
+                                        <div className={`action-menu-popover ${openUpwards ? 'open-upwards' : ''}`} onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 type="button"
                                                 className="action-menu-item"

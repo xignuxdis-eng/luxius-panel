@@ -49,6 +49,8 @@
     overflow-x: auto;
     box-shadow: var(--shadow-md);
     margin-bottom: 70px; /* Space for the floating dock */
+    min-height: 440px; /* Garantiza espacio completo para popovers de acciones aun con pocas filas */
+    padding-bottom: 140px; /* Evita que el popover de la última fila se corte por el desborde de la tabla */
 }
 
 .orders-table {
@@ -1122,6 +1124,12 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+}
+
+.action-menu-popover.open-upwards {
+    top: auto;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.4);
 }
 
 .action-menu-item {

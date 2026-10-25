@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import { getOrderTag, isDesignerOwner } from '@/types/orden'
 import { isDesignerRole } from '../../types/auth'
-import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, resolveMediaUrl, matchesOrderId } from '@data/db'
+import { getOrdenes, getMateriales, saveOrden, deleteOrden, getClientes, saveBatchOrders, mergeOrdersIntoBatch, resolveMediaUrl, matchesOrderId, deductStockForOrder } from '@data/db'
 import { useAuthStore } from '@store/authStore'
 import NuevoPedidoModal from './NuevoPedidoModal'
 import StatusChangeModal from './StatusChangeModal'
@@ -651,10 +651,19 @@ export default function Entrada() {
             setLoading(true);
             const finalIds = Array.from(selectedIds);
 
-            // Actualización optimista en memoria para feedback instantáneo en vivo
-            setOrders(prev => prev.map(o => finalIds.some(id => matchesOrderId(o, id)) ? { ...o, status } : o));
+            // Deducción automática de stock para órdenes tildadas en lote
+            finalIds.forEach(id => {
+                const targetOrder = orders.find(x => matchesOrderId(x, id));
+                if (targetOrder && !targetOrder.stockDescontado) {
+                    const ok = deductStockForOrder(targetOrder, status);
+                    if (ok) targetOrder.stockDescontado = true;
+                }
+            });
 
-            await saveBatchOrders('update', finalIds.map(String), { status });
+            // Actualización optimista en memoria para feedback instantáneo en vivo
+            setOrders(prev => prev.map(o => finalIds.some(id => matchesOrderId(o, id)) ? { ...o, status, stockDescontado: true } : o));
+
+            await saveBatchOrders('update', finalIds.map(String), { status, stockDescontado: true });
 
             setSelectedIds(new Set());
             await loadOrders(true);
