@@ -1867,6 +1867,10 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Sugerencia de Anidado Notoria para Vinilo Vehicular (`src/utils/nesting/nestingSuggestions.ts` y `Entrada.tsx`)**:
     - Detecta grupos de 2 o más archivos/órdenes con idéntico ancho impresas en Vinilo Vehicular cuya sumatoria de metros lineales no supera los 2,90 m.
     - Presenta un banner interactivo destacado en la interfaz de Entrada (`✨ Sugerencia de Anidado Xana: Ahorro de Laminado`) permitiendo al operador laminar en una sola pasada continua en vez de laminar piezas individuales separadas.
+    - **Aislamiento Estricto de Paños en Nesting Studio (`BatchRowMaster.tsx`, `FloatingBatchDock.tsx`, `NestingStudioModal.tsx`)**:
+      - Al hacer clic en la sugerencia (píldora o botón del banner desplegado en lote), se filtran y pasan a Nesting Studio **estrictamente los paños que coinciden con la sugerencia** (`sug.itemIds`), evitando arrastrar paños de otros anchos, materiales o dimensiones del pedido.
+      - En `FloatingBatchDock.tsx`, la píldora de sugerencia es interactiva y permite anidar directamente los paños sugeridos con 1 clic.
+      - En `NestingStudioModal.tsx`, se agregó botón toggle `🎯 Aislar solo X paños sugeridos` / `👁️ Ver todos los paños` en el banner superior, permitiendo al operador aislar o restaurar las piezas en el pliego y listado en cualquier momento.
   - **Cálculo de Consumo en Bobina por Filas Anidadas a lo Ancho (`pricingEngine.ts`, `entradaCalculations.ts`, `inventory.db.ts`)**:
     - **Problema**: Para piezas pequeñas con múltiples copias (ej. 4 copias de 0,33 × 0,25 m en bobina de 1,37 m), el sistema multiplicaba el avance en secuencia lineal ($0,25 \times 4 = 1,00$ ml).
     - **Solución**: Se computan las piezas que caben a lo ancho de la bobina (`fitsPerRow = floor(usefulWidth / itemWidth)`). Las copias se agrupan en filas (`rows = ceil(copias / fitsPerRow)`), resultando en un avance lineal exacto de 0,25 ml ($1 \text{ fila} \times 0,25$ m).

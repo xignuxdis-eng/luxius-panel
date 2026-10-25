@@ -264,9 +264,14 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                     className="batch-vehicular-nesting-pill"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onOpenNestingModal(item.orders, item.batchName);
+                                        const matchingIds = new Set(vehicularSuggestions[0].itemIds.map(String));
+                                        const strictlyMatchingOrders = item.orders.filter(o => matchingIds.has(String(o.id || o.ot)));
+                                        onOpenNestingModal(
+                                            strictlyMatchingOrders.length > 0 ? strictlyMatchingOrders : item.orders,
+                                            `${item.batchName} — Anidado ${vehicularSuggestions[0].matchingWidth.toFixed(2)}m`
+                                        );
                                     }}
-                                    title={`💡 Sugerencia de Anidado (Ahorro de Laminado):\n${vehicularSuggestions.map(s => s.message).join('\n')}\n${vehicularSuggestions.map(s => s.benefitText).join('\n')}\nClic para anidar en Nesting Studio.`}
+                                    title={`💡 Sugerencia de Anidado (Ahorro de Laminado):\n${vehicularSuggestions.map(s => s.message).join('\n')}\n${vehicularSuggestions.map(s => s.benefitText).join('\n')}\nClic para anidar únicamente los paños sugeridos en Nesting Studio.`}
                                 >
                                     💡 Sugerencia: Laminar juntos (≤ 2.90m)
                                 </span>
@@ -442,42 +447,51 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
             {isExpanded && vehicularSuggestions.length > 0 && (
                 <tr className="batch-vehicular-nesting-row">
                     <td colSpan={5}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '1.35rem', filter: 'drop-shadow(0 0 5px #f59e0b)' }}>💡</span>
-                                <div>
-                                    <div style={{ fontWeight: 800, color: '#fbbf24', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span>Sugerencia de Anidado — Ahorro en Tiempo de Laminado</span>
-                                        <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.25)', color: '#fef3c7' }}>
-                                            ≤ 2.90 ml
-                                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {vehicularSuggestions.map((sug, sIdx) => {
+                                const matchingIds = new Set(sug.itemIds.map(String));
+                                const strictlyMatchingOrders = item.orders.filter(o => matchingIds.has(String(o.id || o.ot)));
+                                const targetOrders = strictlyMatchingOrders.length > 0 ? strictlyMatchingOrders : item.orders;
+                                return (
+                                    <div key={sug.id || sIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span style={{ fontSize: '1.35rem', filter: 'drop-shadow(0 0 5px #f59e0b)' }}>💡</span>
+                                            <div>
+                                                <div style={{ fontWeight: 800, color: '#fbbf24', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span>Sugerencia de Anidado ({sug.matchingWidth.toFixed(2)}m) — Ahorro en Tiempo de Laminado</span>
+                                                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.25)', color: '#fef3c7' }}>
+                                                        {sug.totalLinearMeters.toFixed(2)} ml ≤ 2.90 ml
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>
+                                                    {sug.message} {sug.benefitText}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenNestingModal(targetOrders, `${item.batchName} — Anidado ${sug.matchingWidth.toFixed(2)}m`)}
+                                            style={{
+                                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                                color: '#000',
+                                                fontWeight: 800,
+                                                border: 'none',
+                                                padding: '6px 14px',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.8rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 0 10px rgba(245, 158, 11, 0.35)',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            <span>📐</span> Anidar {targetOrders.length} paños sugeridos
+                                        </button>
                                     </div>
-                                    <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>
-                                        {vehicularSuggestions[0].message} {vehicularSuggestions[0].benefitText}
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => onOpenNestingModal(item.orders, item.batchName)}
-                                style={{
-                                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                    color: '#000',
-                                    fontWeight: 800,
-                                    border: 'none',
-                                    padding: '6px 14px',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.8rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    boxShadow: '0 0 10px rgba(245, 158, 11, 0.35)',
-                                    whiteSpace: 'nowrap'
-                                }}
-                            >
-                                <span>📐</span> Anidar en Nesting Studio
-                            </button>
+                                );
+                            })}
                         </div>
                     </td>
                 </tr>

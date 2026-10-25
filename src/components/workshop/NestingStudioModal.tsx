@@ -87,10 +87,18 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [selectedPieceId, setSelectedPieceId] = useState<string | number | null>(null);
 
-    // Estado de copias interactivas por ítem
     const [copiesMap, setCopiesMap] = useState<Record<string | number, number>>({});
     const [isCustomRoll, setIsCustomRoll] = useState<boolean>(false);
     const [customRollInput, setCustomRollInput] = useState<string>('');
+    const [filterSuggestedOnly, setFilterSuggestedOnly] = useState<boolean>(false);
+
+    // Órdenes activas en el lienzo (aislamiento de sugerencia o lote completo)
+    const activeOrders = useMemo(() => {
+        if (!filterSuggestedOnly || vehicularSuggestions.length === 0) return orders;
+        const matchIds = new Set(vehicularSuggestions[0].itemIds.map(String));
+        const strictly = orders.filter(o => matchIds.has(String(o.id || o.ot)));
+        return strictly.length > 0 ? strictly : orders;
+    }, [orders, filterSuggestedOnly, vehicularSuggestions]);
 
     // Sincronizar copias iniciales desde las órdenes
     useEffect(() => {
@@ -145,7 +153,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
     };
 
     const nestingItems = useMemo<NestingItem[]>(() => {
-        return orders.map(o => {
+        return activeOrders.map(o => {
             const key = o.id || o.ot || '';
             const c = copiesMap[key] !== undefined ? copiesMap[key] : (Math.max(1, Number(o.copias) || 1));
             const friendlyName = getPieceDisplayName(o);
@@ -161,7 +169,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                 orderId: o.id
             };
         });
-    }, [orders, copiesMap]);
+    }, [activeOrders, copiesMap]);
 
     const nestingResult = useMemo<NestingResult>(() => {
         const usefulW = getBobinaUsefulWidth(rollWidth);
@@ -349,7 +357,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                 Nesting Studio — Imposición 2D en Bobina
                             </div>
                             <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                                {orders.length} orden(es) · Cliente: {orders[0]?.clienteNombre || 'General'} · Material: {orders[0]?.material || 'VV'}
+                                {activeOrders.length} orden(es) / paño(s) · Cliente: {activeOrders[0]?.clienteNombre || 'General'} · Material: {activeOrders[0]?.material || 'VV'}
                             </span>
                         </div>
                     </div>
@@ -376,17 +384,41 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                                 <strong>Sugerencia de Producción:</strong> {vehicularSuggestions[0].message} Se laminarán juntas en un solo paso continuo de laminadora (≤ 2.90m).
                             </span>
                         </div>
-                        <span style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            background: 'rgba(245, 158, 11, 0.25)',
-                            border: '1px solid rgba(245, 158, 11, 0.5)',
-                            color: '#fef3c7'
-                        }}>
-                            ⚡ Ahorro de Laminado
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {orders.length > vehicularSuggestions[0].items.length && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFilterSuggestedOnly(prev => !prev)}
+                                    style={{
+                                        cursor: 'pointer',
+                                        background: filterSuggestedOnly ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)',
+                                        color: filterSuggestedOnly ? '#000' : '#fef3c7',
+                                        border: '1px solid #f59e0b',
+                                        borderRadius: '6px',
+                                        padding: '4px 10px',
+                                        fontWeight: 800,
+                                        fontSize: '0.74rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                    title="Alternar entre ver únicamente las piezas que pueden anidarse juntas o todas las piezas de la orden"
+                                >
+                                    {filterSuggestedOnly ? '👁️ Ver todos los paños' : `🎯 Aislar solo ${vehicularSuggestions[0].items.length} paños sugeridos`}
+                                </button>
+                            )}
+                            <span style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: 'rgba(245, 158, 11, 0.25)',
+                                border: '1px solid rgba(245, 158, 11, 0.5)',
+                                color: '#fef3c7'
+                            }}>
+                                ⚡ Ahorro de Laminado
+                            </span>
+                        </div>
                     </div>
                 )}
 
@@ -397,7 +429,7 @@ export const NestingStudioModal: React.FC<NestingStudioModalProps> = ({
                         <NestingMetricsBar nestingResult={nestingResult} />
 
                         <NestingPiecesList
-                            orders={orders}
+                            orders={activeOrders}
                             nestingResult={nestingResult}
                             copiesMap={copiesMap}
                             setCopiesMap={setCopiesMap}

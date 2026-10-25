@@ -565,6 +565,14 @@ export default function Entrada() {
         handleOpenNestingModal(selectedOrders, `Lote ${firstClient || 'Unificado'}`);
     };
 
+    const handleOpenNestingForSuggestion = () => {
+        if (!selectedVehicularNesting) return;
+        const matchingIds = new Set(selectedVehicularNesting.itemIds.map(String));
+        const strictlyMatchingOrders = displayedOrders.filter(o => matchingIds.has(String(o.id || o.ot)));
+        if (strictlyMatchingOrders.length === 0) return;
+        handleOpenNestingModal(strictlyMatchingOrders, `Anidado Sugerido — ${selectedVehicularNesting.matchingWidth.toFixed(2)}m`);
+    };
+
     const handleMergeSelectedIntoBatch = async () => {
         const selectedOrders = displayedOrders.filter(o => selectedIds.has(String(o.id || o.ot)));
         if (selectedOrders.length < 2) {
@@ -876,6 +884,7 @@ export default function Entrada() {
                 onBatchRestore={handleBatchRestore}
                 onBatchDelete={handleBatchDelete}
                 vehicularSuggestion={selectedVehicularNesting}
+                onOpenNestingSuggestion={handleOpenNestingForSuggestion}
             />
 
             {/* TABLE */}

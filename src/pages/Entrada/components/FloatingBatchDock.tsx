@@ -19,6 +19,7 @@ export interface FloatingBatchDockProps {
     onBatchRestore: () => void;
     onBatchDelete: () => void;
     vehicularSuggestion?: import('@/utils/nesting').VehicularNestingSuggestion;
+    onOpenNestingSuggestion?: () => void;
 }
 
 export function FloatingBatchDock({
@@ -38,7 +39,8 @@ export function FloatingBatchDock({
     onBatchStatus,
     onBatchRestore,
     onBatchDelete,
-    vehicularSuggestion
+    vehicularSuggestion,
+    onOpenNestingSuggestion
 }: FloatingBatchDockProps) {
     if (selectedIds.size === 0) return null;
 
@@ -56,22 +58,28 @@ export function FloatingBatchDock({
                         <span>$: <strong>{selectedTotals.price.toLocaleString()}</strong></span>
                     )}
                     {vehicularSuggestion && (
-                        <span style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            color: '#fbbf24',
-                            background: 'rgba(245, 158, 11, 0.22)',
-                            border: '1px solid rgba(245, 158, 11, 0.6)',
-                            boxShadow: '0 0 10px rgba(245, 158, 11, 0.3)',
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            whiteSpace: 'nowrap',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                        }} title={`💡 ${vehicularSuggestion.message}\n${vehicularSuggestion.benefitText}`}>
-                            💡 Sugerencia: Anidar para laminar ({vehicularSuggestion.totalLinearMeters.toFixed(2)} ml)
-                        </span>
+                        <button
+                            type="button"
+                            onClick={onOpenNestingSuggestion}
+                            style={{
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                color: '#fbbf24',
+                                background: 'rgba(245, 158, 11, 0.22)',
+                                border: '1px solid rgba(245, 158, 11, 0.6)',
+                                boxShadow: '0 0 10px rgba(245, 158, 11, 0.3)',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                whiteSpace: 'nowrap',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                            title={`💡 ${vehicularSuggestion.message}\n${vehicularSuggestion.benefitText}\nClic para anidar únicamente los ${vehicularSuggestion.items.length} paños sugeridos.`}
+                        >
+                            💡 Sugerencia: Anidar {vehicularSuggestion.items.length} paños ({vehicularSuggestion.totalLinearMeters.toFixed(2)} ml)
+                        </button>
                     )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem', flexWrap: 'nowrap' }}>
