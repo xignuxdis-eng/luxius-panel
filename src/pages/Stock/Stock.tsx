@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Header from '@components/layout/Header'
-import { getMateriales, saveMaterial, refreshCollection, getOrdenes, saveMovimientoStock } from '@data/db'
+import { getMateriales, saveMaterial, refreshCollection, getOrdenes, saveMovimientoStock, reconcilePendingStockDeductions } from '@data/db'
 import type { Material, Order } from '@/types'
 import Button from '@components/ui/Button'
 import StockNewsFeed from '@components/StockNewsFeed'
@@ -8,7 +8,7 @@ import NuevoMaterialModal from '@pages/ABM/NuevoMaterialModal'
 import { syncMaterialVariations } from '@/utils/materialAudit'
 import { computeStockForecast, canViewStockAlerts, type ForecastItem } from '@/utils/stockForecast'
 import { useAuthStore } from '@store/authStore'
-import { RefreshCw, PlusCircle, ShieldCheck } from 'lucide-react'
+import { RefreshCw, PlusCircle, ShieldCheck, PackageCheck } from 'lucide-react'
 import './Stock.css'
 
 export default function Stock() {
@@ -26,9 +26,18 @@ export default function Stock() {
 
     useEffect(() => {
         loadStock()
-        // Sync with live server in background
-        refreshCollection('materiales').then(() => loadStock())
-        getOrdenes().then(setOrders).catch(() => setOrders([]))
+        // Sync with live server in background and run auto-reconciliation
+        refreshCollection('materiales').then(() => {
+            loadStock()
+            getOrdenes().then(fetched => {
+                setOrders(fetched)
+                const res = reconcilePendingStockDeductions(fetched)
+                if (res.processedOrders > 0) {
+                    loadStock()
+                    setAuditSummary(`✅ Recuento de Stock: ${res.processedOrders} orden(es) aplicadas al inventario.`)
+                }
+            }).catch(() => setOrders([]))
+        })
     }, [])
 
     useEffect(() => {
@@ -76,6 +85,22 @@ export default function Stock() {
         }
     }
 
+    const handleReconcile = async () => {
+        setIsRefreshing(true)
+        try {
+            const currentOrders = await getOrdenes().catch(() => [] as Order[])
+            const res = reconcilePendingStockDeductions(currentOrders)
+            await refreshCollection('materiales')
+            loadStock()
+            if (res.processedOrders > 0) {
+                setAuditSummary(`✅ Recuento de Stock: ${res.processedOrders} orden(es) procesadas y descontadas del inventario en ${res.materialsUpdated} material(es).`)
+            } else {
+                setAuditSummary(`✅ Recuento de Stock: Todas las órdenes impresas y entregadas ya se encuentran conciliadas con el inventario.`)
+            }
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
 
     const handleOpenAdjustment = (material: Material, bobinaAncho?: number) => {
         setSelectedMaterial(material)
@@ -615,6 +640,16 @@ export default function Stock() {
                     >
                         <ShieldCheck size={14} />
                         <span className="label">Auditar</span>
+                    </button>
+                    <button
+                        className="stat-pill"
+                        style={{ cursor: 'pointer', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24' }}
+                        onClick={handleReconcile}
+                        disabled={isRefreshing}
+                        title="Recalcular y aplicar deducciones de órdenes impresas y entregadas"
+                    >
+                        <PackageCheck size={14} />
+                        <span className="label">Recontar Stock</span>
                     </button>
                     <div className="stat-pill">
                         <span className="label">Total:</span>

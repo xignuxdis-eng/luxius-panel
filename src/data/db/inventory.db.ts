@@ -3,6 +3,7 @@
  */
 
 import type { Material, Calidad, MovimientoStock } from './types';
+import type { Order } from '@/types';
 import {
     isDemoMode,
     DEMO_MATERIALES_KEY,
@@ -807,4 +808,76 @@ export function revertStockForOrder(order: {
 
     return true;
 }
+
+export interface StockReconciliationResult {
+    processedOrders: number;
+    materialsUpdated: number;
+    summary: Record<string, { count: number; ml: number; m2: number }>;
+}
+
+/**
+ * Recuenta y reconcilia el stock para todas las órdenes impresas o entregadas
+ * pendientes de deducción en la sesión o base de datos.
+ */
+export function reconcilePendingStockDeductions(ordersList?: Order[]): StockReconciliationResult {
+    let orders: Order[] = ordersList || [];
+    if (orders.length === 0) {
+        try {
+            const raw = localStorage.getItem('luxius_session_ordenes') || localStorage.getItem('luxius_demo_ordenes');
+            if (raw) orders = JSON.parse(raw);
+        } catch { /* no-op */ }
+    }
+
+    const relevantStatus = ['impreso', 'post', 'completo', 'entregado'];
+    let processedOrders = 0;
+    const summary: Record<string, { count: number; ml: number; m2: number }> = {};
+    const updatedOrderIds: string[] = [];
+
+    orders.forEach(order => {
+        if (relevantStatus.includes(order.status) && !order.stockDescontado) {
+            const ok = deductStockForOrder(order, order.status as any);
+            if (ok) {
+                order.stockDescontado = true;
+                processedOrders++;
+                updatedOrderIds.push(String(order.uuid || order.id || order.ot));
+
+                const matKey = String(order.material || 'OTRO').toUpperCase();
+                if (!summary[matKey]) summary[matKey] = { count: 0, ml: 0, m2: 0 };
+                summary[matKey].count++;
+                const w = Number(order.ancho) || 1;
+                const h = Number(order.alto) || 1;
+                const c = Number(order.copias) || 1;
+                summary[matKey].m2 += Number((w * h * c).toFixed(2));
+                summary[matKey].ml += Number(((order as any).consumoEstimado || h * c).toFixed(2));
+            }
+        }
+    });
+
+    if (processedOrders > 0) {
+        try {
+            const sessionKey = 'luxius_session_ordenes';
+            const raw = localStorage.getItem(sessionKey);
+            if (raw) {
+                const currentSession: any[] = JSON.parse(raw);
+                const merged = currentSession.map(o => {
+                    const match = updatedOrderIds.includes(String(o.uuid || o.id || o.ot));
+                    return match ? { ...o, stockDescontado: true } : o;
+                });
+                localStorage.setItem(sessionKey, JSON.stringify(merged));
+            }
+        } catch { /* no-op */ }
+
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('luxius-materials-updated'));
+            window.dispatchEvent(new CustomEvent('luxius-orders-updated'));
+        }
+    }
+
+    return {
+        processedOrders,
+        materialsUpdated: Object.keys(summary).length,
+        summary
+    };
+}
+
 

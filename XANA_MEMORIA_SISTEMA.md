@@ -1863,6 +1863,21 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Estandarización en Estación de Taller (`src/components/workshop/StationModal.tsx`)**:
     - Título unificado como `📐 PLOTTER DE CORTE` y acción simplificada a `Marcar corte en plotter como completado`, desacoplando la marca física de la interfaz del operario.
 
+- **Sugerencia de Anidado de Vinilo Vehicular, Cálculo de Metros Lineales por Filas y Recuento Integral de Stock (25/10/2026)**:
+  - **Sugerencia de Anidado Notoria para Vinilo Vehicular (`src/utils/nesting/nestingSuggestions.ts` y `Entrada.tsx`)**:
+    - Detecta grupos de 2 o más archivos/órdenes con idéntico ancho impresas en Vinilo Vehicular cuya sumatoria de metros lineales no supera los 2,90 m.
+    - Presenta un banner interactivo destacado en la interfaz de Entrada (`✨ Sugerencia de Anidado Xana: Ahorro de Laminado`) permitiendo al operador laminar en una sola pasada continua en vez de laminar piezas individuales separadas.
+  - **Cálculo de Consumo en Bobina por Filas Anidadas a lo Ancho (`pricingEngine.ts`, `entradaCalculations.ts`, `inventory.db.ts`)**:
+    - **Problema**: Para piezas pequeñas con múltiples copias (ej. 4 copias de 0,33 × 0,25 m en bobina de 1,37 m), el sistema multiplicaba el avance en secuencia lineal ($0,25 \times 4 = 1,00$ ml).
+    - **Solución**: Se computan las piezas que caben a lo ancho de la bobina (`fitsPerRow = floor(usefulWidth / itemWidth)`). Las copias se agrupan en filas (`rows = ceil(copias / fitsPerRow)`), resultando en un avance lineal exacto de 0,25 ml ($1 \text{ fila} \times 0,25$ m).
+  - **Deducción y Recuento de Stock de Materiales y Bobinas**:
+    - **Mapeo Robusto de Materiales (`deductStockForOrder`, `revertStockForOrder`)**: Se incorporó normalización por alias industriales (`VV`, `Vehicular`, `3651`, `Orajet`, `VM`, `FL`, `BL`, `VBB`, `VT`, `BO`) para resolver discrepancias entre códigos de presupuesto y catálogo de inventario.
+    - **Deducción al Tildar Órdenes en Lote (`Entrada.tsx` y `StatusChangeModal.tsx`)**: Se integró `deductStockForOrder` al cambiar estado a `impreso` o `entregado` desde la barra de acciones masivas y desde el modal de cambio de estado individual.
+    - **Reconciliación y Botón "Recontar Stock" (`Stock.tsx` e `inventory.db.ts`)**: Se implementó `reconcilePendingStockDeductions()` que audita órdenes impresas/entregadas sin flag `stockDescontado`, deduce los metros lineales correspondientes del inventario y registra el movimiento de egreso. Incorporado botón `📦 Recontar Stock` en la barra superior de `Stock.tsx` junto con reconciliación automática de fondo.
+    - **Reconciliación Histórica en Supabase**: Se reconciliaron las 134 órdenes históricas marcadas como impresas/entregadas actualizando `stockDescontado = True` y sincronizando el stock físico de vinilos y lonas.
+  - **Corrección de Desborde en Menú de Acciones de la Tabla (`Entrada.css`, `SingleOrderRow.tsx`, `BatchRowMaster.tsx`)**:
+    - En tablas con pocas filas, el menú popover de acciones (`...`) quedaba recortado por el contenedor. Se asignó `min-height: 440px` y `padding-bottom: 140px` a `.orders-table-container` y detección dinámica de proximidad al borde inferior (`open-upwards`) para desplegar el menú hacia arriba cuando el espacio inferior es inferior a 280 px.
+
 ---
 
 
