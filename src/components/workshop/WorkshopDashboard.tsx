@@ -79,9 +79,27 @@ export const WorkshopDashboard: React.FC = () => {
 
     useEffect(() => {
         fetchOrders();
-        // Poll orders every 3 seconds to keep workshop in sync with Luxius DB
-        const interval = setInterval(fetchOrders, 3000);
-        return () => clearInterval(interval);
+        // Polling cada 30 segundos sólo si la pestaña está visible para evitar egress innecesario
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                fetchOrders();
+            }
+        }, 30000);
+
+        const handleVisibilityOrFocus = () => {
+            if (document.visibilityState === 'visible') {
+                fetchOrders();
+            }
+        };
+
+        window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+        window.addEventListener('focus', handleVisibilityOrFocus);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+            window.removeEventListener('focus', handleVisibilityOrFocus);
+        };
     }, []);
 
     const handleUpdateStatus = async (orderId: number, newStatus: OrderStatus) => {

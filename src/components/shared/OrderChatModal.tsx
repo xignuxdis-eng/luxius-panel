@@ -46,8 +46,8 @@ export default function OrderChatModal({ isOpen, onClose, order }: OrderChatModa
             setLoading(true)
             fetchMessages().finally(() => setLoading(false))
 
-            // Poll every 3 seconds for new messages
-            const interval = setInterval(fetchMessages, 3000)
+            // Poll every 10 seconds for new messages
+            const interval = setInterval(fetchMessages, 10000)
             return () => clearInterval(interval)
         }
     }, [isOpen, orderId])

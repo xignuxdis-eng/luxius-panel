@@ -114,7 +114,6 @@ export function resolveMediaUrl(fileStr: string): string {
 
 export function getAuthHeaders(baseHeaders: Record<string, string> = {}): Record<string, string> {
     const headers: Record<string, string> = {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
         ...baseHeaders
     };
     try {
@@ -156,15 +155,27 @@ export const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const headers = getAuthHeaders(options.headers || {});
-        const separator = url.includes('?') ? '&' : '?';
-        const cacheBustedUrl = `${url}${separator}_t=${Date.now()}`;
+        const method = (options.method || 'GET').toUpperCase();
+        const isGet = method === 'GET';
 
-        const response = await fetch(cacheBustedUrl, {
+        // Solo cache-busting en mutaciones para permitir validación ETag / 304 en peticiones GET
+        let targetUrl = url;
+        if (!isGet && !url.includes('_t=')) {
+            const separator = url.includes('?') ? '&' : '?';
+            targetUrl = `${url}${separator}_t=${Date.now()}`;
+        }
+
+        const fetchOptions: RequestInit = {
             ...options,
-            cache: 'no-store',
             headers,
             signal: controller.signal
-        });
+        };
+        // Solo forzar no-store en mutaciones si no se especificó otra cosa
+        if (!isGet && !fetchOptions.cache) {
+            fetchOptions.cache = 'no-store';
+        }
+
+        const response = await fetch(targetUrl, fetchOptions);
         clearTimeout(id);
 
         // Si la sesión expiró en el servidor (401 / 403), limpiar token y disparar evento de logout

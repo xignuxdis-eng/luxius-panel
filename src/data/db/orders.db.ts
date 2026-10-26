@@ -65,7 +65,11 @@ export async function getOrdenes(forceRefresh = false): Promise<Order[]> {
     }
 
     try {
-        const response = await fetchWithTimeout(`${API_URL}/orders`, { cache: 'no-store' }, 35000);
+        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 35000);
+        if (response.status === 304) {
+            // ETag validó que no hubo cambios en el servidor
+            return localOrders;
+        }
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
