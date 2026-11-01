@@ -1888,4 +1888,24 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
 
 ---
 
+- **Prevención de Imágenes Duplicadas/Truncadas en Lote y Corrección de Guardado de Stock de Rollos (31/10/2026)**:
+  - **Detección de Archivos Duplicados y Truncados por Peso Exacto (`NuevoPedidoModal.tsx`)**:
+    - **Problema**: Al interrumpirse la carga de archivos por enlace (Google Drive o WeTransfer) en un lote y volver a ingresar el link, el sistema sumaba nuevamente todos los archivos al lote sin comprobar qué imágenes ya estaban en la lista. Además, si la descarga anterior se había cortado a la mitad, la imagen quedaba truncada o con peso incompleto sin ser sustituida.
+    - **Solución**: Se implementó una verificación por nombre de archivo (`fileName` / `originalName`) y tamaño en bytes (`file.size`):
+      - Si el archivo ya existe en el lote con peso idéntico y dimensiones válidas (`width > 0 && height > 0`), **se omite** automáticamente para evitar duplicaciones y no alterar el recuento total.
+      - Si el archivo ya existía pero con peso diferente (incompleto) o dimensiones no extraídas, **se reemplaza in-place** con el nuevo archivo completo manteniendo el orden sin inflar la cantidad de ítems.
+      - En `server/routes/cloud_import.py` se expuso `Content-Length` en los encabezados CORS para asegurar validación precisa de tamaño.
+  - **Persistencia de Materiales en Rollo, Bobinas y Stock (`inventory.db.ts`, `NuevoMaterialModal.tsx`, `Stock.tsx`)**:
+    - **Problema**: Al cargar o modificar materiales de tipo rollo (`ml`), los cambios no se guardaban o se revertían a cero por tres motivos:
+      1. `saveMaterial()` no asignaba el array `bobinas` ni atributos como `unidad` al crear materiales nuevos.
+      2. Al ajustar stock por bobina en `Stock.tsx`, se actualizaba `bobina.stockActual` pero no el `stockActual` general del material.
+      3. Al ingresar a la pantalla de Stock, la función `reconcilePendingStockDeductions()` re-descontaba órdenes históricas porque el backend no persistía el flag `stockDescontado`.
+    - **Solución**:
+      - Se preservan las propiedades `bobinas`, `unidad`, `color`, `botellasCerradas` y `botellasMl` en `saveMaterial()` y `deduplicateMaterials()`.
+      - Se calcula y sincroniza automáticamente `stockActual` como la sumatoria de las bobinas configuradas.
+      - En `NuevoMaterialModal.tsx` se agregó el campo editable `Stock (mL)` para cada bobina individual.
+      - En `server/routes/orders.py` se agregó `stockDescontado` a `ORDER_SPEC_KEYS` y en `_presupuesto_to_order`.
+      - En `inventory.db.ts` se incorporó persistencia local en `luxius_reconciled_stock_ids` para evitar doble deducción de stock.
+      - Se añadieron tests unitarios automatizados en `src/data/db.stock.test.ts` verificando la persistencia de bobinas y la protección contra doble deducción.
 
+---

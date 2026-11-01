@@ -848,17 +848,72 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     handleFileChange({ target: { files: [file] } } as any);
                 } else if (targetTab === 'lote') {
                     let downloadErrors = 0;
+                    let skippedCount = 0;
+                    let replacedCount = 0;
+                    let addedCount = 0;
+
                     for (let i = 0; i < data.files.length; i++) {
                         if (abortController.signal.aborted) break;
                         const fileInfo = data.files[i];
-                        setCloudImportStatus(`Descargando (${i + 1}/${data.files.length}): ${fileInfo.originalName}...`);
+                        setCloudImportStatus(`Procesando (${i + 1}/${data.files.length}): ${fileInfo.originalName}...`);
+
+                        // 1. Verificar si ya existe en el lote un ítem con el mismo nombre
+                        const currentBatch = batchItemsRef.current;
+                        const existingIndex = currentBatch.findIndex(it =>
+                            it.fileName.trim().toLowerCase() === fileInfo.originalName.trim().toLowerCase() ||
+                            (it.file && it.file.name.trim().toLowerCase() === fileInfo.originalName.trim().toLowerCase())
+                        );
+
                         try {
                             const fileUrl = fileInfo.tempUrl.startsWith('http') ? fileInfo.tempUrl : `${activeBaseUrl}${fileInfo.tempUrl}`;
                             const blobRes = await fetchWithTimeout(fileUrl, 90000);
                             if (!blobRes.ok) { downloadErrors++; continue; }
                             const blob = await blobRes.blob();
+
+                            // Descartar respuestas vacías / corruptas
+                            if (blob.size === 0) {
+                                downloadErrors++;
+                                continue;
+                            }
+
                             const file = new File([blob], fileInfo.originalName, { type: blob.type || 'application/octet-stream' });
 
+                            // 2. Si ya existía un archivo con el mismo nombre:
+                            if (existingIndex !== -1) {
+                                const existingItem = currentBatch[existingIndex];
+                                const isSameSize = existingItem.file && existingItem.file.size === file.size;
+                                const hasValidMeta = existingItem.metadata && existingItem.metadata.width > 0 && existingItem.metadata.height > 0;
+
+                                // Si tiene peso idéntico y metadatos válidos, está completo: OMITIR para no duplicar
+                                if (isSameSize && hasValidMeta) {
+                                    console.log(`[CloudImport] Archivo ya presente e íntegro (${file.name}, ${file.size} bytes). Omitiendo duplicado.`);
+                                    skippedCount++;
+                                    continue;
+                                }
+
+                                // Si el peso difiere o quedó truncado sin metadatos: REEMPLAZAR IN-PLACE
+                                console.log(`[CloudImport] Archivo truncado o incompleto detectado (${file.name}). Reemplazando in-place.`);
+                                replacedCount++;
+
+                                const url = URL.createObjectURL(file);
+                                blobStore.set(file.name, url);
+                                const meta = await extractMetadata(file, url);
+
+                                setBatchItems(prev => prev.map((it, idx) => idx === existingIndex ? {
+                                    ...it,
+                                    file: file,
+                                    fileName: file.name,
+                                    previewUrl: meta.thumbnailUrl || url,
+                                    metadata: meta,
+                                    confirmed: true
+                                } : it));
+
+                                await new Promise(r => setTimeout(r, 40));
+                                continue;
+                            }
+
+                            // 3. Archivo nuevo: agregar al lote
+                            addedCount++;
                             const placeholder: BatchItem = {
                                 id: Math.random().toString(36).substr(2, 9),
                                 file: file,
@@ -893,6 +948,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     if (downloadErrors > 0 && downloadErrors === data.files.length) {
                         throw new Error('No se pudo descargar ningún archivo. Verifique su conexión e intente de nuevo.');
                     }
+                    console.log(`[CloudImport] Resumen: ${addedCount} agregados, ${replacedCount} reemplazados (truncados), ${skippedCount} omitidos (duplicados íntegros), ${downloadErrors} errores.`);
                 }
                 
                 setShowCloudInput(false);
@@ -1078,11 +1134,24 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const currentQual = getValues('calidad');
         const initialQual = currentQual || watchedCalidad || (availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO');
 
-        // STEP 1: ADD INSTANT PLACEHOLDER CARDS FOR ALL FILES
+        // STEP 1: VERIFY DUPLICATES AND TRUNCATED FILES BEFORE ADDING PLACEHOLDERS
         const queue: { file: File; fileId: string; ext: string; url: string; initialMat: string; initialQual: string }[] = [];
 
         for (const file of files) {
-            const fileId = Math.random().toString(36).substring(2, 9);
+            const currentBatch = batchItemsRef.current;
+            const existing = currentBatch.find(it =>
+                it.fileName.trim().toLowerCase() === file.name.trim().toLowerCase() ||
+                (it.file && it.file.name.trim().toLowerCase() === file.name.trim().toLowerCase())
+            );
+
+            // Si ya existe con peso idéntico y metadatos válidos, omitir para no duplicar
+            if (existing && existing.file && existing.file.size === file.size && existing.metadata && existing.metadata.width > 0 && existing.metadata.height > 0) {
+                console.log(`[Luxius-Batch] Archivo ya presente e íntegro (${file.name}, ${file.size} bytes). Omitiendo duplicado.`);
+                continue;
+            }
+
+            // Si ya existe pero quedó truncado o con dimensiones vacías, reutilizar su ID para reemplazarlo
+            const fileId = existing ? existing.id : Math.random().toString(36).substring(2, 9);
             const ext = (file.name.split('.').pop()?.toUpperCase() || '');
             const url = URL.createObjectURL(file);
             blobStore.set(file.name, url);
@@ -1094,13 +1163,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 previewUrl: '',
                 metadata: { width: 0, height: 0, dpi: 72, format: ext, colorMode: 'Detectando...', pageCount: 0 },
                 confirmed: true,
-                copias: 1,
-                material: initialMat,
-                calidad: initialQual,
-                demasiasConfig: { top: false, bottom: false, left: false, right: false },
-                servicios: {}
+                copias: existing ? existing.copias : 1,
+                material: existing?.material || initialMat,
+                calidad: existing?.calidad || initialQual,
+                demasiasConfig: existing?.demasiasConfig || { top: false, bottom: false, left: false, right: false },
+                servicios: existing?.servicios || {}
             };
-            setBatchItems(prev => [...prev, placeholder]);
+
+            if (existing) {
+                setBatchItems(prev => prev.map(it => it.id === fileId ? placeholder : it));
+            } else {
+                setBatchItems(prev => [...prev, placeholder]);
+            }
             queue.push({ file, fileId, ext, url, initialMat, initialQual });
         }
 

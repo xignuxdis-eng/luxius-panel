@@ -196,6 +196,7 @@ export function deduplicateMaterials(materials: Material[]): Material[] {
             const base = preferCurrent ? item : existing;
             const other = preferCurrent ? existing : item;
 
+            const combinedBobinas = (base.bobinas && base.bobinas.length > 0) ? base.bobinas : other.bobinas;
             deduped[existingIndex] = {
                 ...other,
                 ...base,
@@ -203,7 +204,12 @@ export function deduplicateMaterials(materials: Material[]): Material[] {
                 stockActual: (existing.stockActual || 0) + (item.stockActual || 0),
                 stockMinimo: Math.max(existing.stockMinimo || 0, item.stockMinimo || 0),
                 precioM2: Number(base.precioM2 || 0) > 0 ? base.precioM2 : (other.precioM2 || 0),
-                habilitado: existing.habilitado !== false && item.habilitado !== false
+                habilitado: existing.habilitado !== false && item.habilitado !== false,
+                bobinas: combinedBobinas,
+                unidad: base.unidad || other.unidad,
+                color: base.color || other.color,
+                botellasCerradas: base.botellasCerradas ?? other.botellasCerradas,
+                botellasMl: base.botellasMl ?? other.botellasMl
             };
         } else {
             deduped.push({ ...item });
@@ -346,13 +352,26 @@ export function saveMaterial(material: Partial<Material>): Material {
     const prevStock = existingIndex !== -1 ? (sessionItems[existingIndex].stockActual || 0) : undefined;
     let result: Material;
 
+    // Calcular stockActual sincronizado si se proporcionaron bobinas
+    let computedStock = material.stockActual;
+    if (material.bobinas && material.bobinas.length > 0) {
+        const hasCoilStock = material.bobinas.some(b => b.stockActual !== undefined);
+        if (hasCoilStock) {
+            computedStock = material.bobinas.reduce((acc, b) => acc + (Number(b.stockActual) || 0), 0);
+        }
+    }
+
     if (existingIndex !== -1) {
-        sessionItems[existingIndex] = {
+        const updatedItem = {
             ...sessionItems[existingIndex],
             ...material,
             id: sessionItems[existingIndex].id,
             calidad: normalizedCalidad
         } as Material;
+        if (computedStock !== undefined) {
+            updatedItem.stockActual = computedStock;
+        }
+        sessionItems[existingIndex] = updatedItem;
         result = sessionItems[existingIndex];
     } else {
         const newMaterial: Material = {
@@ -363,10 +382,15 @@ export function saveMaterial(material: Partial<Material>): Material {
             tipo: material.tipo || 'Sustrato',
             tipoCobro: material.tipoCobro || 'm2',
             preciosPorAncho: material.preciosPorAncho,
+            bobinas: material.bobinas || [],
             precioM2: material.precioM2 || 0,
             ancho: material.ancho || 1.0,
+            unidad: material.unidad || (material.tipoCobro === 'ml' ? 'M Lineal' : 'mts'),
+            color: material.color,
+            botellasCerradas: material.botellasCerradas,
+            botellasMl: material.botellasMl,
             habilitado: material.habilitado !== undefined ? material.habilitado : true,
-            stockActual: material.stockActual || 0,
+            stockActual: computedStock !== undefined ? computedStock : (material.stockActual || 0),
             stockMinimo: material.stockMinimo || 10
         };
 
@@ -833,8 +857,17 @@ export function reconcilePendingStockDeductions(ordersList?: Order[]): StockReco
     const summary: Record<string, { count: number; ml: number; m2: number }> = {};
     const updatedOrderIds: string[] = [];
 
+    // Cargar registro persistente de órdenes ya descontadas para nunca volver a restar
+    let persistentDeducted = new Set<string>();
+    try {
+        const stored = localStorage.getItem('luxius_reconciled_stock_ids');
+        if (stored) persistentDeducted = new Set(JSON.parse(stored));
+    } catch { /* no-op */ }
+
     orders.forEach(order => {
-        if (relevantStatus.includes(order.status) && !order.stockDescontado) {
+        const orderKey = String(order.uuid || order.id || order.ot);
+        const alreadyDeducted = Boolean(order.stockDescontado || persistentDeducted.has(orderKey));
+        if (relevantStatus.includes(order.status) && !alreadyDeducted) {
             const ok = deductStockForOrder(order, order.status as any);
             if (ok) {
                 order.stockDescontado = true;
@@ -865,6 +898,11 @@ export function reconcilePendingStockDeductions(ordersList?: Order[]): StockReco
                 });
                 localStorage.setItem(sessionKey, JSON.stringify(merged));
             }
+        } catch { /* no-op */ }
+
+        try {
+            updatedOrderIds.forEach(id => persistentDeducted.add(id));
+            localStorage.setItem('luxius_reconciled_stock_ids', JSON.stringify(Array.from(persistentDeducted)));
         } catch { /* no-op */ }
 
         if (typeof window !== 'undefined') {
