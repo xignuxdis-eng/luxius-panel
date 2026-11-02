@@ -1930,3 +1930,30 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
       - Se corrigió la duplicación de texto en el tag de la orden (de `OT-OT-XXXX` a `OT-XXXX`).
 
 ---
+
+
+- **Normalización Canónica de Nomenclatura OT y Hardening Integral de Seguridad (02/11/2026)**:
+  - **Erradicación de Redundancia "OT OT" y "OT-OT-" (`orderNumber.ts`, `orderFileDownloader.ts`, `orders.db.ts`, `XpressViewer`)**:
+    - **Problema**: En diversos puntos del sistema aparecía duplicado el prefijo de orden (`OT OT` o `OT-OT-FDC3D915`). Esto ocurría porque `orderFileDownloader.ts` solo comprobaba `startsWith('OT-')` concatenando el prefijo si el archivo original ya se llamaba `"OT 1234 foto.jpg"`, `orders.db.ts` concatenaba `OT-${nextSeqId}` sobre identificadores que ya tenían `OT-`, y componentes como `RejectOrderModal.tsx` o `PrepressInspectorTab.tsx` escribían `OT-{order.ot}` o `order.ot.startsWith('OT-') ? order.ot : \`OT-${order.ot}\`` sin validar si ya existía una doble duplicación en el estado local o en la base de datos.
+    - **Solución**:
+      - Se creó el módulo canónico `src/utils/orderNumber.ts` con funciones puras `formatOTNumber()`, `extractOTRaw()` y `cleanOriginalFilename()`. Emplean expresiones regulares exhaustivas (`^(\s*OT[\s\-_]*)+`) para limpiar cualquier repetición de `OT`, guiones o espacios, garantizando idempotencia matemática (`formatOTNumber("OT-OT-FDC3D915") === "OT-FDC3D915"`).
+      - Se crearon 10 pruebas unitarias automatizadas en `src/utils/orderNumber.test.ts`.
+      - Se integró `cleanOriginalFilename` y `extractOTRaw` en `buildProductionFilename` (`orderFileDownloader.ts`), evitando que nombres de producción queden como `OT-1234_... --- OT 1234 archivo.jpg`.
+      - En `orders.db.ts` se normalizan de forma transparente todos los pedidos provenientes de la API o del almacenamiento local (`getOrdenes`, `saveOrden`, `matchesOrderId`).
+      - En `PrepressInspectorTab.tsx`, `RejectOrderModal.tsx`, `UpscalerModal.tsx` y `XpressViewer.tsx` se utiliza `formatOTNumber()`.
+      - En el backend (`server/services/order_utils.py` y `server/routes/orders.py`) se implementó `format_ot_code` para garantizar que la traducción del backend entregue siempre códigos canónicos.
+  - **Remediación de Vulnerabilidades de Seguridad y Hardening Arquitectónico**:
+    - **VULN-01 (Crítica — `/api/download`)**: Se movió la verificación de JWT con `payload_from_request(allow_query_token=True)` al inicio absoluto del endpoint en `server/app.py`, bloqueando la descarga anónima de archivos de clientes desde almacenamiento local o Cloudflare R2.
+    - **VULN-02 (Alta — `/api/cloud-import/file`)**: Se añadió el decorador `@login_required` a la función `stream_cloud_file` en `server/routes/cloud_import.py`, impidiendo que el backend actúe como proxy abierto de descarga hacia Google Drive.
+    - **VULN-03 (Alta — RBAC en Borrado de Órdenes)**: Se restringió `DELETE /api/orders/<order_id>` con `@admin_required` en `server/routes/orders.py`, garantizando que únicamente usuarios administradores o jefes de producción puedan eliminar órdenes a la papelera.
+    - **VULN-04 (Alta — Bóveda Drive y OAuth)**: Se aseguraron los endpoints sensibles `/vault/orphans/purge`, `/config` y `/disconnect` con `@admin_required` en `server/routes/google_drive.py`.
+    - **VULN-05 (Alta — Sanitización de Usuarios y Roles)**:
+      - En `server/app.py`, `get_collection('usuarios')` filtra campos internos sensibles para usuarios no administradores (solo expone `id`, `nombre`, `username`, `rol` y `role`).
+      - En `post_json_collection` y `delete_json_collection_item`, la modificación o eliminación de la colección `roles` exige explícitamente pertenecer a `ADMIN_ROLES`.
+    - **VULN-06 (Media — CORS)**: Se eliminó el wildcard permisivo `{"origins": r".*"}` en `server/app.py`, enlazando los recursos API y uploads estrictamente a la lista blanca `ALLOWED_ORIGIN_PATTERNS`.
+    - **VULN-07 (Media — Anti-Spoofing de IP)**: Se integró `ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)` en `server/app.py` y se actualizó `client_ip()` en `security_utils.py` para usar `req.remote_addr` validado por Werkzeug, previniendo evasión de límites de fuerza bruta en login.
+    - **VULN-08 (Media — Sanitización XSS)**: Se removió `dangerouslySetInnerHTML` espurio en `src/pages/Impresion/Impresion.tsx` para texto plano y se agregó `sanitizeSvg` en `src/pages/XpressViewer/RedrawerStudio.tsx` para neutralizar inyecciones de script en vistas vectoriales.
+    - **VULN-09 (Arquitectura — Servidor Propio / Self-Hosted)**: Se desacopló `getApiBaseUrl()` en `src/data/db/client.ts` para respetar `VITE_API_URL` en compilación, `${window.location.origin}/api` en dominios de servidor propio con proxy reverso, y la nube de Render como fallback en GitHub Pages.
+  - **Sincronización de Backend**: Los cambios de backend fueron replicados y validados sintácticamente tanto en la copia local `server/` como en el repositorio autoritativo `F:\luXius-Backend`.
+
+---

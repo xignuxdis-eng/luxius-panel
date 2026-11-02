@@ -1,6 +1,7 @@
 // src/pages/XpressViewer/subcomponents/UpscalerModal.tsx
 import React from 'react';
 import { Order } from '../../../types/orden';
+import { formatOTNumber } from '../../../utils/orderNumber';
 import { UpscaledResult } from '../XpressViewer.types';
 
 interface UpscalerModalProps {
@@ -404,7 +405,7 @@ export const UpscalerModal: React.FC<UpscalerModalProps> = ({
                                         title="Reemplazar el arte original de la OT con esta versión escalada"
                                     >
                                         <span>💾</span>
-                                        <span>{isSavingUpscale ? 'Guardando...' : `Reemplazar Arte en OT #${order.ot}`}</span>
+                                        <span>{isSavingUpscale ? 'Guardando...' : `Reemplazar Arte en ${formatOTNumber(order.ot || order.id)}`}</span>
                                     </button>
                                 </>
                             )}

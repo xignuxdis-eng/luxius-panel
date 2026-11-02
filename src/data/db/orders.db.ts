@@ -8,20 +8,21 @@ import { DEMO_ORDENES } from '../demoSandboxData';
 import { API_URL, fetchWithTimeout } from './client';
 import { getMateriales } from './inventory.db';
 import { enrichOrdersWithCurrentStock } from '@/utils/stockForecast';
+import { formatOTNumber } from '@/utils/orderNumber';
 
 export type { UpdateBatchGroupParams };
 
 export function matchesOrderId(order: { id?: number | string, ot?: string, uuid?: string }, targetId: number | string): boolean {
     if (!order || targetId === undefined || targetId === null) return false;
     const targetStr = String(targetId).trim().toLowerCase();
-    const targetClean = targetStr.replace(/^ot-/i, '');
+    const targetClean = targetStr.replace(/^(\s*ot[\s\-_]*)+/i, '');
     const targetHex = targetClean.replace(/-/g, '');
 
     const idStr = String(order.id || '').trim().toLowerCase();
-    const idClean = idStr.replace(/^ot-/i, '');
+    const idClean = idStr.replace(/^(\s*ot[\s\-_]*)+/i, '');
 
     const otStr = String(order.ot || '').trim().toLowerCase();
-    const otClean = otStr.replace(/^ot-/i, '');
+    const otClean = otStr.replace(/^(\s*ot[\s\-_]*)+/i, '');
 
     const uuidStr = String((order as any).uuid || '').trim().toLowerCase();
     const uuidHex = uuidStr.replace(/-/g, '');
@@ -81,16 +82,23 @@ async function getRawOrdenes(forceRefresh = false): Promise<Order[]> {
         if (response.ok) {
             const apiOrders = await response.json();
             if (Array.isArray(apiOrders)) {
-                // El servidor es la fuente única y autoritativa de verdad
-                localStorage.setItem('luxius_session_ordenes', JSON.stringify(apiOrders));
+                // El servidor es la fuente única y autoritativa de verdad (normalizando códigos OT)
+                const normalized = apiOrders.map(o => ({
+                    ...o,
+                    ot: formatOTNumber(o.ot || o.id),
+                }));
+                localStorage.setItem('luxius_session_ordenes', JSON.stringify(normalized));
                 localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
-                return apiOrders;
+                return normalized;
             }
         }
     } catch (error) {
         console.warn('[db] Falló la obtención remota de órdenes, usando copia offline:', error);
     }
-    return localOrders;
+    return localOrders.map(o => ({
+        ...o,
+        ot: formatOTNumber(o.ot || o.id),
+    }));
 }
 
 export function getNextSequentialId(existingOrders: Order[]): number {
@@ -135,9 +143,9 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
             demoOrders[existingIdx] = saved;
         } else {
             const nextSeqId = order.id || getNextSequentialId(demoOrders);
-            const otCode = order.ot || `OT-${nextSeqId}`;
+            const otCode = formatOTNumber(order.ot || nextSeqId);
             saved = {
-                id: Number(nextSeqId),
+                id: Number(nextSeqId) || 0,
                 ot: otCode,
                 nombreTarea: order.nombreTarea || (order as any).observaciones || 'Trabajo Demo',
                 descripcion: order.descripcion || order.nombreTarea || 'Trabajo Demo',
@@ -192,14 +200,14 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
     const existing = existingIdx >= 0 ? localOrders[existingIdx] : undefined;
 
     const nextSeqId = order.id || existing?.id || getNextSequentialId(localOrders);
-    const otCode = order.ot || existing?.ot || `OT-${nextSeqId}`;
+    const otCode = formatOTNumber(order.ot || existing?.ot || nextSeqId);
 
     // Si ya existe la orden, mezclar encima de existing para NUNCA vaciar archivos, materiales ni subtotales
     const newOrder: Order = existing ? {
         ...existing,
         ...order,
         id: existing.id || order.id || Number(nextSeqId),
-        ot: existing.ot || order.ot || otCode,
+        ot: formatOTNumber(existing.ot || order.ot || otCode),
         status: (order.status || existing.status || 'orden') as any,
         category: (order.category || existing.category || 'impresion') as any,
         updatedAt: now.toISOString(),

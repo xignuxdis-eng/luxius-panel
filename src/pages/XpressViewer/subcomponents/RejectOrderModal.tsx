@@ -1,6 +1,7 @@
 // src/pages/XpressViewer/subcomponents/RejectOrderModal.tsx
 import React from 'react';
 import { Order } from '../../../types/orden';
+import { formatOTNumber } from '@/utils/orderNumber';
 
 interface RejectOrderModalProps {
     isOpen: boolean;
@@ -30,7 +31,7 @@ export const RejectOrderModal: React.FC<RejectOrderModalProps> = ({
             <div className="xpress-reject-modal" onClick={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>↩️</span> Rebote Técnico de OT-{order?.ot}
+                        <span>↩️</span> Rebote Técnico de {formatOTNumber(order?.ot || order?.id)}
                     </h3>
                     <button
                         type="button"

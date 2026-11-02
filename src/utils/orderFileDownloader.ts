@@ -2,6 +2,7 @@ import JSZip from 'jszip'
 import { API_URL, resolveMediaUrl, getAuthHeaders, getMateriales, getServicios } from '@data/db'
 import type { Order } from '@/types'
 import { calculateItemPriceDetailed } from './pricingCalculator'
+import { extractOTRaw, formatOTNumber, cleanOriginalFilename } from './orderNumber'
 
 /**
  * Sanitiza nombres de archivo eliminando caracteres ilegales en Windows/Linux/macOS
@@ -159,13 +160,7 @@ export function getBatchOrderFolderPath(order: Partial<Order>): string {
  * Formato: OT-{otNumber}_x{copias}_{material}_{servicios}_{ancho}x{alto} --- {nombreOriginal}
  */
 export function buildProductionFilename(order: Order, _index: number, originalName: string): string {
-    let otRaw = String(order.ot || order.id || '0').trim()
-    if (otRaw.toUpperCase().startsWith('OT-')) {
-        otRaw = otRaw.slice(3).trim()
-    } else if (otRaw.toUpperCase().startsWith('OT')) {
-        otRaw = otRaw.slice(2).trim()
-    }
-    const otNumber = otRaw || '0'
+    const otNumber = extractOTRaw(order.ot || order.id)
     const copias = order.copias || 1
 
     // 1. Resolver código corto de material
@@ -195,8 +190,14 @@ export function buildProductionFilename(order: Order, _index: number, originalNa
         } catch { }
     }
 
+    // Si ya viene con el prefijo canónico completo para esta OT, no duplicarlo
+    if (originalName.startsWith(`OT-${otNumber}_`) || originalName.startsWith(`OT-${otNumber} `)) {
+        return sanitizeFileName(originalName)
+    }
+
+    const cleanBaseName = cleanOriginalFilename(originalName, `OT-${otNumber}`)
     const hasDimensionsRegex = /\d+[.,]?\d*\s*[xX]\s*\d+[.,]?\d*/
-    const alreadyHasDimensions = hasDimensionsRegex.test(originalName)
+    const alreadyHasDimensions = hasDimensionsRegex.test(cleanBaseName)
 
     let dimString = ''
     if (!alreadyHasDimensions && order.ancho && order.alto) {
@@ -210,11 +211,7 @@ export function buildProductionFilename(order: Order, _index: number, originalNa
     const servicesStr = serviceCodes.length > 0 ? `_${serviceCodes.join('_')}` : ''
     const prefix = `OT-${otNumber}_x${copias}_${materialCode}${servicesStr}${dimString}${bobinaStr}`
 
-    if (originalName.startsWith(`OT-${otNumber}`) || originalName.startsWith('OT-')) {
-        return sanitizeFileName(originalName)
-    }
-
-    return sanitizeFileName(`${prefix} --- ${originalName}`)
+    return sanitizeFileName(`${prefix} --- ${cleanBaseName}`)
 }
 
 /**
@@ -386,8 +383,7 @@ export function generateZipFilename({ batchName, orders }: { batchName?: string;
  * Genera el nombre del ZIP para una sola orden con múltiples archivos
  */
 export function generateSingleOrderZipFilename(order: Order): string {
-    const otRaw = String(order.ot || order.id || '0').trim()
-    const otStr = otRaw.toUpperCase().startsWith('OT') ? otRaw : `OT-${otRaw}`
+    const otStr = formatOTNumber(order.ot || order.id)
     const clientStr = sanitizeFileName(order.clienteNombre || 'Cliente')
     const dateStr = new Date().toISOString().slice(0, 10)
     const count = order.archivos?.length || 0

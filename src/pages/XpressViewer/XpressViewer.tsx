@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import './XpressViewer.css';
 import { resolveMediaUrl } from '../../data/db';
 import { Order } from '../../types/orden';
+import { formatOTNumber } from '../../utils/orderNumber';
 import { RedrawerStudio } from './RedrawerStudio';
 import { PrintSheeterStudio } from './printsheeter/PrintSheeterStudio';
 import { SuiteCraftTab } from './suitecraft/SuiteCraftTab';
@@ -149,8 +150,8 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {order && (
-                        <span style={{ fontSize: '0.78rem', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }} title={`Orden #${order.ot} - ${order.clienteNombre}`}>
-                            OT #{order.ot}
+                        <span style={{ fontSize: '0.78rem', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }} title={`Orden ${formatOTNumber(order.ot || order.id)} - ${order.clienteNombre}`}>
+                            {formatOTNumber(order.ot || order.id)}
                         </span>
                     )}
                     {file && (

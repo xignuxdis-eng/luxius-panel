@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ImageTracer, { ImageTracerOptions } from 'imagetracerjs';
 import { svgToDxf, triggerFileDownload } from '../../utils/vectorUtils';
 import { Order } from '../../types/orden';
@@ -18,6 +18,15 @@ type ViewMode = 'split' | 'overlay' | 'vector' | 'draw';
 type PresetType = 'cutline' | 'logo' | 'detailed' | 'silhouette' | 'custom';
 type DrawTool = 'pan' | 'pen' | 'line' | 'eraser';
 
+function sanitizeSvg(svg: string): string {
+    if (!svg) return '';
+    return svg
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
+        .replace(/\son\w+\s*=\s*[^>\s]+/gi, '')
+        .replace(/href\s*=\s*['"]javascript:[^'"]*['"]/gi, '');
+}
+
 export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
     initialImageUrl,
     initialFileName = 'imagen_vectorizada',
@@ -30,6 +39,7 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
     const [currentImage, setCurrentImage] = useState<string | null>(initialImageUrl || null);
     const [fileName, setFileName] = useState<string>(initialFileName);
     const [vectorSvg, setVectorSvg] = useState<string | null>(null);
+    const safeVectorSvg = useMemo(() => sanitizeSvg(vectorSvg || ''), [vectorSvg]);
     const [isTracing, setIsTracing] = useState<boolean>(false);
     const [statusText, setStatusText] = useState<string>('');
 
@@ -789,7 +799,7 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
                                                 width: `${(100 / (100 - splitPos)) * 100}%`,
                                                 height: '100%'
                                             }}
-                                            dangerouslySetInnerHTML={{ __html: vectorSvg || '' }}
+                                            dangerouslySetInnerHTML={{ __html: safeVectorSvg }}
                                         />
                                     </div>
                                     <span className="redrawer-split-label after">Vector SVG (Curvas)</span>
@@ -816,7 +826,7 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
                                     <div 
                                         className="redrawer-vector-layer"
                                         style={{ opacity: overlayOpacity }}
-                                        dangerouslySetInnerHTML={{ __html: vectorSvg || '' }}
+                                        dangerouslySetInnerHTML={{ __html: safeVectorSvg }}
                                     />
                                 </div>
                             )}
@@ -825,7 +835,7 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
                             {viewMode === 'vector' && (
                                 <div 
                                     style={{ width: imageDimensions.width, height: imageDimensions.height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    dangerouslySetInnerHTML={{ __html: vectorSvg || '' }}
+                                    dangerouslySetInnerHTML={{ __html: safeVectorSvg }}
                                 />
                             )}
 
@@ -840,7 +850,7 @@ export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
                                     />
                                     <div 
                                         className="redrawer-vector-layer"
-                                        dangerouslySetInnerHTML={{ __html: vectorSvg || '' }}
+                                        dangerouslySetInnerHTML={{ __html: safeVectorSvg }}
                                     />
                                     <canvas 
                                         ref={drawCanvasRef}

@@ -41,12 +41,27 @@ export function getApiBaseUrl(): string {
 
     // Capacitor Native Android / iOS app
     if (isCapacitorNative()) {
-        return 'https://luxius-backend.onrender.com/api';
+        return (import.meta as any).env?.VITE_API_URL || 'https://luxius-backend.onrender.com/api';
     }
 
     // Local PC browser development
     const isLocalBrowser = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    return isLocalBrowser ? 'http://localhost:5000/api' : 'https://luxius-backend.onrender.com/api';
+    if (isLocalBrowser) {
+        return 'http://localhost:5000/api';
+    }
+
+    // Si hay una variable de entorno en build-time (ej. servidor propio con VITE_API_URL):
+    const envUrl = (import.meta as any).env?.VITE_API_URL;
+    if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+        return envUrl.trim().replace(/\/+$/, '');
+    }
+
+    // En un servidor propio con reverse proxy donde el frontend y backend se sirven en el mismo dominio
+    if (window.location.origin && !window.location.origin.includes('github.io')) {
+        return `${window.location.origin}/api`;
+    }
+
+    return 'https://luxius-backend.onrender.com/api';
 }
 
 export function setCustomApiUrl(url: string | null): void {

@@ -468,7 +468,7 @@ export default function Impresion() {
                                             {ev.time_str && <span>⏱️ {ev.time_str}</span>}
                                             {ev.speed_str && <span>🚀 {ev.speed_str}</span>}
                                             {ev.ink_ml && (
-                                                <span style={{ color: '#38bdf8' }} dangerouslySetInnerHTML={{ __html: `💧 ${ev.ink_ml}` }} />
+                                                <span style={{ color: '#38bdf8' }}>💧 {ev.ink_ml}</span>
                                             )}
                                         </div>
                                     </div>

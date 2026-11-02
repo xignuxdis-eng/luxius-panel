@@ -17,6 +17,7 @@ import {
     UpscaledResult,
     PrepressInspectorProps
 } from '../XpressViewer.types';
+import { formatOTNumber } from '../../../utils/orderNumber';
 import { RejectOrderModal } from './RejectOrderModal';
 import { UpscalerModal } from './UpscalerModal';
 
@@ -616,7 +617,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
             };
             await saveOrden(updated);
             setOrder(updated);
-            setBleedSavedFeedback(`¡Demasía de ${bleedCm} cm guardada en OT #${order.ot}!`);
+            setBleedSavedFeedback(`¡Demasía de ${bleedCm} cm guardada en ${formatOTNumber(order.ot || order.id)}!`);
             setTimeout(() => setBleedSavedFeedback(null), 3500);
         } catch (err) {
             console.error('[XpressViewer] Error guardando demasías:', err);
@@ -646,7 +647,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
             };
             await saveOrden(updated);
             setOrder(updated);
-            setActionSuccessMessage(`✅ ¡OT #${order.ot} aprobada técnicamente y enviada a Impresión!`);
+            setActionSuccessMessage(`✅ ¡${formatOTNumber(order.ot || order.id)} aprobada técnicamente y enviada a Impresión!`);
             setTimeout(() => setActionSuccessMessage(null), 4000);
         } catch (err) {
             console.error('[XpressViewer] Error aprobando orden:', err);
@@ -671,7 +672,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
             setOrder(updated);
             setShowRejectModal(false);
             setRejectReason('');
-            setActionSuccessMessage(`↩️ OT #${order.ot} marcada como REBOTADA con reporte técnico.`);
+            setActionSuccessMessage(`↩️ ${formatOTNumber(order.ot || order.id)} marcada como REBOTADA con reporte técnico.`);
             setTimeout(() => setActionSuccessMessage(null), 4000);
         } catch (err) {
             console.error('[XpressViewer] Error rebotando orden:', err);
@@ -907,8 +908,8 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
 
             const saved = await saveOrden(updatedOrder);
             setOrder(saved);
-            setUpscaleSaveFeedback(replaceInOrder ? `✅ ¡Arte principal reemplazado en OT #${order.ot}!` : `✅ ¡Arte secundario añadido a OT #${order.ot}!`);
-            setActionSuccessMessage(replaceInOrder ? `✅ OT #${order.ot}: Arte actualizado con versión HD` : `✅ OT #${order.ot}: Arte secundario HD agregado`);
+            setUpscaleSaveFeedback(replaceInOrder ? `✅ ¡Arte principal reemplazado en ${formatOTNumber(order.ot || order.id)}!` : `✅ ¡Arte secundario añadido a ${formatOTNumber(order.ot || order.id)}!`);
+            setActionSuccessMessage(replaceInOrder ? `✅ ${formatOTNumber(order.ot || order.id)}: Arte actualizado con versión HD` : `✅ ${formatOTNumber(order.ot || order.id)}: Arte secundario HD agregado`);
             setTimeout(() => {
                 setUpscaleSaveFeedback(null);
                 setActionSuccessMessage(null);
@@ -1259,7 +1260,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
                                 <div className="xpress-order-action-dock" onClick={(e) => e.stopPropagation()}>
                                     <div className="xpress-dock-order-info">
                                         <span style={{ fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                                            {order.ot.startsWith('OT-') ? order.ot : `OT-${order.ot}`}
+                                            {formatOTNumber(order.ot || order.id)}
                                         </span>
                                         <span style={{ fontWeight: 600, color: '#f8fafc' }}>
                                             {order.clienteNombre}
@@ -1799,7 +1800,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
                                             }}
                                         >
                                             <span>💾</span>
-                                            <span>Guardar Demasía en OT #{order.ot}</span>
+                                            <span>Guardar Demasía en {formatOTNumber(order.ot || order.id)}</span>
                                         </button>
                                     )}
                                 </div>
