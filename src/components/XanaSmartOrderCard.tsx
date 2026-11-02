@@ -431,8 +431,8 @@ export const XanaSmartOrderCard: React.FC<XanaSmartOrderCardProps> = ({
             {/* Encabezado Principal */}
             <div className="order-card-header">
                 <div className="header-title-box">
-                    <Sparkles size={16} className="icon-sparkle" />
-                    <h4>Cotizador & Borrador Xana</h4>
+                    <Sparkles size={15} className="icon-sparkle" />
+                    <h4 title="Cotizador & Borrador Inteligente Xana">Cotizador Xana</h4>
                 </div>
 
                 <div className="material-selector-box">
