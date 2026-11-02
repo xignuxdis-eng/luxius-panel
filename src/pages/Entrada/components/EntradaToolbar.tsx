@@ -9,6 +9,7 @@ export interface EntradaToolbarProps {
     setStatusFilter: (s: string) => void;
     onClearFilters: () => void;
     displayedOrdersCount: number;
+    displayedTotals: { m2: number; ml: number };
     onNewOrder: () => void;
     tagFilter: string;
     setTagFilter: (t: string) => void;
@@ -25,6 +26,7 @@ export function EntradaToolbar({
     setStatusFilter,
     onClearFilters,
     displayedOrdersCount,
+    displayedTotals,
     onNewOrder,
     tagFilter,
     setTagFilter,
@@ -73,9 +75,19 @@ export function EntradaToolbar({
                     </div>
 
                     <div className="filter-actions">
-                        <span className="results-count">
-                            {displayedOrdersCount} ordenes
-                        </span>
+                        <div className="results-summary-pills">
+                            <span className="summary-pill summary-pill-orders" title="Total de órdenes en la vista actual">
+                                <strong>{displayedOrdersCount}</strong> {displayedOrdersCount === 1 ? 'orden' : 'órdenes'}
+                            </span>
+                            <span className="summary-divider">·</span>
+                            <span className="summary-pill summary-pill-m2 font-mono" title="Total de metros cuadrados (m²)">
+                                <strong>{displayedTotals.m2.toFixed(2)}</strong> <small>m²</small>
+                            </span>
+                            <span className="summary-divider">·</span>
+                            <span className="summary-pill summary-pill-ml font-mono" title="Total de metros lineales de bobina (ml)">
+                                <strong>{displayedTotals.ml.toFixed(2)}</strong> <small>ml</small>
+                            </span>
+                        </div>
                         <Button variant="primary" onClick={onNewOrder} size="sm" className="btn-glow">
                             + Nuevo Pedido
                         </Button>

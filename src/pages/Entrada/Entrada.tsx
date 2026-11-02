@@ -459,8 +459,24 @@ export default function Entrada() {
         return result;
     }, [displayedOrders, selectedIds]);
 
-
-
+    const displayedTotals = useMemo(() => {
+        let m2 = 0;
+        let ml = 0;
+        groupedOrders.forEach(item => {
+            if (item.isBatch) {
+                m2 += item.totalConsumption.m2 || 0;
+                ml += item.totalConsumption.ml || 0;
+            } else {
+                const cons = getConsumption(item.order);
+                if (cons.unit === 'm²') m2 += cons.value;
+                else if (cons.unit === 'ml') ml += cons.value;
+            }
+        });
+        return {
+            m2: Math.round(m2 * 100) / 100,
+            ml: Math.round(ml * 100) / 100
+        };
+    }, [groupedOrders, allMateriales]);
 
     const selectedTotals = {
         m2: Array.from(selectedIds).reduce((acc, id) => {
@@ -871,6 +887,7 @@ export default function Entrada() {
                 setStatusFilter={setStatusFilter}
                 onClearFilters={handleClearFilters}
                 displayedOrdersCount={displayedOrders.length}
+                displayedTotals={displayedTotals}
                 onNewOrder={handleNewOrder}
                 tagFilter={tagFilter}
                 setTagFilter={setTagFilter}

@@ -27,6 +27,57 @@
     gap: 12px;
 }
 
+.results-summary-pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.summary-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+}
+
+.summary-pill-orders strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.summary-pill-m2 strong {
+    color: #34d399;
+    font-weight: 700;
+}
+
+.summary-pill-m2 small {
+    color: rgba(52, 211, 153, 0.85);
+    font-size: 0.70rem;
+    font-weight: 600;
+}
+
+.summary-pill-ml strong {
+    color: var(--metric-cyan, #38bdf8);
+    font-weight: 700;
+}
+
+.summary-pill-ml small {
+    color: rgba(56, 189, 248, 0.85);
+    font-size: 0.70rem;
+    font-weight: 600;
+}
+
+.summary-divider {
+    color: rgba(255, 255, 255, 0.2);
+    font-weight: bold;
+}
+
 .results-count {
     font-size: 11px;
     color: var(--text-muted);
