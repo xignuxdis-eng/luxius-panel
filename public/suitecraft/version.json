@@ -1,0 +1,12 @@
+{
+  "photocraft": {
+    "version": "v0.19.0",
+    "updatedAt": "2026-11-01T19:36:04Z",
+    "wasm": "photocraft-web-boot-a223668ac1e11b19_bg.wasm"
+  },
+  "vectorcraft": {
+    "version": "v0.20.0",
+    "updatedAt": "2026-11-01T19:43:26Z",
+    "wasm": "vectorcraft-web-fd27ad12f2de614d_bg.wasm"
+  }
+}

@@ -1,0 +1,60 @@
+name: Auto-Update SuiteCraft (PhotoCraft & VectorCraft)
+
+# Se ejecuta todos los lunes a las 04:00 UTC y también manualmente bajo demanda.
+# Comprueba si upstream (storytold/photocraft y storytold/vectorcraft) publicó nuevas versiones.
+# Si hay novedades, descarga los assets web, reinyecta el puente de autocarga, verifica
+# que compile y funcione con npm run verify, y comitea a master disparando el deploy automático.
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "suitecraft-autoupdate"
+  cancel-in-progress: true
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run SuiteCraft Update Checker
+        id: updater
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/check_suitecraft_updates.py
+
+      - name: Verify build if updated
+        if: steps.updater.outputs.updated == 'true'
+        run: npm run verify
+
+      - name: Commit and push changes
+        if: steps.updater.outputs.updated == 'true'
+        run: |
+          git config user.name "Xana - LuXius Bot"
+          git config user.email "xana@luxius.com"
+          git add public/suitecraft/
+          git commit -m "chore(suitecraft): auto-update editors upstream to ${{ steps.updater.outputs.tools }}"
+          git push origin master
