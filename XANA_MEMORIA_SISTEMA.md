@@ -1910,3 +1910,23 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
       - Se añadieron tests unitarios automatizados en `src/data/db.stock.test.ts` verificando la persistencia de bobinas y la protección contra doble deducción.
 
 ---
+
+- **Correcciones en Xpress Viewer, Enrutamiento de Imágenes y Carga en PhotoCraft (01/11/2026)**:
+  - **Enrutamiento Correcto al Visor al Hacer Clic en Imágenes de la OT (`SharedFileViewerModal.tsx`)**:
+    - **Problema**: Al hacer clic sobre la miniatura/imagen de una orden de trabajo en el modal de detalle para visualizarla, el sistema navegaba forzadamente con `&tab=suitecraft`, abriendo PhotoCraft en lugar de abrir el Visor de Xpress Studio.
+    - **Solución**: Se eliminó el parámetro forzado `&tab=suitecraft` del evento `onClick` de la miniatura de la imagen en `SharedFileViewerModal.tsx` (dejando como destino el Visor nativo con herramientas de medición, DPI y preimpresión) y se actualizó el tooltip a *"Hacé clic para inspeccionar en Xpress Viewer"*. Se mantuvo el botón explícito morado para abrir intencionalmente en PhotoCraft (`&tab=photocraft`).
+  - **Carga Automática de Archivos en PhotoCraft y VectorCraft (`SuiteCraftTab.tsx`, `XpressViewer.tsx`, `public/suitecraft/photocraft/index.html`, `public/suitecraft/vectorcraft/index.html`)**:
+    - **Problema**: Al invocar PhotoCraft o VectorCraft desde una orden o imagen, el editor WebAssembly abría un lienzo vacío sin cargar el diseño. Esto se debía a que los editores basados en Rust/Wasm de Storytold no leen el hash de URL con formato JSON (`#{"files":[...]}`) ni contaban con un listener en el HTML estático para procesar archivos.
+    - **Solución**:
+      - En `public/suitecraft/photocraft/index.html` y `public/suitecraft/vectorcraft/index.html` se integró un script de autocarga que escucha tanto el hash inicial como mensajes `postMessage` (`SUITECRAFT_LOAD_BUFFER` / `SUITECRAFT_LOAD_FILE`).
+      - Cuando el Wasm completa su inicialización y oculta el spinner de carga, se crea un `DataTransfer` con el `File` y se despacha un evento nativo de `drop` directamente sobre el canvas (`#photocraft_canvas` / `#vectorcraft_canvas`), abriendo el archivo de forma nativa e inmediata en el editor.
+      - En `SuiteCraftTab.tsx` se implementó el envío reactivo del archivo en `ArrayBuffer` vía `postMessage` tan pronto como el iframe se monta o cuando cambia el archivo activo, eliminando bloqueos por CORS en orígenes mixtos o data URLs.
+      - En `XpressViewer.tsx` se amplió la resolución de `suiteCraftFileUrl` para admitir imágenes en memoria (`blob:` y `data:`) sin descartarlas.
+  - **Eliminación de Superposición de Herramientas en Xpress Viewer (`XpressViewer.css`, `PrepressInspectorTab.tsx`)**:
+    - **Problema**: La tarjeta flotante de metadatos/preimpresión de la OT (`OT-FDC3D915`, acciones *"Aprobar Preimpresión"* y *"Rebotar al Vendedor"*) y la barra de herramientas flotante de zoom (`- 30% +`, accesos a PhotoCraft/VectorCraft y botón cerrar) compartían la misma posición fija en el centro inferior (`bottom: 24px` y `bottom: 30px`), superponiéndose y tapándose mutuamente en pantalla.
+    - **Solución**:
+      - Se creó el contenedor `.xpress-bottom-dock-container` con layout flex en columna centrada (`flex-direction: column; align-items: center; gap: 10px;`) y `pointer-events: none` con hijos interactivos (`pointer-events: auto`).
+      - La tarjeta de aprobación de la OT se apila limpiamente **por encima** de la barra de zoom y herramientas, ambas perfectamente visibles, legibles y sin colisión espacial.
+      - Se corrigió la duplicación de texto en el tag de la orden (de `OT-OT-XXXX` a `OT-XXXX`).
+
+---

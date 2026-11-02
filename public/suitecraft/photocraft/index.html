@@ -37,5 +37,136 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
       download or come from a different version of this page. <a href="">Reload</a> to try again; the browser
       console lists what failed.</p>
   </div>
+
+  <script>
+  (function() {
+    const CANVAS_ID = 'photocraft_canvas';
+    const LOADING_ID = 'photocraft_loading';
+    let isAppReady = false;
+    let pendingFile = null;
+    let lastDelivered = null;
+
+    function dispatchDrop(file) {
+      if (!file) return false;
+      const canvas = document.getElementById(CANVAS_ID) || document.querySelector('canvas');
+      if (!canvas) return false;
+
+      const fileKey = file.name + ':' + file.size;
+      if (lastDelivered === fileKey) return true;
+
+      const dt = new DataTransfer();
+      dt.items.add(file);
+
+      const pos = {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: dt,
+        clientX: window.innerWidth / 2,
+        clientY: window.innerHeight / 2
+      };
+
+      try {
+        const dragEnter = new DragEvent('dragenter', pos);
+        const dragOver = new DragEvent('dragover', pos);
+        const drop = new DragEvent('drop', pos);
+
+        window.dispatchEvent(dragEnter);
+        canvas.dispatchEvent(dragEnter);
+        window.dispatchEvent(dragOver);
+        canvas.dispatchEvent(dragOver);
+        canvas.dispatchEvent(drop);
+        window.dispatchEvent(drop);
+        lastDelivered = fileKey;
+        console.log('[SuiteCraft:PhotoCraft] Archivo entregado exitosamente al lienzo:', file.name, file.size + 'B');
+        return true;
+      } catch (err) {
+        console.error('[SuiteCraft:PhotoCraft] Error despachando drop:', err);
+        return false;
+      }
+    }
+
+    function onAppReady() {
+      isAppReady = true;
+      if (pendingFile) {
+        const f = pendingFile;
+        pendingFile = null;
+        setTimeout(() => dispatchDrop(f), 350);
+      }
+    }
+
+    function queueFile(file) {
+      if (isAppReady) {
+        setTimeout(() => dispatchDrop(file), 250);
+      } else {
+        pendingFile = file;
+      }
+    }
+
+    window.addEventListener('TrunkApplicationStarted', () => {
+      const checkInterval = setInterval(() => {
+        const loading = document.getElementById(LOADING_ID);
+        const canvas = document.getElementById(CANVAS_ID) || document.querySelector('canvas');
+        const isGone = !loading || !document.body.contains(loading) || loading.style.display === 'none';
+        if (isGone && canvas) {
+          clearInterval(checkInterval);
+          setTimeout(onAppReady, 300);
+        }
+      }, 120);
+
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (!isAppReady) onAppReady();
+      }, 15000);
+    });
+
+    async function loadUrl(url, fallbackName) {
+      if (!url) return;
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const fileName = fallbackName || url.split('/').pop()?.split('?')[0] || 'diseno.png';
+        const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+        queueFile(file);
+      } catch (err) {
+        console.warn('[SuiteCraft:PhotoCraft] No se pudo descargar la imagen por fetch:', err);
+      }
+    }
+
+    try {
+      if (window.location.hash && window.location.hash.length > 1) {
+        const raw = decodeURIComponent(window.location.hash.slice(1));
+        let targetUrl = null;
+        try {
+          const json = JSON.parse(raw);
+          if (json.files && json.files.length > 0) targetUrl = json.files[0];
+        } catch (_) {
+          if (/^(https?|data|blob):/i.test(raw)) targetUrl = raw;
+        }
+        if (targetUrl) {
+          loadUrl(targetUrl);
+        }
+      }
+    } catch (err) {
+      console.warn('[SuiteCraft:PhotoCraft] Error leyendo hash inicial:', err);
+    }
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'SUITECRAFT_LOAD_BUFFER' && data.buffer) {
+        try {
+          const blob = new Blob([data.buffer], { type: data.mimeType || 'image/png' });
+          const file = new File([blob], data.fileName || 'diseno.png', { type: blob.type });
+          queueFile(file);
+        } catch (err) {
+          console.error('[SuiteCraft:PhotoCraft] Error procesando buffer de postMessage:', err);
+        }
+      } else if (data.type === 'SUITECRAFT_LOAD_FILE' && data.fileUrl) {
+        loadUrl(data.fileUrl, data.fileName);
+      }
+    });
+  })();
+  </script>
 </body>
 </html>

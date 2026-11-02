@@ -37,6 +37,9 @@ export const SuiteCraftTab: React.FC<SuiteCraftTabProps> = ({
     onClose,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const deliveredUrlRef = useRef<string | null>(null);
+
     const [isReady, setIsReady] = useState<boolean>(false);
     const [reloadKey, setReloadKey] = useState<number>(0);
     const [slowAlert, setSlowAlert] = useState<boolean>(false);
@@ -69,14 +72,53 @@ export const SuiteCraftTab: React.FC<SuiteCraftTabProps> = ({
         return () => window.clearTimeout(timer);
     }, [isReady, reloadKey]);
 
+    const dispatchFileToIframe = useCallback(async () => {
+        const iframe = iframeRef.current;
+        if (!iframe || !iframe.contentWindow || !initialFileUrl) return;
+
+        try {
+            const res = await fetch(initialFileUrl);
+            const blob = await res.blob();
+            const buffer = await blob.arrayBuffer();
+            const fallbackExt = toolId === 'vectorcraft' ? 'svg' : 'png';
+            const fileName = initialFileName || initialFileUrl.split('/').pop()?.split('?')[0] || `diseno.${fallbackExt}`;
+
+            iframe.contentWindow.postMessage({
+                type: 'SUITECRAFT_LOAD_BUFFER',
+                buffer,
+                mimeType: blob.type || (toolId === 'vectorcraft' ? 'image/svg+xml' : 'image/png'),
+                fileName
+            }, '*');
+            deliveredUrlRef.current = initialFileUrl;
+        } catch {
+            // Fallback por URL si fetch directo no es posible
+            iframe.contentWindow.postMessage({
+                type: 'SUITECRAFT_LOAD_FILE',
+                fileUrl: initialFileUrl,
+                fileName: initialFileName
+            }, '*');
+            deliveredUrlRef.current = initialFileUrl;
+        }
+    }, [initialFileUrl, initialFileName, toolId]);
+
     const handleIframeLoad = useCallback(() => {
         setIsReady(true);
         setSlowAlert(false);
-    }, []);
+        setTimeout(() => {
+            dispatchFileToIframe();
+        }, 300);
+    }, [dispatchFileToIframe]);
+
+    useEffect(() => {
+        if (isActive && isReady && initialFileUrl && deliveredUrlRef.current !== initialFileUrl) {
+            dispatchFileToIframe();
+        }
+    }, [isActive, isReady, initialFileUrl, dispatchFileToIframe]);
 
     const handleReload = useCallback(() => {
         setIsReady(false);
         setSlowAlert(false);
+        deliveredUrlRef.current = null;
         setReloadKey((k) => k + 1);
     }, []);
 
@@ -167,6 +209,7 @@ export const SuiteCraftTab: React.FC<SuiteCraftTabProps> = ({
 
             <div className="suitecraft-stage">
                 <iframe
+                    ref={iframeRef}
                     key={`${toolId}-${reloadKey}`}
                     src={finalUrl}
                     title={`${tool.name} — ${tool.subtitle}`}

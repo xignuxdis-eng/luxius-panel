@@ -79,15 +79,20 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
     const paramFileUrl = searchParams.get('fileUrl') || searchParams.get('url') || initialFileUrl;
     const paramFileName = searchParams.get('fileName') || searchParams.get('name') || initialFileName;
 
-    const suiteCraftFileUrl = useMemo(() => {
-        const candidates = [paramFileUrl, order?.archivos?.[0], previewUrl];
+    const activeFileUrl = useMemo(() => {
+        const candidates = [paramFileUrl, previewUrl, order?.archivos?.[0]];
         for (const candidate of candidates) {
-            if (!candidate || /^(blob|data):/i.test(candidate)) continue;
-            const absolute = toAbsoluteFileUrl(resolveMediaUrl(candidate));
-            if (absolute) return absolute;
+            if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
+                return resolveMediaUrl(candidate);
+            }
         }
         return null;
-    }, [paramFileUrl, order, previewUrl]);
+    }, [paramFileUrl, previewUrl, order]);
+
+    const suiteCraftFileUrl = useMemo(() => {
+        if (!activeFileUrl) return null;
+        return toAbsoluteFileUrl(activeFileUrl) || activeFileUrl;
+    }, [activeFileUrl]);
 
     return (
         <div className="xpress-container">

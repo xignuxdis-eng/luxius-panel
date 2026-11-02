@@ -1253,7 +1253,60 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
                                 </div>
                             )}
 
-                            <div className="xpress-toolbar">
+                            <div className="xpress-bottom-dock-container">
+                                {/* Barra de Aprobación Técnica y Pase a Impresión */}
+                            {order && (
+                                <div className="xpress-order-action-dock" onClick={(e) => e.stopPropagation()}>
+                                    <div className="xpress-dock-order-info">
+                                        <span style={{ fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                                            {order.ot.startsWith('OT-') ? order.ot : `OT-${order.ot}`}
+                                        </span>
+                                        <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                            {order.clienteNombre}
+                                        </span>
+                                        <span style={{ color: '#94a3b8' }}>•</span>
+                                        <span style={{ color: '#cbd5e1' }}>
+                                            {order.material} ({targetWidthMeters}m × {targetHeightMeters}m)
+                                        </span>
+                                        <span style={{ 
+                                            fontSize: '0.75rem', 
+                                            padding: '2px 8px', 
+                                            borderRadius: '10px',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase',
+                                            background: order.status === 'orden' ? 'rgba(16, 185, 129, 0.2)' : order.status === 'rebotado' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                                            color: order.status === 'orden' ? '#34d399' : order.status === 'rebotado' ? '#f87171' : '#a5b4fc'
+                                        }}>
+                                            {order.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="xpress-dock-actions">
+                                        <button
+                                            type="button"
+                                            className="xpress-btn-approve"
+                                            onClick={handleApprovePreflight}
+                                            disabled={isUpdatingOrder}
+                                            title="Aprobar técnicamente y pasar a cola de impresión"
+                                        >
+                                            <span>🚀</span>
+                                            <span>Aprobar Preimpresión</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="xpress-btn-reject"
+                                            onClick={() => setShowRejectModal(true)}
+                                            disabled={isUpdatingOrder}
+                                            title="Rebotar al vendedor con reporte técnico"
+                                        >
+                                            <span>↩️</span>
+                                            <span>Rebotar al Vendedor</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                                <div className="xpress-toolbar">
                                 <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.1, z - 0.2)); }} title="Alejar">➖</button>
                                 <span style={{color: '#fff', fontSize: '0.8rem', minWidth: '40px', textAlign: 'center'}}>{Math.round(zoom * 100)}%</span>
                                 <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(10, z + 0.2)); }} title="Acercar">➕</button>
@@ -1417,58 +1470,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
                                 <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 8px' }}></div>
                                 <button className="xpress-tool-btn" onClick={(e) => { e.stopPropagation(); if (onClose) { onClose(); } else { handleClear(); } }} title="Cerrar archivo">❌</button>
                             </div>
-
-                            {/* Barra de Aprobación Técnica y Pase a Impresión */}
-                            {order && (
-                                <div className="xpress-order-action-dock" onClick={(e) => e.stopPropagation()}>
-                                    <div className="xpress-dock-order-info">
-                                        <span style={{ fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                                            OT-{order.ot}
-                                        </span>
-                                        <span style={{ fontWeight: 600, color: '#f8fafc' }}>
-                                            {order.clienteNombre}
-                                        </span>
-                                        <span style={{ color: '#94a3b8' }}>•</span>
-                                        <span style={{ color: '#cbd5e1' }}>
-                                            {order.material} ({targetWidthMeters}m × {targetHeightMeters}m)
-                                        </span>
-                                        <span style={{ 
-                                            fontSize: '0.75rem', 
-                                            padding: '2px 8px', 
-                                            borderRadius: '10px',
-                                            fontWeight: 700,
-                                            textTransform: 'uppercase',
-                                            background: order.status === 'orden' ? 'rgba(16, 185, 129, 0.2)' : order.status === 'rebotado' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(99, 102, 241, 0.2)',
-                                            color: order.status === 'orden' ? '#34d399' : order.status === 'rebotado' ? '#f87171' : '#a5b4fc'
-                                        }}>
-                                            {order.status}
-                                        </span>
-                                    </div>
-
-                                    <div className="xpress-dock-actions">
-                                        <button
-                                            type="button"
-                                            className="xpress-btn-approve"
-                                            onClick={handleApprovePreflight}
-                                            disabled={isUpdatingOrder}
-                                            title="Aprobar técnicamente y pasar a cola de impresión"
-                                        >
-                                            <span>🚀</span>
-                                            <span>Aprobar Preimpresión</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="xpress-btn-reject"
-                                            onClick={() => setShowRejectModal(true)}
-                                            disabled={isUpdatingOrder}
-                                            title="Rebotar al vendedor con reporte técnico"
-                                        >
-                                            <span>↩️</span>
-                                            <span>Rebotar al Vendedor</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     )}
                 </div>

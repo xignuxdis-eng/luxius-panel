@@ -331,11 +331,11 @@ export default function SharedFileViewerModal({
                                         {isImage ? (
                                             <div
                                                 style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-                                                title="Hacé clic para editar en SuiteCraft"
+                                                title="Hacé clic para inspeccionar en Xpress Viewer"
                                                 onClick={() => {
                                                     onClose()
                                                     const orderParam = order?.id ? `&orderId=${order.id}` : ''
-                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=suitecraft`)
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}`)
                                                 }}
                                             >
                                                 <img
@@ -458,7 +458,7 @@ export default function SharedFileViewerModal({
                                                 onClick={() => {
                                                     onClose()
                                                     const orderParam = order?.id ? `&orderId=${order.id}` : ''
-                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=suitecraft`)
+                                                    navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(url)}&fileName=${encodeURIComponent(productionName)}${orderParam}&tab=photocraft`)
                                                 }}
                                                 style={{
                                                     background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
@@ -467,10 +467,10 @@ export default function SharedFileViewerModal({
                                                     cursor: 'pointer',
                                                     boxShadow: '0 2px 8px rgba(139, 92, 246, 0.35)'
                                                 }}
-                                                title="Abrir y editar en SuiteCraft (raster y vectorial)"
+                                                title="Abrir y editar en PhotoCraft (raster y retoque)"
                                             >
                                                 <span className="icon">🎨</span>
-                                                Editor SuiteCraft
+                                                Editor PhotoCraft
                                             </button>
                                             <button
                                                 type="button"
