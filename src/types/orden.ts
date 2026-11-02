@@ -102,6 +102,8 @@ export interface Order {
     // Files
     archivos: string[]
     archivosOriginales?: string[]
+    driveFiles?: Array<{ filename: string; driveId: string; driveUrl: string }>
+    driveBackup?: boolean
     imgMetadata?: {
         width: number
         height: number

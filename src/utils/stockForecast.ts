@@ -350,12 +350,14 @@ export interface OrderStockEvaluation {
     warningReason?: string
 }
 
+export const TERMINAL_STATUSES = new Set(['entregado', 'completo', 'finalizado', 'anulado', 'eliminado'])
+
 /**
  * Evalúa la disponibilidad de stock para una orden específica frente al stock actual de materiales.
  */
 export function evaluateOrderStock(order: Order, materials: Material[]): OrderStockEvaluation {
-    // Si la orden ya descontó stock o está terminada/anulada/eliminada, no requiere stock adicional
-    if (order.stockDescontado || order.status === 'finalizado' || order.status === 'anulado' || order.status === 'eliminado') {
+    // Si la orden ya descontó stock o está terminada/entregada/anulada/eliminada, no requiere stock adicional
+    if (order.stockDescontado || TERMINAL_STATUSES.has(order.status)) {
         return { hasStock: true, availableStock: 0, requiredStock: 0, suggestedBobina: null }
     }
 
@@ -389,8 +391,8 @@ export function enrichOrdersWithCurrentStock(orders: Order[], materials: Materia
     if (!Array.isArray(materials) || materials.length === 0) return orders
 
     return orders.map(order => {
-        // No tocar órdenes ya finalizadas, anuladas o eliminadas
-        if (order.status === 'finalizado' || order.status === 'anulado' || order.status === 'eliminado') {
+        // No evaluar ni advertir sobre órdenes ya entregadas, finalizadas, completas, anuladas o eliminadas
+        if (TERMINAL_STATUSES.has(order.status)) {
             if (order.stockWarning) {
                 return { ...order, stockWarning: false }
             }

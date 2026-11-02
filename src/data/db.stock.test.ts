@@ -335,4 +335,53 @@ describe('Actualización Reactiva de Órdenes según Stock de Materiales', () =>
         expect(ordenActualizada.bobinaAsignada).toBe(1.37)
         expect(ordenActualizada.stockWarning).toBe(false)
     })
+
+    it('excluye órdenes en estados terminales (entregado, completo, anulado) del cómputo de demanda y stockWarning', () => {
+        saveMaterial({
+            id: 205,
+            codigo: 'VIN-TERMINAL',
+            descripcion: 'Vinilo Terminal Test',
+            tipoCobro: 'ml',
+            stockActual: 0,
+            bobinas: [{ ancho: 1.52, precioML: 20000, stockActual: 0 }],
+            habilitado: true
+        })
+
+        const terminalOrder: Order = {
+            id: 505,
+            ot: 'OT-505',
+            status: 'entregado', // Estado terminal
+            clientId: 1,
+            clienteNombre: 'Cliente Entregado',
+            material: 'VIN-TERMINAL',
+            calidad: 'ECO',
+            alto: 5,
+            ancho: 1.5,
+            copias: 1,
+            subtotal: 10000,
+            archivos: [],
+            accesorios: [],
+            laminado: false,
+            bordado: false,
+            panelizado: false,
+            portabanners: 0,
+            demasias: 0,
+            envio: '',
+            emergencia: false,
+            fechaCreacion: '2026-10-01',
+            fechaEntrega: '2026-10-02',
+            observaciones: '',
+            observaciones2: '',
+            stockDescontado: false, // Aunque estuviera pendiente de descontar, al estar entregada no debe bloquear
+            stockWarning: true // Venía con advertencia previa mientras estaba pendiente
+        }
+
+        const mats = getMateriales()
+        const [resultOrder] = enrichOrdersWithCurrentStock([terminalOrder], mats)
+
+        // No debe generar alerta de falta de stock ni computar demanda
+        expect(resultOrder.stockWarning).toBe(false)
+        expect(evaluateOrderStock(terminalOrder, mats).hasStock).toBe(true)
+        expect(evaluateOrderStock(terminalOrder, mats).warningReason).toBeUndefined()
+    })
 })

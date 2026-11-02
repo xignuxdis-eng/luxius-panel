@@ -41,13 +41,26 @@ export function matchesOrderId(order: { id?: number | string, ot?: string, uuid?
     );
 }
 
-export async function getOrdenes(forceRefresh = false): Promise<Order[]> {
-    const rawOrders = await getRawOrdenes(forceRefresh);
+export interface GetOrdenesOptions {
+    scope?: 'active' | 'history' | 'all';
+    days?: number;
+    limit?: number;
+}
+
+// Cache en memoria para la sesión activa que no satura el límite de 5MB de localStorage
+let inMemoryOrdersCache: Order[] | null = null;
+
+export function getCachedOrdenesMemory(): Order[] | null {
+    return inMemoryOrdersCache;
+}
+
+export async function getOrdenes(forceRefresh = false, options?: GetOrdenesOptions): Promise<Order[]> {
+    const rawOrders = await getRawOrdenes(forceRefresh, options);
     const materials = getMateriales();
     return enrichOrdersWithCurrentStock(rawOrders, materials);
 }
 
-async function getRawOrdenes(forceRefresh = false): Promise<Order[]> {
+async function getRawOrdenes(forceRefresh = false, options?: GetOrdenesOptions): Promise<Order[]> {
     if (isDemoMode()) {
         const demoOrdersJson = localStorage.getItem(DEMO_ORDENES_KEY);
         if (demoOrdersJson) {
@@ -66,15 +79,21 @@ async function getRawOrdenes(forceRefresh = false): Promise<Order[]> {
         localOrders = JSON.parse(localOrdersJson);
     } catch (e) { }
 
-    // Si se guardó hace menos de 2 segundos y no se forza recarga, usar local para evitar parpadeos
+    // Si se guardó hace menos de 2 segundos y no se forza recarga, usar memoria/local para evitar parpadeos
     const lastSaveTs = Number(localStorage.getItem('luxius_ordenes_last_save') || '0');
     const timeSinceLastSave = Date.now() - lastSaveTs;
-    if (!forceRefresh && timeSinceLastSave < 2000 && localOrders.length > 0) {
-        return localOrders;
+    if (!forceRefresh && timeSinceLastSave < 2000) {
+        if (inMemoryOrdersCache && inMemoryOrdersCache.length > 0) return inMemoryOrdersCache;
+        if (localOrders.length > 0) return localOrders;
     }
 
     try {
-        const response = await fetchWithTimeout(`${API_URL}/orders`, {}, 35000);
+        const queryParams = new URLSearchParams();
+        if (options?.scope && options.scope !== 'all') queryParams.set('scope', options.scope);
+        if (options?.days && options.days > 0) queryParams.set('days', String(options.days));
+        if (options?.limit && options.limit > 0) queryParams.set('limit', String(options.limit));
+        const urlWithParams = queryParams.toString() ? `${API_URL}/orders?${queryParams.toString()}` : `${API_URL}/orders`;
+        const response = await fetchWithTimeout(urlWithParams, {}, 35000);
         if (response.status === 304) {
             // ETag validó que no hubo cambios en el servidor
             return localOrders;
@@ -87,8 +106,22 @@ async function getRawOrdenes(forceRefresh = false): Promise<Order[]> {
                     ...o,
                     ot: formatOTNumber(o.ot || o.id),
                 }));
-                localStorage.setItem('luxius_session_ordenes', JSON.stringify(normalized));
-                localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+                inMemoryOrdersCache = normalized;
+                try {
+                    // Si el volumen de órdenes supera 250, guardar en localStorage solo activas + 100 históricas recientes
+                    // para blindar contra QuotaExceededError (5MB de localStorage).
+                    const TERMINAL_SET = new Set(['entregado', 'finalizado', 'anulado', 'eliminado']);
+                    let cacheToStore = normalized;
+                    if (normalized.length > 250) {
+                        const activeList = normalized.filter(o => !TERMINAL_SET.has(o.status));
+                        const recentTerminal = normalized.filter(o => TERMINAL_SET.has(o.status)).slice(0, 100);
+                        cacheToStore = [...activeList, ...recentTerminal];
+                    }
+                    localStorage.setItem('luxius_session_ordenes', JSON.stringify(cacheToStore));
+                    localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+                } catch (storageErr) {
+                    console.warn('[db] localStorage lleno, conservando órdenes en memoria:', storageErr);
+                }
                 return normalized;
             }
         }

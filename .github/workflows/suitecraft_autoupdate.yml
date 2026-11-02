@@ -58,3 +58,4 @@ jobs:
           git add public/suitecraft/
           git commit -m "chore(suitecraft): auto-update editors upstream to ${{ steps.updater.outputs.tools }}"
           git push origin master
+
