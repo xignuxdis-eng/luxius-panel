@@ -35,7 +35,7 @@ export interface StockForecast {
     groupsAtRisk: GroupForecast[]
 }
 
-const ACTIVE_STATUSES = new Set(['orden'])
+const ACTIVE_STATUSES = new Set(['relevamiento', 'diseno', 'orden', 'impresion'])
 
 const SEVERITY_RANK: Record<ForecastSeverity, number> = { ok: 1, low: 2, critical: 3 }
 
@@ -109,7 +109,7 @@ export function computeStockForecast(orders: Order[], materials: Material[]): St
     }
 
     const groupMap = new Map<string, GroupForecast>()
-    const activeOrders = orders.filter(o => ACTIVE_STATUSES.has(o.status))
+    const activeOrders = orders.filter(o => ACTIVE_STATUSES.has(o.status) && !o.stockDescontado)
 
     activeOrders.forEach(order => {
         const code = String(order.material || '').trim()
@@ -191,4 +191,101 @@ export function computeStockForecast(orders: Order[], materials: Material[]): St
     const groupsAtRisk = groups.filter(g => g.riskLevel === 'critical')
 
     return { items, groups, criticalCount, lowCount, groupsAtRisk }
+}
+
+export interface OrderStockEvaluation {
+    hasStock: boolean
+    availableStock: number
+    requiredStock: number
+    warningReason?: string
+}
+
+/**
+ * Evalúa la disponibilidad de stock para una orden específica frente al stock actual de materiales.
+ */
+export function evaluateOrderStock(order: Order, materials: Material[]): OrderStockEvaluation {
+    // Si la orden ya descontó stock o está terminada/anulada/eliminada, no requiere stock adicional
+    if (order.stockDescontado || order.status === 'finalizado' || order.status === 'anulado' || order.status === 'eliminado') {
+        return { hasStock: true, availableStock: 0, requiredStock: 0 }
+    }
+
+    const code = String(order.material || '').trim().toLowerCase()
+    if (!code) {
+        return { hasStock: true, availableStock: 0, requiredStock: 0 }
+    }
+
+    const mat = materials.find(m =>
+        (m.codigo && m.codigo.toLowerCase() === code) ||
+        (m.descripcion && m.descripcion.toLowerCase() === code)
+    )
+
+    if (!mat) {
+        return { hasStock: false, availableStock: 0, requiredStock: 0, warningReason: 'Material no encontrado' }
+    }
+
+    const required = orderConsumption(order, mat)
+    if (required <= 0) {
+        return { hasStock: true, availableStock: 0, requiredStock: 0 }
+    }
+
+    let available = 0
+    if (mat.tipoCobro === 'ml' && mat.bobinas && mat.bobinas.length > 0) {
+        const w = toNum(order.bobinaAsignada ?? order.precioDetalle?.bobinaAncho ?? order.precioDetalle?.bobinaUsada)
+        const match = mat.bobinas.find(b => Math.abs(toNum(b.ancho) - w) < 0.01)
+        if (match) {
+            available = toNum(match.stockActual)
+        } else {
+            // Si no tiene bobina exacta asignada, buscar bobinas compatibles con el tamaño del pedido
+            const orderW = toNum(order.ancho) > 20 ? toNum(order.ancho) / 100 : toNum(order.ancho)
+            const orderH = toNum(order.alto) > 20 ? toNum(order.alto) / 100 : toNum(order.alto)
+            const minDim = Math.min(orderW, orderH)
+            const validBobinas = mat.bobinas.filter(b => toNum(b.ancho) >= minDim - 0.02)
+            if (validBobinas.length > 0) {
+                available = Math.max(...validBobinas.map(b => toNum(b.stockActual)))
+            } else {
+                available = toNum(mat.stockActual)
+            }
+        }
+    } else {
+        available = toNum(mat.stockActual)
+    }
+
+    const hasStock = available >= required && available > 0
+    return {
+        hasStock,
+        availableStock: available,
+        requiredStock: required,
+        warningReason: hasStock ? undefined : (available <= 0 ? 'Sin stock disponible' : 'Stock insuficiente')
+    }
+}
+
+/**
+ * Enriquece y sincroniza reactivamente las órdenes con el stock actual de materiales.
+ * Si el usuario agregó stock del material, el stockWarning se desactiva (pasa a false).
+ * Si el stock es insuficiente, se activa stockWarning.
+ */
+export function enrichOrdersWithCurrentStock(orders: Order[], materials: Material[]): Order[] {
+    if (!Array.isArray(orders)) return []
+    if (!Array.isArray(materials) || materials.length === 0) return orders
+
+    return orders.map(order => {
+        // No tocar órdenes ya finalizadas, anuladas o eliminadas
+        if (order.status === 'finalizado' || order.status === 'anulado' || order.status === 'eliminado') {
+            if (order.stockWarning) {
+                return { ...order, stockWarning: false }
+            }
+            return order
+        }
+
+        const evaluation = evaluateOrderStock(order, materials)
+        const newStockWarning = !evaluation.hasStock
+
+        if (order.stockWarning !== newStockWarning) {
+            return {
+                ...order,
+                stockWarning: newStockWarning
+            }
+        }
+        return order
+    })
 }

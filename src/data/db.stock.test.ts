@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { saveMaterial, getMateriales, reconcilePendingStockDeductions } from './db'
+import { evaluateOrderStock, enrichOrdersWithCurrentStock } from '@/utils/stockForecast'
 import type { Material, Order } from '@/types'
 
 describe('Persistencia de Materiales y Rollos/Bobinas', () => {
@@ -123,5 +124,156 @@ describe('Reconciliación y Protección de Deducción de Stock', () => {
         const matsPost2 = getMateriales()
         const matPost2 = matsPost2.find(m => m.codigo === 'VV')
         expect(matPost2!.stockActual).toBe(stockAfterFirst)
+    })
+})
+
+describe('Actualización Reactiva de Órdenes según Stock de Materiales', () => {
+    beforeEach(() => {
+        localStorage.clear()
+    })
+
+    it('marca stockWarning: true cuando el stock disponible es insuficiente', () => {
+        const materialSinStock: Partial<Material> = {
+            id: 99,
+            codigo: 'LONA-FRONT',
+            descripcion: 'Lona Front 13oz',
+            tipoCobro: 'm2',
+            stockActual: 0,
+            habilitado: true
+        }
+        saveMaterial(materialSinStock)
+
+        const ordenTest: Order = {
+            id: 101,
+            ot: 'OT-101',
+            status: 'orden',
+            clientId: 1,
+            clienteNombre: 'Cliente 1',
+            material: 'LONA-FRONT',
+            calidad: 'ECO',
+            alto: 2,
+            ancho: 1,
+            copias: 1,
+            subtotal: 5000,
+            archivos: [],
+            accesorios: [],
+            laminado: false,
+            bordado: false,
+            panelizado: false,
+            portabanners: 0,
+            demasias: 0,
+            envio: '',
+            emergencia: false,
+            fechaCreacion: '2026-11-01',
+            fechaEntrega: '2026-11-02',
+            observaciones: '',
+            observaciones2: '',
+            stockDescontado: false,
+            stockWarning: false
+        }
+
+        const mats = getMateriales()
+        const evalRes = evaluateOrderStock(ordenTest, mats)
+        expect(evalRes.hasStock).toBe(false)
+        expect(evalRes.warningReason).toBe('Sin stock disponible')
+
+        const [enriched] = enrichOrdersWithCurrentStock([ordenTest], mats)
+        expect(enriched.stockWarning).toBe(true)
+    })
+
+    it('actualiza la orden a stockWarning: false automáticamente al cargar/agregar nuevo stock', () => {
+        // Inicialmente con stock 0
+        const mat = saveMaterial({
+            id: 100,
+            codigo: 'VIN-PROD',
+            descripcion: 'Vinilo Produccion',
+            tipoCobro: 'ml',
+            stockActual: 0,
+            bobinas: [{ ancho: 1.52, precioML: 10000, stockActual: 0 }],
+            habilitado: true
+        })
+
+        const orden: Order = {
+            id: 202,
+            ot: 'OT-202',
+            status: 'orden',
+            clientId: 1,
+            clienteNombre: 'Cliente 2',
+            material: 'VIN-PROD',
+            calidad: 'ECO',
+            bobinaAsignada: 1.52,
+            alto: 1.5,
+            ancho: 1,
+            copias: 1,
+            subtotal: 10000,
+            archivos: [],
+            accesorios: [],
+            laminado: false,
+            bordado: false,
+            panelizado: false,
+            portabanners: 0,
+            demasias: 0,
+            envio: '',
+            emergencia: false,
+            fechaCreacion: '2026-11-01',
+            fechaEntrega: '2026-11-02',
+            observaciones: '',
+            observaciones2: '',
+            stockDescontado: false,
+            stockWarning: true // venía con advertencia
+        }
+
+        // Antes de agregar stock
+        const mats1 = getMateriales()
+        const [ordenSinStock] = enrichOrdersWithCurrentStock([orden], mats1)
+        expect(ordenSinStock.stockWarning).toBe(true)
+
+        // El usuario agrega 50 metros de bobina al stock
+        saveMaterial({
+            ...mat,
+            bobinas: [{ ancho: 1.52, precioML: 10000, stockActual: 50 }]
+        })
+
+        // Al recargar/sincronizar el listado de órdenes con el nuevo stock
+        const mats2 = getMateriales()
+        const [ordenConStock] = enrichOrdersWithCurrentStock([ordenSinStock], mats2)
+
+        // ¡La orden se actualizó y la advertencia se apagó!
+        expect(ordenConStock.stockWarning).toBe(false)
+    })
+
+    it('no marca stockWarning si la orden ya tiene stockDescontado: true', () => {
+        const mats = getMateriales()
+        const ordenDescontada: Order = {
+            id: 303,
+            ot: 'OT-303',
+            status: 'impreso',
+            clientId: 1,
+            clienteNombre: 'Cliente 3',
+            material: 'MATERIAL-INEXISTENTE',
+            calidad: 'ECO',
+            alto: 1,
+            ancho: 1,
+            copias: 1,
+            subtotal: 1000,
+            archivos: [],
+            accesorios: [],
+            laminado: false,
+            bordado: false,
+            panelizado: false,
+            portabanners: 0,
+            demasias: 0,
+            envio: '',
+            emergencia: false,
+            fechaCreacion: '2026-11-01',
+            fechaEntrega: '2026-11-02',
+            observaciones: '',
+            observaciones2: '',
+            stockDescontado: true,
+            stockWarning: true
+        }
+
+        const [enriched] = enrichOrdersWithCurrentStock([ordenDescontada], mats)
+        expect(enriched.stockWarning).toBe(false)
     })
 })

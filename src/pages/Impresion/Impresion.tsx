@@ -72,6 +72,16 @@ export default function Impresion() {
         loadOrders()
     }, [user])
 
+    useEffect(() => {
+        const onStockUpdate = () => loadOrders()
+        window.addEventListener("luxius-materials-updated", onStockUpdate)
+        window.addEventListener("luxius-stock-updated", onStockUpdate)
+        return () => {
+            window.removeEventListener("luxius-materials-updated", onStockUpdate)
+            window.removeEventListener("luxius-stock-updated", onStockUpdate)
+        }
+    }, [])
+
     const handleMarkAsPrinted = async (order: Order) => {
         setOrders(prev => prev.map(o => (o.uuid || o.id) === (order.uuid || order.id) ? { ...o, status: 'impreso', stockDescontado: true } : o))
 
@@ -244,7 +254,22 @@ export default function Impresion() {
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                            <span className="material-tag-sm">{order.material}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <span className="material-tag-sm">{order.material}</span>
+                                                {order.stockWarning && !order.stockDescontado && (
+                                                    <span style={{
+                                                        fontSize: '9px',
+                                                        padding: '1px 5px',
+                                                        borderRadius: '3px',
+                                                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                                        color: '#f87171',
+                                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                                        fontWeight: 700
+                                                    }} title="Stock insuficiente del material en inventario">
+                                                        ⚠ Sin Stock
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                                 <span style={{
                                                     fontSize: '9px',

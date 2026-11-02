@@ -579,6 +579,34 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                 <div className="composite-bottom-row">
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Consumo:</span>
                                     <OrderConsumptionBadge order={order} consumption={consumption} />
+                                    {canViewAlerts && order.stockWarning && (
+                                        <span style={{
+                                            fontSize: '0.68rem',
+                                            fontWeight: 700,
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            background: 'rgba(239, 68, 68, 0.15)',
+                                            color: '#f87171',
+                                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                                            whiteSpace: 'nowrap'
+                                        }} title="Stock insuficiente del material en depósito">
+                                            ⚠ Sin Stock
+                                        </span>
+                                    )}
+                                    {canViewAlerts && order.stockDescontado && (
+                                        <span style={{
+                                            fontSize: '0.68rem',
+                                            fontWeight: 600,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px',
+                                            background: 'rgba(16, 185, 129, 0.15)',
+                                            color: '#34d399',
+                                            border: '1px solid rgba(16, 185, 129, 0.35)',
+                                            whiteSpace: 'nowrap'
+                                        }} title="Stock reservado y descontado">
+                                            ✓ Stock OK
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </td>

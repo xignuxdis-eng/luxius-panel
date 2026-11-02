@@ -13,7 +13,7 @@ import OrderChatModal from '@components/shared/OrderChatModal'
 import type { Order, Cliente, Material } from '@/types'
 import { generatePdfBudget, generatePdfBatch, type BudgetPdfMode } from '@/utils/generatePdfBudget'
 import { generateProductionLabel } from '@/utils/generateLabelPdf'
-import { computeStockForecast, canViewStockAlerts } from '@/utils/stockForecast'
+import { computeStockForecast, canViewStockAlerts, enrichOrdersWithCurrentStock } from '@/utils/stockForecast'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import PdfModeModal from '@components/PdfModeModal'
 import NestingStudioModal from '@components/workshop/NestingStudioModal'
@@ -124,6 +124,20 @@ export default function Entrada() {
         setAllClientes(getClientes())
         setAllMateriales(getMateriales())
     }, [orders])
+
+    useEffect(() => {
+        const handleStockUpdate = () => {
+            const mats = getMateriales()
+            setAllMateriales(mats)
+            setOrders(prev => enrichOrdersWithCurrentStock(prev, mats))
+        }
+        window.addEventListener("luxius-materials-updated", handleStockUpdate)
+        window.addEventListener("luxius-stock-updated", handleStockUpdate)
+        return () => {
+            window.removeEventListener("luxius-materials-updated", handleStockUpdate)
+            window.removeEventListener("luxius-stock-updated", handleStockUpdate)
+        }
+    }, [])
 
     const handleToggleOrderTag = async (targetOrder: Order, tagId: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -1000,6 +1014,7 @@ export default function Entrada() {
                                         allMateriales={allMateriales}
                                         allClientes={allClientes}
                                         isAdmin={isAdmin}
+                                        canViewAlerts={canViewAlerts}
                                         onStatusClick={(o) => {
                                             setStatusOrder(o);
                                             setStatusBatchOrders(undefined);

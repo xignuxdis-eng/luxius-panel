@@ -6,6 +6,8 @@ import type { Order, UpdateBatchGroupParams } from './types';
 import { isDemoMode, DEMO_ORDENES_KEY, HIDDEN_ORDENES_KEY } from './cache';
 import { DEMO_ORDENES } from '../demoSandboxData';
 import { API_URL, fetchWithTimeout } from './client';
+import { getMateriales } from './inventory.db';
+import { enrichOrdersWithCurrentStock } from '@/utils/stockForecast';
 
 export type { UpdateBatchGroupParams };
 
@@ -39,6 +41,12 @@ export function matchesOrderId(order: { id?: number | string, ot?: string, uuid?
 }
 
 export async function getOrdenes(forceRefresh = false): Promise<Order[]> {
+    const rawOrders = await getRawOrdenes(forceRefresh);
+    const materials = getMateriales();
+    return enrichOrdersWithCurrentStock(rawOrders, materials);
+}
+
+async function getRawOrdenes(forceRefresh = false): Promise<Order[]> {
     if (isDemoMode()) {
         const demoOrdersJson = localStorage.getItem(DEMO_ORDENES_KEY);
         if (demoOrdersJson) {

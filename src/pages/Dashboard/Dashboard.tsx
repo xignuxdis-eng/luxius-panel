@@ -556,6 +556,13 @@ function StockAlertsWidget() {
 
     useEffect(() => {
         fetchAlerts()
+        const onStockUpdate = () => fetchAlerts()
+        window.addEventListener("luxius-materials-updated", onStockUpdate)
+        window.addEventListener("luxius-stock-updated", onStockUpdate)
+        return () => {
+            window.removeEventListener("luxius-materials-updated", onStockUpdate)
+            window.removeEventListener("luxius-stock-updated", onStockUpdate)
+        }
     }, [])
 
     const handleDismiss = async (order: Order) => {
