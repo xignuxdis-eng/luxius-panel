@@ -131,11 +131,26 @@ export default function Entrada() {
             setAllMateriales(mats)
             setOrders(prev => enrichOrdersWithCurrentStock(prev, mats))
         }
+        const handleOrdersUpdated = () => {
+            loadOrders(true)
+        }
+        const handleOpenOrderModal = () => {
+            setEditingOrder(null)
+            setIsModalOpen(true)
+        }
+        if (sessionStorage.getItem('luxius_xana_draft_order')) {
+            setEditingOrder(null)
+            setIsModalOpen(true)
+        }
         window.addEventListener("luxius-materials-updated", handleStockUpdate)
         window.addEventListener("luxius-stock-updated", handleStockUpdate)
+        window.addEventListener("luxius:orders-updated", handleOrdersUpdated)
+        window.addEventListener("luxius:open-order-modal", handleOpenOrderModal)
         return () => {
             window.removeEventListener("luxius-materials-updated", handleStockUpdate)
             window.removeEventListener("luxius-stock-updated", handleStockUpdate)
+            window.removeEventListener("luxius:orders-updated", handleOrdersUpdated)
+            window.removeEventListener("luxius:open-order-modal", handleOpenOrderModal)
         }
     }, [])
 

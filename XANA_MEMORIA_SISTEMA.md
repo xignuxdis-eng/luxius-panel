@@ -1987,3 +1987,28 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - `server/scripts/test_xana_jarvis.py`: **11 / 11 pruebas aprobadas (100%)** validando imposición 2D ($0^\circ$ vs $90^\circ$), alias industriales, nesting en fila, alertas de stock, briefing ejecutivo, cuentas por cobrar, RBAC en mutación de OTs y pre-router `<50ms`.
 
 ---
+
+- **Rediseño Integral de Pedido Inteligente (Smart Order v2.0) — Enlaces de Google Drive / WeTransfer y Modo Lote Multi-Imagen (02/11/2026)**:
+  - **Diagnóstico de Causa Raíz (Enlaces de Google Drive y UI Aplastada)**:
+    1. **Fallo de descarga en Google Drive (`drive_1lTF...` y `0 × 0 m`)**: En `server/routes/xana_smart_order.py` y `server/routes/cloud_import.py`, la descarga de enlaces individuales usaba `gdown.download(id=drive_id)` sin `fuzzy=True` y tenía como fallback `https://drive.google.com/uc?export=download&id={drive_id}`, el cual devuelve una página HTML intersticial de Google en lugar del binario. Ese HTML se guardaba como `drive_{id}.jpg`; Pillow fallaba al abrirlo, devolviendo `0 × 0 m` y una URL de miniatura que apuntaba a un archivo HTML corrupto.
+    2. **Icono de imagen rota con texto `alt` desbordado**: En `XanaSmartOrderCard.tsx`, el `<img>` tenía `alt={item.originalName}` sin manejador `onError`, por lo que al fallar la carga el navegador renderizaba el texto `drive_1lTF4amOynU4JEDrL...` desbordando la caja de `68×68 px`.
+    3. **Textos aplastados en columnas verticales de 1 letra (`7\n2\nD\nP\nI`, `R\nG\nB`, `1\n:\n1`)**: `.xana-bubble` tenía `max-width: 88%` sobre un contenedor de `360px` y aplicaba `word-break: break-word` heredado a todos los hijos. Dentro de `.cartel-details-box`, los badges técnicos y botones de escala carecían de `white-space: nowrap` y `flex-shrink: 0`.
+  - **Solución en Backend (`server/routes/xana_smart_order.py`, `server/routes/cloud_import.py`, `server/services/dimension_analyzer.py`)**:
+    - Implementado descargador multi-estrategia `_download_single_drive_file()` que prioriza `https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t`, extrae el nombre real del archivo desde `Content-Disposition` o desde el `<title>` de `/file/d/{id}/view` (`_fetch_drive_view_title()`), usa `gdown.download(..., fuzzy=True)` como segunda vía y `https://drive.google.com/thumbnail?id={drive_id}&sz=w2500` como tercera vía para imágenes.
+    - Incorporado detector `_is_html_file()` y validación de cabecera en `analyze_file_dimensions()` que rechaza páginas HTML intersticiales (`<!DOCTYPE html` / `<html`) con un mensaje claro en lugar de generar archivos fantasma de `0 × 0 m`.
+    - Los thumbnails generados en el backend ahora se codifican e incrustan como Data URL Base64 (`data:image/jpeg;base64,...` mediante `_encode_thumb_data_url()`), garantizando visualización instantánea sin depender de rutas relativas ni CORS.
+    - Integrada la calculadora real de tarifas de Supabase (`_find_material` y `_get_effective_unit_price` de `services.xana_tools`) en `xana_smart_order.py`.
+    - En `cloud_import.py` (`stream_cloud_file`), habilitado `payload_from_request(allow_query_token=True)` y añadido `headers: getAuthHeaders()` en `NuevoPedidoModal.tsx`.
+  - **Motor Híbrido en Navegador + Rediseño UI Industrial (`XanaAssistant.tsx`, `XanaSmartOrderCard.tsx`, `XanaSmartOrderCard.css`, `XanaAssistant.css`)**:
+    - **Motor Primario en Navegador (`XanaAssistant.tsx`)**: Al pegar un link de Google Drive o WeTransfer, Xana consulta `/api/import-cloud`, descarga cada archivo mostrando progreso en tiempo real (`Procesando (i/N): nombre...`), verifica los magic bytes (`normalizeCloudFile` para detectar PDF/JPG/PNG/TIFF/CDR o bloquear HTML), extrae dimensiones reales en cm, DPI, modo de color y miniatura local con `extractMetadata()`, guarda la vista previa en `blobStore` y cotiza cada pieza con `calculateItemPriceDetailed()`. Si el motor primario no aplica, hace fallback transparente a `/api/xana/smart-order`.
+    - **Nueva Arquitectura Visual Anti-Colapso (`XanaSmartOrderCard.tsx` y `.css`)**:
+      - Contenedor de Xana ampliado a `415px` y `.xana-bubble-bot:has(.xana-order-card)` al `100%` del ancho con `word-break: normal`.
+      - Separación estructural en dos niveles por ítem: fila superior con miniatura protegida (`alt=""` + `onError` a ícono limpio de formato), nombre completo con elipsis, medida en metros y cm (`📐 1.50 × 1.00 m (150×100 cm)`), precio individual (`$ 35.860`) y píldoras horizontales (`300 DPI`, `CMYK`, `Bobina 1.52m`, `1.00 ml`) con `white-space: nowrap; flex-shrink: 0`. Fila inferior de ancho completo para `Escala: 1:1 | 1:10 | 1:20` y stepper `Copias: - 1 +`.
+      - Si un archivo vectorial no trae medidas embebidas (`0 × 0 m`), muestra inputs inline (`Ancho m × Alto m`) para completarlas al instante.
+    - **Modo Lote Multi-Imagen (Batch Mode)**:
+      - Cuando el enlace contiene múltiples archivos, se habilita automáticamente la **Barra de Lote** con **Escala Global (`1:1`, `1:10`, `1:20`)** para escalar todas las piezas con un clic y selector entre **Vista Compacta (Tabla)** (activada automáticamente para $>3$ archivos, con clic para expandir cualquier fila) y **Vista Detallada**.
+    - **Integración Completa con Producción (`saveOrden` y `NuevoPedidoModal`)**:
+      - El botón **"Confirmar Orden"** persiste directamente mediante `saveOrden` en Supabase y `localStorage`, emitiendo el código OT canónico.
+      - El botón **"Abrir en Modal"** hidrata automáticamente `NuevoPedidoModal` (en pestaña `Unitario` para 1 archivo o `Lote` para múltiples archivos) con clientes, medidas, copias, materiales y vistas previas cargadas.
+
+---

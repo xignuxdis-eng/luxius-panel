@@ -5,10 +5,13 @@ import {
     Activity, RefreshCw, ChevronDown, Package, Trash2, Zap, Calculator, HelpCircle, Mic, MicOff, Palette, Printer
 } from 'lucide-react';
 import { getRecentLogs, clearLogs, RecordedError } from '../utils/errorRecorder';
-import { API_URL } from '../data/db';
+import { API_URL, getMateriales, getClientes, getAuthHeaders, uploadFile } from '../data/db';
+import { blobStore } from '../data/blobStore';
+import { extractMetadata } from '../pages/Entrada/utils/fileMetadataParser';
+import { calculateItemPriceDetailed } from '../utils/pricingCalculator';
 import './XanaAssistant.css';
 
-import XanaSmartOrderCard, { SmartDraftOrder } from './XanaSmartOrderCard';
+import XanaSmartOrderCard, { SmartDraftOrder, SmartCartelItem } from './XanaSmartOrderCard';
 
 interface Message {
     role: 'user' | 'bot';
@@ -31,6 +34,98 @@ const NORMALIZED_ROLES: Record<string, string> = {
 
 function normalizeRole(raw: string): string {
     return NORMALIZED_ROLES[raw.toLowerCase()] || 'cliente';
+}
+
+function inferMaterialFromText(text: string): string {
+    const lower = text.toLowerCase();
+    const mats = getMateriales().filter(m => m.habilitado !== false);
+    const findCode = (keywords: string[], fallbackCode: string): string => {
+        const found = mats.find(m =>
+            keywords.some(k =>
+                (m.nombre || '').toLowerCase().includes(k) ||
+                (m.codigo || '').toLowerCase() === k
+            )
+        );
+        return (found ? (found.codigo || found.nombre) : fallbackCode) || fallbackCode;
+    };
+    if (lower.includes('microperforado') || lower.includes('micro')) return findCode(['microperforado', 'vm'], 'VM');
+    if (lower.includes('blackout') || lower.includes('doble faz')) return findCode(['blackout', 'lb'], 'LB');
+    if (lower.includes('backlight') || lower.includes('back')) return findCode(['backlight', 'lback'], 'LBACK');
+    if (lower.includes('vinilo') || lower.includes('autoadhesivo') || lower.includes('calco')) return findCode(['vinilo', 'vv', 'vb'], 'VV');
+    if (lower.includes('lona') || lower.includes('front') || lower.includes('cartel') || lower.includes('banner')) return findCode(['lona', 'lf'], 'LF');
+    return mats[0]?.codigo || 'LF';
+}
+
+function inferClientFromText(text: string): { id?: number | null; nombre: string } {
+    const lower = text.toLowerCase();
+    const clientes = getClientes();
+    for (const c of clientes) {
+        const name = (c.nombre || '').trim();
+        if (name.length >= 3 && lower.includes(name.toLowerCase())) {
+            const numId = typeof c.id === 'number' ? c.id : (Number(c.id) || null);
+            return { id: numId, nombre: name };
+        }
+    }
+    return { id: null, nombre: 'Particular (Web)' };
+}
+
+function parseDimsFromFilenameCm(name: string): { widthCm: number; heightCm: number } | null {
+    const base = name.replace(/\.[^.]+$/, '');
+    const mCm = base.match(/(\d+(?:[.,]\d+)?)\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*(cm|m|mm)\b/i);
+    if (mCm) {
+        let w = parseFloat(mCm[1].replace(',', '.'));
+        let h = parseFloat(mCm[2].replace(',', '.'));
+        const unit = mCm[3].toLowerCase();
+        if (unit === 'm') { w *= 100; h *= 100; }
+        else if (unit === 'mm') { w /= 10; h /= 10; }
+        if (w > 0 && h > 0) return { widthCm: Math.round(w * 10) / 10, heightCm: Math.round(h * 10) / 10 };
+    }
+    return null;
+}
+
+async function normalizeCloudFile(blob: Blob, rawName: string): Promise<File> {
+    const headerBuf = await blob.slice(0, 64).arrayBuffer();
+    const bytes = new Uint8Array(headerBuf);
+    const ascii = new TextDecoder('ascii', { fatal: false }).decode(bytes).trim().toLowerCase();
+
+    if (ascii.startsWith('<!doctype html') || ascii.startsWith('<html')) {
+        throw new Error('Google Drive devolvió una página de bloqueo HTML. Verifique que el archivo tenga acceso público ("Cualquier persona con el enlace").');
+    }
+
+    let cleanName = rawName.trim() || 'archivo_cloud';
+    const hasExt = /\.(jpg|jpeg|png|tif|tiff|pdf|eps|ai|cdr|psd|webp)$/i.test(cleanName);
+
+    let detectedExt = '';
+    let detectedMime = blob.type || 'application/octet-stream';
+
+    if (bytes.length >= 4) {
+        if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+            detectedExt = '.pdf';
+            detectedMime = 'application/pdf';
+        } else if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+            detectedExt = '.jpg';
+            detectedMime = 'image/jpeg';
+        } else if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+            detectedExt = '.png';
+            detectedMime = 'image/png';
+        } else if (
+            (bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2A && bytes[3] === 0x00) ||
+            (bytes[0] === 0x4D && bytes[1] === 0x4D && bytes[2] === 0x00 && bytes[3] === 0x2A)
+        ) {
+            detectedExt = '.tif';
+            detectedMime = 'image/tiff';
+        } else if (ascii.startsWith('riff') && ascii.includes('cdr')) {
+            detectedExt = '.cdr';
+        }
+    }
+
+    if (!hasExt && detectedExt) {
+        cleanName = `${cleanName}${detectedExt}`;
+    } else if (detectedExt && cleanName.startsWith('archivo_drive')) {
+        cleanName = cleanName.replace(/\.[^.]+$/, '') + detectedExt;
+    }
+
+    return new File([blob], cleanName, { type: detectedMime });
 }
 
 export default function XanaAssistant() {
@@ -192,12 +287,16 @@ const menuRef = useRef<HTMLDivElement>(null);
             const isCloudLink = urlMatch && (
                 urlMatch[0].includes('wetransfer.com') || 
                 urlMatch[0].includes('we.tl') || 
-                urlMatch[0].includes('drive.google.com')
+                urlMatch[0].includes('drive.google.com') ||
+                urlMatch[0].includes('docs.google.com')
             );
 
             if (isCloudLink) {
+                const cloudUrl = urlMatch[0];
                 const token = localStorage.getItem('luxius_auth_token') || localStorage.getItem('luxius_token') || '';
-                
+                const materialCode = inferMaterialFromText(textToSend);
+                const clientInfo = inferClientFromText(textToSend);
+
                 // Mensaje provisional de progreso
                 const progressTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 setMessages(prev => [
@@ -209,6 +308,193 @@ const menuRef = useRef<HTMLDivElement>(null);
                     }
                 ]);
 
+                const updateProgressText = (stepLabel: string) => {
+                    setMessages(prev => prev.map(m =>
+                        (m.text.includes('Descargando y analizando') || m.text.includes('Procesando ('))
+                            ? { ...m, text: `⏳ **${stepLabel}**\n\nExtrayendo dimensiones en cm, DPI, modo de color y evaluando bobinas óptimas...` }
+                            : m
+                    ));
+                };
+
+                // MOTOR 1 (Primario): /api/import-cloud + extractMetadata en navegador (previews locales + PDF.js + TIFF/CDR/JPG nativo)
+                try {
+                    let activeBaseUrl = API_URL.replace(/\/api\/?$/, '');
+                    let cloudRes: Response | null = null;
+                    try {
+                        cloudRes = await fetch(`${API_URL}/import-cloud`, {
+                            method: 'POST',
+                            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                            body: JSON.stringify({ url: cloudUrl })
+                        });
+                    } catch {
+                        if (API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+                            activeBaseUrl = 'https://luxius-backend.onrender.com';
+                            cloudRes = await fetch(`https://luxius-backend.onrender.com/api/import-cloud`, {
+                                method: 'POST',
+                                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                                body: JSON.stringify({ url: cloudUrl })
+                            });
+                        }
+                    }
+
+                    if (cloudRes && cloudRes.ok) {
+                        const cloudData = await cloudRes.json();
+                        if (cloudData.status === 'success' && Array.isArray(cloudData.files) && cloudData.files.length > 0) {
+                            const parsedCarteles: SmartCartelItem[] = [];
+                            let totalMl = 0;
+                            let totalM2 = 0;
+                            let totalPrice = 0;
+
+                            for (let idx = 0; idx < cloudData.files.length; idx++) {
+                                const fileInfo = cloudData.files[idx];
+                                const displayRawName = fileInfo.originalName || fileInfo.fileName || `archivo_${idx + 1}`;
+                                updateProgressText(`Procesando (${idx + 1}/${cloudData.files.length}): ${displayRawName}...`);
+
+                                try {
+                                    const fileUrl = fileInfo.tempUrl.startsWith('http')
+                                        ? fileInfo.tempUrl
+                                        : `${activeBaseUrl}${fileInfo.tempUrl}`;
+                                    const blobRes = await fetch(fileUrl, { headers: getAuthHeaders() });
+                                    if (!blobRes.ok) continue;
+                                    const blob = await blobRes.blob();
+                                    if (!blob || blob.size === 0) continue;
+
+                                    // Check if server returned a clearer filename in Content-Disposition
+                                    let resolvedName = displayRawName;
+                                    const cdHeader = blobRes.headers.get('Content-Disposition') || '';
+                                    const cdMatch = cdHeader.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+                                    if (cdMatch && cdMatch[1]) {
+                                        try {
+                                            const decoded = decodeURIComponent(cdMatch[1].trim());
+                                            if (decoded && !decoded.startsWith('archivo_drive')) {
+                                                resolvedName = decoded;
+                                            }
+                                        } catch {}
+                                    }
+
+                                    const file = await normalizeCloudFile(blob, resolvedName);
+                                    const localBlobUrl = URL.createObjectURL(file);
+                                    const meta = await extractMetadata(file, localBlobUrl, 1);
+
+                                    let widthCm = Number(meta.width) || 0;
+                                    let heightCm = Number(meta.height) || 0;
+                                    if (widthCm <= 0 || heightCm <= 0) {
+                                        const fnDims = parseDimsFromFilenameCm(file.name);
+                                        if (fnDims) {
+                                            widthCm = fnDims.widthCm;
+                                            heightCm = fnDims.heightCm;
+                                        }
+                                    }
+
+                                    const dpiVal = Number(meta.dpi) || 72;
+                                    let escalaSugerida = 1;
+                                    let alertaEscala = false;
+                                    if (widthCm > 0 && heightCm > 0 && widthCm <= 35 && heightCm <= 35 && dpiVal >= 200) {
+                                        escalaSugerida = 10;
+                                        alertaEscala = true;
+                                    }
+
+                                    const rawAnchoM = Math.round((widthCm / 100) * 100) / 100;
+                                    const rawAltoM = Math.round((heightCm / 100) * 100) / 100;
+                                    const anchoM = Math.round(rawAnchoM * escalaSugerida * 100) / 100;
+                                    const altoM = Math.round(rawAltoM * escalaSugerida * 100) / 100;
+                                    const priceInfo = calculateItemPriceDetailed(materialCode, anchoM, altoM, 1, {}, clientInfo.id || undefined);
+                                    const finalPreview = meta.thumbnailUrl || localBlobUrl;
+
+                                    // Store preview in blobStore for instant access in Xana and NuevoPedidoModal
+                                    blobStore.set(file.name, finalPreview);
+
+                                    // Upload to server in background if small/medium (<35MB) so archivo_url is persisted
+                                    let serverSavedFilename = file.name;
+                                    if (file.size <= 35 * 1024 * 1024) {
+                                        try {
+                                            const upRes = await uploadFile(file);
+                                            if (upRes?.filename) {
+                                                serverSavedFilename = upRes.filename;
+                                                blobStore.set(upRes.filename, finalPreview);
+                                            }
+                                        } catch {}
+                                    }
+
+                                    const itemM2 = Math.round(anchoM * altoM * 100) / 100;
+                                    totalMl += priceInfo.consumoEstimado || 0;
+                                    totalM2 += itemM2;
+                                    totalPrice += priceInfo.subtotal || 0;
+
+                                    parsedCarteles.push({
+                                        tipo: materialCode,
+                                        copias: 1,
+                                        medidas: { ancho: anchoM, alto: altoM },
+                                        raw_medidas: { ancho: rawAnchoM, alto: rawAltoM },
+                                        bobinaAsignada: priceInfo.bobinaAsignada || 1.37,
+                                        consumoEstimado: Math.round((priceInfo.consumoEstimado || 0) * 100) / 100,
+                                        m2Estimado: itemM2,
+                                        originalName: file.name,
+                                        fileName: serverSavedFilename,
+                                        fileUrl: `/uploads/${serverSavedFilename}`,
+                                        thumbnailUrl: finalPreview,
+                                        dpi: dpiVal,
+                                        colorMode: meta.colorMode || 'CMYK',
+                                        format: meta.format || file.name.split('.').pop()?.toUpperCase() || 'IMG',
+                                        scaleFactor: escalaSugerida,
+                                        scaleAlert: alertaEscala,
+                                        scaleReason: alertaEscala ? `Densidad ${dpiVal} DPI en lienzo ${widthCm}x${heightCm} cm` : 'Tamaño real 1:1',
+                                        sha256: '',
+                                        precioCalculado: Math.round(priceInfo.subtotal || 0)
+                                    });
+                                } catch (itemErr) {
+                                    console.warn('[Xana Cloud Item Parse Warning]:', itemErr);
+                                }
+                            }
+
+                            if (parsedCarteles.length > 0) {
+                                const firstCartel = parsedCarteles[0];
+                                const draftOrder: SmartDraftOrder = {
+                                    cliente_id: clientInfo.id ?? null,
+                                    cliente_nombre: clientInfo.nombre,
+                                    descripcion: parsedCarteles.length === 1
+                                        ? `${firstCartel.originalName} (${firstCartel.medidas.ancho}x${firstCartel.medidas.alto}m)`
+                                        : `Lote de ${parsedCarteles.length} archivos desde enlace`,
+                                    material: materialCode,
+                                    calidad: 'ECO',
+                                    copias: 1,
+                                    ancho: firstCartel.medidas.ancho,
+                                    alto: firstCartel.medidas.alto,
+                                    archivos: parsedCarteles.map(c => c.fileName),
+                                    archivosOriginales: parsedCarteles.map(c => c.originalName),
+                                    carteles: parsedCarteles,
+                                    bobinaAsignada: firstCartel.bobinaAsignada,
+                                    consumoEstimado: Math.round(totalMl * 100) / 100,
+                                    totalM2: Math.round(totalM2 * 100) / 100,
+                                    precioMl: 0,
+                                    total: Math.round(totalPrice),
+                                    observaciones: textToSend,
+                                    imgMetadata: {
+                                        dpi: firstCartel.dpi,
+                                        colorMode: firstCartel.colorMode,
+                                        format: firstCartel.format,
+                                        thumbnailUrl: firstCartel.thumbnailUrl
+                                    }
+                                };
+
+                                setMessages(prev => [
+                                    ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Procesando (')),
+                                    {
+                                        role: 'bot',
+                                        text: `✨ ¡Enlace analizado con éxito! Procesé **${parsedCarteles.length} archivo(s)** con vista previa, medidas reales, DPI, asignación de bobina y cotización oficial.\n\nRevisa o ajusta tu pedido a continuación:`,
+                                        smartDraftOrder: draftOrder,
+                                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    }
+                                ]);
+                                return;
+                            }
+                        }
+                    }
+                } catch (clientCloudErr) {
+                    console.warn('[Xana Primary Cloud Engine Notice, falling back to /xana/smart-order]:', clientCloudErr);
+                }
+
+                // MOTOR 2 (Respaldo Backend): /api/xana/smart-order
                 try {
                     const initRes = await fetch(`${API_URL}/xana/smart-order`, {
                         method: 'POST',
@@ -217,7 +503,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                             'Authorization': token ? `Bearer ${token}` : ''
                         },
                         body: JSON.stringify({
-                            url: urlMatch[0],
+                            url: cloudUrl,
                             observaciones: textToSend
                         })
                     });
@@ -227,7 +513,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                     // Si ya devolvió la orden directamente (síncrono)
                     if (initRes.ok && initData.draft_order) {
                         setMessages(prev => [
-                            ...prev.filter(m => !m.text.includes('Descargando y analizando archivos')),
+                            ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Procesando (')),
                             {
                                 role: 'bot',
                                 text: `✨ ¡Procesé el enlace con éxito! He analizado **${initData.draft_order.carteles?.length || 1} archivo(s)**.\n\nRevisa el borrador interactivo a continuación:`,
@@ -250,13 +536,15 @@ const menuRef = useRef<HTMLDivElement>(null);
                             attempts++;
 
                             try {
-                                const pollRes = await fetch(`${API_URL}/xana/smart-order/status/${jobId}`);
+                                const pollRes = await fetch(`${API_URL}/xana/smart-order/status/${jobId}`, {
+                                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                                });
                                 if (pollRes.ok) {
                                     const pollData = await pollRes.json();
                                     if (pollData.status === 'success' && pollData.draft_order) {
                                         completed = true;
                                         setMessages(prev => [
-                                            ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Analizando')),
+                                            ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Analizando') && !m.text.includes('Procesando (')),
                                             {
                                                 role: 'bot',
                                                 text: `✨ ¡Procesé el enlace con éxito! He descargado y analizado **${pollData.draft_order.carteles?.length || 1} archivo(s)**, extrayendo dimensiones, DPI y calculando el descarte óptimo de bobina.\n\nRevisa el borrador interactivo a continuación:`,
@@ -268,7 +556,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                     } else if (pollData.status === 'error') {
                                         completed = true;
                                         setMessages(prev => [
-                                            ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Analizando')),
+                                            ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Analizando') && !m.text.includes('Procesando (')),
                                             {
                                                 role: 'bot',
                                                 text: `⚠️ **No se pudo procesar el enlace:** ${pollData.error || 'Error desconocido'}`,
@@ -277,11 +565,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                         ]);
                                         return;
                                     } else if (pollData.progress) {
-                                        setMessages(prev => prev.map(m => 
-                                            (m.text.includes('Descargando y analizando') || m.text.includes('Analizando'))
-                                                ? { ...m, text: `⏳ **${pollData.progress}**\n\nExtrayendo dimensiones en cm, DPI, modo de color y evaluando bobinas óptimas...` }
-                                                : m
-                                        ));
+                                        updateProgressText(pollData.progress);
                                     }
                                 }
                             } catch (pErr) {
@@ -295,7 +579,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                     } else {
                         const errMsg = initData.error || `Error HTTP ${initRes.status}`;
                         setMessages(prev => [
-                            ...prev.filter(m => !m.text.includes('Descargando y analizando')),
+                            ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Procesando (')),
                             {
                                 role: 'bot',
                                 text: `⚠️ **No se pudo procesar el enlace:** ${errMsg}`,
@@ -306,7 +590,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                     }
                 } catch (fetchErr: any) {
                     setMessages(prev => [
-                        ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Analizando')),
+                        ...prev.filter(m => !m.text.includes('Descargando y analizando') && !m.text.includes('Analizando') && !m.text.includes('Procesando (')),
                         {
                             role: 'bot',
                             text: `⚠️ Error al conectar con el servidor: ${fetchErr.message || 'Verifica tu conexión.'}`,

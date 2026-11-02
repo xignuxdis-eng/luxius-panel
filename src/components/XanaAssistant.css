@@ -30,8 +30,9 @@
     position: fixed;
     bottom: 16px;
     right: 16px;
-    width: 360px;
-    height: 540px;
+    width: 415px;
+    max-width: calc(100vw - 24px);
+    height: 580px;
     max-height: calc(100vh - 32px);
     background: #0f172a;
     border-radius: 18px;
@@ -292,6 +293,13 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-bottom-left-radius: 2px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.xana-bubble-bot:has(.xana-order-card) {
+    max-width: 100%;
+    width: 100%;
+    padding: 10px 10px;
+    word-break: normal;
 }
 
 .xana-bubble-content {

@@ -753,6 +753,81 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setPreviewUrl(null);
             setMetadata(null);
             setSelectedFile(null);
+
+            // Hydrate from Xana Smart Draft Order if requested via "Abrir en Modal"
+            try {
+                const rawXanaDraft = sessionStorage.getItem('luxius_xana_draft_order');
+                if (rawXanaDraft) {
+                    sessionStorage.removeItem('luxius_xana_draft_order');
+                    const xanaDraft = JSON.parse(rawXanaDraft);
+                    const carteles = Array.isArray(xanaDraft?.carteles) ? xanaDraft.carteles : [];
+                    const matCode = xanaDraft?.material || 'LF';
+
+                    if (xanaDraft?.cliente_id) {
+                        setValue('clienteId', String(xanaDraft.cliente_id));
+                    }
+                    if (xanaDraft?.cliente_nombre && xanaDraft.cliente_nombre !== 'Particular (Web)') {
+                        setClientSearch(xanaDraft.cliente_nombre);
+                    }
+
+                    if (carteles.length === 1) {
+                        const c = carteles[0];
+                        const storedName = c.fileName || c.originalName || c.archivo_guardado || c.archivo || 'archivo_cloud.jpg';
+                        const origName = c.originalName || c.archivo || storedName;
+                        const wM = Number(c.medidas?.ancho ?? c.ancho_m ?? xanaDraft.ancho ?? 0);
+                        const hM = Number(c.medidas?.alto ?? c.alto_m ?? xanaDraft.alto ?? 0);
+                        const thumb = blobStore.get(storedName) || blobStore.get(origName) || c.thumbnailUrl || c.thumbnail_url || resolveMediaUrl(storedName);
+                        setActiveTab('unitario');
+                        setValue('material', matCode);
+                        setValue('ancho', String(wM));
+                        setValue('alto', String(hM));
+                        setValue('copias', Number(c.copias) || 1);
+                        setValue('observaciones', xanaDraft.observaciones || '');
+                        setFileName(storedName);
+                        if (thumb) setPreviewUrl(thumb);
+                        setMetadata({
+                            width: Math.round(wM * 100 * 10) / 10,
+                            height: Math.round(hM * 100 * 10) / 10,
+                            dpi: c.dpi || 72,
+                            format: c.format || c.formato || 'IMG',
+                            colorMode: c.colorMode || c.modo_color || 'CMYK',
+                            thumbnailUrl: thumb || undefined
+                        });
+                    } else if (carteles.length > 1) {
+                        setActiveTab('lote');
+                        setValue('material', matCode);
+                        setValue('observaciones', xanaDraft.observaciones || '');
+                        const hydratedBatch: BatchItem[] = carteles.map((c: any, idx: number) => {
+                            const storedName = c.fileName || c.originalName || c.archivo_guardado || c.archivo || `item_${idx + 1}.jpg`;
+                            const origName = c.originalName || c.archivo || storedName;
+                            const wM = Number(c.medidas?.ancho ?? c.ancho_m ?? 0);
+                            const hM = Number(c.medidas?.alto ?? c.alto_m ?? 0);
+                            const thumb = blobStore.get(storedName) || blobStore.get(origName) || c.thumbnailUrl || c.thumbnail_url || resolveMediaUrl(storedName) || '';
+                            const dummyFile = new File([], origName);
+                            return {
+                                id: `xana_${Date.now()}_${idx}`,
+                                file: dummyFile,
+                                fileName: storedName,
+                                previewUrl: thumb,
+                                metadata: {
+                                    width: Math.round(wM * 100 * 10) / 10,
+                                    height: Math.round(hM * 100 * 10) / 10,
+                                    dpi: c.dpi || 72,
+                                    format: c.format || c.formato || 'IMG',
+                                    colorMode: c.colorMode || c.modo_color || 'CMYK',
+                                    thumbnailUrl: thumb || undefined
+                                },
+                                confirmed: true,
+                                copias: Number(c.copias) || 1,
+                                material: matCode
+                            };
+                        });
+                        setBatchItems(hydratedBatch);
+                    }
+                }
+            } catch (e) {
+                console.warn('[NuevoPedidoModal] Error hidratando borrador de Xana:', e);
+            }
         }
     }, [isOpen, order, reset, setValue, currentDefaultStatus]);
 
@@ -823,7 +898,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     abortController.signal.addEventListener('abort', onParentAbort);
 
                     try {
-                        const response = await fetch(url, { signal: downloadCtrl.signal });
+                        const response = await fetch(url, {
+                            headers: getAuthHeaders(),
+                            signal: downloadCtrl.signal
+                        });
                         clearTimeout(timeoutId);
                         abortController.signal.removeEventListener('abort', onParentAbort);
                         return response;
