@@ -109,29 +109,44 @@ export const getPdfThumbnail = async (_file: File | ArrayBuffer | null, pageNum:
 export const parseJPGDPI = (view: DataView): number => {
     const len = view.byteLength;
     let offset = 2; // Skip SOI (FF D8)
+    let fallbackDpi = 0;
 
     while (offset < len - 4) {
         if (view.getUint8(offset) !== 0xFF) break;
         const marker = view.getUint8(offset + 1);
+        if (marker === 0xDA || marker === 0xD9) break; // SOS or EOI
+        if (marker === 0xFF) {
+            offset += 1;
+            continue;
+        }
         const size = view.getUint16(offset + 2);
+        if (size < 2) break;
 
-        // 1. APP0 (JFIF)
-        if (marker === 0xE0 && size >= 16) {
+        // 1. APP0 (JFIF) — JFIF header layout after 0xFFE0 + size(2):
+        // +4..+8 = "JFIF\0", +9 = vMajor, +10 = vMinor, +11 = units (1=DPI, 2=DPC), +12..+13 = Xdensity, +14..+15 = Ydensity
+        if (marker === 0xE0 && size >= 16 && offset + 16 <= len) {
             const identifier = String.fromCharCode(
                 view.getUint8(offset + 4), view.getUint8(offset + 5),
                 view.getUint8(offset + 6), view.getUint8(offset + 7),
                 view.getUint8(offset + 8)
             );
             if (identifier === 'JFIF\0') {
-                const unit = view.getUint8(offset + 13); // 1 = DPI, 2 = DPC
-                const xres = view.getUint16(offset + 14);
-                if (unit === 1 && xres > 0) return xres;
-                if (unit === 2 && xres > 0) return Math.round(xres * 2.54);
+                const unit = view.getUint8(offset + 11); // 1 = DPI, 2 = DPC
+                const xres = view.getUint16(offset + 12);
+                let jfifDpi = 0;
+                if (unit === 1 && xres > 0) jfifDpi = xres;
+                else if (unit === 2 && xres > 0) jfifDpi = Math.round(xres * 2.54);
+                else if (unit === 0 && xres > 10) jfifDpi = xres;
+
+                if (jfifDpi > 0) {
+                    if (jfifDpi !== 72 && jfifDpi !== 96) return jfifDpi;
+                    fallbackDpi = jfifDpi;
+                }
             }
         }
 
         // 2. APP13 (Photoshop / 8BIM)
-        if (marker === 0xED && size >= 12) {
+        if (marker === 0xED && size >= 12 && offset + 2 + size <= len) {
             const app13Data = new DataView(view.buffer, view.byteOffset + offset + 4, size - 2);
             let j = 0;
             while (j < app13Data.byteLength - 12) {
@@ -139,12 +154,17 @@ export const parseJPGDPI = (view: DataView): number => {
                     const id = app13Data.getUint16(j + 4);
                     const nameLen = app13Data.getUint8(j + 6);
                     const nameFieldLen = (nameLen + 1 + 1) & ~1; // Length byte + string + pad to even
+                    if (j + 6 + nameFieldLen + 4 > app13Data.byteLength) break;
                     const resourceSize = app13Data.getUint32(j + 6 + nameFieldLen);
-                    if (id === 0x03ED) { // ResolutionInfo
-                        const hRes = app13Data.getUint16(j + 6 + nameFieldLen + 4); // Skip size field, then 4 bytes of fixed point HRes
-                        if (hRes > 0) return hRes;
+                    const dataStart = j + 6 + nameFieldLen + 4;
+                    if (id === 0x03ED && dataStart + 8 <= app13Data.byteLength) { // ResolutionInfo
+                        const hRes = app13Data.getUint16(dataStart); // Fixed point 16.16 integer part
+                        const hResUnit = app13Data.getUint16(dataStart + 4); // 1 = pixels/inch, 2 = pixels/cm
+                        if (hRes > 0) {
+                            return hResUnit === 2 ? Math.round(hRes * 2.54) : hRes;
+                        }
                     }
-                    j += 6 + nameFieldLen + 4 + resourceSize;
+                    j = dataStart + resourceSize;
                     if (resourceSize % 2 !== 0) j++; // Pad to even
                 } else {
                     j++;
@@ -152,54 +172,106 @@ export const parseJPGDPI = (view: DataView): number => {
             }
         }
 
-        // 3. APP1 (EXIF)
-        if (marker === 0xE1 && size >= 20) {
-            // Search for "Exif\0\0"
+        // 3. APP1 (EXIF or XMP)
+        if (marker === 0xE1 && size >= 20 && offset + 2 + size <= len) {
+            // 3a. EXIF ("Exif\0\0")
             if (view.getUint32(offset + 4) === 0x45786966) {
                 const startOfTiff = offset + 10;
-                const isLittleEndian = view.getUint16(startOfTiff) === 0x4949;
-                const ifd0Offset = isLittleEndian ? view.getUint32(startOfTiff + 4, true) : view.getUint32(startOfTiff + 4, false);
-                const ifdOffset = startOfTiff + ifd0Offset;
+                if (startOfTiff + 8 <= len) {
+                    const isLittleEndian = view.getUint16(startOfTiff) === 0x4949;
+                    const ifd0Offset = isLittleEndian ? view.getUint32(startOfTiff + 4, true) : view.getUint32(startOfTiff + 4, false);
+                    const ifdOffset = startOfTiff + ifd0Offset;
 
-                if (ifdOffset < view.byteLength - 2) {
-                    const numEntries = isLittleEndian ? view.getUint16(ifdOffset, true) : view.getUint16(ifdOffset, false);
-                    for (let entry = 0; entry < numEntries; entry++) {
-                        const entryPos = ifdOffset + 2 + (entry * 12);
-                        if (entryPos > view.byteLength - 12) break;
-                        const tag = isLittleEndian ? view.getUint16(entryPos, true) : view.getUint16(entryPos, false);
-                        if (tag === 0x011A) { // XResolution
+                    if (ifdOffset < len - 2) {
+                        const numEntries = isLittleEndian ? view.getUint16(ifdOffset, true) : view.getUint16(ifdOffset, false);
+                        let exifXRes = 0;
+                        let exifUnit = 2; // Default 2 = inch, 3 = cm
+                        for (let entry = 0; entry < numEntries; entry++) {
+                            const entryPos = ifdOffset + 2 + (entry * 12);
+                            if (entryPos > len - 12) break;
+                            const tag = isLittleEndian ? view.getUint16(entryPos, true) : view.getUint16(entryPos, false);
                             const type = isLittleEndian ? view.getUint16(entryPos + 2, true) : view.getUint16(entryPos + 2, false);
                             const valOffset = isLittleEndian ? view.getUint32(entryPos + 8, true) : view.getUint32(entryPos + 8, false);
 
-                            if (type === 5) { // RATIONAL
-                                const dataPos = startOfTiff + valOffset;
-                                if (dataPos < view.byteLength - 8) {
-                                    const num = isLittleEndian ? view.getUint32(dataPos, true) : view.getUint32(dataPos, false);
-                                    const den = isLittleEndian ? view.getUint32(dataPos + 4, true) : view.getUint32(dataPos + 4, false);
-                                    if (den !== 0) return Math.round(num / den);
+                            if (tag === 0x0128) { // ResolutionUnit
+                                exifUnit = type === 3
+                                    ? (isLittleEndian ? view.getUint16(entryPos + 8, true) : view.getUint16(entryPos + 8, false))
+                                    : valOffset;
+                            } else if (tag === 0x011A) { // XResolution
+                                if (type === 5) { // RATIONAL
+                                    const dataPos = startOfTiff + valOffset;
+                                    if (dataPos < len - 8) {
+                                        const num = isLittleEndian ? view.getUint32(dataPos, true) : view.getUint32(dataPos, false);
+                                        const den = isLittleEndian ? view.getUint32(dataPos + 4, true) : view.getUint32(dataPos + 4, false);
+                                        if (den !== 0) exifXRes = num / den;
+                                    }
                                 }
                             }
                         }
+                        if (exifXRes > 0) {
+                            const finalExifDpi = exifUnit === 3 ? Math.round(exifXRes * 2.54) : Math.round(exifXRes);
+                            if (finalExifDpi !== 72 && finalExifDpi !== 96) return finalExifDpi;
+                            if (!fallbackDpi) fallbackDpi = finalExifDpi;
+                        }
                     }
                 }
+            } else {
+                // 3b. XMP packet inside APP1
+                try {
+                    const xmpBytes = new Uint8Array(view.buffer, view.byteOffset + offset + 4, size - 2);
+                    const xmpText = new TextDecoder().decode(xmpBytes);
+                    const xResMatch = xmpText.match(/<tiff:XResolution>([\d./]+)<\/tiff:XResolution>/i) ||
+                        xmpText.match(/tiff:XResolution="([\d./]+)"/i);
+                    if (xResMatch) {
+                        const raw = xResMatch[1];
+                        const val = raw.includes('/') ? (parseFloat(raw.split('/')[0]) / parseFloat(raw.split('/')[1])) : parseFloat(raw);
+                        if (val > 0) {
+                            const unitMatch = xmpText.match(/<tiff:ResolutionUnit>(\d+)<\/tiff:ResolutionUnit>/i) ||
+                                xmpText.match(/tiff:ResolutionUnit="(\d+)"/i);
+                            const unitVal = unitMatch ? parseInt(unitMatch[1], 10) : 2;
+                            const xmpDpi = unitVal === 3 ? Math.round(val * 2.54) : Math.round(val);
+                            if (xmpDpi > 0) return xmpDpi;
+                        }
+                    }
+                } catch {}
             }
         }
 
         offset += size + 2;
-        if (offset > 128000) break; // Scan a larger portion for metadata
     }
 
-    return 72; // Default for Large Format/Web if unknown
+    return fallbackDpi || 72; // Default for Large Format/Web if unknown
 };
 
 export const parseJPGColorMode = (view: DataView): string => {
     const len = view.byteLength;
     let offset = 2;
+    let adobeColorHint = '';
     while (offset < len - 4) {
         if (view.getUint8(offset) !== 0xFF) break;
         const marker = view.getUint8(offset + 1);
+        if (marker === 0xDA || marker === 0xD9) break;
+        if (marker === 0xFF) {
+            offset += 1;
+            continue;
+        }
         const size = view.getUint16(offset + 2);
-        if (marker === 0xC0 || marker === 0xC2) { // SOF0 or SOF2
+        if (size < 2) break;
+
+        // APP14 (Adobe) marker: +4..+8 = "Adobe", +15 = transform (0 = Unknown/CMYK for 4-ch, 2 = YCCK/CMYK)
+        if (marker === 0xEE && size >= 14 && offset + 16 <= len) {
+            const id = String.fromCharCode(
+                view.getUint8(offset + 4), view.getUint8(offset + 5),
+                view.getUint8(offset + 6), view.getUint8(offset + 7),
+                view.getUint8(offset + 8)
+            );
+            if (id === 'Adobe') {
+                const transform = view.getUint8(offset + 15);
+                if (transform === 0 || transform === 2) adobeColorHint = 'CMYK';
+            }
+        }
+
+        if ((marker === 0xC0 || marker === 0xC1 || marker === 0xC2) && offset + 9 < len) { // SOF0, SOF1, SOF2
             const comps = view.getUint8(offset + 9);
             if (comps === 1) return 'Escala de grises';
             if (comps === 4) return 'CMYK';
@@ -207,7 +279,7 @@ export const parseJPGColorMode = (view: DataView): string => {
         }
         offset += size + 2;
     }
-    return 'RGB';
+    return adobeColorHint || 'RGB';
 };
 
 export const parsePNGDPI = (view: DataView): number => {
@@ -353,7 +425,8 @@ export const parseEPSMetadata = async (file: File) => {
 export const getImageDPI = async (file: File): Promise<number> => {
     console.log(`[Luxius-Meta] Analizando DPI (Optimizado): ${file.name} (${file.size} bytes)`);
     try {
-        const headerBlob = file.slice(0, 128 * 1024);
+        // Soportar perfiles ICC CMYK grandes (ej. SWOP / FOGRA39 ~560KB) antes de los marcadores APP13/SOF0
+        const headerBlob = file.slice(0, Math.min(file.size, 1024 * 1024));
         const buffer = await headerBlob.arrayBuffer();
         const view = new DataView(buffer);
         const extension = file.name.split('.').pop()?.toLowerCase() || '';
@@ -379,7 +452,7 @@ export const getImageDPI = async (file: File): Promise<number> => {
 
 export const getImageColorMode = async (file: File): Promise<string> => {
     try {
-        const headerBlob = file.slice(0, 128 * 1024);
+        const headerBlob = file.slice(0, Math.min(file.size, 1024 * 1024));
         const buffer = await headerBlob.arrayBuffer();
         const view = new DataView(buffer);
         const extension = file.name.split('.').pop()?.toLowerCase() || '';

@@ -83,6 +83,23 @@ function parseDimsFromFilenameCm(name: string): { widthCm: number; heightCm: num
     return null;
 }
 
+function parseCopiesFromFilename(name: string): number {
+    const base = name.replace(/\.[^.]+$/, '');
+    const m = base.match(/(?:[xX×]\s*)?(\d+)\s*cop(?:ias?)?\b/i);
+    if (m) {
+        const n = parseInt(m[1], 10);
+        if (n >= 1 && n <= 500) return n;
+    }
+    return 1;
+}
+
+function parseExplicitScaleFromFilename(name: string): number {
+    const lower = name.toLowerCase();
+    if (/\b(?:escala\s*1[.:/]?10|esc\s*1[.:/]?10|1[:/]10)\b/.test(lower)) return 10;
+    if (/\b(?:escala\s*1[.:/]?20|esc\s*1[.:/]?20|1[:/]20)\b/.test(lower)) return 20;
+    return 1;
+}
+
 async function normalizeCloudFile(blob: Blob, rawName: string): Promise<File> {
     const headerBuf = await blob.slice(0, 64).arrayBuffer();
     const bytes = new Uint8Array(headerBuf);
@@ -387,18 +404,16 @@ const menuRef = useRef<HTMLDivElement>(null);
                                     }
 
                                     const dpiVal = Number(meta.dpi) || 72;
-                                    let escalaSugerida = 1;
-                                    let alertaEscala = false;
-                                    if (widthCm > 0 && heightCm > 0 && widthCm <= 35 && heightCm <= 35 && dpiVal >= 200) {
-                                        escalaSugerida = 10;
-                                        alertaEscala = true;
-                                    }
+                                    const explicitScale = parseExplicitScaleFromFilename(file.name);
+                                    const copiasDetectadas = parseCopiesFromFilename(file.name);
+                                    const escalaAplicada = explicitScale;
+                                    const alertaEscala = explicitScale > 1 || (widthCm > 0 && heightCm > 0 && Math.max(widthCm, heightCm) <= 35 && dpiVal >= 200);
 
                                     const rawAnchoM = Math.round((widthCm / 100) * 100) / 100;
                                     const rawAltoM = Math.round((heightCm / 100) * 100) / 100;
-                                    const anchoM = Math.round(rawAnchoM * escalaSugerida * 100) / 100;
-                                    const altoM = Math.round(rawAltoM * escalaSugerida * 100) / 100;
-                                    const priceInfo = calculateItemPriceDetailed(materialCode, anchoM, altoM, 1, {}, clientInfo.id || undefined);
+                                    const anchoM = Math.round(rawAnchoM * escalaAplicada * 100) / 100;
+                                    const altoM = Math.round(rawAltoM * escalaAplicada * 100) / 100;
+                                    const priceInfo = calculateItemPriceDetailed(materialCode, anchoM, altoM, copiasDetectadas, {}, clientInfo.id || undefined);
                                     const finalPreview = meta.thumbnailUrl || localBlobUrl;
 
                                     // Store preview in blobStore for instant access in Xana and NuevoPedidoModal
@@ -416,14 +431,14 @@ const menuRef = useRef<HTMLDivElement>(null);
                                         } catch {}
                                     }
 
-                                    const itemM2 = Math.round(anchoM * altoM * 100) / 100;
+                                    const itemM2 = Math.round(anchoM * altoM * copiasDetectadas * 100) / 100;
                                     totalMl += priceInfo.consumoEstimado || 0;
                                     totalM2 += itemM2;
                                     totalPrice += priceInfo.subtotal || 0;
 
                                     parsedCarteles.push({
                                         tipo: materialCode,
-                                        copias: 1,
+                                        copias: copiasDetectadas,
                                         medidas: { ancho: anchoM, alto: altoM },
                                         raw_medidas: { ancho: rawAnchoM, alto: rawAltoM },
                                         bobinaAsignada: priceInfo.bobinaAsignada || 1.37,
@@ -436,11 +451,12 @@ const menuRef = useRef<HTMLDivElement>(null);
                                         dpi: dpiVal,
                                         colorMode: meta.colorMode || 'CMYK',
                                         format: meta.format || file.name.split('.').pop()?.toUpperCase() || 'IMG',
-                                        scaleFactor: escalaSugerida,
+                                        scaleFactor: escalaAplicada,
                                         scaleAlert: alertaEscala,
                                         scaleReason: alertaEscala ? `Densidad ${dpiVal} DPI en lienzo ${widthCm}x${heightCm} cm` : 'Tamaño real 1:1',
                                         sha256: '',
-                                        precioCalculado: Math.round(priceInfo.subtotal || 0)
+                                        precioCalculado: Math.round(priceInfo.subtotal || 0),
+                                        rotated: Boolean(priceInfo.rotated)
                                     });
                                 } catch (itemErr) {
                                     console.warn('[Xana Cloud Item Parse Warning]:', itemErr);
