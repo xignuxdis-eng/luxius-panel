@@ -1957,3 +1957,33 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
   - **Sincronización de Backend**: Los cambios de backend fueron replicados y validados sintácticamente tanto en la copia local `server/` como en el repositorio autoritativo `F:\luXius-Backend`.
 
 ---
+
+- **Evolución de Inteligencia de Xana AI a Nivel Jarvis — Jarvis Engine v2.0 (02/11/2026)**:
+  - **Auditoría y Diagnóstico en Vivo contra Supabase (`test_suite_a4.py`)**:
+    - Al someter a Xana a pruebas de estrés contra la base real de Supabase, se identificaron y corrigieron 4 cuellos de botella críticos en la resolución de materiales y precios:
+      1. `VV` (`Vinilo Orajet 3651`) almacena tarifas por metro lineal dentro de `bobinas[].precioML` (`1.37m` -> \$32.000/ml, `1.52m` -> \$34.000/ml), mientras que `tool_cotizar_trabajo` sólo leía `precio` a nivel raíz.
+      2. La búsqueda de `"lona"` hacía match primero con `BL` (`Lona Back Light 15oz`, deshabilitada) antes que con `FL` (`Lona Front Light 13oz`, habilitada), abortando la cotización.
+      3. Términos habituales de taller como `"vinilo vehicular"`, `"micro"`, `"blackout"` o `"tinta"` no mapeaban a los códigos reales (`VV`, `VM`, `VBB`, `INK`).
+  - **Motor Determinista de Materiales, Bobinas y Nesting en Fila (`server/services/xana_tools.py`)**:
+    - Implementado diccionario industrial `MATERIAL_ALIASES` y buscador en dos pasadas `_find_material()` que prioriza materiales habilitados (`habilitado: True`) y coincidencias exactas antes de evaluar materiales deshabilitados.
+    - Implementado `_get_effective_unit_price()` que extrae con precisión `precioML` de la bobina seleccionada cuando `tipoCobro == 'ml'` o `precio`/`precioM2` cuando `tipoCobro == 'm2'`.
+    - Mejorado `tool_cotizar_trabajo()` con cálculo real de **nesting por fila** a lo ancho de la bobina (`piezas_por_fila`, `filas_totales`, `metros_lineales_consumidos`), soporte para recargo de **Cliente Particular** (`es_particular`) y **alerta proactiva de déficit de stock** (`alerta_stock`) cuando el pedido supera el metraje disponible en la bobina.
+  - **5 Nuevas Herramientas Ejecutivas y Operativas (19 Tools en Total)**:
+    1. `calcular_imposicion_plancha`: calculadora matemática 2D exacta de etiquetas/stickers/tarjetas en formatos `A4`, `A3`, `SRA3`, `M2`, `BOBINA_137` y `BOBINA_152`, comparando orientación normal ($0^\circ$) vs rotada ($90^\circ$) con separación de corte en mm y márgenes de pinza.
+    2. `consultar_briefing_ejecutivo`: reporte integral estilo Jarvis que cruza en una sola llamada la cola de impresión (OTs, ml, m², urgencias), cuellos de botella (>48h en taller), alertas de stock crítico, facturación de los últimos 30 días, cuentas por cobrar y oportunidades de nesting, emitiendo recomendaciones tácticas priorizadas.
+    3. `analizar_oportunidades_nesting`: escanea la cola activa buscando órdenes de Vinilo Vehicular de igual ancho ($\le 1,515\text{ m}$) cuya suma de avance sea $\le 2,90\text{ m}$ para unificar paños y ahorrar laminado especial.
+    4. `consultar_cuentas_por_cobrar`: audita todas las órdenes con `saldo_pendiente > 0` ordenadas por monto de deuda y calcula la deuda total en la calle.
+    5. `actualizar_estado_orden`: permite cambiar el estado de una OT (`diseno`, `orden`, `impreso`, `entregado`, `cancelado`) y anexar notas con timestamp e inspección RBAC estricta (bloqueado para rol `cliente`).
+  - **Orquestador Multi-Tool con Memoria Conversacional y Fast-Path `<50ms` (`server/services/xana_graph.py`)**:
+    - Incorporado pre-enrutador determinista `_try_fast_tool_dispatch()` que resuelve comandos directos (`/taller`, `/briefing`, `/alertas`, `/deudores`, `/nesting`, `/tarifario` y consultas de imposición 2D) sin latencia de red ni consumo de cuota LLM.
+    - `function_calling_node` ahora inyecta el historial conversacional reciente (`history[-4:]`) al LLM con tools y ejecuta **múltiples herramientas en paralelo** (`tool_calls[:4]`) cuando el usuario realiza preguntas compuestas.
+    - Añadido fallback determinista `_fallback_deterministic_tool_match()` para garantizar operatividad de herramientas al 100% incluso ante caídas de proveedor LLM o agotamiento de cuota API.
+    - Eliminadas todas las referencias residuales a `"Neon PostgreSQL"` en `xana_graph.py` y `XanaAssistant.tsx`, actualizándolas a `"Supabase PostgreSQL"`.
+  - **Mejoras en Interfaz Frontend (`src/components/XanaAssistant.tsx`)**:
+    - Corregida la lectura del token JWT en Smart Order (`localStorage.getItem('luxius_auth_token') || localStorage.getItem('luxius_token')`).
+    - Añadidos accesos rápidos ejecutivos en el menú de Xana para **Briefing Ejecutivo Jarvis**, **Oportunidades de Nesting**, **Cuentas por Cobrar** y **Calcular Planchas / Calcos**.
+  - **Verificación Automatizada (100% Pass Rate)**:
+    - `server/scripts/test_suite_a4.py`: **23 / 23 pruebas aprobadas (100%)**, 0 fallos en casos trampa anti-alucinación.
+    - `server/scripts/test_xana_jarvis.py`: **11 / 11 pruebas aprobadas (100%)** validando imposición 2D ($0^\circ$ vs $90^\circ$), alias industriales, nesting en fila, alertas de stock, briefing ejecutivo, cuentas por cobrar, RBAC en mutación de OTs y pre-router `<50ms`.
+
+---

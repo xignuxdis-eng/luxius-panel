@@ -196,7 +196,7 @@ const menuRef = useRef<HTMLDivElement>(null);
             );
 
             if (isCloudLink) {
-                const token = localStorage.getItem('luxius_token') || '';
+                const token = localStorage.getItem('luxius_auth_token') || localStorage.getItem('luxius_token') || '';
                 
                 // Mensaje provisional de progreso
                 const progressTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -480,54 +480,82 @@ const menuRef = useRef<HTMLDivElement>(null);
                                         </div>
                                     </button>
 
+                                    {/* Briefing Ejecutivo Jarvis (Admin / Impresor / Vendedor) */}
+                                    {!isCliente && (
+                                        <button 
+                                            className="dropdown-item item-smart-order"
+                                            onClick={() => sendMessage('/briefing')}
+                                        >
+                                            <Sparkles size={15} className="icon-sparkle" />
+                                            <div>
+                                                <strong>Briefing Ejecutivo Jarvis</strong>
+                                                <small>Taller, finanzas, stock y prioridades</small>
+                                            </div>
+                                        </button>
+                                    )}
+
                                     {/* Cálculo de imposición (Para todos) */}
                                     <button 
                                         className="dropdown-item item-calc"
-                                        onClick={() => sendMessage('¿Cuántos calcos de 5x5 cm entran en una hoja A4?')}
+                                        onClick={() => sendMessage('¿Cuántos calcos de 5x5 cm entran en una hoja A4 para 200 unidades?')}
                                     >
                                         <Calculator size={15} />
                                         <div>
                                             <strong>Calcular Planchas / Calcos</strong>
-                                            <small>Rendimiento e imposición A4/A3</small>
+                                            <small>Imposición exacta 2D (0° vs 90°)</small>
                                         </div>
                                     </button>
+
+                                    {/* Oportunidades de Nesting (Admin / Impresor) */}
+                                    {isImpresor && (
+                                        <button 
+                                            className="dropdown-item item-queue"
+                                            onClick={() => sendMessage('/nesting')}
+                                        >
+                                            <Printer size={15} />
+                                            <div>
+                                                <strong>Oportunidades de Nesting</strong>
+                                                <small>Ahorro de laminado en cola</small>
+                                            </div>
+                                        </button>
+                                    )}
 
                                     {/* Órdenes */}
                                     <button 
                                         className="dropdown-item item-orders"
-                                        onClick={() => sendMessage(isCliente ? '¿Cómo consulto el estado de mis pedidos?' : '¿Cuál es el estado general de las órdenes de trabajo activas?')}
+                                        onClick={() => sendMessage(isCliente ? '¿Cómo consulto el estado de mis pedidos?' : '/taller')}
                                     >
                                         <Activity size={15} />
                                         <div>
-                                            <strong>{isCliente ? 'Mis Pedidos' : 'Estado de Órdenes'}</strong>
-                                            <small>{isCliente ? 'Seguimiento de mis trabajos' : 'Resumen de taller y pendientes'}</small>
+                                            <strong>{isCliente ? 'Mis Pedidos' : 'Cola de Taller en Vivo'}</strong>
+                                            <small>{isCliente ? 'Seguimiento de mis trabajos' : 'OTs, metros lineales y bobinas'}</small>
                                         </div>
                                     </button>
+
+                                    {/* Cuentas por Cobrar (Admin) */}
+                                    {isAdmin && (
+                                        <button 
+                                            className="dropdown-item item-orders"
+                                            onClick={() => sendMessage('/deudores')}
+                                        >
+                                            <Activity size={15} />
+                                            <div>
+                                                <strong>Cuentas por Cobrar</strong>
+                                                <small>Órdenes impagas y deuda en calle</small>
+                                            </div>
+                                        </button>
+                                    )}
 
                                     {/* Stock (Admin / Impresor) */}
                                     {isImpresor && (
                                         <button 
                                             className="dropdown-item item-stock"
-                                            onClick={() => sendMessage('Revisar estado e inventario de stock y materiales')}
+                                            onClick={() => sendMessage('/alertas')}
                                         >
                                             <Package size={15} />
                                             <div>
-                                                <strong>Alertas de Stock</strong>
+                                                <strong>Alertas de Stock Crítico</strong>
                                                 <small>Nivel de lonas, vinilos y tintas</small>
-                                            </div>
-                                        </button>
-                                    )}
-
-                                    {/* Cola de Taller (Admin / Impresor) */}
-                                    {isImpresor && (
-                                        <button 
-                                            className="dropdown-item item-queue"
-                                            onClick={() => sendMessage('¿Cuántas órdenes y metros lineales tenemos pendientes en la cola de taller?')}
-                                        >
-                                            <Printer size={15} />
-                                            <div>
-                                                <strong>Cola de Taller</strong>
-                                                <small>Metros y órdenes a imprimir</small>
                                             </div>
                                         </button>
                                     )}
@@ -576,12 +604,12 @@ const menuRef = useRef<HTMLDivElement>(null);
                                     {isAdmin && (
                                         <button 
                                             className="dropdown-item item-db"
-                                            onClick={() => sendMessage('Audita la salud de la base de datos Neon y tablas del sistema')}
+                                            onClick={() => sendMessage('Audita la salud de la base de datos Supabase y tablas del sistema')}
                                         >
                                             <Database size={15} />
                                             <div>
                                                 <strong>Salud de Base de Datos</strong>
-                                                <small>Auditar motor PostgreSQL / Neon</small>
+                                                <small>Auditar motor PostgreSQL / Supabase</small>
                                             </div>
                                         </button>
                                     )}
