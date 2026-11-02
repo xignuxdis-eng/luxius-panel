@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { saveMaterial, getMateriales, reconcilePendingStockDeductions } from './db'
 import { evaluateOrderStock, enrichOrdersWithCurrentStock } from '@/utils/stockForecast'
+import { getConsumption } from '@/pages/Entrada/utils/entradaCalculations'
 import type { Material, Order } from '@/types'
 
 describe('Persistencia de Materiales y Rollos/Bobinas', () => {
@@ -275,5 +276,63 @@ describe('Actualización Reactiva de Órdenes según Stock de Materiales', () =>
 
         const [enriched] = enrichOrdersWithCurrentStock([ordenDescontada], mats)
         expect(enriched.stockWarning).toBe(false)
+    })
+
+    it('reasigna dinámicamente la bobina disponible con stock al actualizar el inventario', () => {
+        // Material con dos bobinas: 1.52m (sin stock) y 1.37m (con 60m de stock)
+        saveMaterial({
+            id: 200,
+            codigo: 'VIN-REASSIGN',
+            descripcion: 'Vinilo Impresion Reassign',
+            tipoCobro: 'ml',
+            stockActual: 60,
+            bobinas: [
+                { ancho: 1.37, precioML: 15000, stockActual: 60 },
+                { ancho: 1.52, precioML: 18000, stockActual: 0 }
+            ],
+            habilitado: true
+        })
+
+        // Orden de 0.80 x 1.20m que originalmente se había cargado en bobina 1.52m
+        const orden: Order = {
+            id: 404,
+            ot: 'OT-404',
+            status: 'orden',
+            clientId: 1,
+            clienteNombre: 'Cliente 4',
+            material: 'VIN-REASSIGN',
+            calidad: 'ECO',
+            bobinaAsignada: 1.52, // Tenía asignada la de 1.52m sin stock
+            alto: 1.2,
+            ancho: 0.8,
+            copias: 1,
+            subtotal: 5000,
+            archivos: [],
+            accesorios: [],
+            laminado: false,
+            bordado: false,
+            panelizado: false,
+            portabanners: 0,
+            demasias: 0,
+            envio: '',
+            emergencia: false,
+            fechaCreacion: '2026-11-01',
+            fechaEntrega: '2026-11-02',
+            observaciones: '',
+            observaciones2: '',
+            stockDescontado: false,
+            stockWarning: true
+        }
+
+        const mats = getMateriales()
+
+        // 1. getConsumption debe asignar la bobina de 1.37m que SÍ tiene stock
+        const consumption = getConsumption(orden, mats)
+        expect(consumption.bobina).toBe('1.37')
+
+        // 2. enrichOrdersWithCurrentStock debe actualizar bobinaAsignada a 1.37 y apagar stockWarning
+        const [ordenActualizada] = enrichOrdersWithCurrentStock([orden], mats)
+        expect(ordenActualizada.bobinaAsignada).toBe(1.37)
+        expect(ordenActualizada.stockWarning).toBe(false)
     })
 })

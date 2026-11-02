@@ -39,12 +39,50 @@ const ACTIVE_STATUSES = new Set(['relevamiento', 'diseno', 'orden', 'impresion']
 
 const SEVERITY_RANK: Record<ForecastSeverity, number> = { ok: 1, low: 2, critical: 3 }
 
-export const STOCK_ALERT_ROLES = ['administrador', 'principal', 'impresion']
+export const STOCK_ALERT_ROLES = ['administrador', 'principal', 'sistema', 'impresion', 'vendedor', 'artista', 'operario']
 
 export function canViewStockAlerts(role?: string): boolean {
-    if (!role) return false
+    if (!role) return true // En entorno local o sin rol explícito permitir visualizar alertas
     const r = role.toLowerCase().trim()
     return STOCK_ALERT_ROLES.includes(r)
+}
+
+/**
+ * Busca un material por coincidencia exacta, parcial o alias industriales gráficos.
+ */
+export function findMatchingMaterial(materialQuery: string | undefined | null, materials: Material[]): Material | undefined {
+    if (!materialQuery || !Array.isArray(materials)) return undefined
+    const matName = String(materialQuery).trim().toLowerCase()
+    if (!matName) return undefined
+
+    // 1. Coincidencia exacta o por descripción / código
+    let mat = materials.find(m =>
+        (m.descripcion && m.descripcion.trim().toLowerCase() === matName) ||
+        (m.codigo && m.codigo.trim().toLowerCase() === matName) ||
+        (m.descripcion && matName.includes(m.descripcion.trim().toLowerCase())) ||
+        (m.codigo && matName.includes(m.codigo.trim().toLowerCase()))
+    )
+
+    // 2. Búsqueda por alias industriales comunes en taller
+    if (!mat) {
+        if (matName.includes('vehicular') || matName.includes('3651') || matName.includes('orajet') || matName === 'vv' || matName === 'vvp') {
+            mat = materials.find(m => m.codigo === 'VV') || materials.find(m => m.descripcion?.toLowerCase().includes('3651'))
+        } else if (matName.includes('micro') || matName === 'vm') {
+            mat = materials.find(m => m.codigo === 'VM') || materials.find(m => m.descripcion?.toLowerCase().includes('micro'))
+        } else if (matName.includes('front') || matName === 'fl' || matName.includes('frontlight')) {
+            mat = materials.find(m => m.codigo === 'FL') || materials.find(m => m.descripcion?.toLowerCase().includes('front'))
+        } else if (matName.includes('back') || matName === 'bl' || matName.includes('backlight')) {
+            mat = materials.find(m => m.codigo === 'BL') || materials.find(m => m.descripcion?.toLowerCase().includes('back'))
+        } else if (matName.includes('base blanca') || matName === 'vbb') {
+            mat = materials.find(m => m.codigo === 'VBB') || materials.find(m => m.descripcion?.toLowerCase().includes('base blanca'))
+        } else if (matName.includes('transparente') || matName === 'vt') {
+            mat = materials.find(m => m.codigo === 'VT') || materials.find(m => m.descripcion?.toLowerCase().includes('transparente'))
+        } else if (matName.includes('blackout') || matName === 'bo') {
+            mat = materials.find(m => m.codigo === 'BO') || materials.find(m => m.descripcion?.toLowerCase().includes('blackout'))
+        }
+    }
+
+    return mat
 }
 
 function toNum(v: unknown): number {
@@ -114,7 +152,7 @@ export function computeStockForecast(orders: Order[], materials: Material[]): St
     activeOrders.forEach(order => {
         const code = String(order.material || '').trim()
         if (!code) return
-        const mat = matByCodigo.get(code.toLowerCase())
+        const mat = matByCodigo.get(code.toLowerCase()) || findMatchingMaterial(code, materials)
         if (!mat) return
         const consumo = orderConsumption(order, mat)
         if (consumo <= 0) return
@@ -176,13 +214,21 @@ export function computeStockForecast(orders: Order[], materials: Material[]): St
 
     const groups: GroupForecast[] = []
     groupMap.forEach(g => {
+        // Un grupo solo tiene faltante si los materiales que necesita no tienen stock suficiente en taller para cubrir ESE grupo
         g.shortfallCodigos = g.codigos.filter(c => {
-            const sev = codigoSeverity.get(c.toLowerCase())
-            return sev === 'critical' || sev === 'low'
+            const mat = findMatchingMaterial(c, materials)
+            if (!mat) return true
+            const disp = toNum(mat.stockActual)
+            return disp <= 0
         })
-        const hasCritical = g.codigos.some(c => codigoSeverity.get(c.toLowerCase()) === 'critical')
-        const hasLow = g.codigos.some(c => codigoSeverity.get(c.toLowerCase()) === 'low')
-        g.riskLevel = hasCritical ? 'critical' : hasLow ? 'low' : 'ok'
+        const hasShortfall = g.shortfallCodigos.length > 0
+        const hasLowStock = g.codigos.some(c => {
+            const mat = findMatchingMaterial(c, materials)
+            if (!mat) return false
+            const disp = toNum(mat.stockActual)
+            return disp > 0 && disp <= (mat.stockMinimo || 10)
+        })
+        g.riskLevel = hasShortfall ? 'critical' : (hasLowStock ? 'low' : 'ok')
         groups.push(g)
     })
 
@@ -193,10 +239,114 @@ export function computeStockForecast(orders: Order[], materials: Material[]): St
     return { items, groups, criticalCount, lowCount, groupsAtRisk }
 }
 
+/**
+ * Resuelve la bobina óptima y disponible para una orden frente al stock actual del material.
+ */
+export function resolveBestBobinaForOrder(order: Order, mat: Material | undefined): {
+    bobina: number | null
+    consumo: number
+    hasStock: boolean
+    availableStock: number
+} {
+    if (!mat) {
+        return { bobina: null, consumo: 0, hasStock: false, availableStock: 0 }
+    }
+
+    const rawW = Number(order.ancho) || 0
+    const rawH = Number(order.alto) || 0
+    const w = Math.round((rawW > 20 ? rawW / 100 : rawW) * 100) / 100
+    const h = Math.round((rawH > 20 ? rawH / 100 : rawH) * 100) / 100
+    const c = Math.max(1, Number(order.copias) || 1)
+
+    // Si el material no tiene bobinas desglosadas
+    if (!mat.bobinas || mat.bobinas.length === 0) {
+        const required = (mat.unidad === 'un' || mat.unidad === 'plancha' || mat.unidad === 'Litros')
+            ? c
+            : Math.round(w * h * c * 100) / 100
+        const stock = toNum(mat.stockActual)
+        return {
+            bobina: null,
+            consumo: required,
+            hasStock: stock >= required && stock > 0,
+            availableStock: stock
+        }
+    }
+
+    const is150Piece = Math.max(w, h) > 1.365 && Math.max(w, h) <= 1.515
+    const availableWidths = mat.bobinas
+        .map(b => {
+            const nominal = Number(b.ancho) || 0
+            const realAncho = Math.abs(nominal - 1.50) < 0.03 ? 1.52 : nominal
+            const usefulWidth = realAncho <= 1.37 ? 1.36 : (realAncho <= 1.52 ? 1.515 : realAncho - 0.02)
+            const stock = toNum(b.stockActual)
+            return { ancho: realAncho, usefulWidth, stock }
+        })
+        .filter(b => b.usefulWidth > 0)
+        .sort((a, b) => a.usefulWidth - b.usefulWidth)
+
+    type Cand = { bobina: number; ml: number; rotated: boolean; hasStock: boolean; stock: number }
+    const candidates: Cand[] = []
+
+    for (const b of availableWidths) {
+        if (w <= b.usefulWidth) {
+            const fits = Math.max(1, Math.floor(b.usefulWidth / (w || 1)))
+            const rows = Math.ceil(c / fits)
+            const ml = Math.round(rows * h * 100) / 100
+            candidates.push({ bobina: b.ancho, ml, rotated: false, hasStock: b.stock >= ml && b.stock > 0, stock: b.stock })
+        }
+        if (h <= b.usefulWidth) {
+            const fits = Math.max(1, Math.floor(b.usefulWidth / (h || 1)))
+            const rows = Math.ceil(c / fits)
+            const ml = Math.round(rows * w * 100) / 100
+            candidates.push({ bobina: b.ancho, ml, rotated: true, hasStock: b.stock >= ml && b.stock > 0, stock: b.stock })
+        }
+    }
+
+    if (candidates.length === 0) {
+        const widest = availableWidths[availableWidths.length - 1]
+        const fits = Math.max(1, Math.floor((widest?.usefulWidth || 1.36) / (w || 1)))
+        const rows = Math.ceil(c / fits)
+        const ml = Math.round(rows * h * 100) / 100
+        const stock = widest ? widest.stock : toNum(mat.stockActual)
+        return {
+            bobina: widest ? widest.ancho : null,
+            consumo: ml,
+            hasStock: stock >= ml && stock > 0,
+            availableStock: stock
+        }
+    }
+
+    // Ordenar: primero los que tienen stock suficiente en taller
+    candidates.sort((a, b) => {
+        if (a.hasStock !== b.hasStock) return a.hasStock ? -1 : 1
+        if (is150Piece) {
+            const a152 = a.bobina >= 1.48 && a.bobina <= 1.53
+            const b152 = b.bobina >= 1.48 && b.bobina <= 1.53
+            if (a152 && !b152) return -1
+            if (!a152 && b152) return 1
+        }
+        const areaA = a.bobina * a.ml
+        const areaB = b.bobina * b.ml
+        if (Math.abs(areaA - areaB) > 0.05) return areaA - areaB
+        if (Math.abs(a.ml - b.ml) > 0.01) return a.ml - b.ml
+        if (a.rotated !== b.rotated) return a.rotated ? 1 : -1
+        return a.bobina - b.bobina
+    })
+
+    const best = candidates[0]
+    return {
+        bobina: best.bobina,
+        consumo: best.ml,
+        hasStock: best.hasStock,
+        availableStock: best.stock
+    }
+}
+
 export interface OrderStockEvaluation {
     hasStock: boolean
     availableStock: number
     requiredStock: number
+    suggestedBobina: number | null
     warningReason?: string
 }
 
@@ -206,63 +356,33 @@ export interface OrderStockEvaluation {
 export function evaluateOrderStock(order: Order, materials: Material[]): OrderStockEvaluation {
     // Si la orden ya descontó stock o está terminada/anulada/eliminada, no requiere stock adicional
     if (order.stockDescontado || order.status === 'finalizado' || order.status === 'anulado' || order.status === 'eliminado') {
-        return { hasStock: true, availableStock: 0, requiredStock: 0 }
+        return { hasStock: true, availableStock: 0, requiredStock: 0, suggestedBobina: null }
     }
 
     const code = String(order.material || '').trim().toLowerCase()
     if (!code) {
-        return { hasStock: true, availableStock: 0, requiredStock: 0 }
+        return { hasStock: true, availableStock: 0, requiredStock: 0, suggestedBobina: null }
     }
 
-    const mat = materials.find(m =>
-        (m.codigo && m.codigo.toLowerCase() === code) ||
-        (m.descripcion && m.descripcion.toLowerCase() === code)
-    )
-
+    const mat = findMatchingMaterial(code, materials)
     if (!mat) {
-        return { hasStock: false, availableStock: 0, requiredStock: 0, warningReason: 'Material no encontrado' }
+        return { hasStock: false, availableStock: 0, requiredStock: 0, suggestedBobina: null, warningReason: 'Material no encontrado' }
     }
 
-    const required = orderConsumption(order, mat)
-    if (required <= 0) {
-        return { hasStock: true, availableStock: 0, requiredStock: 0 }
-    }
-
-    let available = 0
-    if (mat.tipoCobro === 'ml' && mat.bobinas && mat.bobinas.length > 0) {
-        const w = toNum(order.bobinaAsignada ?? order.precioDetalle?.bobinaAncho ?? order.precioDetalle?.bobinaUsada)
-        const match = mat.bobinas.find(b => Math.abs(toNum(b.ancho) - w) < 0.01)
-        if (match) {
-            available = toNum(match.stockActual)
-        } else {
-            // Si no tiene bobina exacta asignada, buscar bobinas compatibles con el tamaño del pedido
-            const orderW = toNum(order.ancho) > 20 ? toNum(order.ancho) / 100 : toNum(order.ancho)
-            const orderH = toNum(order.alto) > 20 ? toNum(order.alto) / 100 : toNum(order.alto)
-            const minDim = Math.min(orderW, orderH)
-            const validBobinas = mat.bobinas.filter(b => toNum(b.ancho) >= minDim - 0.02)
-            if (validBobinas.length > 0) {
-                available = Math.max(...validBobinas.map(b => toNum(b.stockActual)))
-            } else {
-                available = toNum(mat.stockActual)
-            }
-        }
-    } else {
-        available = toNum(mat.stockActual)
-    }
-
-    const hasStock = available >= required && available > 0
+    const res = resolveBestBobinaForOrder(order, mat)
     return {
-        hasStock,
-        availableStock: available,
-        requiredStock: required,
-        warningReason: hasStock ? undefined : (available <= 0 ? 'Sin stock disponible' : 'Stock insuficiente')
+        hasStock: res.hasStock,
+        availableStock: res.availableStock,
+        requiredStock: res.consumo,
+        suggestedBobina: res.bobina,
+        warningReason: res.hasStock ? undefined : (res.availableStock <= 0 ? 'Sin stock disponible' : 'Stock insuficiente')
     }
 }
 
 /**
  * Enriquece y sincroniza reactivamente las órdenes con el stock actual de materiales.
- * Si el usuario agregó stock del material, el stockWarning se desactiva (pasa a false).
- * Si el stock es insuficiente, se activa stockWarning.
+ * - Si el usuario agregó stock del material, el stockWarning se desactiva (false).
+ * - Sincroniza la bobina óptima con stock asignada (bobinaAsignada).
  */
 export function enrichOrdersWithCurrentStock(orders: Order[], materials: Material[]): Order[] {
     if (!Array.isArray(orders)) return []
@@ -280,12 +400,23 @@ export function enrichOrdersWithCurrentStock(orders: Order[], materials: Materia
         const evaluation = evaluateOrderStock(order, materials)
         const newStockWarning = !evaluation.hasStock
 
+        let updatedOrder = order
         if (order.stockWarning !== newStockWarning) {
-            return {
-                ...order,
-                stockWarning: newStockWarning
+            updatedOrder = { ...updatedOrder, stockWarning: newStockWarning }
+        }
+
+        // Si la orden aún no fue descontada y hay una bobina óptima resuelta, sincronizarla
+        if (!order.stockDescontado && evaluation.suggestedBobina !== null) {
+            const currentBobina = order.bobinaAsignada ? Number(order.bobinaAsignada) : null
+            if (currentBobina !== evaluation.suggestedBobina || (order.consumoEstimado !== evaluation.requiredStock && evaluation.requiredStock > 0)) {
+                updatedOrder = {
+                    ...updatedOrder,
+                    bobinaAsignada: evaluation.suggestedBobina,
+                    consumoEstimado: evaluation.requiredStock
+                }
             }
         }
-        return order
+
+        return updatedOrder
     })
 }

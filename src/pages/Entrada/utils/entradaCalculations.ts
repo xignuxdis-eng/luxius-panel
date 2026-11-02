@@ -1,5 +1,6 @@
 import type { Order, Cliente, Material } from '@/types'
 import { getBobinaUsefulWidth } from '@/utils/nestingEngine'
+import { findMatchingMaterial } from '@/utils/stockForecast'
 
 export const round2 = (val: number): number => Math.round((val + Number.EPSILON) * 100) / 100;
 
@@ -25,7 +26,7 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
     if (storedSubtotal > 0) return Math.round(storedSubtotal);
 
     // 3. Fallback: recalcular desde materiales (solo para órdenes sin total guardado)
-    const matData = allMateriales.find(m => m.codigo === order.material);
+    const matData = findMatchingMaterial(order.material, allMateriales);
     const w = round2(Number(order.ancho) || 0);
     const h = round2(Number(order.alto) || 0);
     const c = Number(order.copias) || 1;
@@ -107,7 +108,7 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
 }
 
 export function getConsumption(order: Order, allMateriales: Material[]): ConsumptionResult {
-    const matData = allMateriales.find(m => m.codigo === order.material);
+    const matData = findMatchingMaterial(order.material, allMateriales);
 
     const rawW = Number(order.ancho) || 0;
     const rawH = Number(order.alto) || 0;
@@ -123,93 +124,111 @@ export function getConsumption(order: Order, allMateriales: Material[]): Consump
 
         const maxDim = Math.max(w, h);
         const is150Piece = maxDim > 1.365 && maxDim <= 1.515;
-        // Corrección reactiva si una pieza de 1.50m tenía erróneamente guardada bobina 1.37m o consumo de 1.50ml
-        const isAnomaly137 = is150Piece && (Number(assignedBobina) === 1.37 || String(assignedBobina).includes('1.37'));
 
-        if (val === undefined || !assignedBobina || isAnomaly137) {
-            if (matData?.bobinas && matData.bobinas.length > 0) {
-                const availableWidths = matData.bobinas
-                    .map((b: any) => {
-                        const nominal = Number(b.ancho) || 0;
-                        const realAncho = (Math.abs(nominal - 1.50) < 0.03) ? 1.52 : nominal;
-                        const usefulWidth = getBobinaUsefulWidth(realAncho);
-                        return { ...b, ancho: realAncho, usefulWidth };
-                    })
-                    .filter((b: any) => b.usefulWidth > 0)
-                    .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
+        // Si la orden no fue descontada, re-evaluamos dinámicamente frente al stock de bobinas
+        const isPending = !order.stockDescontado;
 
-                type Candidate = { bobina: number; ml: number; rotated: boolean };
-                const candidates: Candidate[] = [];
+        if (matData?.bobinas && matData.bobinas.length > 0) {
+            const availableWidths = matData.bobinas
+                .map((b: any) => {
+                    const nominal = Number(b.ancho) || 0;
+                    const realAncho = (Math.abs(nominal - 1.50) < 0.03) ? 1.52 : nominal;
+                    const usefulWidth = getBobinaUsefulWidth(realAncho);
+                    const stock = Number(b.stockActual ?? 0);
+                    return { ...b, ancho: realAncho, usefulWidth, stockActual: stock };
+                })
+                .filter((b: any) => b.usefulWidth > 0)
+                .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
-                for (const b of availableWidths) {
-                    if (w <= b.usefulWidth) {
-                        const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (w || 1)));
-                        const rows = Math.ceil(c / fitsPerRow);
-                        candidates.push({ bobina: b.ancho, ml: round2(rows * h), rotated: false });
-                    }
-                    if (h <= b.usefulWidth) {
-                        const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (h || 1)));
-                        const rows = Math.ceil(c / fitsPerRow);
-                        candidates.push({ bobina: b.ancho, ml: round2(rows * w), rotated: true });
-                    }
+            type Candidate = { bobina: number; ml: number; rotated: boolean; hasStock: boolean; stock: number };
+            const candidates: Candidate[] = [];
+
+            for (const b of availableWidths) {
+                if (w <= b.usefulWidth) {
+                    const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (w || 1)));
+                    const rows = Math.ceil(c / fitsPerRow);
+                    const ml = round2(rows * h);
+                    candidates.push({ bobina: b.ancho, ml, rotated: false, hasStock: b.stockActual >= ml && b.stockActual > 0, stock: b.stockActual });
                 }
+                if (h <= b.usefulWidth) {
+                    const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (h || 1)));
+                    const rows = Math.ceil(c / fitsPerRow);
+                    const ml = round2(rows * w);
+                    candidates.push({ bobina: b.ancho, ml, rotated: true, hasStock: b.stockActual >= ml && b.stockActual > 0, stock: b.stockActual });
+                }
+            }
 
-                candidates.sort((a, b) => {
-                    if (is150Piece) {
-                        const aIs152 = a.bobina >= 1.48 && a.bobina <= 1.53;
-                        const bIs152 = b.bobina >= 1.48 && b.bobina <= 1.53;
-                        if (aIs152 && !bIs152) return -1;
-                        if (!aIs152 && bIs152) return 1;
-                    }
-                    const areaA = a.bobina * a.ml;
-                    const areaB = b.bobina * b.ml;
-                    if (Math.abs(areaA - areaB) > 0.05) return areaA - areaB;
-                    if (Math.abs(a.ml - b.ml) > 0.01) return a.ml - b.ml;
-                    if (a.rotated !== b.rotated) return a.rotated ? 1 : -1;
-                    return a.bobina - b.bobina;
-                });
-
-                if (candidates.length > 0) {
+            if (candidates.length > 0) {
+                // Si la orden está pendiente, preferir la bobina compatible que tenga stock real en taller
+                if (isPending) {
+                    candidates.sort((a, b) => {
+                        // 1. Prioridad absoluta: tener stock disponible
+                        if (a.hasStock !== b.hasStock) {
+                            return a.hasStock ? -1 : 1;
+                        }
+                        // 2. Si ambas tienen stock y una es la ya asignada por el usuario, mantenerla si es válida
+                        if (assignedBobina) {
+                            const aIsAssigned = Math.abs(a.bobina - Number(assignedBobina)) < 0.01;
+                            const bIsAssigned = Math.abs(b.bobina - Number(assignedBobina)) < 0.01;
+                            if (aIsAssigned && !bIsAssigned && a.hasStock) return -1;
+                            if (!aIsAssigned && bIsAssigned && b.hasStock) return 1;
+                        }
+                        if (is150Piece) {
+                            const aIs152 = a.bobina >= 1.48 && a.bobina <= 1.53;
+                            const bIs152 = b.bobina >= 1.48 && b.bobina <= 1.53;
+                            if (aIs152 && !bIs152) return -1;
+                            if (!aIs152 && bIs152) return 1;
+                        }
+                        const areaA = a.bobina * a.ml;
+                        const areaB = b.bobina * b.ml;
+                        if (Math.abs(areaA - areaB) > 0.05) return areaA - areaB;
+                        if (Math.abs(a.ml - b.ml) > 0.01) return a.ml - b.ml;
+                        if (a.rotated !== b.rotated) return a.rotated ? 1 : -1;
+                        return a.bobina - b.bobina;
+                    });
                     val = candidates[0].ml;
                     assignedBobina = candidates[0].bobina;
-                } else {
-                    const widest = availableWidths[availableWidths.length - 1];
-                    const fitsPerRow = Math.max(1, Math.floor((widest?.usefulWidth || 1.36) / (w || 1)));
-                    const rows = Math.ceil(c / fitsPerRow);
-                    val = round2(rows * h);
-                    assignedBobina = widest?.ancho;
+                } else if (!assignedBobina || val === undefined) {
+                    val = candidates[0].ml;
+                    assignedBobina = candidates[0].bobina;
                 }
+            } else if (!assignedBobina) {
+                const widest = availableWidths[availableWidths.length - 1];
+                const fitsPerRow = Math.max(1, Math.floor((widest?.usefulWidth || 1.36) / (w || 1)));
+                const rows = Math.ceil(c / fitsPerRow);
+                val = round2(rows * h);
+                assignedBobina = widest?.ancho;
+            }
+        } else if (!assignedBobina || isPending) {
+            // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
+            if (is150Piece) {
+                assignedBobina = 1.52;
+                const fitsW = Math.max(1, Math.floor(1.515 / (w || 1)));
+                const fitsH = Math.max(1, Math.floor(1.515 / (h || 1)));
+                val = (w <= 1.515) ? round2(Math.ceil(c / fitsW) * h) : round2(Math.ceil(c / fitsH) * w);
+            } else if (w <= 1.365) {
+                assignedBobina = 1.37;
+                const fits = Math.max(1, Math.floor(1.365 / (w || 1)));
+                val = round2(Math.ceil(c / fits) * h);
+            } else if (h <= 1.365 && round2(w * c) <= round2(h * c)) {
+                assignedBobina = 1.37;
+                const fits = Math.max(1, Math.floor(1.365 / (h || 1)));
+                val = round2(Math.ceil(c / fits) * w);
+            } else if (w <= 1.515 || h <= 1.515) {
+                assignedBobina = 1.52;
+                const fitsW = Math.max(1, Math.floor(1.515 / (w || 1)));
+                const fitsH = Math.max(1, Math.floor(1.515 / (h || 1)));
+                val = (h <= 1.515 && round2(Math.ceil(c / fitsH) * w) < round2(Math.ceil(c / fitsW) * h))
+                    ? round2(Math.ceil(c / fitsH) * w)
+                    : round2(Math.ceil(c / fitsW) * h);
             } else {
-                // Standard Vehicular Vinyl roll sizes: 1.37m & 1.52m
-                if (is150Piece) {
-                    assignedBobina = 1.52;
-                    const fitsW = Math.max(1, Math.floor(1.515 / (w || 1)));
-                    const fitsH = Math.max(1, Math.floor(1.515 / (h || 1)));
-                    val = (w <= 1.515) ? round2(Math.ceil(c / fitsW) * h) : round2(Math.ceil(c / fitsH) * w);
-                } else if (w <= 1.365) {
-                    assignedBobina = 1.37;
-                    const fits = Math.max(1, Math.floor(1.365 / (w || 1)));
-                    val = round2(Math.ceil(c / fits) * h);
-                } else if (h <= 1.365 && round2(w * c) <= round2(h * c)) {
-                    assignedBobina = 1.37;
-                    const fits = Math.max(1, Math.floor(1.365 / (h || 1)));
-                    val = round2(Math.ceil(c / fits) * w);
-                } else if (w <= 1.515 || h <= 1.515) {
-                    assignedBobina = 1.52;
-                    const fitsW = Math.max(1, Math.floor(1.515 / (w || 1)));
-                    const fitsH = Math.max(1, Math.floor(1.515 / (h || 1)));
-                    val = (h <= 1.515 && round2(Math.ceil(c / fitsH) * w) < round2(Math.ceil(c / fitsW) * h))
-                        ? round2(Math.ceil(c / fitsH) * w)
-                        : round2(Math.ceil(c / fitsW) * h);
-                } else {
-                    assignedBobina = 1.52;
-                    const fits = Math.max(1, Math.floor(1.515 / (w || 1)));
-                    val = round2(Math.ceil(c / fits) * h);
-                }
+                assignedBobina = 1.52;
+                const fits = Math.max(1, Math.floor(1.515 / (w || 1)));
+                val = round2(Math.ceil(c / fits) * h);
             }
         }
         return {
-            value: round2(val),
+            value: round2(val ?? 0),
             unit: 'ml',
             bobina: assignedBobina ? `${assignedBobina}` : null
         };
