@@ -6,6 +6,7 @@ import React, { useEffect, useRef } from 'react';
 import type { Order } from '@/types/orden';
 import type { StationConfig } from './types';
 import { fmtM2, orderM2, type StationAlert, type StationStats } from './workshopAlerts';
+import { printerTelemetry } from '@/services/printerTelemetry';
 
 export interface StationSheetCardProps {
     station: StationConfig;
@@ -136,6 +137,37 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
                     <span style={{ border: `1px solid ${stateColor}`, color: stateColor, borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>● {stateLabel}</span>
                 </div>
             )}
+
+            {station.id === 'plotter1' && (() => {
+                const tele = printerTelemetry.getMachine('RS-640');
+                if (!tele) return null;
+                const isPrinting = tele.status === 'printing' && Boolean(tele.current_job);
+                const statusColor = isPrinting ? '#38bdf8' : tele.status === 'offline' ? '#ef4444' : '#22c55e';
+                const statusText = isPrinting ? '🚀 IMPRIMIENDO' : tele.status === 'offline' ? 'DESCONECTADA' : 'STANDBY (LISTO)';
+
+                return (
+                    <div style={{ ...box, marginTop: 10, borderColor: statusColor, background: '#091522' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ color: statusColor, fontWeight: 700, fontSize: 10 }}>TELEMETRÍA VERSAWORKS</span>
+                            <span style={{ background: '#122538', padding: '1px 5px', borderRadius: 3, fontSize: 9, color: '#f8fafc' }}>{statusText}</span>
+                        </div>
+                        {isPrinting && tele.current_job && (
+                            <div style={{ background: '#122538', padding: 6, borderRadius: 4, borderLeft: '3px solid #38bdf8', margin: '6px 0' }}>
+                                <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: 11, wordBreak: 'break-all' }}>📄 {tele.current_job.job_name}</div>
+                                <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
+                                    {tele.current_job.size_str ? `📏 ${tele.current_job.size_str} ` : ''}
+                                    {tele.current_job.ink_ml ? `| 💧 ${tele.current_job.ink_ml} ` : ''}
+                                </div>
+                            </div>
+                        )}
+                        {tele.last_completed_job && (
+                            <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 4 }}>
+                                <span style={{ color: '#cbd5e1' }}>Último trabajo:</span> {tele.last_completed_job.job_name.substring(0, 26)}... ({tele.last_completed_job.time_str || 'Hoy'})
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {alerts.length > 0 && (
                 <>
