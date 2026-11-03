@@ -8,6 +8,12 @@
     "version": "v0.20.0",
     "updatedAt": "2026-11-01T19:43:26Z",
     "wasm": "vectorcraft-web-fd27ad12f2de614d_bg.wasm"
+  },
+  "psdfy": {
+    "version": "v0.3.2",
+    "updatedAt": "2026-05-29T10:22:58Z",
+    "engine": "SAM 2 & PyTorch",
+    "repo": "https://github.com/Mattel-Limbo/psdfy",
+    "defaultPort": 3457
   }
 }
-

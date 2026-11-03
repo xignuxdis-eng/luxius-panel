@@ -331,7 +331,7 @@ export default function SharedFileViewerModal({
                                         {isImage ? (
                                             <div
                                                 style={{ position: 'relative', width: '100%', cursor: 'pointer' }}
-                                                title="Hacé clic para inspeccionar en Xpress Viewer"
+                                                title="Hacé clic para abrir en LuXius Studio"
                                                 onClick={() => {
                                                     onClose()
                                                     const orderParam = order?.id ? `&orderId=${order.id}` : ''

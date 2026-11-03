@@ -1479,7 +1479,7 @@ export const PrepressInspectorTab: React.FC<PrepressInspectorProps> = ({
                 {/* Sidebar Metadata */}
                 <div className="xpress-sidebar">
                     <div className="xpress-sidebar-header">
-                        <h2>👁️ Xpress Viewer</h2>
+                        <h2>🎨 LuXius Studio</h2>
                     </div>
                     
                     <div className="xpress-sidebar-content">

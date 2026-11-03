@@ -374,7 +374,7 @@ export const PrintSheeterStudio: React.FC<PrintSheeterStudioProps> = ({
     const handleSendBackToViewer = () => {
         if (!canvasRef.current || !onSendToViewer) return;
         setIsExporting(true);
-        setExportProgressText('Enviando resultado a Xpress Viewer...');
+        setExportProgressText('Enviando resultado a LuXius Studio...');
 
         setTimeout(() => {
             try {
@@ -460,9 +460,9 @@ export const PrintSheeterStudio: React.FC<PrintSheeterStudioProps> = ({
                             className="ps-btn ps-btn-primary"
                             onClick={handleSendBackToViewer}
                             disabled={!layoutResult || isExporting}
-                            title="Llevar la composición a Xpress Viewer para medición, demasías o aprobación"
+                            title="Llevar la composición a LuXius Studio para medición, demasías o aprobación"
                         >
-                            👁️ Enviar a Visor Xpress
+                            🎨 Enviar a Visor LuXius
                         </button>
                     )}
                     {onClose && (

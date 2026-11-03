@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
     { label: 'Dashboard', path: '/', icon: '📊' },
     { label: 'Entrada', path: '/entrada', icon: '📥' },
     { label: 'Presupuestador', path: '/presupuestador', icon: '💰' },
-    { label: 'Xpress Viewer', path: '/xpress-viewer', icon: '👁️' },
+    { label: 'LuXius Studio', path: '/xpress-viewer', icon: '🎨' },
     { label: 'Diseño', path: '/diseno', icon: '🎨' },
     { label: 'Impresión', path: '/impresion', icon: '🖨️' },
     { label: 'Stock', path: '/stock', icon: '📦' },

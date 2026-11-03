@@ -154,6 +154,7 @@ function App() {
                                         <Route path="/entrada" element={<Entrada />} />
                                         <Route path="/presupuestador" element={<Presupuestador />} />
                                         <Route path="/xpress-viewer" element={<XpressViewer />} />
+                                        <Route path="/luxius-studio" element={<XpressViewer />} />
                                         <Route path="/diseno" element={<Diseno />} />
                                         <Route path="/impresion" element={<Impresion />} />
                                         <Route path="/stock" element={<Stock />} />
