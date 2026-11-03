@@ -17,12 +17,13 @@ export const PrintManagerHUD: React.FC<PrintManagerHUDProps> = ({
 
     const getStatusTag = (status: string) => {
         switch (status) {
-            case 'orden': return { label: '[Printing]', color: '#22c55e' };
-            case 'diseno': return { label: '[Waiting]', color: '#eab308' };
-            case 'rebotado': return { label: '[REBOTADO]', color: '#ef4444' };
-            case 'impreso': return { label: '[Trillar]', color: '#ec4899' };
-            case 'post': return { label: '[Empaqueta]', color: '#3b82f6' };
-            case 'entregado': return { label: '[Shipped]', color: '#10b981' };
+            case 'orden': return { label: '[Para Imprimir]', color: '#f97316' };
+            case 'diseno': return { label: '[En Diseño]', color: '#eab308' };
+            case 'rebotado': return { label: '[Rechazado]', color: '#ef4444' };
+            case 'impreso': return { label: '[Impreso]', color: '#ec4899' };
+            case 'post': return { label: '[Terminaciones]', color: '#3b82f6' };
+            case 'completo': return { label: '[Para Entregar]', color: '#06b6d4' };
+            case 'entregado': return { label: '[Entregado]', color: '#10b981' };
             default: return { label: `[${statusLabels[status as keyof typeof statusLabels] || status}]`, color: '#38bdf8' };
         }
     };

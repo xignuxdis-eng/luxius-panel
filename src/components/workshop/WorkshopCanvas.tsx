@@ -226,7 +226,7 @@ export const WorkshopCanvas: React.FC<WorkshopCanvasProps> = ({
                         targetY: 135,
                         heldItem: `OT #${readyToPrint.ot || readyToPrint.id}`,
                         speechBubble: {
-                            text: `OT #${readyToPrint.ot || readyToPrint.id} [Printing]`,
+                            text: `OT #${readyToPrint.ot || readyToPrint.id} [Para Imprimir]`,
                             color: '#22c55e',
                             timer: 140
                         }

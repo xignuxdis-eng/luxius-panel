@@ -12,6 +12,7 @@ export interface StationSheetCardProps {
     station: StationConfig;
     stats: StationStats;
     alerts: StationAlert[];
+    orders?: Order[];
     isMachine: boolean;
     /** Si es false (p. ej. pantalla completa), se oculta el botón que abre el detalle completo. */
     canOpenDetail: boolean;
@@ -64,6 +65,7 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
     station,
     stats,
     alerts,
+    orders = [],
     isMachine,
     canOpenDetail,
     onOpenDetail,
@@ -185,7 +187,34 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
                                 <div style={{ color: a.severity === 'danger' ? '#fca5a5' : '#fcd34d', fontWeight: 700 }}>
                                     {ALERT_ICON[a.kind] ?? '⚠️'} {a.title}
                                 </div>
-                                <div style={{ color: '#cbd5e1' }}>{a.detail}</div>
+                                <div style={{ color: '#cbd5e1', fontSize: 11 }}>{a.detail}</div>
+                                {Array.isArray(a.orderIds) && a.orderIds.length > 0 && onOpenOrder && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                                        {a.orderIds.map((oid) => {
+                                            const ord = orders.find((o) => o.id === oid);
+                                            return (
+                                                <button
+                                                    key={oid}
+                                                    type="button"
+                                                    onClick={() => ord && onOpenOrder(ord)}
+                                                    style={{
+                                                        background: '#2a1215',
+                                                        border: '1px solid #ef4444',
+                                                        borderRadius: 3,
+                                                        color: '#fca5a5',
+                                                        fontSize: 10,
+                                                        padding: '2px 6px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 700
+                                                    }}
+                                                    title={`Ver OT #${ord?.ot || oid} y gestionar fecha`}
+                                                >
+                                                    OT #{ord?.ot || oid} ↗
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>

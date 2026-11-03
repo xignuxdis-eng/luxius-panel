@@ -15,6 +15,7 @@ export interface PrinterJobInfo {
     speed_str?: string
     time_str?: string
     error_code?: string
+    progress?: number
     timestamp: string
 }
 

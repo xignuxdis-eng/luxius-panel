@@ -158,7 +158,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
     // Refs for real-time synchronization
     const ordersRef = useRef<Order[]>(orders);
-    const printingOrdersRef = useRef<Order[]>(orders.filter(o => o.status === 'orden'));
     const selectedStationRef = useRef<StationId | null>(selectedStation);
     const prevOrdersSnapshotRef = useRef<OrderStateSnapshot>({});
     const pendingDiffsRef = useRef<OrderDiff[]>([]);
@@ -456,7 +455,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     // Update synced refs
     useEffect(() => {
         ordersRef.current = orders;
-        printingOrdersRef.current = orders.filter(o => o.status === 'orden');
 
         // Compute diffs against previous snapshot
         const { diffs, nextSnapshot } = diffOrders(prevOrdersSnapshotRef.current, orders);
@@ -2099,8 +2097,6 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     } catch (_) {}
                 }
 
-                const allPrintingOrders = printingOrdersRef.current;
-
                 plottersListRef.current.forEach((plotter, pIdx) => {
                     const { carriage, sheet, glow, barFill, progressText, statusLed, isOffline, width: plotterW } = plotter;
                     if (!carriage || carriage.destroyed ||
@@ -2120,10 +2116,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const isTelePrinting = tele?.status === 'printing' && Boolean(tele.current_job);
                     const isTeleOffline = tele?.status === 'offline';
 
-                    // Distribute orders: si la máquina está imprimiendo en vivo según VersaWorks, manda la telemetría
-                    const assignedOrder = allPrintingOrders[pIdx] || (pIdx === 0 ? allPrintingOrders[0] : undefined);
-                    const isPlotterPrinting = (isTelePrinting || Boolean(assignedOrder)) && !isOffline && !isTeleOffline;
-                    const isVip = Boolean(assignedOrder && (String(assignedOrder.batchId || '').includes('VIP') || String(assignedOrder.ot || '').includes('URG')));
+                    // Para máquinas conectadas (RS-640), la realidad física del RIP manda: solo se mueve si está imprimiendo de verdad.
+                    // Para máquinas sin telemetría, no simular animación si están en espera.
+                    const isPlotterPrinting = isTelePrinting && !isOffline && !isTeleOffline;
+                    const isVip = Boolean(isTelePrinting && tele?.current_job && (
+                        tele.current_job.job_name.toUpperCase().includes('VIP') ||
+                        tele.current_job.job_name.toUpperCase().includes('URG')
+                    ));
 
                     if (isPlotterPrinting) {
                         // 1. Carriage sweep
@@ -2190,25 +2189,31 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         const barH = 20;
                         barFill.clear();
 
-                        // Haz de luz en la base de la barra como línea fina de actividad (no tapa el texto)
-                        const beamW = Math.floor(barWidth * 0.35);
-                        const beamOffset = ((frameCount * 2.5 + pIdx * 25) % (barWidth + beamW)) - beamW;
-                        const beamStart = Math.max(0, beamOffset);
-                        const beamEnd = Math.min(barWidth, beamOffset + beamW);
-                        if (beamEnd > beamStart) {
-                            barFill.roundRect(beamStart, barH - 3, beamEnd - beamStart, 2, 1);
-                            barFill.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.85 });
+                        const jobProgress = tele?.current_job?.progress;
+                        if (typeof jobProgress === 'number' && jobProgress >= 0) {
+                            const pctW = Math.round((barWidth * Math.min(100, Math.max(2, jobProgress))) / 100);
+                            barFill.roundRect(0, barH - 4, pctW, 3, 1);
+                            barFill.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.9 });
+                        } else {
+                            // Haz de luz en la base de la barra como línea fina de actividad (no tapa el texto)
+                            const beamW = Math.floor(barWidth * 0.35);
+                            const beamOffset = ((frameCount * 2.5 + pIdx * 25) % (barWidth + beamW)) - beamW;
+                            const beamStart = Math.max(0, beamOffset);
+                            const beamEnd = Math.min(barWidth, beamOffset + beamW);
+                            if (beamEnd > beamStart) {
+                                barFill.roundRect(beamStart, barH - 3, beamEnd - beamStart, 2, 1);
+                                barFill.fill({ color: isVip ? 0xfbbf24 : 0x38bdf8, alpha: 0.85 });
+                            }
                         }
                         barFill.alpha += (1 - barFill.alpha) * 0.08;
 
-                        // Texto de progreso dinámico: Prioriza telemetría real de VersaWorks
+                        // Texto de progreso dinámico: Telemetría real de VersaWorks
                         let targetProgressText = 'STANDBY (LISTO)';
                         if (isTelePrinting && tele?.current_job) {
                             const rawName = tele.current_job.job_name;
-                            const cleanName = rawName.length > 22 ? `${rawName.substring(0, 20)}...` : rawName;
-                            targetProgressText = `🖨️ IMPRIMIENDO: ${cleanName}`;
-                        } else if (assignedOrder) {
-                            targetProgressText = `SIGUIENTE EN COLA: OT #${assignedOrder.ot || assignedOrder.id}`;
+                            const cleanName = rawName.length > 20 ? `${rawName.substring(0, 18)}...` : rawName;
+                            const pctText = typeof jobProgress === 'number' ? ` (${Math.round(jobProgress)}%)` : '';
+                            targetProgressText = `🖨️ ${cleanName}${pctText}`;
                         }
 
                         if (progressText.text !== targetProgressText) {
@@ -2253,11 +2258,12 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     }
                 });
 
-                // Iluminación: luz cian bajo las máquinas en línea con trabajo en cola
+                // Iluminación: luz cian bajo las máquinas que estén físicamente imprimiendo
                 if (lightingRef.current) {
                     const active: Record<string, boolean> = {};
                     plottersListRef.current.forEach((p, i) => {
-                        active[p.id] = Boolean(allPrintingOrders[i] || (i === 0 && allPrintingOrders[0])) && !p.isOffline;
+                        const t = i === 0 ? printerTelemetryRef.current['RS-640'] : undefined;
+                        active[p.id] = (t?.status === 'printing' && Boolean(t.current_job)) && !p.isOffline;
                     });
                     lightingRef.current.update(elapsedMs, active);
                 }
@@ -2375,6 +2381,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         station={st}
                         stats={computeStationStats(st, orders, workshopNow())}
                         alerts={alerts.filter((a) => a.stationId === st.id)}
+                        orders={orders}
                         isMachine={isMachine}
                         canOpenDetail={!isFs}
                         onOpenDetail={() => {

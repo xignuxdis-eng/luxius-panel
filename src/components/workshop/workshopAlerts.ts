@@ -16,6 +16,7 @@ export interface StationAlert {
     severity: AlertSeverity;
     title: string;
     detail: string;
+    orderIds?: number[];
 }
 
 /** Estados en los que una orden sigue "viva" en el taller (para saber si está atrasada). */
@@ -143,7 +144,8 @@ export function computeStationAlerts(
             kind: 'atraso',
             severity: 'danger',
             title: `${list.length} ${plural(list.length, 'orden atrasada', 'órdenes atrasadas')}`,
-            detail: listNames(list.map((o) => `OT #${o.ot || o.id}`))
+            detail: listNames(list.map((o) => `OT #${o.ot || o.id}`)),
+            orderIds: list.map((o) => o.id)
         });
     });
 
@@ -155,7 +157,8 @@ export function computeStationAlerts(
             kind: 'rebote',
             severity: 'warn',
             title: `${rebotadas.length} ${plural(rebotadas.length, 'orden rebotada', 'órdenes rebotadas')}`,
-            detail: listNames(rebotadas.map((o) => `OT #${o.ot || o.id}`))
+            detail: listNames(rebotadas.map((o) => `OT #${o.ot || o.id}`)),
+            orderIds: rebotadas.map((o) => o.id)
         });
     }
 
