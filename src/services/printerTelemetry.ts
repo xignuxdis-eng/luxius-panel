@@ -30,9 +30,10 @@ export interface PrinterMachineData {
 
 export interface PrinterStatusResponse {
     ok: boolean
-    machines: Record<string, PrinterMachineData>
-    count: number
-    timestamp: string
+    printers?: PrinterMachineData[]
+    machines?: Record<string, PrinterMachineData>
+    count?: number
+    timestamp?: string
 }
 
 type TelemetryListener = (machines: Record<string, PrinterMachineData>) => void
@@ -108,8 +109,16 @@ class PrinterTelemetryService {
             }
 
             const data: PrinterStatusResponse = await res.json()
-            if (data && data.ok && data.machines) {
-                this.lastData = data.machines
+            if (data && data.ok) {
+                const map: Record<string, PrinterMachineData> = {}
+                if (Array.isArray(data.printers)) {
+                    data.printers.forEach((p) => {
+                        map[p.machine_id] = p
+                    })
+                } else if (data.machines) {
+                    Object.assign(map, data.machines)
+                }
+                this.lastData = map
                 this.notifyListeners()
             }
             return this.lastData
@@ -151,3 +160,4 @@ class PrinterTelemetryService {
 }
 
 export const printerTelemetry = PrinterTelemetryService.getInstance()
+
