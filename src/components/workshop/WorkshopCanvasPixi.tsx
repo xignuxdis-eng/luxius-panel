@@ -58,6 +58,7 @@ import { GuestManager } from './workshopGuests';
 import { PetManager, type PetProfile } from './workshopPet';
 import { playAnimalSound } from './workshopAnimalSound';
 import { WORKSHOP_CONFIG, DEFAULT_FX as BASE_DEFAULT_FX } from './content/config';
+import { printerTelemetry, type PrinterMachineData } from '@/services/printerTelemetry';
 import { preloadSpriteOverrides } from './workshopSpriteOverrides';
 import PetSheetCard from './PetSheetCard';
 import WallPanel from './WallPanel';
@@ -262,6 +263,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const wallPanelRef = useRef<'board' | 'clock' | null>(null);
     wallPanelRef.current = wallPanel;
     const lastStationCloseRef = useRef<{ id: string; t: number } | null>(null);
+    const printerTelemetryRef = useRef<Record<string, PrinterMachineData>>({});
     const [focusedId, setFocusedId] = useState<string | null>(null);
     const focusedRef = useRef<string | null>(null);
     focusedRef.current = focusedId;
@@ -578,6 +580,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             document.removeEventListener('fullscreenchange', onFs);
             if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
             if (camTweenRef.current) cancelAnimationFrame(camTweenRef.current);
+        };
+    }, []);
+
+    // Telemetría viva de impresoras / Roland VersaWorks (XignuX Monitor)
+    useEffect(() => {
+        const unsubscribe = printerTelemetry.subscribe((machines) => {
+            printerTelemetryRef.current = machines;
+        });
+        return () => {
+            unsubscribe();
         };
     }, []);
 
@@ -1952,14 +1964,18 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     };
 
     /**
-     * Updates Plotter Tooltip HUD with real active order data (B0.2: Coordinates scaled)
+     * Updates Plotter Tooltip HUD with real active order data & live telemetry (B0.2: Coordinates scaled)
      */
     const updatePlotterTooltip = (stationId: StationId = 'plotter1') => {
         if (!tooltipTextRef.current || !tooltipContainerRef.current) return;
         const stations = getPixiStations();
         const station = stations.find(s => s.id === stationId);
-        const isOffline = station?.estado === 'offline';
         const title = station?.title || 'Plotter';
+
+        // Consultar telemetría viva para plotter1 (RS-640)
+        const teleData = stationId === 'plotter1' ? printerTelemetryRef.current['RS-640'] : undefined;
+        const isLivePrinting = teleData?.status === 'printing' && Boolean(teleData.current_job);
+        const isOffline = station?.estado === 'offline' || teleData?.status === 'offline';
 
         if (station) {
             tooltipContainerRef.current.x = Math.round(Math.max(10, Math.min(270, station.x + 20)) * currentScaleRef.current);
@@ -1972,6 +1988,19 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 'Estado: DESCONECTADO (OFFLINE)\n' +
                 'Sin comunicación de red\n' +
                 'Click para configuración';
+            return;
+        }
+
+        // Si está imprimiendo físicamente según VersaWorks, proyectar telemetría real
+        if (isLivePrinting && teleData?.current_job) {
+            const job = teleData.current_job;
+            const sizeTxt = job.size_str ? ` | ${job.size_str}` : '';
+            const inkTxt = job.ink_ml ? ` | 💧 ${job.ink_ml}` : '';
+            tooltipTextRef.current.text =
+                `🚀 IMPRIMIENDO EN VIVO (VersaWorks)\n` +
+                `Archivo: ${job.job_name.substring(0, 32)}${job.job_name.length > 32 ? '...' : ''}\n` +
+                `Detalle: ${sizeTxt}${inkTxt}\n` +
+                `Máquina: ${teleData.machine_name || 'RS-640'}`;
             return;
         }
 
@@ -2086,12 +2115,17 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const railMinX = plotter.plotterOffsetX + 32;
                     const railRange = plotter.plotterActualW - 74;
 
-                    // Distribute orders: plotter 0 takes first, plotter 1 takes second, or standby
+                    // Telemetría viva de Roland VersaWorks (plotter 0 = RS-640)
+                    const tele = pIdx === 0 ? printerTelemetryRef.current['RS-640'] : undefined;
+                    const isTelePrinting = tele?.status === 'printing' && Boolean(tele.current_job);
+                    const isTeleOffline = tele?.status === 'offline';
+
+                    // Distribute orders: si la máquina está imprimiendo en vivo según VersaWorks, manda la telemetría
                     const assignedOrder = allPrintingOrders[pIdx] || (pIdx === 0 ? allPrintingOrders[0] : undefined);
-                    const isPlotterPrinting = Boolean(assignedOrder) && !isOffline;
+                    const isPlotterPrinting = (isTelePrinting || Boolean(assignedOrder)) && !isOffline && !isTeleOffline;
                     const isVip = Boolean(assignedOrder && (String(assignedOrder.batchId || '').includes('VIP') || String(assignedOrder.ot || '').includes('URG')));
 
-                    if (isPlotterPrinting && assignedOrder) {
+                    if (isPlotterPrinting) {
                         // 1. Carriage sweep
                         const sweepSpeed = 0.05;
                         const cosVal = Math.cos((frameCount + pIdx * 30) * sweepSpeed);
@@ -2151,10 +2185,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             sheet.alpha += (1 - sheet.alpha) * 0.1;
                         }
 
-                        // NOTA TÉCNICA: En Luxius, el estado 'orden' representa una orden ingresada/enviada a taller
-                        // que se encuentra "en cola" de espera para impresión en máquina, no un estado de impresión en tiempo real.
-                        // No se calculan porcentajes ni progresos simulados hasta contar con telemetría directa de hardware.
-                        // 4. Barra de actividad indeterminada animada con fondo oscuro sólido (sin números ni porcentajes inventados)
+                        // 4. Barra de actividad interactiva con datos reales de telemetría si existen
                         const barWidth = Math.round((plotter.plotterActualW - 24) * PS_PLOT * currentScaleRef.current);
                         const barH = 20;
                         barFill.clear();
@@ -2170,9 +2201,16 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         }
                         barFill.alpha += (1 - barFill.alpha) * 0.08;
 
-                        const targetProgressText = assignedOrder
-                            ? `SIGUIENTE EN COLA: OT #${assignedOrder.ot || assignedOrder.id}`
-                            : 'STANDBY (LISTO)';
+                        // Texto de progreso dinámico: Prioriza telemetría real de VersaWorks
+                        let targetProgressText = 'STANDBY (LISTO)';
+                        if (isTelePrinting && tele?.current_job) {
+                            const rawName = tele.current_job.job_name;
+                            const cleanName = rawName.length > 22 ? `${rawName.substring(0, 20)}...` : rawName;
+                            targetProgressText = `🖨️ IMPRIMIENDO: ${cleanName}`;
+                        } else if (assignedOrder) {
+                            targetProgressText = `SIGUIENTE EN COLA: OT #${assignedOrder.ot || assignedOrder.id}`;
+                        }
+
                         if (progressText.text !== targetProgressText) {
                             progressText.text = targetProgressText;
                         }
@@ -2186,7 +2224,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                         if (frameCount % 4 === 0) {
                             emitParticle(plotter.baseX + (carriage.x + 6) * PS_PLOT, plotter.baseY + (carriage.y + 6) * PS_PLOT, isVip);
                         }
-                    } else if (isOffline) {
+                    } else if (isOffline || isTeleOffline) {
                         // Offline: grises, sin luz ni movimiento, carriage quieto en posición de reposo
                         carriage.x += (railMinX - carriage.x) * 0.06;
                         glow.alpha += (0 - glow.alpha) * 0.08;

@@ -5,6 +5,7 @@ import { Order } from '@/types/orden';
 import { audioEngine } from './AudioEngine';
 import { getMaquinas, getMateriales, isCutMachine } from '@/data/db';
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal';
+import { printerTelemetry } from '@/services/printerTelemetry';
 
 interface StationModalProps {
     stationId: StationId | null;
@@ -293,6 +294,45 @@ export const StationModal: React.FC<StationModalProps> = ({
                             </div>
                         </div>
                     )}
+
+                    {stationId === 'plotter1' && (() => {
+                        const tele = printerTelemetry.getMachine('RS-640');
+                        if (!tele) return null;
+                        const isPrinting = tele.status === 'printing' && tele.current_job;
+                        const isOffline = tele.status === 'offline';
+                        const statusColor = isPrinting ? '#38bdf8' : isOffline ? '#64748b' : '#22c55e';
+                        const statusText = isPrinting ? '🚀 IMPRIMIENDO' : isOffline ? '🔌 DESCONECTADO (OFFLINE)' : '🟢 EN ESPERA (LISTO)';
+
+                        return (
+                            <div style={{ backgroundColor: '#0f172a', padding: '12px', borderRadius: '4px', border: `1px solid ${statusColor}`, marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: statusColor }}>
+                                        TELEMETRÍA EN VIVO (ROLAND VERSAWORKS)
+                                    </span>
+                                    <span style={{ fontSize: '9px', backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '3px', color: '#f8fafc' }}>
+                                        {statusText}
+                                    </span>
+                                </div>
+                                {isPrinting && tele.current_job && (
+                                    <div style={{ backgroundColor: '#1e293b', padding: '8px', borderRadius: '3px', borderLeft: '3px solid #38bdf8', marginBottom: '8px' }}>
+                                        <div style={{ fontSize: '9px', color: '#f8fafc', fontWeight: 'bold' }}>
+                                            📄 {tele.current_job.job_name}
+                                        </div>
+                                        <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '3px' }}>
+                                            {tele.current_job.size_str ? `📏 ${tele.current_job.size_str} ` : ''}
+                                            {tele.current_job.ink_ml ? `| 💧 ${tele.current_job.ink_ml} ` : ''}
+                                            {tele.current_job.speed_str ? `| 🚀 ${tele.current_job.speed_str}` : ''}
+                                        </div>
+                                    </div>
+                                )}
+                                {tele.recent_events && tele.recent_events.length > 0 && (
+                                    <div style={{ fontSize: '8px', color: '#94a3b8' }}>
+                                        <span style={{ color: '#cbd5e1' }}>Último finalizado:</span> {tele.recent_events[0].job_name} ({tele.recent_events[0].time_str || 'Hoy'})
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     <h4 style={{ margin: '14px 0 8px 0', fontSize: '10px', color: '#38bdf8' }}>
                         ÓRDENES EN ESTACIÓN [{stationOrders.length}]
