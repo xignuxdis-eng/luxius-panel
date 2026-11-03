@@ -49,6 +49,12 @@ export function isDesignerRole(role: string | undefined | null): boolean {
     return r === 'artista' || r === 'disenador' || r === 'diseno' || r === 'diseñador' || r === 'diseño';
 }
 
+export function isAdminRole(role: string | undefined | null): boolean {
+    if (!role) return false;
+    const normalizedRole = role.toLowerCase().trim();
+    return ['principal', 'administrador', 'admin', 'sistema', 'master'].includes(normalizedRole);
+}
+
 export interface RoleConfig {
     id: number
     name: string

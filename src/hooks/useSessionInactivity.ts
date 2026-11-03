@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@store/authStore';
+import { isAdminRole } from '@/types/auth';
 
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos exactos
 
@@ -12,7 +13,8 @@ export function useSessionInactivity() {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        if (!isAuthenticated || !user || user.role === 'visitante') {
+        // Eximir de deslogueo por inactividad a roles de Administrador, Principal y Sistema
+        if (!isAuthenticated || !user || user.role === 'visitante' || isAdminRole(user.role)) {
             if (timerRef.current) {
                 clearTimeout(timerRef.current);
                 timerRef.current = null;
