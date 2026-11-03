@@ -10,7 +10,6 @@ import { PrintSheeterStudio } from './printsheeter/PrintSheeterStudio';
 import { SuiteCraftTab } from './suitecraft/SuiteCraftTab';
 import { toAbsoluteFileUrl } from './suitecraft/tools';
 import { PrepressInspectorTab } from './subcomponents/PrepressInspectorTab';
-import { PsdfyTab } from './subcomponents/PsdfyTab';
 import { XpressViewerTab, XpressViewerProps } from './XpressViewer.types';
 
 export type {
@@ -38,14 +37,12 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
         tabParam === 'redrawer' ? 'redrawer'
         : (tabParam === 'printsheeter' || tabParam === 'mosaic') ? 'printsheeter'
         : tabParam === 'vectorcraft' ? 'vectorcraft'
-        : tabParam === 'psdfy' ? 'psdfy'
         : (tabParam === 'photocraft' || tabParam === 'suitecraft' || tabParam === 'gimpstudio' || tabParam === 'editor') ? 'photocraft'
         : 'viewer';
 
     const [activeTab, setActiveTab] = useState<XpressViewerTab>(initialTab);
     const [hasMountedPhotocraft, setHasMountedPhotocraft] = useState<boolean>(initialTab === 'photocraft');
     const [hasMountedVectorcraft, setHasMountedVectorcraft] = useState<boolean>(initialTab === 'vectorcraft');
-    const [hasMountedPsdfy, setHasMountedPsdfy] = useState<boolean>(initialTab === 'psdfy');
 
     const [order, setOrder] = useState<Order | null>(null);
     const [file, setFile] = useState<File | null>(null);
@@ -57,7 +54,6 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
         if (p === 'redrawer') setActiveTab('redrawer');
         else if (p === 'printsheeter' || p === 'mosaic') setActiveTab('printsheeter');
         else if (p === 'vectorcraft') setActiveTab('vectorcraft');
-        else if (p === 'psdfy') setActiveTab('psdfy');
         else if (p === 'photocraft' || p === 'suitecraft' || p === 'gimpstudio' || p === 'editor') setActiveTab('photocraft');
         else if (!p && activeTab !== 'viewer') setActiveTab('viewer');
     }, [searchParams, activeTab]);
@@ -67,10 +63,8 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
             setHasMountedPhotocraft(true);
         } else if (activeTab === 'vectorcraft' && !hasMountedVectorcraft) {
             setHasMountedVectorcraft(true);
-        } else if (activeTab === 'psdfy' && !hasMountedPsdfy) {
-            setHasMountedPsdfy(true);
         }
-    }, [activeTab, hasMountedPhotocraft, hasMountedVectorcraft, hasMountedPsdfy]);
+    }, [activeTab, hasMountedPhotocraft, hasMountedVectorcraft]);
 
     const handleTabChange = (newTab: XpressViewerTab) => {
         setActiveTab(newTab);
@@ -152,15 +146,6 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
                         ✒️ VectorCraft
                         <span className="xpress-tab-pill" style={{ background: '#0891b2', color: '#fff' }}>VECTOR</span>
                     </button>
-                    <button 
-                        type="button"
-                        className={`xpress-nav-tab ${activeTab === 'psdfy' ? 'active' : ''}`}
-                        onClick={() => handleTabChange('psdfy')}
-                        title="PSDFy — Segmentación inteligente de capas con IA SAM 2 para Photoshop"
-                    >
-                        📑 PSDFy
-                        <span className="xpress-tab-pill" style={{ background: '#7c3aed', color: '#fff' }}>IA PSD</span>
-                    </button>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -216,21 +201,6 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
                     }}
                 />
             )}
-            {hasMountedPsdfy && (
-                <PsdfyTab
-                    initialFileUrl={suiteCraftFileUrl}
-                    initialFileName={file?.name || paramFileName || metadata?.name || null}
-                    order={order}
-                    isActive={activeTab === 'psdfy'}
-                    onClose={() => {
-                        if (onClose) {
-                            onClose();
-                        } else {
-                            handleTabChange('viewer');
-                        }
-                    }}
-                />
-            )}
 
             {activeTab === 'redrawer' ? (
                 <RedrawerStudio 
@@ -277,7 +247,7 @@ export const XpressViewer: React.FC<XpressViewerProps> = ({
                     }}
                     onClose={onClose}
                 />
-            ) : activeTab === 'photocraft' || activeTab === 'vectorcraft' || activeTab === 'psdfy' ? null : (
+            ) : activeTab === 'photocraft' || activeTab === 'vectorcraft' ? null : (
                 <PrepressInspectorTab
                     file={file}
                     setFile={setFile}

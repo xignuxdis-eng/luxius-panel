@@ -1,7 +1,7 @@
 // src/pages/XpressViewer/XpressViewer.types.ts
 import { Order } from '../../types/orden';
 
-export type XpressViewerTab = 'viewer' | 'redrawer' | 'printsheeter' | 'photocraft' | 'vectorcraft' | 'psdfy';
+export type XpressViewerTab = 'viewer' | 'redrawer' | 'printsheeter' | 'photocraft' | 'vectorcraft';
 
 export type ToolMode = 'none' | 'measure' | 'bleed' | 'pan';
 
