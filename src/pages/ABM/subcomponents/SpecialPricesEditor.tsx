@@ -125,125 +125,131 @@ export default function SpecialPricesEditor({ preciosEspeciales, onChange }: Spe
                 </div>
             </div>
 
-            {/* Formulario de carga */}
-            <div className="spe-form-grid">
-                {/* 1. Selección de Material */}
-                <div className="spe-field">
-                    <label className="spe-label">Material</label>
-                    <select
-                        className="input-field spe-select"
-                        value={selectedMatCode}
-                        onChange={(e) => handleMaterialChange(e.target.value)}
-                    >
-                        <option value="">Seleccionar material...</option>
-                        {allMateriales.map((m) => (
-                            <option key={m.id} value={m.codigo}>
-                                {m.descripcion} ({m.codigo}) — Base: {m.tipoCobro === 'ml' ? 'Metro Lineal' : 'Metro Cuadrado'}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+            {/* Formulario de carga en 2 filas limpias y ordenadas */}
+            <div className="spe-form-container">
+                {/* Fila 1: Material y Modalidad de Cobro */}
+                <div className="spe-form-row spe-row-top">
+                    {/* 1. Selección de Material */}
+                    <div className="spe-field spe-field-material">
+                        <label className="spe-label">Material</label>
+                        <select
+                            className="input-field spe-select"
+                            value={selectedMatCode}
+                            onChange={(e) => handleMaterialChange(e.target.value)}
+                        >
+                            <option value="">Seleccionar material...</option>
+                            {allMateriales.map((m) => (
+                                <option key={m.id} value={m.codigo}>
+                                    {m.descripcion} ({m.codigo}) — Base: {m.tipoCobro === 'ml' ? 'mL' : 'm²'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                {/* 2. Discriminación de Unidad: M2 vs ML */}
-                <div className="spe-field">
-                    <label className="spe-label">Modalidad de Cobro</label>
-                    <div className="spe-unit-toggle">
-                        <button
-                            type="button"
-                            className={`spe-unit-btn ${unit === 'm2' ? 'active-m2' : ''}`}
-                            onClick={() => {
-                                setUnit('m2');
-                                setSelectedAncho('');
-                                setCustomAncho('');
-                            }}
-                        >
-                            📐 Metro Cuadrado (m²)
-                        </button>
-                        <button
-                            type="button"
-                            className={`spe-unit-btn ${unit === 'ml' ? 'active-ml' : ''}`}
-                            onClick={() => setUnit('ml')}
-                        >
-                            📏 Metro Lineal (ml)
-                        </button>
+                    {/* 2. Discriminación de Unidad: M2 vs ML */}
+                    <div className="spe-field spe-field-unit">
+                        <label className="spe-label">Modalidad de Cobro</label>
+                        <div className="spe-unit-toggle">
+                            <button
+                                type="button"
+                                className={`spe-unit-btn ${unit === 'm2' ? 'active-m2' : ''}`}
+                                onClick={() => {
+                                    setUnit('m2');
+                                    setSelectedAncho('');
+                                    setCustomAncho('');
+                                }}
+                            >
+                                📐 Metro Cuadrado (m²)
+                            </button>
+                            <button
+                                type="button"
+                                className={`spe-unit-btn ${unit === 'ml' ? 'active-ml' : ''}`}
+                                onClick={() => setUnit('ml')}
+                            >
+                                📏 Metro Lineal (ml)
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* 3. Selección de Ancho de Bobina */}
-                <div className="spe-field">
-                    <label className="spe-label">
-                        {unit === 'm2' ? 'Ancho de Rollo' : 'Ancho de Bobina (ml)'}
-                    </label>
-                    {unit === 'm2' ? (
-                        <div className="spe-m2-info-box">
-                            <CheckCircle2 size={15} color="#22c55e" />
-                            <span>Aplica a cualquier ancho (precio por m²)</span>
-                        </div>
-                    ) : (
-                        <div className="spe-ancho-selector-group">
-                            <select
-                                className="input-field spe-select"
-                                value={selectedAncho}
-                                onChange={(e) => setSelectedAncho(e.target.value)}
+                {/* Fila 2: Ancho de Bobina/Rollo, Precio y Botón Agregar */}
+                <div className="spe-form-row spe-row-bottom">
+                    {/* 3. Selección de Ancho de Bobina */}
+                    <div className="spe-field spe-field-ancho">
+                        <label className="spe-label">
+                            {unit === 'm2' ? 'Ancho de Rollo' : 'Ancho de Bobina (ml)'}
+                        </label>
+                        {unit === 'm2' ? (
+                            <div className="spe-m2-info-box" title="Para materiales cobrados en m², el precio aplica a cualquier ancho">
+                                <CheckCircle2 size={16} color="#22c55e" style={{ flexShrink: 0 }} />
+                                <span>Aplica a cualquier ancho (precio uniforme por m²)</span>
+                            </div>
+                        ) : (
+                            <div className="spe-ancho-selector-group">
+                                <select
+                                    className="input-field spe-select"
+                                    value={selectedAncho}
+                                    onChange={(e) => setSelectedAncho(e.target.value)}
+                                >
+                                    <option value="">Todos los anchos (general por ml)</option>
+                                    {availableWidths.map((w) => {
+                                        const bobinaMatch = currentMat?.bobinas?.find(b => b.ancho === w);
+                                        const precioInfo = bobinaMatch?.precioML ? ` ($${bobinaMatch.precioML.toLocaleString()} lista)` : '';
+                                        return (
+                                            <option key={w} value={w.toString()}>
+                                                Bobina {w}m{precioInfo}
+                                            </option>
+                                        );
+                                    })}
+                                    <option value="custom">Otro ancho personalizado...</option>
+                                </select>
+
+                                {selectedAncho === 'custom' && (
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0.1"
+                                        placeholder="Ej: 1.60"
+                                        className="input-field spe-custom-ancho-input"
+                                        value={customAncho}
+                                        onChange={(e) => setCustomAncho(e.target.value)}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 4. Precio Especial y Botón */}
+                    <div className="spe-field spe-field-price">
+                        <label className="spe-label">
+                            Precio Especial ({unit === 'm2' ? '$/m²' : '$/ml'})
+                        </label>
+                        <div className="spe-price-input-group">
+                            <input
+                                type="number"
+                                min="0"
+                                step="100"
+                                placeholder={unit === 'm2' ? 'Ej: 12000' : 'Ej: 28000'}
+                                className="input-field spe-price-input"
+                                value={priceInput}
+                                onChange={(e) => setPriceInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddPrice();
+                                    }
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="primary"
+                                onClick={handleAddPrice}
+                                disabled={!selectedMatCode || !priceInput}
+                                className="spe-add-btn"
                             >
-                                <option value="">Todos los anchos (general por ml)</option>
-                                {availableWidths.map((w) => {
-                                    const bobinaMatch = currentMat?.bobinas?.find(b => b.ancho === w);
-                                    const precioInfo = bobinaMatch?.precioML ? ` ($${bobinaMatch.precioML.toLocaleString()} lista)` : '';
-                                    return (
-                                        <option key={w} value={w.toString()}>
-                                            Bobina {w}m{precioInfo}
-                                        </option>
-                                    );
-                                })}
-                                <option value="custom">Otro ancho personalizado...</option>
-                            </select>
-
-                            {selectedAncho === 'custom' && (
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.1"
-                                    placeholder="Ej: 1.60"
-                                    className="input-field spe-custom-ancho-input"
-                                    value={customAncho}
-                                    onChange={(e) => setCustomAncho(e.target.value)}
-                                />
-                            )}
+                                <Plus size={16} /> Agregar
+                            </Button>
                         </div>
-                    )}
-                </div>
-
-                {/* 4. Precio Especial */}
-                <div className="spe-field">
-                    <label className="spe-label">
-                        Precio Especial ({unit === 'm2' ? '$/m²' : '$/ml'})
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                            type="number"
-                            min="0"
-                            step="100"
-                            placeholder={unit === 'm2' ? 'Ej: 12000' : 'Ej: 28000'}
-                            className="input-field"
-                            value={priceInput}
-                            onChange={(e) => setPriceInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleAddPrice();
-                                }
-                            }}
-                        />
-                        <Button
-                            type="button"
-                            variant="primary"
-                            onClick={handleAddPrice}
-                            disabled={!selectedMatCode || !priceInput}
-                            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                            <Plus size={16} /> Agregar
-                        </Button>
                     </div>
                 </div>
             </div>

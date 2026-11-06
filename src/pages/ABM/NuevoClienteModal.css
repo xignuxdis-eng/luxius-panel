@@ -82,21 +82,33 @@
     line-height: 1.35;
 }
 
-.spe-form-grid {
+.spe-form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: #0d1829;
+    padding: 14px;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+}
+
+.spe-form-row {
     display: grid;
-    grid-template-columns: 1.8fr 1.3fr 1.2fr 1.4fr;
-    gap: 12px;
+    gap: 14px;
     align-items: flex-end;
 }
 
-@media (max-width: 900px) {
-    .spe-form-grid {
-        grid-template-columns: 1fr 1fr;
-    }
+.spe-row-top {
+    grid-template-columns: 1.4fr 1fr;
 }
 
-@media (max-width: 600px) {
-    .spe-form-grid {
+.spe-row-bottom {
+    grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 720px) {
+    .spe-row-top,
+    .spe-row-bottom {
         grid-template-columns: 1fr;
     }
 }
@@ -104,25 +116,29 @@
 .spe-field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .spe-label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     color: #cbd5e1;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin: 0;
 }
 
 .spe-select {
     width: 100%;
+    height: 38px;
     background-color: #111e30;
     color: #f8fafc;
     border: 1px solid #334155;
     border-radius: 6px;
-    padding: 7px 10px;
+    padding: 0 10px;
     font-size: 0.85rem;
+    box-sizing: border-box;
 }
 
 .spe-unit-toggle {
@@ -130,23 +146,29 @@
     background: #111e30;
     border: 1px solid #334155;
     border-radius: 6px;
-    padding: 2px;
-    gap: 2px;
+    padding: 3px;
+    gap: 4px;
+    height: 38px;
+    box-sizing: border-box;
 }
 
 .spe-unit-btn {
     flex: 1;
     background: transparent;
     border: none;
-    padding: 6px 4px;
-    font-size: 0.75rem;
+    padding: 0 8px;
+    height: 100%;
+    font-size: 0.8rem;
     font-weight: 600;
     color: #94a3b8;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s ease;
     white-space: nowrap;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .spe-unit-btn:hover {
@@ -168,16 +190,19 @@
 .spe-m2-info-box {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     background: #052e16;
     border: 1px dashed #22c55e;
     color: #86efac;
-    padding: 6px 10px;
+    padding: 0 12px;
     border-radius: 6px;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    height: 35px;
+    height: 38px;
     box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .spe-ancho-selector-group {
@@ -190,8 +215,35 @@
     background-color: #111e30;
     border: 1px solid #0284c7;
     font-size: 0.85rem;
-    padding: 5px 8px;
-    border-radius: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    height: 38px;
+    box-sizing: border-box;
+}
+
+.spe-price-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+}
+
+.spe-price-input {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    box-sizing: border-box;
+}
+
+.spe-add-btn {
+    height: 38px;
+    padding: 0 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-weight: 600;
 }
 
 .spe-help-banner {
