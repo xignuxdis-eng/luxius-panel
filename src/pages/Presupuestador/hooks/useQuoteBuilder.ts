@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { downloadPresupuestoPDF, type PresupuestoItem, type PresupuestoData } from '@/utils/presupuestoPdf';
 import type { UnidadMedida } from '@/types/orden';
 import { isDesignerRole } from '@/types';
+import { resolveSpecialPrice } from '@/utils/pricing/specialPricing';
 
 export function useQuoteBuilder() {
     const navigate = useNavigate();
@@ -112,14 +113,20 @@ export function useQuoteBuilder() {
     const [customCantidad, setCustomCantidad] = useState<number>(1);
     const [customPrecioUnitario, setCustomPrecioUnitario] = useState<number>(15000);
 
-    // Auto-update Catalog M2 Price based on material selection
+    // Auto-update Catalog M2 Price based on material and client special pricing
     useEffect(() => {
         const allMats = getMateriales();
         const mat = allMats.find(m => (m.descripcion || m.codigo) === catMaterial);
-        if (mat && mat.precioM2) {
-            setCatPrecioM2(mat.precioM2);
+        if (mat) {
+            const selectedClient = clientes.find(c => c.id === Number(selectedClientId));
+            const special = resolveSpecialPrice(selectedClient, mat.codigo, undefined, mat.tipoCobro);
+            if (special.hasSpecialPrice && special.price) {
+                setCatPrecioM2(special.price);
+            } else if (mat.precioM2) {
+                setCatPrecioM2(mat.precioM2);
+            }
         }
-    }, [catMaterial]);
+    }, [catMaterial, selectedClientId, clientes]);
 
     const handleAddCatalogItem = (e: React.FormEvent) => {
         e.preventDefault();

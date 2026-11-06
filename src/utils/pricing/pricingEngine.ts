@@ -6,6 +6,7 @@ import { getMateriales, getClientes, getServicios, getTarifasXignuxSync } from '
 import type { DemasiasConfig } from '@/types';
 import { getBobinaUsefulWidth } from '../nestingEngine';
 import type { PriceCalculationResult } from './pricingTypes';
+import { resolveSpecialPrice } from './specialPricing';
 
 export const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
 
@@ -60,15 +61,20 @@ export function calculateItemPriceDetailed(
         const clientList = getClientes();
         cliente = clientList.find(cl => String(cl.id) === String(clientIdParam));
     }
-    const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[materialCode] : null;
+
+    // Verificar si el cliente tiene un precio especial explícito por M2 para este material
+    // (Por ejemplo: "VV:m2" para cotizar vinilo en M2 plano, o "VBB:m2" / "VBB" en materiales M2)
+    const explicitM2Resolution = resolveSpecialPrice(cliente, materialCode, undefined, tipoCobro);
+    const hasExplicitM2 = explicitM2Resolution.hasSpecialPrice && explicitM2Resolution.unit === 'm2';
 
     let basePrice = 0;
     let assignedBobina: number | undefined;
     let appliedPriceMl: number | undefined;
+    let appliedPriceM2: number | undefined;
     let rotated = false;
     let linearMeters = 0;
 
-    if (tipoCobro === 'ml') {
+    if (tipoCobro === 'ml' && !hasExplicitM2) {
         const availableWidths: { ancho: number; precioML: number; usefulWidth: number }[] = [];
         
         if (Array.isArray(bobinas) && bobinas.length > 0) {
@@ -94,8 +100,8 @@ export function calculateItemPriceDetailed(
         }[] = [];
 
         availableWidths.forEach(({ ancho: bobinaAncho, precioML, usefulWidth }) => {
-            const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${bobinaAncho}`] : null;
-            const priceToUse = specialPriceWidth || specialPrice || precioML;
+            const specialRes = resolveSpecialPrice(cliente, materialCode, bobinaAncho, tipoCobro);
+            const priceToUse = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : precioML;
 
             // 1. Orientacion Normal (Ancho de la pieza a lo ancho de la bobina)
             if (w <= usefulWidth) {
@@ -159,8 +165,8 @@ export function calculateItemPriceDetailed(
         // Fallback si excede todas las bobinas: asignar la bobina mas ancha
         if (bestCost === Infinity && availableWidths.length > 0) {
             const widest = availableWidths[availableWidths.length - 1];
-            const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${materialCode}:${widest.ancho}`] : null;
-            const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
+            const specialRes = resolveSpecialPrice(cliente, materialCode, widest.ancho, tipoCobro);
+            const priceToUse = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : widest.precioML;
             const fitsPerRow = Math.max(1, Math.floor(widest.usefulWidth / (w || 1)));
             const rows = Math.ceil(c / fitsPerRow);
             const ml = round2(rows * h);
@@ -172,10 +178,13 @@ export function calculateItemPriceDetailed(
 
         basePrice = bestCost === Infinity ? 0 : Math.round(bestCost);
     } else {
-        const priceToUse = specialPrice || precioM2 || 0;
+        // Cobro en M2: NO importa el ancho del rollo (se factura por superficie plana calculada)
+        const specialM2 = resolveSpecialPrice(cliente, materialCode, undefined, tipoCobro);
+        const priceToUse = (specialM2.hasSpecialPrice && specialM2.price) ? specialM2.price : (precioM2 || 0);
         const m2 = round2(w * h * c);
         basePrice = w > 0 ? Math.round(m2 * priceToUse) : 0;
         linearMeters = 0;
+        appliedPriceM2 = priceToUse;
     }
 
     // Si se aplica modalidad de Cliente Particular, aplicar recargo porcentual personalizado
@@ -222,15 +231,17 @@ export function calculateItemPriceDetailed(
 
     const subtotal = basePrice + servicesTotal;
 
+    const isCalculationMl = tipoCobro === 'ml' && !hasExplicitM2;
+
     return {
         subtotal,
-        consumoEstimado: tipoCobro === 'ml' ? linearMeters : round2(w * h * c),
+        consumoEstimado: isCalculationMl ? linearMeters : round2(w * h * c),
         bobinaAsignada: assignedBobina,
         precioMl: appliedPriceMl,
         rotated,
         esParticular: !!isParticular,
         recargoParticularPct: isParticular ? particularMarkupPct : 0,
-        precioDetalle: tipoCobro === 'ml' ? {
+        precioDetalle: isCalculationMl ? {
             tipoCobro: 'ml',
             bobinaAncho: assignedBobina,
             bobinaUsada: assignedBobina,
@@ -242,7 +253,7 @@ export function calculateItemPriceDetailed(
             recargoParticularPct: isParticular ? particularMarkupPct : 0
         } : {
             tipoCobro: 'm2',
-            precioM2: specialPrice || precioM2 || 0,
+            precioM2: appliedPriceM2 || precioM2 || 0,
             costoBase: basePrice,
             esParticular: !!isParticular,
             recargoParticularPct: isParticular ? particularMarkupPct : 0

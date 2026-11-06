@@ -3,4 +3,5 @@
  */
 
 export * from './pricingTypes';
+export * from './specialPricing';
 export * from './pricingEngine';

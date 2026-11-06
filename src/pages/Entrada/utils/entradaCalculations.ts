@@ -1,6 +1,7 @@
 import type { Order, Cliente, Material } from '@/types'
 import { getBobinaUsefulWidth } from '@/utils/nestingEngine'
 import { findMatchingMaterial } from '@/utils/stockForecast'
+import { resolveSpecialPrice } from '@/utils/pricing/specialPricing'
 
 export const round2 = (val: number): number => Math.round((val + Number.EPSILON) * 100) / 100;
 
@@ -32,22 +33,23 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
     const c = Number(order.copias) || 1;
 
     if (matData) {
-        if (matData.tipoCobro === 'ml' && matData.bobinas && matData.bobinas.length > 0) {
+        const cliente = allClientes.find(cl => String(cl.id) === String(order.clientId));
+        const explicitM2 = resolveSpecialPrice(cliente, order.material, undefined, matData.tipoCobro);
+        const hasExplicitM2 = explicitM2.hasSpecialPrice && explicitM2.unit === 'm2';
+
+        if (matData.tipoCobro === 'ml' && matData.bobinas && matData.bobinas.length > 0 && !hasExplicitM2) {
             const safetyMargin = 0.01;
             const availableWidths = matData.bobinas
                 .map((b: any) => ({ ...b, usefulWidth: round2(b.ancho - safetyMargin) }))
                 .filter((b: any) => b.usefulWidth > 0)
                 .sort((a: any, b: any) => a.usefulWidth - b.usefulWidth);
 
-            const cliente = allClientes.find(cl => String(cl.id) === String(order.clientId));
-            const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
-
             type Candidate = { bobina: number; ml: number; cost: number; rotated: boolean };
             const candidates: Candidate[] = [];
 
             for (const b of availableWidths) {
-                const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${b.ancho}`] : null;
-                const priceToUse = specialPriceWidth || specialPrice || b.precioML;
+                const specialRes = resolveSpecialPrice(cliente, order.material, b.ancho, matData.tipoCobro);
+                const priceToUse = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : b.precioML;
 
                 if (w <= b.usefulWidth) {
                     const fitsPerRow = Math.max(1, Math.floor(b.usefulWidth / (w || 1)));
@@ -86,8 +88,8 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
 
             if (availableWidths.length > 0) {
                 const widest = availableWidths[availableWidths.length - 1];
-                const specialPriceWidth = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[`${order.material}:${widest.ancho}`] : null;
-                const priceToUse = specialPriceWidth || specialPrice || widest.precioML;
+                const specialRes = resolveSpecialPrice(cliente, order.material, widest.ancho, matData.tipoCobro);
+                const priceToUse = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : widest.precioML;
                 const fitsPerRow = Math.max(1, Math.floor(widest.usefulWidth / (w || 1)));
                 const rows = Math.ceil(c / fitsPerRow);
                 const ml = round2(rows * h);
@@ -95,10 +97,10 @@ export function calculateOrderPrice(order: Order, allMateriales: Material[], all
             }
         }
 
-        if (matData.precioM2) {
-            const cliente = allClientes.find(cl => String(cl.id) === String(order.clientId));
-            const specialPrice = (cliente && cliente.preciosEspeciales) ? cliente.preciosEspeciales[order.material] : null;
-            const priceToUse = specialPrice || matData.precioM2 || 0;
+        // Cobro en M2: NO importa el ancho del rollo (se factura por superficie calculada)
+        const specialM2 = resolveSpecialPrice(cliente, order.material, undefined, matData.tipoCobro);
+        const priceToUse = (specialM2.hasSpecialPrice && specialM2.price) ? specialM2.price : (matData.precioM2 || 0);
+        if (priceToUse > 0) {
             const m2 = round2(w * h * c);
             return Math.round(m2 * priceToUse);
         }
