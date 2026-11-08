@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Nostalgist } from 'nostalgist'
+import {
+    SnesRomItem,
+    loadSnesRomsCatalog,
+    saveLocalRomFile,
+    getLocalRomFile,
+    deleteLocalRomFile
+} from '../snesRomsStore'
 
 export interface EmulatedGameConfig {
     id: string
@@ -17,35 +24,29 @@ export interface EmulatedGameConfig {
 
 interface SnesEmulatorGameProps {
     game: EmulatedGameConfig
-}
-
-function resolvePublicAssetUrl(path: string): string {
-    if (!path) return ''
-    if (/^(https?:|blob:|data:)/i.test(path)) return path
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
-    const cleanPath = path.startsWith('/') ? path : `/${path}`
-    return `${base}${cleanPath}`
+    onBack?: () => void
 }
 
 export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const folderInputRef = useRef<HTMLInputElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
     const nostalgistRef = useRef<Nostalgist | null>(null)
 
-    const defaultResolvedUrl = resolvePublicAssetUrl(
-        game.romUrl || '/roms/snes/nsmw1_twelve_magic_orbs.sfc'
-    )
+    // Catálogo de ROMs detectadas
+    const [romCatalog, setRomCatalog] = useState<SnesRomItem[]>([])
+    const [selectedRomId, setSelectedRomId] = useState<string>(game.id)
+    const [activeRomItem, setActiveRomItem] = useState<SnesRomItem | null>(null)
 
-    const [activeRom, setActiveRom] = useState<File | string>(defaultResolvedUrl)
-    const [romName, setRomName] = useState<string | null>(null)
     const [status, setStatus] = useState<'idle' | 'checking' | 'loading' | 'running' | 'error' | 'missing'>('checking')
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [isPaused, setIsPaused] = useState<boolean>(false)
     const [saveNotice, setSaveNotice] = useState<string | null>(null)
+    const [showCatalogModal, setShowCatalogModal] = useState<boolean>(false)
 
-    // Detener instancia previa
+    // Detener emulador
     const stopEmulator = useCallback(async () => {
         if (nostalgistRef.current) {
             try {
@@ -57,8 +58,24 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         }
     }, [])
 
-    // Arrancar emulador Nostalgist con canvas nativo
-    const launchRom = useCallback(async (romSource: File | string, displayName?: string) => {
+    // Cargar catálogo inicial de ROMs
+    const refreshCatalog = useCallback(async () => {
+        const list = await loadSnesRomsCatalog()
+        setRomCatalog(list)
+        return list
+    }, [])
+
+    useEffect(() => {
+        refreshCatalog().then(list => {
+            const current = list.find(r => r.id === selectedRomId) || list[0] || null
+            if (current) {
+                setActiveRomItem(current)
+            }
+        })
+    }, [refreshCatalog, selectedRomId])
+
+    // Arrancar emulador con la ROM seleccionada
+    const launchRomItem = useCallback(async (item: SnesRomItem) => {
         if (!canvasRef.current) return
         setStatus('loading')
         setErrorMessage(null)
@@ -66,18 +83,32 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         await stopEmulator()
 
         try {
-            let romParam: File | string | { fileName: string; fileContent: Blob } = romSource
+            let romParam: File | Blob | string | { fileName: string; fileContent: Blob } | null = null
 
-            if (typeof romSource === 'string') {
-                // Comprobar existencia en servidor
-                const checkRes = await fetch(romSource, { method: 'HEAD' })
-                const contentType = (checkRes.headers.get('content-type') || '').toLowerCase()
-                if (!checkRes.ok || contentType.includes('text/html')) {
-                    setStatus('missing')
-                    return
+            // Si es local en IndexedDB
+            if (item.isCustom) {
+                const blob = await getLocalRomFile(item.id)
+                if (blob) {
+                    romParam = { fileName: item.fileName, fileContent: blob }
                 }
-            } else if (romSource instanceof File) {
-                romParam = romSource
+            } else if (item.url) {
+                // Comprobar existencia en servidor
+                const checkRes = await fetch(item.url, { method: 'HEAD' })
+                const contentType = (checkRes.headers.get('content-type') || '').toLowerCase()
+                if (checkRes.ok && !contentType.includes('text/html')) {
+                    romParam = item.url
+                } else {
+                    // Fallback a búsqueda local si el usuario ya la había subido
+                    const fallbackBlob = await getLocalRomFile(item.id)
+                    if (fallbackBlob) {
+                        romParam = { fileName: item.fileName, fileContent: fallbackBlob }
+                    }
+                }
+            }
+
+            if (!romParam) {
+                setStatus('missing')
+                return
             }
 
             const instance = await Nostalgist.launch({
@@ -94,48 +125,118 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
 
             nostalgistRef.current = instance
             setStatus('running')
-            setRomName(displayName || (typeof romSource === 'string' ? romSource.split('/').pop() || game.name : romSource.name))
+            setActiveRomItem(item)
+            setSelectedRomId(item.id)
         } catch (err: unknown) {
             console.error('Error al iniciar Snes9x / Nostalgist:', err)
             setStatus('error')
             setErrorMessage(err instanceof Error ? err.message : 'Error desconocido al inicializar el núcleo SNES.')
         }
-    }, [game.name, stopEmulator])
+    }, [stopEmulator])
 
-    // Verificar y cargar ROM por defecto o tras selección
+    // Ejecutar cuando cambia el item activo
     useEffect(() => {
-        let mounted = true
-        if (typeof activeRom === 'string') {
-            fetch(activeRom, { method: 'HEAD' })
-                .then(res => {
-                    if (!mounted) return
-                    const contentType = (res.headers.get('content-type') || '').toLowerCase()
-                    if (res.ok && !contentType.includes('text/html')) {
-                        launchRom(activeRom)
-                    } else {
-                        setStatus('missing')
-                    }
-                })
-                .catch(() => {
-                    if (mounted) setStatus('missing')
-                })
-        } else {
-            launchRom(activeRom, activeRom.name)
-        }
+        if (!activeRomItem) return
+        launchRomItem(activeRomItem)
 
         return () => {
-            mounted = false
             stopEmulator()
         }
-    }, [activeRom, launchRom, stopEmulator])
+    }, [activeRomItem, launchRomItem, stopEmulator])
 
-    // Handler para subida local de ROM
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Handler para subida de archivo ROM suelto (.sfc / .smc / .zip)
+    const handleSingleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        setActiveRom(file)
-        setRomName(file.name)
-        launchRom(file, file.name)
+        const romId = `snes_custom_${Date.now()}`
+        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ')
+        await saveLocalRomFile(romId, cleanName, file)
+        const updated = await refreshCatalog()
+        const newItem = updated.find(r => r.id === romId)
+        if (newItem) {
+            setActiveRomItem(newItem)
+            setSelectedRomId(newItem.id)
+        }
+        setShowCatalogModal(false)
+    }
+
+    // Handler para escaneo masivo de carpeta local
+    const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files
+        if (!files || files.length === 0) return
+
+        const validExts = ['.sfc', '.smc', '.zip', '.7z']
+        let addedCount = 0
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i]
+            const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+            if (validExts.includes(ext)) {
+                const romId = `snes_local_${file.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ')
+                await saveLocalRomFile(romId, cleanName, file)
+                addedCount++
+            }
+        }
+
+        if (addedCount > 0) {
+            setSaveNotice(`🎮 ¡Se detectaron y agregaron ${addedCount} ROMs de SNES a tu biblioteca!`)
+            setTimeout(() => setSaveNotice(null), 4000)
+            const updated = await refreshCatalog()
+            if (updated.length > 0) {
+                setActiveRomItem(updated[updated.length - 1])
+                setSelectedRomId(updated[updated.length - 1].id)
+            }
+        } else {
+            setSaveNotice('⚠️ No se encontraron archivos .sfc o .smc en la carpeta seleccionada')
+            setTimeout(() => setSaveNotice(null), 3000)
+        }
+        setShowCatalogModal(false)
+    }
+
+    // Usar File System Access API para abrir directorio si el navegador lo soporta
+    const handleNativeDirectoryPicker = async () => {
+        if ('showDirectoryPicker' in window) {
+            try {
+                const dirHandle = await (window as any).showDirectoryPicker()
+                let addedCount = 0
+                const validExts = ['.sfc', '.smc', '.zip', '.7z']
+
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file') {
+                        const file = await entry.getFile()
+                        const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+                        if (validExts.includes(ext)) {
+                            const romId = `snes_dir_${file.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                            const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ')
+                            await saveLocalRomFile(romId, cleanName, file)
+                            addedCount++
+                        }
+                    }
+                }
+
+                if (addedCount > 0) {
+                    setSaveNotice(`🎮 ¡Directorio sincronizado: ${addedCount} ROMs cargadas!`)
+                    setTimeout(() => setSaveNotice(null), 4000)
+                    const updated = await refreshCatalog()
+                    if (updated.length > 0) {
+                        setActiveRomItem(updated[updated.length - 1])
+                        setSelectedRomId(updated[updated.length - 1].id)
+                    }
+                } else {
+                    setSaveNotice('⚠️ No se encontraron archivos SNES (.sfc/.smc) en la carpeta seleccionada.')
+                    setTimeout(() => setSaveNotice(null), 3000)
+                }
+                setShowCatalogModal(false)
+            } catch (err: any) {
+                if (err.name !== 'AbortError') {
+                    console.warn('showDirectoryPicker error:', err)
+                    folderInputRef.current?.click()
+                }
+            }
+        } else {
+            folderInputRef.current?.click()
+        }
     }
 
     const togglePause = async () => {
@@ -164,7 +265,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
     }
 
     const handleSaveState = async () => {
-        if (!nostalgistRef.current) return
+        if (!nostalgistRef.current || !activeRomItem) return
         try {
             const { state } = await nostalgistRef.current.saveState()
             const arrayBuffer = await state.arrayBuffer()
@@ -175,8 +276,8 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                 binary += String.fromCharCode(bytes[i])
             }
             const base64 = btoa(binary)
-            localStorage.setItem(`luxius_snes_save_${game.id}`, base64)
-            setSaveNotice('💾 ¡Partida guardada con éxito!')
+            localStorage.setItem(`luxius_snes_save_${activeRomItem.id}`, base64)
+            setSaveNotice(`💾 ¡Partida guardada en ${activeRomItem.name}!`)
             setTimeout(() => setSaveNotice(null), 3000)
         } catch (err) {
             console.error('Error guardando estado:', err)
@@ -186,11 +287,11 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
     }
 
     const handleLoadState = async () => {
-        if (!nostalgistRef.current) return
+        if (!nostalgistRef.current || !activeRomItem) return
         try {
-            const base64 = localStorage.getItem(`luxius_snes_save_${game.id}`)
+            const base64 = localStorage.getItem(`luxius_snes_save_${activeRomItem.id}`)
             if (!base64) {
-                setSaveNotice('⚠️ No hay partida guardada previa')
+                setSaveNotice('⚠️ No hay partida guardada previa para este juego')
                 setTimeout(() => setSaveNotice(null), 3000)
                 return
             }
@@ -221,8 +322,38 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         }
     }
 
+    const handleDeleteLocalRom = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation()
+        await deleteLocalRomFile(id)
+        const updated = await refreshCatalog()
+        if (selectedRomId === id && updated.length > 0) {
+            setActiveRomItem(updated[0])
+            setSelectedRomId(updated[0].id)
+        }
+    }
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+            {/* Input oculto para subir archivo ROM suelto */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".sfc,.smc,.zip,.7z"
+                style={{ display: 'none' }}
+                onChange={handleSingleFileUpload}
+            />
+
+            {/* Input oculto para escanear carpeta completa */}
+            <input
+                ref={folderInputRef}
+                type="file"
+                // @ts-expect-error - webkitdirectory no es estándar pero funciona en Chromium y Firefox
+                webkitdirectory=""
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleFolderUpload}
+            />
+
             {/* Barra de Metadatos y Acciones */}
             <div
                 className="pixel-box"
@@ -233,7 +364,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '10px',
-                    borderColor: game.color,
+                    borderColor: activeRomItem?.color || game.color,
                     background: 'rgba(10, 8, 22, 0.9)',
                 }}
             >
@@ -242,27 +373,32 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                         style={{
                             padding: '3px 8px',
                             background: 'rgba(255, 51, 102, 0.2)',
-                            border: `1px solid ${game.color}`,
-                            color: game.color,
+                            border: `1px solid ${activeRomItem?.color || game.color}`,
+                            color: activeRomItem?.color || game.color,
                             fontFamily: 'var(--font-pixel-title)',
                             fontSize: '10px',
                         }}
                     >
-                        {game.platform || 'SNES'}
+                        {activeRomItem?.genre || 'SNES (Super Nintendo)'}
                     </span>
-                    <span
+
+                    {/* Selector rápido del juego activo */}
+                    <button
+                        type="button"
+                        className="pixel-btn"
                         style={{
-                            padding: '3px 8px',
-                            background: 'rgba(0, 240, 255, 0.14)',
-                            border: '1px solid var(--pixel-neon-cyan)',
-                            color: 'var(--pixel-neon-cyan)',
-                            fontFamily: 'var(--font-pixel-ui)',
                             fontSize: '11px',
+                            padding: '4px 10px',
+                            borderColor: 'var(--pixel-neon-cyan)',
+                            color: 'var(--pixel-neon-cyan)',
                         }}
+                        onClick={() => setShowCatalogModal(true)}
+                        title="Ver lista de ROMs detectadas y cargar nuevas"
                     >
-                        Core: SNES9X (Libretro WASM • SA-1 Native)
-                    </span>
-                    {game.exits && (
+                        📚 Catálogo de ROMs ({romCatalog.length}) ▾
+                    </button>
+
+                    {activeRomItem?.exits && (
                         <span
                             style={{
                                 padding: '3px 8px',
@@ -273,41 +409,30 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                                 fontSize: '11px',
                             }}
                         >
-                            🚩 {game.exits}
-                        </span>
-                    )}
-                    {game.difficulty && (
-                        <span
-                            style={{
-                                padding: '3px 8px',
-                                background: 'rgba(180, 75, 255, 0.16)',
-                                border: '1px solid #b44bff',
-                                color: '#d89eff',
-                                fontFamily: 'var(--font-pixel-ui)',
-                                fontSize: '11px',
-                            }}
-                        >
-                            ⚡ Dificultad: {game.difficulty}
+                            🚩 {activeRomItem.exits}
                         </span>
                     )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".sfc,.smc,.zip,.7z"
-                        style={{ display: 'none' }}
-                        onChange={handleFileChange}
-                    />
+                    <button
+                        type="button"
+                        className="pixel-btn"
+                        style={{ fontSize: '10px' }}
+                        onClick={handleNativeDirectoryPicker}
+                        title="Escanear una carpeta de tu PC para detectar automáticamente todas las ROMs"
+                    >
+                        📁 Escanear Carpeta
+                    </button>
+
                     <button
                         type="button"
                         className="pixel-btn"
                         style={{ fontSize: '10px' }}
                         onClick={() => fileInputRef.current?.click()}
-                        title="Cargar archivo ROM .sfc/.smc/.zip desde tu equipo"
+                        title="Cargar un archivo .sfc o .smc suelto"
                     >
-                        📂 Cargar ROM (.sfc)
+                        📂 Cargar ROM
                     </button>
 
                     {status === 'running' && (
@@ -359,7 +484,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                 </div>
             </div>
 
-            {/* Notificación de guardado/carga */}
+            {/* Notificación temporal */}
             {saveNotice && (
                 <div
                     style={{
@@ -376,6 +501,120 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                 </div>
             )}
 
+            {/* Modal / Selector de Catálogo de Juegos Detectados */}
+            {showCatalogModal && (
+                <div
+                    className="pixel-box"
+                    style={{
+                        padding: '14px',
+                        background: 'rgba(12, 10, 26, 0.98)',
+                        borderColor: 'var(--pixel-neon-cyan)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                    }}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'var(--font-pixel-title)', fontSize: '13px', color: 'var(--pixel-gold-coin)' }}>
+                            🕹️ BIBLIOTECA DE JUEGOS SNES DETECTADOS ({romCatalog.length})
+                        </span>
+                        <button
+                            type="button"
+                            className="pixel-btn"
+                            style={{ fontSize: '10px' }}
+                            onClick={() => setShowCatalogModal(false)}
+                        >
+                            ✕ Cerrar
+                        </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                            type="button"
+                            className="pixel-btn pixel-btn-primary"
+                            style={{ fontSize: '11px' }}
+                            onClick={handleNativeDirectoryPicker}
+                        >
+                            📁 Escanear Carpeta Completa de ROMs
+                        </button>
+                        <button
+                            type="button"
+                            className="pixel-btn"
+                            style={{ fontSize: '11px' }}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            ➕ Agregar Archivo Individual (.sfc/.smc)
+                        </button>
+                    </div>
+
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                            gap: '10px',
+                            maxHeight: '260px',
+                            overflowY: 'auto',
+                            padding: '4px',
+                        }}
+                    >
+                        {romCatalog.map(rom => {
+                            const isCurrent = rom.id === activeRomItem?.id
+                            return (
+                                <div
+                                    key={rom.id}
+                                    className="pixel-box"
+                                    onClick={() => {
+                                        setActiveRomItem(rom)
+                                        setSelectedRomId(rom.id)
+                                        setShowCatalogModal(false)
+                                    }}
+                                    style={{
+                                        padding: '10px',
+                                        cursor: 'pointer',
+                                        borderColor: isCurrent ? 'var(--pixel-gold-coin)' : rom.color || '#ff3366',
+                                        background: isCurrent ? 'rgba(255, 199, 0, 0.12)' : 'rgba(20, 18, 38, 0.8)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        position: 'relative',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '20px' }}>{rom.icon || '🎮'}</span>
+                                        <span
+                                            style={{
+                                                fontFamily: 'var(--font-pixel-title)',
+                                                fontSize: '11px',
+                                                color: isCurrent ? 'var(--pixel-gold-coin)' : '#fff',
+                                                lineHeight: 1.3,
+                                            }}
+                                        >
+                                            {rom.name}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '10px', color: 'var(--pixel-text-dim)' }}>
+                                        Archivo: {rom.fileName}
+                                    </div>
+                                    {rom.isCustom && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                            <span style={{ fontSize: '9px', color: 'var(--pixel-neon-cyan)' }}>[En Memoria]</span>
+                                            <button
+                                                type="button"
+                                                className="pixel-btn"
+                                                style={{ fontSize: '9px', padding: '1px 6px', color: '#ff4444', borderColor: '#ff4444' }}
+                                                onClick={(e) => handleDeleteLocalRom(e, rom.id)}
+                                            >
+                                                🗑️ Quitar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Contenedor del Viewport con Canvas Nativo */}
             <div
                 ref={containerRef}
@@ -384,7 +623,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                     position: 'relative',
                     width: '100%',
                     height: '500px',
-                    borderColor: game.color,
+                    borderColor: activeRomItem?.color || game.color,
                     background: '#07060f',
                     overflow: 'hidden',
                     display: 'flex',
@@ -418,9 +657,9 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                             alignItems: 'center',
                         }}
                     >
-                        <span>⏳ Cargando núcleo Snes9x WebAssembly (SA-1)...</span>
+                        <span>⏳ Cargando {activeRomItem?.name || 'Juego SNES'}...</span>
                         <span style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '11px', color: '#aaa' }}>
-                            Inicializando búfer de audio y memoria emulada
+                            Inicializando núcleo Snes9x (Libretro WebAssembly + SA-1)
                         </span>
                     </div>
                 )}
@@ -466,16 +705,16 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                             gap: '14px',
                         }}
                     >
-                        <div style={{ fontSize: '42px' }}>🍄</div>
+                        <div style={{ fontSize: '42px' }}>{activeRomItem?.icon || '🎮'}</div>
                         <div
                             style={{
                                 fontFamily: 'var(--font-pixel-title)',
                                 fontSize: '14px',
-                                color: game.color,
+                                color: activeRomItem?.color || game.color,
                                 lineHeight: 1.5,
                             }}
                         >
-                            {game.name}
+                            {activeRomItem?.name || game.name}
                         </div>
                         <p
                             style={{
@@ -486,7 +725,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                                 lineHeight: 1.5,
                             }}
                         >
-                            {game.objective}
+                            {activeRomItem?.objective || game.objective}
                         </p>
                         <div
                             style={{
@@ -499,9 +738,9 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                                 lineHeight: 1.5,
                             }}
                         >
-                            Archivo ROM predeterminado en: <code>{game.romUrl}</code>
+                            Archivo esperado: <code>{activeRomItem?.fileName || 'rom.sfc'}</code>
                             <br />
-                            Selecciona tu archivo <code>.sfc</code> / <code>.smc</code> / <code>.zip</code> para arrancar de inmediato:
+                            Selecciona el archivo o escanea tu carpeta de juegos para iniciar automáticamente:
                         </div>
 
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -511,14 +750,22 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                                 style={{ fontSize: '12px', padding: '10px 18px' }}
                                 onClick={() => fileInputRef.current?.click()}
                             >
-                                📂 Seleccionar ROM (.sfc / .smc / .zip)
+                                📂 Seleccionar Archivo ROM (.sfc / .smc / .zip)
+                            </button>
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '12px', padding: '10px 18px' }}
+                                onClick={handleNativeDirectoryPicker}
+                            >
+                                📁 Escanear Carpeta Completa
                             </button>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Footer con Mapeo de Controles */}
+            {/* Footer con Mapeo de Controles y Detalles */}
             <div
                 className="pixel-box"
                 style={{
@@ -546,9 +793,9 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                             color: 'var(--pixel-gold-coin)',
                         }}
                     >
-                        🎮 CONTROLES Y GUARDADO NATIVO (SNES9X)
+                        🎮 CONTROLES (SNES9X) • JUEGOS DETECTADOS: {romCatalog.length}
                     </span>
-                    {romName && (
+                    {activeRomItem && (
                         <span
                             style={{
                                 fontFamily: 'var(--font-pixel-ui)',
@@ -556,7 +803,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                                 color: 'var(--pixel-neon-cyan)',
                             }}
                         >
-                            Cartucho: {romName}
+                            Cartucho activo: {activeRomItem.name} ({activeRomItem.fileName})
                         </span>
                     )}
                 </div>
@@ -570,7 +817,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                         color: '#d0d0d0',
                     }}
                 >
-                    {game.controls.map((ctrl, idx) => (
+                    {(activeRomItem?.controls || game.controls).map((ctrl, idx) => (
                         <span key={idx}>• {ctrl}</span>
                     ))}
                 </div>
