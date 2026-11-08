@@ -32,17 +32,17 @@ function generateSnesRomsIndex(): void {
         fs.mkdirSync(snesDir, { recursive: true })
     }
     const files = fs.readdirSync(snesDir)
-    const validExts = ['.sfc', '.smc', '.zip', '.7z']
+    const validExts = ['.sfc', '.smc', '.fig', '.swc', '.zip']
     const romFiles = files.filter(f => validExts.includes(path.extname(f).toLowerCase()))
 
     const indexFile = path.resolve(snesDir, 'index.json')
-    let existingMeta: Record<string, any> = {}
+    const existingMeta: Record<string, Record<string, unknown>> = {}
     if (fs.existsSync(indexFile)) {
         try {
             const raw = JSON.parse(fs.readFileSync(indexFile, 'utf8'))
             if (Array.isArray(raw)) {
-                raw.forEach(item => {
-                    if (item.fileName) existingMeta[item.fileName] = item
+                raw.forEach((item: Record<string, unknown>) => {
+                    if (typeof item.fileName === 'string') existingMeta[item.fileName] = item
                 })
             }
         } catch {
@@ -63,12 +63,12 @@ function generateSnesRomsIndex(): void {
             color: meta.color || '#ff3366',
             exits: meta.exits || undefined,
             difficulty: meta.difficulty || undefined,
-            tags: meta.tags || ['SNES'],
-            objective: meta.objective || `Juego Super Nintendo cargado desde public/roms/snes/${file}.`,
+            tags: meta.tags || ['SNES', 'SA-1 Ready'],
+            objective: meta.objective || `Juego Super Nintendo precargado desde public/roms/snes/${file}.`,
             controls: meta.controls || [
                 'Flechas: D-Pad / Mover',
-                'Z: Botón B (Saltar) · X: Botón A',
-                'A: Botón Y (Correr) · S: Botón X',
+                'Z: Botón B (Saltar) · X: Botón A (Salto Giro)',
+                'A: Botón Y (Correr) · S: Botón X (Poder)',
                 'Enter: Start · Shift: Select · Q/W: L/R',
                 'Soporte nativo para Gamepad USB/Bluetooth'
             ]
@@ -88,6 +88,15 @@ function versionGeneratorPlugin(): Plugin {
             }
             fs.writeFileSync(path.resolve(publicDir, 'version.json'), buildVersionData())
             generateSnesRomsIndex()
+        },
+        configureServer(server) {
+            generateSnesRomsIndex()
+            const snesDir = path.resolve(__dirname, 'public', 'roms', 'snes')
+            server.watcher.on('all', (_event, filePath) => {
+                if (filePath.startsWith(snesDir) && !filePath.endsWith('index.json')) {
+                    generateSnesRomsIndex()
+                }
+            })
         },
         generateBundle() {
             this.emitFile({

@@ -1,11 +1,13 @@
-# Directorio de ROMs SNES (LuXius Arcade Center)
+# Directorio de ROMs Precargadas de SNES (LuXius Arcade Center)
 
-Coloca aquí el archivo ROM parchado para que cargue automáticamente al abrir el juego en la galería:
+Coloca en esta carpeta (`F:\Sitio XignuX\public\roms\snes\`) cualquier archivo ROM de Super Nintendo con extensión:
 
-- **Ruta esperada en proyecto**: `public/roms/snes/nsmw1_twelve_magic_orbs.sfc`
-- **Ruta pública servida**: `/roms/snes/nsmw1_twelve_magic_orbs.sfc` (o `${BASE_URL}roms/snes/nsmw1_twelve_magic_orbs.sfc`)
-- **Título**: *New Super Mario World 1: The Twelve Magic Orbs Powered-Up*
-- **Chip especial requerido**: Nintendo **SA-1** (emulado nativamente por el core `snes9x` en `SnesEmulatorGame.tsx`).
+- `.sfc`
+- `.smc`
+- `.fig` / `.swc`
+- `.zip` (el emulador descomprime automáticamente el `.sfc`/`.smc` interno en memoria)
 
-> Si el archivo `.sfc` no está presente en esta carpeta, el reproductor mostrará un cargador interactivo que permite seleccionar el archivo `.sfc` / `.smc` / `.zip` directamente desde la PC del usuario sin necesidad de recompilar.
-
+## ¿Cómo se publican al sitio automáticamente?
+1. Al compilar (`npm run build` / `npm run verify`) o levantar el entorno (`npm run dev`), el plugin `generateSnesRomsIndex()` en `vite.config.ts` escanea automáticamente todos los archivos de esta carpeta `public/roms/snes/` y genera el catálogo `public/roms/snes/index.json`.
+2. Al hacer `git add -A && git commit && git push origin master`, GitHub Actions publica las ROMs junto con el sitio y aparecen precargadas en el **Catálogo de ROMs** para todos los usuarios.
+3. El núcleo WebAssembly `snes9x_libretro.zip` (con soporte SA-1 y Super FX) ya está alojado localmente en `public/roms/cores/snes9x_libretro.zip`.
