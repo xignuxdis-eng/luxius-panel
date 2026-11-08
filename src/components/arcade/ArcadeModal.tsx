@@ -11,6 +11,7 @@ import { DiggerGame } from './games/DiggerGame'
 import { DonkeyKongGame } from './games/DonkeyKongGame'
 import { TetrisGame } from './games/TetrisGame'
 import { ArkanoidGame } from './games/ArkanoidGame'
+import { SnesEmulatorGame } from './games/SnesEmulatorGame'
 import { GameShell } from './GameShell'
 
 interface ArcadeModalProps {
@@ -18,7 +19,7 @@ interface ArcadeModalProps {
     onClose: () => void
 }
 
-interface GameInfo {
+export interface GameInfo {
     id: string
     name: string
     icon: string
@@ -27,9 +28,39 @@ interface GameInfo {
     color: string
     objective: string
     controls: string[]
+    platform?: string
+    core?: 'snes' | 'snes9x'
+    romUrl?: string
+    exits?: string
+    difficulty?: string
+    tags?: string[]
+    isEmulated?: boolean
 }
 
 const GAMES: GameInfo[] = [
+    {
+        id: 'nsmw1_twelve_magic_orbs',
+        name: 'New Super Mario World 1: The Twelve Magic Orbs Powered-Up',
+        icon: '🍄',
+        year: 'SNES',
+        genre: 'Plataformas / Clásico',
+        color: '#ff3366',
+        platform: 'SNES (Super Nintendo)',
+        core: 'snes9x',
+        romUrl: '/roms/snes/nsmw1_twelve_magic_orbs.sfc',
+        exits: '115 exits',
+        difficulty: 'Intermedia',
+        tags: ['SNES', 'SA-1', '115 Exits', 'Intermedia'],
+        isEmulated: true,
+        objective: 'Remake con 12 mundos principales, 93 niveles, Luigi jugable, 16 nuevos power-ups y banda sonora personalizada.',
+        controls: [
+            'Flechas: Mover a Mario / Luigi',
+            'Z: Saltar (B) · X: Salto Giro / Spin Jump (A)',
+            'A: Correr / Poder (Y) · S: Reserva / Mirar (X)',
+            'Enter: Start (Pausa) · Shift: Select · Q/W: L/R',
+            'Soporte nativo para Gamepad y guardado local (IndexedDB)',
+        ],
+    },
     { id: 'tetris', name: 'Tetris', icon: '🧱', year: '1984', genre: 'Puzzle', color: '#b44bff',
         objective: 'Encaja las piezas para completar líneas. Cada 10 líneas sube el nivel y la velocidad.',
         controls: ['← → / A D: mover', '↑ / W / X: girar · Z: girar inverso', '↓ / S: bajar rápido', 'Espacio: caída instantánea'] },
@@ -138,13 +169,32 @@ export const ArcadeModal: React.FC<ArcadeModalProps> = ({ isOpen, onClose }) => 
                                 }}
                             >
                                 <span style={{ fontSize: '40px' }}>{game.icon}</span>
-                                <span style={{ fontFamily: 'var(--font-pixel-title)', fontSize: '13px', color: game.color }}>
+                                <span style={{ fontFamily: 'var(--font-pixel-title)', fontSize: '13px', color: game.color, lineHeight: 1.35 }}>
                                     {game.name}
                                 </span>
                                 <span style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '10px', color: 'var(--pixel-text-dim)' }}>
                                     {game.year} • {game.genre}
                                 </span>
-                                <button className="pixel-btn pixel-btn-primary" style={{ fontSize: '10px', marginTop: '6px' }}>
+                                {game.tags && game.tags.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
+                                        {game.tags.map(tag => (
+                                            <span
+                                                key={tag}
+                                                style={{
+                                                    padding: '1px 5px',
+                                                    fontSize: '9px',
+                                                    fontFamily: 'var(--font-pixel-ui)',
+                                                    background: 'rgba(255, 51, 102, 0.16)',
+                                                    border: `1px solid ${game.color}`,
+                                                    color: '#ffd6e5',
+                                                }}
+                                            >
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                <button className="pixel-btn pixel-btn-primary" style={{ fontSize: '10px', marginTop: 'auto' }}>
                                     ► JUGAR
                                 </button>
                             </div>
@@ -152,7 +202,7 @@ export const ArcadeModal: React.FC<ArcadeModalProps> = ({ isOpen, onClose }) => 
                     </div>
                 )}
 
-                {/* Active Game Canvas View */}
+                {/* Active Game Canvas / Emulator View */}
                 {selectedGame && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
@@ -171,30 +221,34 @@ export const ArcadeModal: React.FC<ArcadeModalProps> = ({ isOpen, onClose }) => 
                             </span>
                         </div>
 
-                        <GameShell
-                            key={selectedGame.id}
-                            title={selectedGame.name}
-                            color={selectedGame.color}
-                            objective={selectedGame.objective}
-                            controls={selectedGame.controls}
-                            onBack={() => setSelectedGame(null)}
-                            onGameOver={handleGameOver}
-                        >
-                            {({ onGameOver, pauseRef }) => {
-                                const common = { username: user?.username || 'guest', name: user?.name || 'Operario', onGameOver, pauseRef }
-                                switch (selectedGame.id) {
-                                    case 'tetris': return <TetrisGame {...common} />
-                                    case 'arkanoid': return <ArkanoidGame {...common} />
-                                    case 'pacman': return <PacmanGame {...common} />
-                                    case 'spaceinvaders': return <SpaceInvadersGame {...common} />
-                                    case 'galaga': return <GalagaGame {...common} />
-                                    case 'bomberman': return <BombermanGame {...common} />
-                                    case 'digger': return <DiggerGame {...common} />
-                                    case 'donkeykong': return <DonkeyKongGame {...common} />
-                                    default: return null
-                                }
-                            }}
-                        </GameShell>
+                        {selectedGame.isEmulated ? (
+                            <SnesEmulatorGame key={selectedGame.id} game={selectedGame} />
+                        ) : (
+                            <GameShell
+                                key={selectedGame.id}
+                                title={selectedGame.name}
+                                color={selectedGame.color}
+                                objective={selectedGame.objective}
+                                controls={selectedGame.controls}
+                                onBack={() => setSelectedGame(null)}
+                                onGameOver={handleGameOver}
+                            >
+                                {({ onGameOver, pauseRef }) => {
+                                    const common = { username: user?.username || 'guest', name: user?.name || 'Operario', onGameOver, pauseRef }
+                                    switch (selectedGame.id) {
+                                        case 'tetris': return <TetrisGame {...common} />
+                                        case 'arkanoid': return <ArkanoidGame {...common} />
+                                        case 'pacman': return <PacmanGame {...common} />
+                                        case 'spaceinvaders': return <SpaceInvadersGame {...common} />
+                                        case 'galaga': return <GalagaGame {...common} />
+                                        case 'bomberman': return <BombermanGame {...common} />
+                                        case 'digger': return <DiggerGame {...common} />
+                                        case 'donkeykong': return <DonkeyKongGame {...common} />
+                                        default: return null
+                                    }
+                                }}
+                            </GameShell>
+                        )}
                     </div>
                 )}
 
