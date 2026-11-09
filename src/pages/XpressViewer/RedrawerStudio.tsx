@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import ImageTracer, { ImageTracerOptions } from 'imagetracerjs';
 import { svgToDxf, triggerFileDownload } from '../../utils/vectorUtils';
 import { Order } from '../../types/orden';
@@ -20,11 +21,11 @@ type DrawTool = 'pan' | 'pen' | 'line' | 'eraser';
 
 function sanitizeSvg(svg: string): string {
     if (!svg) return '';
-    return svg
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
-        .replace(/\son\w+\s*=\s*[^>\s]+/gi, '')
-        .replace(/href\s*=\s*['"]javascript:[^'"]*['"]/gi, '');
+    return DOMPurify.sanitize(svg, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+        ADD_TAGS: ['use'],
+        ADD_ATTR: ['target', 'clip-path', 'fill-rule']
+    });
 }
 
 export const RedrawerStudio: React.FC<RedrawerStudioProps> = ({
