@@ -165,6 +165,17 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
     const [saveNotice, setSaveNotice] = useState<string | null>(null)
     const [showCatalogModal, setShowCatalogModal] = useState<boolean>(false)
     const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false)
+    const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
+
+    // Escuchar cambios de fullscreen del navegador
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const isFull = !!document.fullscreenElement
+            setIsFullscreen(isFull)
+        }
+        document.addEventListener('fullscreenchange', handleFullscreenChange)
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }, [])
 
     // Detener instancia previa de forma segura
     const stopEmulator = useCallback(async () => {
@@ -243,10 +254,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                         wasm: coreBlobs.wasm,
                     },
                     rom: romPayload,
-                    size: {
-                        width: 768,
-                        height: 672,
-                    },
+                    size: 'auto',
                     retroarchConfig: {
                         input_player1_up: 'up',
                         input_player1_down: 'down',
@@ -837,29 +845,51 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                 onDragLeave={() => setIsDraggingOver(false)}
                 onDrop={handleDrop}
                 style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '520px',
+                    position: isFullscreen ? 'fixed' : 'relative',
+                    inset: isFullscreen ? 0 : undefined,
+                    width: isFullscreen ? '100vw' : '100%',
+                    height: isFullscreen ? '100vh' : '540px',
+                    zIndex: isFullscreen ? 999999 : undefined,
                     borderColor: isDraggingOver ? 'var(--pixel-neon-cyan)' : activeRomItem?.color || game.color,
-                    background: '#07060f',
+                    background: '#000',
                     overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                 }}
             >
-                {/* El canvas NUNCA usa display:none para que Emscripten/WebGL mida su tamaño real (768x672) */}
+                {/* Botón flotante para salir de pantalla completa */}
+                {isFullscreen && (
+                    <button
+                        type="button"
+                        className="pixel-btn"
+                        onClick={handleFullscreen}
+                        style={{
+                            position: 'absolute',
+                            top: '16px',
+                            right: '16px',
+                            zIndex: 1000,
+                            fontSize: '11px',
+                            background: 'rgba(0,0,0,0.7)',
+                            borderColor: 'var(--pixel-gold-coin)',
+                            color: 'var(--pixel-gold-coin)',
+                        }}
+                    >
+                        ✕ Salir Pantalla Completa (ESC)
+                    </button>
+                )}
+
+                {/* El canvas escala con relación de aspecto 4:3 clásica de SNES sin deformar */}
                 <canvas
                     key={canvasKey}
                     ref={canvasRef}
-                    width={768}
-                    height={672}
                     tabIndex={0}
                     style={{
-                        width: '768px',
-                        height: '672px',
+                        width: 'auto',
+                        height: 'auto',
                         maxWidth: '100%',
                         maxHeight: '100%',
+                        aspectRatio: '4 / 3',
                         objectFit: 'contain',
                         imageRendering: 'pixelated',
                         outline: 'none',
