@@ -191,6 +191,10 @@ export function generatePresupuestoHTML(data: PresupuestoData): string {
 <body>
     <img src="${LOGO_BASE64}" class="watermark" />
 
+    <div style="background: #fef2f2; border: 1px dashed #ef4444; color: #b91c1c; padding: 6px 12px; margin-bottom: 16px; border-radius: 4px; font-size: 11px; text-align: center; font-weight: 700;">
+        ⚠️ PRESUPUESTO COMERCIAL / SIMULACIÓN — DOCUMENTO NO VÁLIDO COMO FACTURA (SIN VALIDEZ FISCAL ANTE ARCA / AFIP)
+    </div>
+
     <div class="header">
         <img src="${LOGO_BASE64}" alt="XignuX Logo" />
         <h2 style="font-size: 14px; font-weight: 700; margin: 6px 0 3px 0; color: #1e2433;">Servicios Gráficos e Impresión Digital Profesional</h2>
