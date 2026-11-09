@@ -2032,6 +2032,15 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
     - Incorporadas 7 nuevas ROMs míticas de SNES en `public/roms/snes/`: `Street Fighter II (USA).zip`, `Street Fighter II Turbo (USA) (Rev 1).zip`, `Super Street Fighter II (USA).zip`, `Sunset Riders (USA).zip`, `Super Star Wars - Return of the Jedi (USA) (Rev 1).zip`, `Super Star Wars - The Empire Strikes Back (USA) (Rev 1).zip` y `Toy Story (USA).zip`.
     - Actualizado catálogo maestro en `public/roms/snes/index.json` con metadatos pulidos (títulos oficiales, íconos, géneros, esquemas de color temáticos y controles mapeados).
     - Total de 14 juegos de SNES precargados y jugables nativamente en el navegador vía Nostalgist.js (núcleo Snes9x con soporte para chips SA-1 y descompresión en memoria vía JSZip).
+  - **Eliminación del Auto-Arranque de Captain Commando & Hub de Juegos**:
+    - Se eliminó el auto-arranque forzado del primer cartucho (`launchRomItem(list[0])`). Al abrir el emulador, ahora se presenta la **Biblioteca de Juegos SNES** con grilla de tarjetas, buscador interactivo en tiempo real y filtros por categoría (Plataformas, Lucha, Acción, ROMs Locales).
+    - El usuario inicia la emulación manualmente haciendo clic en el botón `▶ JUGAR` del título deseado. Desde la partida se puede volver en cualquier momento a la biblioteca con `◀ Biblioteca de Juegos`.
+  - **Gestor Multislot de Partidas Guardadas (Save States) en IndexedDB**:
+    - Creado `snesSavesStore.ts` con persistencia en base de datos IndexedDB (`luxius_snes_saves_db`), superando el límite restrictivo de 5 MB de `localStorage`.
+    - Soporte para 3 slots independientes por juego con captura automática de miniatura en captura de pantalla (`thumbnailDataUrl`), fecha y hora exacta, guardado rápido (`💾 Guardar`), carga rápida (`⚡ Cargar`), backup descargable (`.state`) e importación de partidas externas desde la PC.
+    - Creado componente modal `SnesSaveStatesModal.tsx`.
+  - **Configurador Interactivo de Controles (SnesControlsModal & snesControlsConfig)**:
+    - Creados `snesControlsConfig.ts` y `SnesControlsModal.tsx` con soporte para reasignación visual e interactiva de cada tecla de teclado (D-Pad, A, B, X, Y, L, R, Start, Select) mapeadas a RetroArch, persistencia en `localStorage` y detección automática de Gamepads USB/Bluetooth mediante Web Gamepad API.
   - **Ajuste y Blindaje Visual en Precios Especiales a Clientes (`NuevoClienteModal.tsx`, `NuevoClienteModal.css`)**:
     - `NuevoClienteModal` actualizado a `size="xl"` (`max-width: 1000px`) para garantizar un ancho confortable y evitar cualquier colapso horizontal o superposición de elementos en pantallas de escritorio.
     - `.spe-price-input` protegido con `min-width: 120px` para impedir que el campo numérico de precio especial se comprima.

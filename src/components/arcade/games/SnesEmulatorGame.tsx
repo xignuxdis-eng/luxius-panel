@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Nostalgist } from 'nostalgist'
 import JSZip from 'jszip'
 import {
@@ -8,6 +8,17 @@ import {
     getLocalRomFile,
     deleteLocalRomFile,
 } from '../snesRomsStore'
+import {
+    SnesKeybindings,
+    loadSnesKeybindings,
+    buildRetroArchInputConfig,
+} from '../snesControlsConfig'
+import {
+    saveGameState,
+    loadGameState,
+} from '../snesSavesStore'
+import { SnesControlsModal } from '../SnesControlsModal'
+import { SnesSaveStatesModal } from '../SnesSaveStatesModal'
 
 export interface EmulatedGameConfig {
     id: string
@@ -52,7 +63,6 @@ async function loadSnes9xCoreBlobs(): Promise<{ js: Blob; wasm: Blob }> {
             }
             const buf = await res.arrayBuffer()
             const bytes = new Uint8Array(buf)
-            // Verificar firma ZIP (PK\x03\x04)
             if (bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
                 zipBuffer = buf
                 break
@@ -103,13 +113,11 @@ async function prepareRomPayload(
         throw new Error('El archivo ROM está vacío o es demasiado pequeño.')
     }
 
-    // Comprobar si por error es un HTML (404 SPA fallback)
     const headerAscii = String.fromCharCode(...bytes.slice(0, 15)).toLowerCase()
     if (headerAscii.includes('<!doctype') || headerAscii.includes('<html')) {
         throw new Error('El archivo ROM aún no se encuentra en el servidor.')
     }
 
-    // Si es un archivo ZIP (PK\x03\x04), extraer el .sfc / .smc interno con JSZip
     const isZipHeader =
         bytes[0] === 0x50 && bytes[1] === 0x4b && (bytes[2] === 0x03 || bytes[2] === 0x05)
 
@@ -146,7 +154,7 @@ async function prepareRomPayload(
     }
 }
 
-export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
+export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game, onBack }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const folderInputRef = useRef<HTMLInputElement>(null)
@@ -159,13 +167,22 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
     const [activeRomItem, setActiveRomItem] = useState<SnesRomItem | null>(null)
     const [canvasKey, setCanvasKey] = useState<number>(1)
 
-    const [status, setStatus] = useState<'idle' | 'checking' | 'loading' | 'running' | 'error' | 'missing'>('checking')
+    // Estado principal: 'library' es la pantalla de inicio sin auto-arranque
+    const [status, setStatus] = useState<'library' | 'loading' | 'running' | 'error' | 'missing'>('library')
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [isPaused, setIsPaused] = useState<boolean>(false)
     const [saveNotice, setSaveNotice] = useState<string | null>(null)
-    const [showCatalogModal, setShowCatalogModal] = useState<boolean>(false)
     const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false)
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
+
+    // Filtros y búsqueda en la Biblioteca
+    const [searchQuery, setSearchQuery] = useState<string>('')
+    const [selectedCategory, setSelectedCategory] = useState<string>('todos')
+
+    // Modales de Controles y Partidas Guardadas
+    const [keybindings, setKeybindings] = useState<SnesKeybindings>(loadSnesKeybindings())
+    const [showControlsModal, setShowControlsModal] = useState<boolean>(false)
+    const [showSavesModal, setShowSavesModal] = useState<boolean>(false)
 
     // Escuchar cambios de fullscreen del navegador
     useEffect(() => {
@@ -202,7 +219,6 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
             await stopEmulator()
 
             try {
-                // 1. Obtener el Blob de la ROM (directo, memoria/IndexedDB, o servidor)
                 let sourceBlob: Blob | null = directBlob || item.fileData || null
 
                 if (!sourceBlob && item.isCustom) {
@@ -232,7 +248,6 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                     return
                 }
 
-                // 2. Desempaquetar ROM (.zip -> .sfc) y cargar núcleo Snes9x en paralelo
                 const [romPayload, coreBlobs] = await Promise.all([
                     prepareRomPayload(sourceBlob, item.fileName),
                     loadSnes9xCoreBlobs(),
@@ -240,11 +255,12 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
 
                 if (currentLaunchId !== launchIdRef.current) return
 
-                // Forzar un nodo <canvas> limpio y esperar un microtick a que React lo monte
                 setCanvasKey((prev) => prev + 1)
-                await new Promise((r) => setTimeout(r, 30))
+                await new Promise((r) => setTimeout(r, 40))
 
                 if (currentLaunchId !== launchIdRef.current || !canvasRef.current) return
+
+                const retroConfig = buildRetroArchInputConfig(keybindings)
 
                 const instance = await Nostalgist.launch({
                     element: canvasRef.current,
@@ -256,19 +272,9 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                     rom: romPayload,
                     size: 'auto',
                     retroarchConfig: {
-                        input_player1_up: 'up',
-                        input_player1_down: 'down',
-                        input_player1_left: 'left',
-                        input_player1_right: 'right',
-                        input_player1_b: 'z',
-                        input_player1_a: 'x',
-                        input_player1_y: 'a',
-                        input_player1_x: 's',
-                        input_player1_l: 'q',
-                        input_player1_r: 'w',
-                        input_player1_start: 'enter',
-                        input_player1_select: 'rshift',
+                        ...retroConfig,
                         video_vsync: true,
+                        savestate_thumbnail_enable: true,
                     },
                 })
 
@@ -295,18 +301,17 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                 )
             }
         },
-        [stopEmulator]
+        [stopEmulator, keybindings]
     )
 
-    // Inicializar catálogo al abrir el componente
+    // Cargar catálogo de ROMs al montar el componente SIN AUTO-ARRANQUE
     useEffect(() => {
         let cancelled = false
         loadSnesRomsCatalog().then((list) => {
             if (cancelled) return
             setRomCatalog(list)
-            if (list.length > 0) {
-                launchRomItem(list[0])
-            } else {
+            // NO se auto-arranca ningún juego: se deja status en 'library' para que el usuario elija
+            if (list.length === 0) {
                 setStatus('missing')
             }
         })
@@ -316,9 +321,9 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
             launchIdRef.current++
             stopEmulator()
         }
-    }, [launchRomItem, stopEmulator])
+    }, [stopEmulator])
 
-    // Evitar que las flechas o Espacio desplacen el modal mientras se juega
+    // Evitar que las teclas del juego desplacen la pantalla
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (status !== 'running') return
@@ -333,7 +338,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [status])
 
-    // Procesar un archivo ROM individual (desde botón o Drag & Drop)
+    // Procesar archivo ROM subido
     const processUploadedRomFile = async (file: File) => {
         const cleanSlug = file.name
             .replace(/\.[^/.]+$/, '')
@@ -345,8 +350,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         const savedItem = await saveLocalRomFile(romId, cleanName, file)
         const updatedList = await loadSnesRomsCatalog()
         setRomCatalog(updatedList)
-        setShowCatalogModal(false)
-        setSaveNotice(`🎮 Cargando cartucho: ${cleanName}...`)
+        setSaveNotice(`🎮 Cartucho listo: ${cleanName}`)
         setTimeout(() => setSaveNotice(null), 3000)
 
         await launchRomItem(savedItem, file)
@@ -354,12 +358,12 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
 
     const handleSingleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
-        e.target.value = '' // Permitir volver a seleccionar el mismo archivo
+        e.target.value = ''
         if (!file) return
         await processUploadedRomFile(file)
     }
 
-    // Procesar múltiples archivos desde selector de carpeta
+    // Escanear carpeta completa
     const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const fileList = e.target.files
         if (!fileList || fileList.length === 0) return
@@ -367,7 +371,6 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         e.target.value = ''
 
         const validExts = ['.sfc', '.smc', '.fig', '.swc', '.zip']
-        let lastSaved: { item: SnesRomItem; file: File } | null = null
         let addedCount = 0
 
         for (const file of files) {
@@ -380,33 +383,28 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                     .replace(/[^a-z0-9]+/g, '_')
                 const romId = `snes_local_${cleanSlug}`
                 const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ')
-                const savedItem = await saveLocalRomFile(romId, cleanName, file)
-                lastSaved = { item: savedItem, file }
+                await saveLocalRomFile(romId, cleanName, file)
                 addedCount++
             }
         }
 
         const updated = await loadSnesRomsCatalog()
         setRomCatalog(updated)
-        setShowCatalogModal(false)
 
-        if (addedCount > 0 && lastSaved) {
+        if (addedCount > 0) {
             setSaveNotice(`🎮 ¡Se agregaron ${addedCount} ROM(s) de SNES a tu biblioteca!`)
             setTimeout(() => setSaveNotice(null), 4000)
-            await launchRomItem(lastSaved.item, lastSaved.file)
         } else {
             setSaveNotice('⚠️ No se encontraron archivos .sfc, .smc o .zip en esa carpeta.')
             setTimeout(() => setSaveNotice(null), 3500)
         }
     }
 
-    // Escaneo de carpeta con File System Access API o fallback a webkitdirectory
     const handleNativeDirectoryPicker = async () => {
         if ('showDirectoryPicker' in window) {
             try {
                 const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<{ values: () => AsyncIterable<{ kind: string; getFile: () => Promise<File> }> }> }).showDirectoryPicker()
                 const validExts = ['.sfc', '.smc', '.fig', '.swc', '.zip']
-                let lastSaved: { item: SnesRomItem; file: File } | null = null
                 let addedCount = 0
 
                 for await (const entry of dirHandle.values()) {
@@ -421,8 +419,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                                 .replace(/[^a-z0-9]+/g, '_')
                             const romId = `snes_local_${cleanSlug}`
                             const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ')
-                            const savedItem = await saveLocalRomFile(romId, cleanName, file)
-                            lastSaved = { item: savedItem, file }
+                            await saveLocalRomFile(romId, cleanName, file)
                             addedCount++
                         }
                     }
@@ -430,14 +427,12 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
 
                 const updated = await loadSnesRomsCatalog()
                 setRomCatalog(updated)
-                setShowCatalogModal(false)
 
-                if (addedCount > 0 && lastSaved) {
+                if (addedCount > 0) {
                     setSaveNotice(`🎮 ¡Directorio sincronizado: ${addedCount} ROM(s) cargadas!`)
                     setTimeout(() => setSaveNotice(null), 4000)
-                    await launchRomItem(lastSaved.item, lastSaved.file)
                 } else {
-                    setSaveNotice('⚠️ No se encontraron archivos .sfc, .smc o .zip en la carpeta elegida.')
+                    setSaveNotice('⚠️ No se encontraron archivos .sfc, .smc o .zip en la carpeta.')
                     setTimeout(() => setSaveNotice(null), 3500)
                 }
             } catch (err: unknown) {
@@ -450,7 +445,6 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         }
     }
 
-    // Soporte Drag & Drop directo sobre el visor
     const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault()
         e.stopPropagation()
@@ -460,6 +454,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         await processUploadedRomFile(file)
     }
 
+    // Controles de emulación
     const togglePause = () => {
         if (!nostalgistRef.current) return
         try {
@@ -485,52 +480,48 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         }
     }
 
-    const handleSaveState = async () => {
-        if (!nostalgistRef.current || !activeRomItem) return
-        try {
-            const { state } = await nostalgistRef.current.saveState()
-            const arrayBuffer = await state.arrayBuffer()
-            const bytes = new Uint8Array(arrayBuffer)
-            let binary = ''
-            const len = bytes.byteLength
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(bytes[i])
-            }
-            const base64 = btoa(binary)
-            localStorage.setItem(`luxius_snes_save_${activeRomItem.id}`, base64)
-            setSaveNotice(`💾 ¡Partida guardada en ${activeRomItem.name}!`)
-            setTimeout(() => setSaveNotice(null), 3000)
-        } catch (err) {
-            console.error('Error guardando estado:', err)
-            setSaveNotice('❌ Error al guardar partida')
-            setTimeout(() => setSaveNotice(null), 3000)
+    // Guardado rápido en Slot 1 (o vía modal para slots 1, 2, 3)
+    const handleQuickSave = async (slot = 1) => {
+        if (!nostalgistRef.current || !activeRomItem) {
+            throw new Error('El emulador no está en ejecución.')
         }
+        const { state, thumbnail } = await nostalgistRef.current.saveState()
+        await saveGameState(activeRomItem.id, activeRomItem.name, slot, state, thumbnail)
+        setSaveNotice(`💾 ¡Partida guardada en Slot ${slot}!`)
+        setTimeout(() => setSaveNotice(null), 3000)
     }
 
-    const handleLoadState = async () => {
+    // Carga rápida desde Slot 1 (o vía modal)
+    const handleQuickLoad = async (slot = 1) => {
         if (!nostalgistRef.current || !activeRomItem) return
         try {
-            const base64 = localStorage.getItem(`luxius_snes_save_${activeRomItem.id}`)
-            if (!base64) {
-                setSaveNotice('⚠️ No hay partida guardada previa para este juego')
+            const stateBlob = await loadGameState(activeRomItem.id, slot)
+            if (!stateBlob) {
+                setSaveNotice(`⚠️ No hay partida guardada en el Slot ${slot}`)
                 setTimeout(() => setSaveNotice(null), 3000)
                 return
             }
-            const binary = atob(base64)
-            const len = binary.length
-            const bytes = new Uint8Array(len)
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binary.charCodeAt(i)
-            }
-            const blob = new Blob([bytes], { type: 'application/octet-stream' })
-            await nostalgistRef.current.loadState(blob)
-            setSaveNotice('⚡ ¡Partida cargada exitosamente!')
+            await nostalgistRef.current.loadState(stateBlob)
+            setSaveNotice(`⚡ ¡Partida cargada desde el Slot ${slot}!`)
             setTimeout(() => setSaveNotice(null), 3000)
         } catch (err) {
             console.error('Error cargando estado:', err)
             setSaveNotice('❌ Error al cargar partida')
             setTimeout(() => setSaveNotice(null), 3000)
         }
+    }
+
+    const handleLoadBlobState = async (stateBlob: Blob) => {
+        if (!nostalgistRef.current) {
+            throw new Error('El emulador no está corriendo.')
+        }
+        await nostalgistRef.current.loadState(stateBlob)
+    }
+
+    // Regresar a la biblioteca de juegos
+    const handleReturnToLibrary = async () => {
+        await stopEmulator()
+        setStatus('library')
     }
 
     const handleFullscreen = () => {
@@ -548,14 +539,38 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
         await deleteLocalRomFile(id)
         const updated = await loadSnesRomsCatalog()
         setRomCatalog(updated)
-        if (activeRomItem?.id === id && updated.length > 0) {
-            await launchRomItem(updated[0])
-        }
     }
+
+    // Filtrado de juegos en la biblioteca
+    const filteredRoms = useMemo(() => {
+        return romCatalog.filter((rom) => {
+            const matchesQuery =
+                rom.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (rom.genre && rom.genre.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                rom.fileName.toLowerCase().includes(searchQuery.toLowerCase())
+
+            if (!matchesQuery) return false
+
+            if (selectedCategory === 'lucha') {
+                return (rom.genre || '').toLowerCase().includes('lucha') || (rom.genre || '').toLowerCase().includes('beat')
+            }
+            if (selectedCategory === 'plataformas') {
+                return (rom.genre || '').toLowerCase().includes('plataforma')
+            }
+            if (selectedCategory === 'accion') {
+                return (rom.genre || '').toLowerCase().includes('acción') || (rom.genre || '').toLowerCase().includes('gun') || (rom.genre || '').toLowerCase().includes('western')
+            }
+            if (selectedCategory === 'locales') {
+                return rom.isCustom
+            }
+
+            return true
+        })
+    }, [romCatalog, searchQuery, selectedCategory])
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-            {/* Input oculto para subir archivo ROM suelto */}
+            {/* Inputs ocultos para subida de archivos / carpetas */}
             <input
                 ref={fileInputRef}
                 type="file"
@@ -563,100 +578,404 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                 style={{ display: 'none' }}
                 onChange={handleSingleFileUpload}
             />
-
-            {/* Input oculto para escanear carpeta completa */}
             <input
                 ref={folderInputRef}
                 type="file"
-                // @ts-expect-error - webkitdirectory es soportado por Chromium/Firefox/Edge
+                // @ts-expect-error - webkitdirectory
                 webkitdirectory=""
                 multiple
                 style={{ display: 'none' }}
                 onChange={handleFolderUpload}
             />
 
-            {/* Barra de Metadatos y Acciones */}
-            <div
-                className="pixel-box"
-                style={{
-                    padding: '10px 14px',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '10px',
-                    borderColor: activeRomItem?.color || game.color,
-                    background: 'rgba(10, 8, 22, 0.9)',
-                }}
-            >
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                    <span
-                        style={{
-                            padding: '3px 8px',
-                            background: 'rgba(255, 51, 102, 0.2)',
-                            border: `1px solid ${activeRomItem?.color || game.color}`,
-                            color: activeRomItem?.color || game.color,
-                            fontFamily: 'var(--font-pixel-title)',
-                            fontSize: '10px',
-                        }}
-                    >
-                        {activeRomItem?.genre || 'SNES (Super Nintendo)'}
-                    </span>
+            {/* Modal de Configuración de Controles */}
+            <SnesControlsModal
+                isOpen={showControlsModal}
+                onClose={() => setShowControlsModal(false)}
+                bindings={keybindings}
+                onSaveBindings={(newBindings) => setKeybindings(newBindings)}
+            />
 
-                    <button
-                        type="button"
-                        className="pixel-btn"
-                        style={{
-                            fontSize: '11px',
-                            padding: '4px 10px',
-                            borderColor: 'var(--pixel-neon-cyan)',
-                            color: 'var(--pixel-neon-cyan)',
-                        }}
-                        onClick={() => setShowCatalogModal((prev) => !prev)}
-                        title="Ver lista de ROMs detectadas y cambiar de juego"
-                    >
-                        📚 Catálogo de ROMs ({romCatalog.length}) ▾
-                    </button>
+            {/* Modal de Partidas Guardadas */}
+            {activeRomItem && (
+                <SnesSaveStatesModal
+                    isOpen={showSavesModal}
+                    onClose={() => setShowSavesModal(false)}
+                    gameId={activeRomItem.id}
+                    gameTitle={activeRomItem.name}
+                    onSaveStateAction={handleQuickSave}
+                    onLoadStateAction={handleLoadBlobState}
+                />
+            )}
 
-                    {activeRomItem?.exits && (
-                        <span
-                            style={{
-                                padding: '3px 8px',
-                                background: 'rgba(255, 199, 0, 0.16)',
-                                border: '1px solid var(--pixel-gold-coin)',
-                                color: 'var(--pixel-gold-coin)',
-                                fontFamily: 'var(--font-pixel-ui)',
-                                fontSize: '11px',
-                            }}
-                        >
-                            🚩 {activeRomItem.exits}
-                        </span>
-                    )}
+            {/* Notificación flotante / Toast */}
+            {saveNotice && (
+                <div
+                    style={{
+                        padding: '8px 14px',
+                        background: 'rgba(255, 199, 0, 0.25)',
+                        border: '1px solid var(--pixel-gold-coin)',
+                        color: 'var(--pixel-gold-coin)',
+                        fontFamily: 'var(--font-pixel-ui)',
+                        fontSize: '12px',
+                        textAlign: 'center',
+                        borderRadius: '4px',
+                    }}
+                >
+                    {saveNotice}
                 </div>
+            )}
 
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                        type="button"
-                        className="pixel-btn"
-                        style={{ fontSize: '10px' }}
-                        onClick={handleNativeDirectoryPicker}
-                        title="Escanear una carpeta de tu PC para detectar todas las ROMs"
+            {/* ==============================================================
+                VISTA 1: BIBLIOTECA DE JUEGOS SNES (SIN AUTO-ARRANQUE)
+                ============================================================== */}
+            {status === 'library' && (
+                <div
+                    className="pixel-box"
+                    onDragOver={(e) => {
+                        e.preventDefault()
+                        setIsDraggingOver(true)
+                    }}
+                    onDragLeave={() => setIsDraggingOver(false)}
+                    onDrop={handleDrop}
+                    style={{
+                        padding: '16px',
+                        background: isDraggingOver ? 'rgba(56, 189, 248, 0.1)' : 'rgba(12, 10, 26, 0.98)',
+                        borderColor: isDraggingOver ? 'var(--pixel-neon-cyan)' : 'var(--pixel-gold-coin)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px',
+                    }}
+                >
+                    {/* Header Principal de la Biblioteca */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            paddingBottom: '12px',
+                        }}
                     >
-                        📁 Escanear Carpeta
-                    </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '28px' }}>🕹️</span>
+                            <div>
+                                <h3
+                                    style={{
+                                        margin: 0,
+                                        fontFamily: 'var(--font-pixel-title)',
+                                        fontSize: '15px',
+                                        color: 'var(--pixel-gold-coin)',
+                                    }}
+                                >
+                                    SUPER NINTENDO ENTERTAINMENT SYSTEM
+                                </h3>
+                                <span
+                                    style={{
+                                        fontFamily: 'var(--font-pixel-ui)',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                    }}
+                                >
+                                    {romCatalog.length} juegos listos • Seleccioná un título para jugar o sumá tus ROMs
+                                </span>
+                            </div>
+                        </div>
 
-                    <button
-                        type="button"
-                        className="pixel-btn pixel-btn-primary"
-                        style={{ fontSize: '10px' }}
-                        onClick={() => fileInputRef.current?.click()}
-                        title="Cargar un archivo .sfc, .smc o .zip desde tu PC"
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '11px', borderColor: 'var(--pixel-neon-cyan)', color: 'var(--pixel-neon-cyan)' }}
+                                onClick={() => setShowControlsModal(true)}
+                                title="Configurar teclas y botones del control SNES"
+                            >
+                                🎮 Configurar Controles
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '11px' }}
+                                onClick={handleNativeDirectoryPicker}
+                                title="Escanear una carpeta de tu PC para detectar todas las ROMs"
+                            >
+                                📁 Escanear Carpeta
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pixel-btn pixel-btn-primary"
+                                style={{ fontSize: '11px' }}
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Cargar un archivo .sfc, .smc o .zip desde tu PC"
+                            >
+                                📂 Cargar ROM (.sfc / .zip)
+                            </button>
+
+                            {onBack && (
+                                <button
+                                    type="button"
+                                    className="pixel-btn"
+                                    style={{ fontSize: '11px' }}
+                                    onClick={onBack}
+                                >
+                                    ✕ Salir
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Barra de Búsqueda y Categorías */}
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {[
+                                { id: 'todos', label: `Todos (${romCatalog.length})` },
+                                { id: 'plataformas', label: '🍄 Plataformas' },
+                                { id: 'lucha', label: '🥋 Lucha' },
+                                { id: 'accion', label: '🤠 Acción' },
+                                { id: 'locales', label: '💾 ROMs Locales' },
+                            ].map((cat) => (
+                                <button
+                                    key={cat.id}
+                                    type="button"
+                                    className={`pixel-btn ${selectedCategory === cat.id ? 'pixel-btn-primary' : ''}`}
+                                    style={{ fontSize: '10px', padding: '4px 10px' }}
+                                    onClick={() => setSelectedCategory(cat.id)}
+                                >
+                                    {cat.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <input
+                            type="text"
+                            placeholder="🔍 Buscar juego (Mario, Street Fighter, Donkey...)"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{
+                                background: '#111827',
+                                border: '1px solid #374151',
+                                borderRadius: '4px',
+                                color: '#f3f4f6',
+                                padding: '6px 12px',
+                                fontSize: '11px',
+                                fontFamily: 'var(--font-pixel-ui)',
+                                minWidth: '240px',
+                                outline: 'none',
+                            }}
+                        />
+                    </div>
+
+                    {/* Grilla de Cartuchos / Juegos */}
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                            gap: '12px',
+                            maxHeight: '480px',
+                            overflowY: 'auto',
+                            padding: '4px',
+                        }}
                     >
-                        📂 Cargar ROM (.sfc / .zip)
-                    </button>
+                        {filteredRoms.map((rom) => {
+                            return (
+                                <div
+                                    key={rom.id}
+                                    className="pixel-box"
+                                    style={{
+                                        padding: '12px',
+                                        borderColor: rom.color || '#ff3366',
+                                        background: 'rgba(20, 18, 38, 0.85)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        gap: '10px',
+                                        transition: 'transform 0.12s ease, border-color 0.12s ease',
+                                    }}
+                                >
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                            <span style={{ fontSize: '26px', flexShrink: 0 }}>{rom.icon || '🎮'}</span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div
+                                                    style={{
+                                                        fontFamily: 'var(--font-pixel-title)',
+                                                        fontSize: '12px',
+                                                        color: '#f8fafc',
+                                                        lineHeight: 1.3,
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                    }}
+                                                    title={rom.name}
+                                                >
+                                                    {rom.name}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        fontFamily: 'var(--font-pixel-ui)',
+                                                        fontSize: '10px',
+                                                        color: rom.color || '#ff3366',
+                                                        marginTop: '2px',
+                                                    }}
+                                                >
+                                                    {rom.genre || 'SNES / Clásico'}
+                                                </div>
+                                            </div>
+                                        </div>
 
-                    {status === 'running' && (
-                        <>
+                                        <p
+                                            style={{
+                                                fontFamily: 'var(--font-pixel-ui)',
+                                                fontSize: '11px',
+                                                color: '#cbd5e1',
+                                                margin: '8px 0 0 0',
+                                                lineHeight: 1.4,
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                            }}
+                                            title={rom.objective}
+                                        >
+                                            {rom.objective || `Juego de SNES (${rom.fileName})`}
+                                        </p>
+                                    </div>
+
+                                    {/* Botón Jugar y Acciones */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                        {rom.isCustom ? (
+                                            <button
+                                                type="button"
+                                                className="pixel-btn"
+                                                style={{ fontSize: '9px', padding: '2px 6px', color: '#ff4444', borderColor: '#ff4444' }}
+                                                onClick={(e) => handleDeleteLocalRom(e, rom.id)}
+                                                title="Eliminar ROM guardada en este navegador"
+                                            >
+                                                🗑️ Borrar
+                                            </button>
+                                        ) : (
+                                            <span style={{ fontSize: '9px', color: '#64748b', fontFamily: 'var(--font-pixel-ui)' }}>
+                                                {rom.fileName.endsWith('.zip') ? '📦 ZIP' : '💾 ROM'}
+                                            </span>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            className="pixel-btn pixel-btn-primary"
+                                            style={{
+                                                fontSize: '11px',
+                                                padding: '6px 16px',
+                                                background: rom.color ? `${rom.color}33` : undefined,
+                                                borderColor: rom.color || 'var(--pixel-gold-coin)',
+                                                color: '#ffffff',
+                                                fontWeight: 700,
+                                            }}
+                                            onClick={() => launchRomItem(rom)}
+                                        >
+                                            ▶ JUGAR
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ==============================================================
+                VISTA 2: EN EMULACIÓN (RUNNING / LOADING / ERROR)
+                ============================================================== */}
+            {status !== 'library' && (
+                <>
+                    {/* Barra Superior de Control del Emulador en Ejecución */}
+                    <div
+                        className="pixel-box"
+                        style={{
+                            padding: '10px 14px',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px',
+                            borderColor: activeRomItem?.color || game.color,
+                            background: 'rgba(10, 8, 22, 0.9)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{
+                                    fontSize: '11px',
+                                    padding: '4px 10px',
+                                    borderColor: 'var(--pixel-gold-coin)',
+                                    color: 'var(--pixel-gold-coin)',
+                                }}
+                                onClick={handleReturnToLibrary}
+                                title="Volver a la selección de juegos SNES"
+                            >
+                                ◀ Biblioteca de Juegos
+                            </button>
+
+                            <span
+                                style={{
+                                    padding: '3px 8px',
+                                    background: 'rgba(255, 51, 102, 0.2)',
+                                    border: `1px solid ${activeRomItem?.color || game.color}`,
+                                    color: activeRomItem?.color || game.color,
+                                    fontFamily: 'var(--font-pixel-title)',
+                                    fontSize: '10px',
+                                }}
+                            >
+                                {activeRomItem?.name || game.name}
+                            </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '10px', borderColor: 'var(--pixel-neon-cyan)', color: 'var(--pixel-neon-cyan)' }}
+                                onClick={() => setShowControlsModal(true)}
+                                title="Mapear teclado o ver controles"
+                            >
+                                🎮 Controles
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '10px', borderColor: 'var(--pixel-gold-coin)', color: 'var(--pixel-gold-coin)' }}
+                                onClick={() => setShowSavesModal(true)}
+                                title="Administrar partidas guardadas en Slots 1, 2, 3"
+                            >
+                                💾 Partidas
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '10px' }}
+                                onClick={() => handleQuickSave(1)}
+                                title="Guardado rápido en Slot 1"
+                            >
+                                💾 Guardar
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '10px' }}
+                                onClick={() => handleQuickLoad(1)}
+                                title="Cargar Slot 1"
+                            >
+                                ⚡ Cargar
+                            </button>
+
                             <button
                                 type="button"
                                 className="pixel-btn"
@@ -665,24 +984,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                             >
                                 {isPaused ? '▶ Reanudar' : '⏸ Pausa'}
                             </button>
-                            <button
-                                type="button"
-                                className="pixel-btn"
-                                style={{ fontSize: '10px' }}
-                                onClick={handleSaveState}
-                                title="Guardar estado de juego en el navegador"
-                            >
-                                💾 Guardar
-                            </button>
-                            <button
-                                type="button"
-                                className="pixel-btn"
-                                style={{ fontSize: '10px' }}
-                                onClick={handleLoadState}
-                                title="Cargar estado guardado"
-                            >
-                                ⚡ Cargar
-                            </button>
+
                             <button
                                 type="button"
                                 className="pixel-btn"
@@ -691,6 +993,7 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                             >
                                 ↻ Reiniciar
                             </button>
+
                             <button
                                 type="button"
                                 className="pixel-btn pixel-btn-primary"
@@ -699,406 +1002,187 @@ export const SnesEmulatorGame: React.FC<SnesEmulatorGameProps> = ({ game }) => {
                             >
                                 ⛶ Pantalla Completa
                             </button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* Notificación temporal */}
-            {saveNotice && (
-                <div
-                    style={{
-                        padding: '6px 12px',
-                        background: 'rgba(255, 199, 0, 0.2)',
-                        border: '1px solid var(--pixel-gold-coin)',
-                        color: 'var(--pixel-gold-coin)',
-                        fontFamily: 'var(--font-pixel-ui)',
-                        fontSize: '12px',
-                        textAlign: 'center',
-                    }}
-                >
-                    {saveNotice}
-                </div>
-            )}
-
-            {/* Selector desplegable de Catálogo de Juegos Detectados */}
-            {showCatalogModal && (
-                <div
-                    className="pixel-box"
-                    style={{
-                        padding: '14px',
-                        background: 'rgba(12, 10, 26, 0.98)',
-                        borderColor: 'var(--pixel-neon-cyan)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                    }}
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'var(--font-pixel-title)', fontSize: '13px', color: 'var(--pixel-gold-coin)' }}>
-                            🕹️ BIBLIOTECA DE JUEGOS SNES ({romCatalog.length})
-                        </span>
-                        <button
-                            type="button"
-                            className="pixel-btn"
-                            style={{ fontSize: '10px' }}
-                            onClick={() => setShowCatalogModal(false)}
-                        >
-                            ✕ Cerrar
-                        </button>
+                        </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                            type="button"
-                            className="pixel-btn pixel-btn-primary"
-                            style={{ fontSize: '11px' }}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            ➕ Cargar Archivo ROM (.sfc / .smc / .zip)
-                        </button>
-                        <button
-                            type="button"
-                            className="pixel-btn"
-                            style={{ fontSize: '11px' }}
-                            onClick={handleNativeDirectoryPicker}
-                        >
-                            📁 Escanear Carpeta Completa de ROMs
-                        </button>
-                    </div>
-
+                    {/* Viewport del Canvas */}
                     <div
+                        ref={containerRef}
+                        className="pixel-box"
+                        onDragOver={(e) => {
+                            e.preventDefault()
+                            setIsDraggingOver(true)
+                        }}
+                        onDragLeave={() => setIsDraggingOver(false)}
+                        onDrop={handleDrop}
                         style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                            gap: '10px',
-                            maxHeight: '260px',
-                            overflowY: 'auto',
-                            padding: '4px',
+                            position: isFullscreen ? 'fixed' : 'relative',
+                            inset: isFullscreen ? 0 : undefined,
+                            width: isFullscreen ? '100vw' : '100%',
+                            height: isFullscreen ? '100vh' : '540px',
+                            zIndex: isFullscreen ? 999999 : undefined,
+                            borderColor: isDraggingOver ? 'var(--pixel-neon-cyan)' : activeRomItem?.color || game.color,
+                            background: '#000',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                         }}
                     >
-                        {romCatalog.map((rom) => {
-                            const isCurrent = rom.id === activeRomItem?.id
-                            return (
-                                <div
-                                    key={rom.id}
-                                    className="pixel-box"
-                                    onClick={() => {
-                                        setShowCatalogModal(false)
-                                        launchRomItem(rom)
-                                    }}
-                                    style={{
-                                        padding: '10px',
-                                        cursor: 'pointer',
-                                        borderColor: isCurrent ? 'var(--pixel-gold-coin)' : rom.color || '#ff3366',
-                                        background: isCurrent ? 'rgba(255, 199, 0, 0.12)' : 'rgba(20, 18, 38, 0.8)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px',
-                                        position: 'relative',
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '20px' }}>{rom.icon || '🎮'}</span>
-                                        <span
-                                            style={{
-                                                fontFamily: 'var(--font-pixel-title)',
-                                                fontSize: '11px',
-                                                color: isCurrent ? 'var(--pixel-gold-coin)' : '#fff',
-                                                lineHeight: 1.3,
-                                            }}
-                                        >
-                                            {rom.name}
-                                        </span>
-                                    </div>
-                                    <div style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '10px', color: 'var(--pixel-text-dim)' }}>
-                                        Archivo: {rom.fileName}
-                                    </div>
-                                    {rom.isCustom && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                                            <span style={{ fontSize: '9px', color: 'var(--pixel-neon-cyan)' }}>[Guardado en Navegador]</span>
-                                            <button
-                                                type="button"
-                                                className="pixel-btn"
-                                                style={{ fontSize: '9px', padding: '1px 6px', color: '#ff4444', borderColor: '#ff4444' }}
-                                                onClick={(e) => handleDeleteLocalRom(e, rom.id)}
-                                            >
-                                                🗑️ Quitar
-                                            </button>
-                                        </div>
-                                    )}
+                        {isFullscreen && (
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                onClick={handleFullscreen}
+                                style={{
+                                    position: 'absolute',
+                                    top: '16px',
+                                    right: '16px',
+                                    zIndex: 1000,
+                                    fontSize: '11px',
+                                    background: 'rgba(0,0,0,0.7)',
+                                    borderColor: 'var(--pixel-gold-coin)',
+                                    color: 'var(--pixel-gold-coin)',
+                                }}
+                            >
+                                ✕ Salir Pantalla Completa (ESC)
+                            </button>
+                        )}
+
+                        <canvas
+                            key={canvasKey}
+                            ref={canvasRef}
+                            tabIndex={0}
+                            style={{
+                                width: 'auto',
+                                height: 'auto',
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                aspectRatio: '4 / 3',
+                                objectFit: 'contain',
+                                imageRendering: 'pixelated',
+                                outline: 'none',
+                                opacity: status === 'running' ? 1 : 0,
+                                pointerEvents: status === 'running' ? 'auto' : 'none',
+                            }}
+                        />
+
+                        {status === 'loading' && (
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'rgba(7, 6, 15, 0.92)',
+                                    fontFamily: 'var(--font-pixel-title)',
+                                    fontSize: '13px',
+                                    color: 'var(--pixel-neon-cyan)',
+                                    textAlign: 'center',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center',
+                                    gap: '10px',
+                                    alignItems: 'center',
+                                    padding: '20px',
+                                }}
+                            >
+                                <span>⏳ Iniciando {activeRomItem?.name || 'SNES'}...</span>
+                                <span style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '11px', color: '#aaa' }}>
+                                    Cargando núcleo Snes9x WebAssembly (Soporte SA-1 / Super FX)
+                                </span>
+                            </div>
+                        )}
+
+                        {status === 'error' && (
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    background: 'rgba(7, 6, 15, 0.95)',
+                                    padding: '24px',
+                                    textAlign: 'center',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <div style={{ fontSize: '36px' }}>⚠️</div>
+                                <div style={{ fontFamily: 'var(--font-pixel-title)', fontSize: '13px', color: '#ff4444' }}>
+                                    No se pudo iniciar la ROM
                                 </div>
-                            )
-                        })}
+                                <p style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '12px', color: '#ccc', maxWidth: '460px' }}>
+                                    {errorMessage || 'Verifica que el archivo sea una ROM válida de Super Nintendo (.sfc, .smc o .zip).'}
+                                </p>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                    <button
+                                        type="button"
+                                        className="pixel-btn pixel-btn-primary"
+                                        onClick={handleReturnToLibrary}
+                                    >
+                                        ◀ Volver a la Biblioteca
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </div>
+
+                    {/* Footer con Mapeo de Controles */}
+                    <div
+                        className="pixel-box"
+                        style={{
+                            padding: '10px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            borderColor: 'rgba(255,255,255,0.18)',
+                            background: 'rgba(10, 8, 22, 0.75)',
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: '8px',
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontFamily: 'var(--font-pixel-title)',
+                                    fontSize: '10px',
+                                    color: 'var(--pixel-gold-coin)',
+                                }}
+                            >
+                                🎮 CONTROLES ACTIVOS ({activeRomItem?.name})
+                            </span>
+                            <button
+                                type="button"
+                                className="pixel-btn"
+                                style={{ fontSize: '9px', padding: '2px 8px', color: 'var(--pixel-neon-cyan)', borderColor: 'var(--pixel-neon-cyan)' }}
+                                onClick={() => setShowControlsModal(true)}
+                            >
+                                ⚙️ Cambiar Teclas
+                            </button>
+                        </div>
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '12px',
+                                fontFamily: 'var(--font-pixel-ui)',
+                                fontSize: '11px',
+                                color: '#d0d0d0',
+                            }}
+                        >
+                            {(activeRomItem?.controls || game.controls).map((ctrl, idx) => (
+                                <span key={idx}>• {ctrl}</span>
+                            ))}
+                        </div>
+                    </div>
+                </>
             )}
-
-            {/* Contenedor del Viewport con Canvas Nativo y soporte Drag & Drop */}
-            <div
-                ref={containerRef}
-                className="pixel-box"
-                onDragOver={(e) => {
-                    e.preventDefault()
-                    setIsDraggingOver(true)
-                }}
-                onDragLeave={() => setIsDraggingOver(false)}
-                onDrop={handleDrop}
-                style={{
-                    position: isFullscreen ? 'fixed' : 'relative',
-                    inset: isFullscreen ? 0 : undefined,
-                    width: isFullscreen ? '100vw' : '100%',
-                    height: isFullscreen ? '100vh' : '540px',
-                    zIndex: isFullscreen ? 999999 : undefined,
-                    borderColor: isDraggingOver ? 'var(--pixel-neon-cyan)' : activeRomItem?.color || game.color,
-                    background: '#000',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}
-            >
-                {/* Botón flotante para salir de pantalla completa */}
-                {isFullscreen && (
-                    <button
-                        type="button"
-                        className="pixel-btn"
-                        onClick={handleFullscreen}
-                        style={{
-                            position: 'absolute',
-                            top: '16px',
-                            right: '16px',
-                            zIndex: 1000,
-                            fontSize: '11px',
-                            background: 'rgba(0,0,0,0.7)',
-                            borderColor: 'var(--pixel-gold-coin)',
-                            color: 'var(--pixel-gold-coin)',
-                        }}
-                    >
-                        ✕ Salir Pantalla Completa (ESC)
-                    </button>
-                )}
-
-                {/* El canvas escala con relación de aspecto 4:3 clásica de SNES sin deformar */}
-                <canvas
-                    key={canvasKey}
-                    ref={canvasRef}
-                    tabIndex={0}
-                    style={{
-                        width: 'auto',
-                        height: 'auto',
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        aspectRatio: '4 / 3',
-                        objectFit: 'contain',
-                        imageRendering: 'pixelated',
-                        outline: 'none',
-                        opacity: status === 'running' ? 1 : 0,
-                        pointerEvents: status === 'running' ? 'auto' : 'none',
-                    }}
-                />
-
-                {status === 'loading' && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(7, 6, 15, 0.92)',
-                            fontFamily: 'var(--font-pixel-title)',
-                            fontSize: '13px',
-                            color: 'var(--pixel-neon-cyan)',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            alignItems: 'center',
-                            padding: '20px',
-                        }}
-                    >
-                        <span>⏳ Iniciando {activeRomItem?.name || 'SNES'}...</span>
-                        <span style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '11px', color: '#aaa' }}>
-                            Cargando núcleo Snes9x WebAssembly (Soporte SA-1 / Super FX)
-                        </span>
-                    </div>
-                )}
-
-                {status === 'error' && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(7, 6, 15, 0.95)',
-                            padding: '24px',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            gap: '12px',
-                            alignItems: 'center',
-                        }}
-                    >
-                        <div style={{ fontSize: '36px' }}>⚠️</div>
-                        <div style={{ fontFamily: 'var(--font-pixel-title)', fontSize: '13px', color: '#ff4444' }}>
-                            No se pudo iniciar la ROM
-                        </div>
-                        <p style={{ fontFamily: 'var(--font-pixel-ui)', fontSize: '12px', color: '#ccc', maxWidth: '460px' }}>
-                            {errorMessage || 'Verifica que el archivo sea una ROM válida de Super Nintendo (.sfc, .smc o .zip).'}
-                        </p>
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                            <button
-                                type="button"
-                                className="pixel-btn pixel-btn-primary"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                📂 Seleccionar ROM (.sfc / .smc / .zip)
-                            </button>
-                            <button
-                                type="button"
-                                className="pixel-btn"
-                                onClick={handleNativeDirectoryPicker}
-                            >
-                                📁 Escanear Carpeta
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {status === 'missing' && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'rgba(7, 6, 15, 0.95)',
-                            padding: '24px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            textAlign: 'center',
-                            gap: '14px',
-                        }}
-                    >
-                        <div style={{ fontSize: '42px' }}>{activeRomItem?.icon || '🍄'}</div>
-                        <div
-                            style={{
-                                fontFamily: 'var(--font-pixel-title)',
-                                fontSize: '14px',
-                                color: activeRomItem?.color || game.color,
-                                lineHeight: 1.5,
-                                maxWidth: '520px',
-                            }}
-                        >
-                            {activeRomItem?.name || game.name}
-                        </div>
-                        <p
-                            style={{
-                                fontFamily: 'var(--font-pixel-ui)',
-                                fontSize: '13px',
-                                color: '#e0e0e0',
-                                margin: 0,
-                                lineHeight: 1.5,
-                                maxWidth: '520px',
-                            }}
-                        >
-                            {activeRomItem?.objective || game.objective}
-                        </p>
-                        <div
-                            style={{
-                                padding: '10px 14px',
-                                background: 'rgba(255, 199, 0, 0.1)',
-                                border: '1px dashed var(--pixel-gold-coin)',
-                                color: 'var(--pixel-gold-coin)',
-                                fontFamily: 'var(--font-pixel-ui)',
-                                fontSize: '11px',
-                                lineHeight: 1.6,
-                                maxWidth: '540px',
-                            }}
-                        >
-                            Podés arrastrar y soltar cualquier archivo <code>.sfc</code>, <code>.smc</code> o <code>.zip</code> aquí mismo, seleccionarlo con el botón de abajo, o colocar tus ROMs en la carpeta del proyecto:
-                            <br />
-                            <code>F:\Sitio XignuX\public\roms\snes\</code>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                            <button
-                                type="button"
-                                className="pixel-btn pixel-btn-primary"
-                                style={{ fontSize: '12px', padding: '10px 18px' }}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                📂 Seleccionar Archivo ROM (.sfc / .smc / .zip)
-                            </button>
-                            <button
-                                type="button"
-                                className="pixel-btn"
-                                style={{ fontSize: '12px', padding: '10px 18px' }}
-                                onClick={handleNativeDirectoryPicker}
-                            >
-                                📁 Escanear Carpeta Completa
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Footer con Mapeo de Controles y Detalles */}
-            <div
-                className="pixel-box"
-                style={{
-                    padding: '10px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    borderColor: 'rgba(255,255,255,0.18)',
-                    background: 'rgba(10, 8, 22, 0.75)',
-                }}
-            >
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '8px',
-                    }}
-                >
-                    <span
-                        style={{
-                            fontFamily: 'var(--font-pixel-title)',
-                            fontSize: '10px',
-                            color: 'var(--pixel-gold-coin)',
-                        }}
-                    >
-                        🎮 CONTROLES (SNES9X) • JUEGOS EN CATÁLOGO: {romCatalog.length}
-                    </span>
-                    {activeRomItem && (
-                        <span
-                            style={{
-                                fontFamily: 'var(--font-pixel-ui)',
-                                fontSize: '11px',
-                                color: 'var(--pixel-neon-cyan)',
-                            }}
-                        >
-                            Cartucho activo: {activeRomItem.name} ({activeRomItem.fileName})
-                        </span>
-                    )}
-                </div>
-                <div
-                    style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '12px',
-                        fontFamily: 'var(--font-pixel-ui)',
-                        fontSize: '11px',
-                        color: '#d0d0d0',
-                    }}
-                >
-                    {(activeRomItem?.controls || game.controls).map((ctrl, idx) => (
-                        <span key={idx}>• {ctrl}</span>
-                    ))}
-                </div>
-            </div>
         </div>
     )
 }
