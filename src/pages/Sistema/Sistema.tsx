@@ -5,6 +5,7 @@ import UsuariosView from './UsuariosView'
 import GoogleDriveView from './GoogleDriveView'
 import TelegramView from './TelegramView'
 import WorkshopOnboardingView from './WorkshopOnboardingView'
+import TermsAndPrivacyView from './TermsAndPrivacyView'
 import './Sistema.css'
 
 
@@ -308,6 +309,7 @@ export default function Sistema() {
                 <NavLink to="/sistema/respaldo" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Respaldo Email</NavLink>
                 <NavLink to="/sistema/db" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Utilidades DB</NavLink>
                 <NavLink to="/sistema/telegram" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>🤖 Telegram Bot</NavLink>
+                <NavLink to="/sistema/legal" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>⚖️ Términos y Privacidad</NavLink>
             </nav>
 
             <div className="abm-content">
@@ -319,6 +321,7 @@ export default function Sistema() {
                     <Route path="db" element={<UtilidadesDB />} />
                     <Route path="telegram" element={<TelegramView />} />
                     <Route path="mensajes" element={<TelegramView />} />
+                    <Route path="legal" element={<TermsAndPrivacyView />} />
                     <Route path="respaldo" element={<div className="p-40 text-muted">Configuración de emails...</div>} />
                     <Route path="*" element={<Navigate to="usuarios" replace />} />
                 </Routes>
