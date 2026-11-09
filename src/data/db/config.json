@@ -1,10 +1,10 @@
 {
   "empresa": {
-    "nombre": "XignuX",
-    "direccion": "José V. Cardozo 912, Córdoba",
-    "telefono": "3517897667 / 3517717071",
-    "email": "xignux.dis@gmail.com",
-    "cuit": "30-12345678-9",
+    "nombre": "Taller Gráfico",
+    "direccion": "Dirección Comercial",
+    "telefono": "0800-000-0000",
+    "email": "contacto@taller.com",
+    "cuit": "30-00000000-0",
     "logo": "/assets/logo.png"
   },
   "sistema": {

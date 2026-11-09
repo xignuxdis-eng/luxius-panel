@@ -42,43 +42,43 @@ import { isDesignerOwner } from '@/types';
 const DEFAULT_USUARIOS: Usuario[] = [
     {
         id: 1,
-        nombre: "Adrian (Principal)",
-        username: "adrian",
-        email: "adrian@luxius.com",
+        nombre: "Super Administrador",
+        username: "admin",
+        email: "admin@luxius.com",
         rol: "principal",
         role: "principal",
         habilitado: true
     },
     {
         id: 2,
-        nombre: "Mirta (Administración)",
-        username: "admin",
-        email: "mirta@luxius.com",
+        nombre: "Administración General",
+        username: "gerencia",
+        email: "gerencia@luxius.com",
         rol: "administrador",
         role: "administrador",
         habilitado: true
     },
     {
         id: 3,
-        nombre: "Vendedor (Ventas)",
+        nombre: "Ejecutivo de Ventas",
         username: "vendedor",
-        email: "vendedor@luxius.com",
+        email: "ventas@luxius.com",
         rol: "vendedor",
         role: "vendedor",
         habilitado: true
     },
     {
         id: 4,
-        nombre: "Impresion (Taller)",
+        nombre: "Operador de Impresión",
         username: "impresion",
-        email: "impresion@luxius.com",
+        email: "taller@luxius.com",
         rol: "impresion",
         role: "impresion",
         habilitado: true
     },
     {
         id: 5,
-        nombre: "Diseño (Artista)",
+        nombre: "Diseñador Gráfico",
         username: "diseno",
         email: "diseno@luxius.com",
         rol: "artista",
@@ -87,30 +87,12 @@ const DEFAULT_USUARIOS: Usuario[] = [
     },
     {
         id: 6,
-        nombre: "Cliente (Externo)",
+        nombre: "Portal Cliente Demo",
         username: "cliente",
         email: "cliente@luxius.com",
         rol: "cliente",
         role: "cliente",
-        clientId: 826300,
-        habilitado: true
-    },
-    {
-        id: 7,
-        nombre: "Curushi (Diseño)",
-        username: "curushi",
-        email: "curushi@luxius.com",
-        rol: "artista",
-        role: "artista",
-        habilitado: true
-    },
-    {
-        id: 830011,
-        nombre: "Carlos Flores",
-        username: "carlos",
-        email: "carlos@luxius.com",
-        rol: "impresion",
-        role: "impresion",
+        clientId: 1,
         habilitado: true
     }
 ];
