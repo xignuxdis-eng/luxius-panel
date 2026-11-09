@@ -47,10 +47,9 @@ const GAMES: GameInfo[] = [
         color: '#ff3366',
         platform: 'SNES (Super Nintendo)',
         core: 'snes9x',
-        romUrl: '/roms/snes/nsmw1_twelve_magic_orbs.sfc',
-        tags: ['SNES', 'SA-1', 'Multi-ROM', 'Autodetección'],
+        tags: ['SNES', 'SA-1', 'Multi-ROM', 'Carga Local'],
         isEmulated: true,
-        objective: 'Emulador universal SNES con autodetección de ROMs de la carpeta public/roms/snes, escaneo de carpetas y soporte nativo para coprocesador SA-1.',
+        objective: 'Emulador universal SNES. Carga tus propios cartuchos ROM (.smc/.sfc/.zip) directamente desde tu equipo para jugar en el navegador.',
         controls: [
             'Flechas: D-Pad / Mover',
             'Z: Botón B (Saltar) · X: Botón A (Salto Giro)',

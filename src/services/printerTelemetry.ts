@@ -23,6 +23,7 @@ export interface PrinterMachineData {
     machine_id: string
     machine_name: string
     status: 'idle' | 'printing' | 'ready' | 'error' | 'offline'
+    is_online?: boolean
     last_seen: string | null
     current_job: PrinterJobInfo | null
     last_completed_job?: PrinterJobInfo | null

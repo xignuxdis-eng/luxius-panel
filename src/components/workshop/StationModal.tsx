@@ -298,8 +298,9 @@ export const StationModal: React.FC<StationModalProps> = ({
                     {stationId === 'plotter1' && (() => {
                         const tele = printerTelemetry.getMachine('RS-640');
                         if (!tele) return null;
-                        const isPrinting = tele.status === 'printing' && tele.current_job;
-                        const isOffline = tele.status === 'offline';
+                        const isOnline = tele.is_online ?? tele.status !== 'offline';
+                        const isPrinting = isOnline && tele.status === 'printing' && tele.current_job;
+                        const isOffline = !isOnline || tele.status === 'offline';
                         const statusColor = isPrinting ? '#38bdf8' : isOffline ? '#64748b' : '#22c55e';
                         const statusText = isPrinting ? '🚀 IMPRIMIENDO' : isOffline ? '🔌 DESCONECTADO (OFFLINE)' : '🟢 EN ESPERA (LISTO)';
 

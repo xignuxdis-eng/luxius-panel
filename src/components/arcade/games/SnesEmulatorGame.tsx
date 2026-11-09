@@ -45,9 +45,7 @@ let cachedSnes9xCore: { js: Blob; wasm: Blob } | null = null
 async function loadSnes9xCoreBlobs(): Promise<{ js: Blob; wasm: Blob }> {
     if (cachedSnes9xCore) return cachedSnes9xCore
 
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
     const candidateUrls = [
-        `${base}/roms/cores/snes9x_libretro.zip`,
         'https://cdn.jsdelivr.net/gh/arianrhodsandlot/retroarch-emscripten-build@v1.22.2/retroarch/snes9x_libretro.zip',
     ]
 

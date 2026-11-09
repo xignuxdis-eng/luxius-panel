@@ -26,58 +26,6 @@ function buildVersionData(): string {
     }, null, 2)
 }
 
-function generateSnesRomsIndex(): void {
-    const snesDir = path.resolve(__dirname, 'public', 'roms', 'snes')
-    if (!fs.existsSync(snesDir)) {
-        fs.mkdirSync(snesDir, { recursive: true })
-    }
-    const files = fs.readdirSync(snesDir)
-    const validExts = ['.sfc', '.smc', '.fig', '.swc', '.zip']
-    const romFiles = files.filter(f => validExts.includes(path.extname(f).toLowerCase()))
-
-    const indexFile = path.resolve(snesDir, 'index.json')
-    const existingMeta: Record<string, Record<string, unknown>> = {}
-    if (fs.existsSync(indexFile)) {
-        try {
-            const raw = JSON.parse(fs.readFileSync(indexFile, 'utf8'))
-            if (Array.isArray(raw)) {
-                raw.forEach((item: Record<string, unknown>) => {
-                    if (typeof item.fileName === 'string') existingMeta[item.fileName] = item
-                })
-            }
-        } catch {
-            // ignore
-        }
-    }
-
-    const items = romFiles.map(file => {
-        const ext = path.extname(file)
-        const baseName = path.basename(file, ext).replace(/[_-]+/g, ' ')
-        const meta = existingMeta[file] || {}
-        return {
-            id: meta.id || `snes_${path.basename(file, ext).toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-            name: meta.name || baseName,
-            fileName: file,
-            icon: meta.icon || '🎮',
-            genre: meta.genre || 'SNES / Clásico',
-            color: meta.color || '#ff3366',
-            exits: meta.exits || undefined,
-            difficulty: meta.difficulty || undefined,
-            tags: meta.tags || ['SNES', 'SA-1 Ready'],
-            objective: meta.objective || `Juego Super Nintendo precargado desde public/roms/snes/${file}.`,
-            controls: meta.controls || [
-                'Flechas: D-Pad / Mover',
-                'Z: Botón B (Saltar) · X: Botón A (Salto Giro)',
-                'A: Botón Y (Correr) · S: Botón X (Poder)',
-                'Enter: Start · Shift: Select · Q/W: L/R',
-                'Soporte nativo para Gamepad USB/Bluetooth'
-            ]
-        }
-    })
-
-    fs.writeFileSync(indexFile, JSON.stringify(items, null, 2), 'utf8')
-}
-
 function versionGeneratorPlugin(): Plugin {
     return {
         name: 'version-generator',
@@ -87,16 +35,6 @@ function versionGeneratorPlugin(): Plugin {
                 fs.mkdirSync(publicDir, { recursive: true })
             }
             fs.writeFileSync(path.resolve(publicDir, 'version.json'), buildVersionData())
-            generateSnesRomsIndex()
-        },
-        configureServer(server) {
-            generateSnesRomsIndex()
-            const snesDir = path.resolve(__dirname, 'public', 'roms', 'snes')
-            server.watcher.on('all', (_event, filePath) => {
-                if (filePath.startsWith(snesDir) && !filePath.endsWith('index.json')) {
-                    generateSnesRomsIndex()
-                }
-            })
         },
         generateBundle() {
             this.emitFile({

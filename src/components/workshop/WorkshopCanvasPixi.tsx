@@ -1972,8 +1972,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
 
         // Consultar telemetría viva para plotter1 (RS-640)
         const teleData = stationId === 'plotter1' ? printerTelemetryRef.current['RS-640'] : undefined;
-        const isLivePrinting = teleData?.status === 'printing' && Boolean(teleData.current_job);
-        const isOffline = station?.estado === 'offline' || teleData?.status === 'offline';
+        const isOnline = teleData ? (teleData.is_online ?? teleData.status !== 'offline') : true;
+        const isLivePrinting = isOnline && teleData?.status === 'printing' && Boolean(teleData.current_job);
+        const isOffline = station?.estado === 'offline' || teleData?.status === 'offline' || !isOnline;
 
         if (station) {
             tooltipContainerRef.current.x = Math.round(Math.max(10, Math.min(270, station.x + 20)) * currentScaleRef.current);

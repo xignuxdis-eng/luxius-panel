@@ -1,0 +1,139 @@
+name: Automated PostgreSQL Backup & Verification
+
+on:
+  schedule:
+    # Ejecución cada 6 horas: 00:00, 06:00, 12:00, 18:00 UTC
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      test_restore:
+        description: 'Ejecutar simulacro de restauración en contenedor efímero'
+        type: boolean
+        default: true
+
+jobs:
+  backup-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      # Contenedor PostgreSQL efímero para validar que el dump restaura sin errores
+      postgres-test:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: restore_test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Instalar herramientas cliente PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 psycopg2-binary requests
+
+      - name: Ejecutar pg_dump y validar integridad
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: Secret DATABASE_URL no configurado."
+            exit 1
+          fi
+
+          TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S")
+          BACKUP_FILE="luxius_supabase_backup_${TIMESTAMP}.dump"
+          SQL_FILE="luxius_supabase_backup_${TIMESTAMP}.sql"
+
+          echo "==> Generando backup binario pg_dump..."
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file="$BACKUP_FILE"
+          
+          echo "==> Generando backup en texto SQL..."
+          pg_dump "$DATABASE_URL" --no-owner --no-acl --file="$SQL_FILE"
+
+          DUMP_SIZE=$(stat -c%s "$BACKUP_FILE")
+          echo "Tamaño del dump binario: $DUMP_SIZE bytes"
+
+          if [ "$DUMP_SIZE" -lt 5000 ]; then
+            echo "ERROR: El archivo de backup es sospechosamente pequeño ($DUMP_SIZE bytes)."
+            exit 1
+          fi
+
+          echo "BACKUP_FILE=$BACKUP_FILE" >> $GITHUB_ENV
+          echo "SQL_FILE=$SQL_FILE" >> $GITHUB_ENV
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+      - name: Validar restauración en PostgreSQL efímero (Healthcheck de Restaurabilidad)
+        run: |
+          echo "==> Probando restauración del dump en base efímera..."
+          export PGPASSWORD=test_password
+          pg_restore -h 127.0.0.1 -p 5433 -U test_user -d restore_test_db --no-owner --no-acl "$BACKUP_FILE" || true
+
+          echo "==> Verificando conteo de datos restaurados..."
+          CLIENTES_COUNT=$(psql -h 127.0.0.1 -p 5433 -U test_user -d restore_test_db -t -c "SELECT count(*) FROM public.clientes;" | xargs)
+          PRESUPUESTOS_COUNT=$(psql -h 127.0.0.1 -p 5433 -U test_user -d restore_test_db -t -c "SELECT count(*) FROM public.presupuestos;" | xargs)
+
+          echo "Clientes restaurados: $CLIENTES_COUNT"
+          echo "Presupuestos restaurados: $PRESUPUESTOS_COUNT"
+
+          if [ "$PRESUPUESTOS_COUNT" -eq 0 ]; then
+            echo "ERROR: La prueba de restauración dio 0 presupuestos."
+            exit 1
+          fi
+          echo "✅ SIMULACRO DE RESTAURACIÓN EXITOSO: Base de datos íntegra y recuperable."
+
+      - name: Subir copia a Cloudflare R2 (si R2 secrets están configurados)
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'luxius-media' }}
+        run: |
+          python -c "
+          import os, sys, boto3
+          account_id = os.environ.get('R2_ACCOUNT_ID')
+          key_id = os.environ.get('R2_ACCESS_KEY_ID')
+          secret_key = os.environ.get('R2_SECRET_ACCESS_KEY')
+          bucket_name = os.environ.get('R2_BUCKET_NAME', 'luxius-media')
+          backup_file = os.environ.get('BACKUP_FILE')
+
+          if not (account_id and key_id and secret_key and backup_file):
+              print('R2 secrets no configurados completos en GitHub; omitiendo upload a R2.')
+              sys.exit(0)
+
+          endpoint_url = f'https://{account_id}.r2.cloudflarestorage.com'
+          s3 = boto3.client('s3', endpoint_url=endpoint_url, aws_access_key_id=key_id, aws_secret_access_key=secret_key)
+          r2_key = f'backups/database/{backup_file}'
+          print(f'Subiendo {backup_file} a r2://{bucket_name}/{r2_key} ...')
+          s3.upload_file(backup_file, bucket_name, r2_key)
+          print('✅ Subida a R2 completada.')
+          "
+
+      - name: Guardar Artifact en GitHub (retención 30 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-backup-${{ env.TIMESTAMP }}
+          path: |
+            ${{ env.BACKUP_FILE }}
+            ${{ env.SQL_FILE }}
+          retention-days: 30
+

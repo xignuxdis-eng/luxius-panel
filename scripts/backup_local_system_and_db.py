@@ -35,7 +35,8 @@ SYSTEM_ZIP_PATH = os.path.join(BACKUPS_DIR, f"luxius_system_backup_{TIMESTAMP}.z
 # DSN Supabase
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    DATABASE_URL = 'postgresql://postgres.stravgsssyvyxeslpryk:Nueva98261!@aws-0-us-east-1.pooler.supabase.com:5432/postgres'
+    print("❌ ERROR: La variable DATABASE_URL no está configurada en el entorno.")
+    sys.exit(1)
 
 print("==========================================================")
 print(" 🛡️  INICIANDO RESPALDO LOCAL DE SISTEMA Y BASE DE DATOS")

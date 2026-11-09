@@ -176,29 +176,8 @@ export async function deleteLocalRomFile(id: string): Promise<void> {
     }
 }
 
-// Carga el catálogo automático desde /roms/snes/index.json + IndexedDB + Memoria
+// Carga el catálogo automático desde IndexedDB + Memoria local del usuario
 export async function loadSnesRomsCatalog(): Promise<SnesRomItem[]> {
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
-    const indexUrl = `${base}/roms/snes/index.json`
-    let serverRoms: SnesRomItem[] = []
-
-    try {
-        const res = await fetch(indexUrl, { cache: 'no-cache' })
-        if (res.ok) {
-            const data = await res.json()
-            if (Array.isArray(data)) {
-                serverRoms = data
-                    .filter((item) => item && typeof item.fileName === 'string')
-                    .map((item) => ({
-                        ...item,
-                        url: `${base}/roms/snes/${encodeURIComponent(item.fileName)}`,
-                    }))
-            }
-        }
-    } catch (e) {
-        console.warn('No se pudo leer /roms/snes/index.json:', e)
-    }
-
     // Unir con las ROMs locales guardadas en el navegador
     const localRecords = await getAllLocalRomRecords()
     const customItems: SnesRomItem[] = localRecords.map((rec) => ({
@@ -215,30 +194,5 @@ export async function loadSnesRomsCatalog(): Promise<SnesRomItem[]> {
         fileData: memoryRomStore.get(rec.id)?.blob,
     }))
 
-    // Si aún no hay ROMs en servidor ni locales, mostrar la entrada de New Super Mario World 1 lista para recibir archivo
-    if (serverRoms.length === 0 && customItems.length === 0) {
-        serverRoms.push({
-            id: 'nsmw1_twelve_magic_orbs',
-            name: 'New Super Mario World 1: The Twelve Magic Orbs Powered-Up',
-            fileName: 'nsmw1_twelve_magic_orbs.sfc',
-            url: `${base}/roms/snes/nsmw1_twelve_magic_orbs.sfc`,
-            icon: '🍄',
-            genre: 'Plataformas / Clásico',
-            color: '#ff3366',
-            exits: '115 exits',
-            difficulty: 'Intermedia',
-            tags: ['SNES', 'SA-1', '115 Exits', 'Intermedia'],
-            objective: 'Remake con 12 mundos principales, 93 niveles, Luigi jugable, 16 nuevos power-ups y banda sonora personalizada.',
-            controls: DEFAULT_SNES_CONTROLS,
-        })
-    }
-
-    const map = new Map<string, SnesRomItem>()
-    // Poner primero las ROMs subidas o detectadas para acceso inmediato
-    customItems.forEach((r) => map.set(r.id, r))
-    serverRoms.forEach((r) => {
-        if (!map.has(r.id)) map.set(r.id, r)
-    })
-
-    return Array.from(map.values())
+    return customItems
 }
