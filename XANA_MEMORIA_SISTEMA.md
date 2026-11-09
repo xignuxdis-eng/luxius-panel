@@ -2026,3 +2026,15 @@ eliminados (devuelve 404 hasta que se adapte o se retire).
       - El botón **"Abrir en Modal"** hidrata automáticamente `NuevoPedidoModal` (en pestaña `Unitario` para 1 archivo o `Lote` para múltiples archivos) con clientes, medidas, copias, materiales y vistas previas cargadas.
 
 ---
+
+- **Arcade Center SNES (14 Juegos Precargados) & Blindaje Visual Precios Especiales — 08/11/2026**:
+  - **Expansión Catálogo SNES Arcade**:
+    - Incorporadas 7 nuevas ROMs míticas de SNES en `public/roms/snes/`: `Street Fighter II (USA).zip`, `Street Fighter II Turbo (USA) (Rev 1).zip`, `Super Street Fighter II (USA).zip`, `Sunset Riders (USA).zip`, `Super Star Wars - Return of the Jedi (USA) (Rev 1).zip`, `Super Star Wars - The Empire Strikes Back (USA) (Rev 1).zip` y `Toy Story (USA).zip`.
+    - Actualizado catálogo maestro en `public/roms/snes/index.json` con metadatos pulidos (títulos oficiales, íconos, géneros, esquemas de color temáticos y controles mapeados).
+    - Total de 14 juegos de SNES precargados y jugables nativamente en el navegador vía Nostalgist.js (núcleo Snes9x con soporte para chips SA-1 y descompresión en memoria vía JSZip).
+  - **Ajuste y Blindaje Visual en Precios Especiales a Clientes (`NuevoClienteModal.tsx`, `NuevoClienteModal.css`)**:
+    - `NuevoClienteModal` actualizado a `size="xl"` (`max-width: 1000px`) para garantizar un ancho confortable y evitar cualquier colapso horizontal o superposición de elementos en pantallas de escritorio.
+    - `.spe-price-input` protegido con `min-width: 120px` para impedir que el campo numérico de precio especial se comprima.
+    - Verificado con `npm run verify` (0 errores TypeScript, 0 errores ESLint, suite Vitest aprobada al 100% y build de producción generado).
+
+---

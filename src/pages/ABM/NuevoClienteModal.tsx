@@ -51,7 +51,7 @@ export default function NuevoClienteModal({ isOpen, onClose, onSave, cliente }: 
             isOpen={isOpen}
             onClose={onClose}
             title={cliente ? "Editar Cliente" : "Agregar Nuevo Cliente"}
-            size="lg"
+            size="xl"
         >
             <form onSubmit={handleSubmit(onSubmit)} className="nuevo-cliente-form">
                 <div className="form-grid">

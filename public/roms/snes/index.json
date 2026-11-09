@@ -1,142 +1,280 @@
 [
   {
-    "id": "snes_captain_commando__e___t_spa100_chilensis_",
-    "name": "Captain Commando (E) [T+Spa100 Chilensis]",
+    "id": "snes_captain_commando",
+    "name": "Captain Commando (Español)",
     "fileName": "Captain Commando (E) [T+Spa100_Chilensis].smc",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "icon": "⚡",
+    "genre": "Beat 'em up / Arcade",
+    "color": "#0ea5e9",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "Español",
+      "Capcom"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Captain Commando (E) [T+Spa100_Chilensis].smc.",
+    "objective": "Comanda el equipo de elite y libera a Metro City en este legendario beat 'em up de Capcom.",
     "controls": [
       "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Z: Saltar · X: Ataque Especial",
+      "A: Golpear / Combo · S: Correr",
+      "Enter: Start · Shift: Select",
       "Soporte nativo para Gamepad USB/Bluetooth"
     ]
   },
   {
-    "id": "snes_donkey_kong_country_3___dixie_kong_s_double_trouble__u_____",
-    "name": "Donkey Kong Country 3   Dixie Kong's Double Trouble (U) [!]",
+    "id": "snes_donkey_kong_country_3",
+    "name": "Donkey Kong Country 3: Dixie Kong's Double Trouble!",
     "fileName": "Donkey Kong Country 3 - Dixie Kong's Double Trouble (U) [!].smc",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "icon": "🍌",
+    "genre": "Plataformas / Aventura",
+    "color": "#10b981",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "Rare",
+      "Aventura"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Donkey Kong Country 3 - Dixie Kong's Double Trouble (U) [!].smc.",
+    "objective": "Explora el Kremisferio Norte junto a Dixie Kong y Kiddy Kong para rescatar a Donkey y Diddy.",
     "controls": [
-      "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Flechas: Mover / Nadar",
+      "Z: Saltar / Flotar helicóptero · A: Rodar / Levantar",
+      "Shift: Cambiar de Kong · Enter: Start",
       "Soporte nativo para Gamepad USB/Bluetooth"
     ]
   },
   {
-    "id": "snes_donkey_kong_country_snes",
-    "name": "Donkey Kong Country SNES",
+    "id": "snes_donkey_kong_country",
+    "name": "Donkey Kong Country",
     "fileName": "Donkey_Kong_Country_SNES.zip",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "icon": "🦍",
+    "genre": "Plataformas / Aventura",
+    "color": "#f59e0b",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "Rare",
+      "Clásico"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Donkey_Kong_Country_SNES.zip.",
+    "objective": "Recupera la reserva de bananas de Donkey Kong y Diddy Kong robada por el Rey K. Rool.",
     "controls": [
-      "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Flechas: Mover / Agacharse",
+      "Z: Saltar · A: Rodar / Correr",
+      "Shift: Cambiar de Kong · Enter: Start",
       "Soporte nativo para Gamepad USB/Bluetooth"
     ]
   },
   {
     "id": "snes_nsmw1_twelve_magic_orbs",
-    "name": "nsmw1 twelve magic orbs",
+    "name": "New Super Mario World 1: The Twelve Magic Orbs",
     "fileName": "nsmw1_twelve_magic_orbs.sfc",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "icon": "🍄",
+    "genre": "Plataformas / SA-1 Hack",
+    "color": "#e11d48",
+    "exits": "115 exits",
+    "difficulty": "Intermedia",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "SA-1 Ready",
+      "ROM Hack",
+      "115 Exits"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/nsmw1_twelve_magic_orbs.sfc.",
+    "objective": "Remake con 12 mundos principales, 93 niveles, Luigi jugable, 16 nuevos power-ups y banda sonora personalizada.",
     "controls": [
-      "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Flechas: Moverse / Agacharse",
+      "Z: Salto normal (B) · X: Salto con giro (A)",
+      "A: Correr / Agarrar caparazones (Y) · S: Poder / Fuego (X)",
+      "Enter: Start (Pausa) · Shift: Select (Soltar ítem de reserva)",
       "Soporte nativo para Gamepad USB/Bluetooth"
     ]
   },
   {
-    "id": "snes_super_bomberman_2__usa_",
-    "name": "Super Bomberman 2 (USA)",
+    "id": "snes_street_fighter_ii",
+    "name": "Street Fighter II: The World Warrior",
+    "fileName": "Street Fighter II (USA).zip",
+    "icon": "🥋",
+    "genre": "Lucha / Arcade",
+    "color": "#f59e0b",
+    "tags": [
+      "SNES",
+      "Capcom",
+      "Lucha"
+    ],
+    "objective": "El pionero del género de peleas 1 vs 1 de Capcom que definió una era dorada.",
+    "controls": [
+      "Flechas: Moverse / Saltar / Cubrirse",
+      "A / S / D: Golpes (Débil / Medio / Fuerte)",
+      "Z / X / C: Patadas (Débil / Medio / Fuerte)",
+      "Enter: Start · Shift: Select"
+    ]
+  },
+  {
+    "id": "snes_street_fighter_ii_turbo",
+    "name": "Street Fighter II Turbo: Hyper Fighting",
+    "fileName": "Street Fighter II Turbo (USA) (Rev 1).zip",
+    "icon": "🔥",
+    "genre": "Lucha / Competitivo",
+    "color": "#ef4444",
+    "tags": [
+      "SNES",
+      "Capcom",
+      "Turbo"
+    ],
+    "objective": "Velocidad turbo vertiginosa, nuevos movimientos aéreos y juego competitivo definitivo.",
+    "controls": [
+      "Flechas: Moverse / Saltar / Cubrirse",
+      "A / S / D: Golpes (Débil / Medio / Fuerte)",
+      "Z / X / C: Patadas (Débil / Medio / Fuerte)",
+      "Enter: Start · Shift: Select"
+    ]
+  },
+  {
+    "id": "snes_sunset_riders",
+    "name": "Sunset Riders",
+    "fileName": "Sunset Riders (USA).zip",
+    "icon": "🤠",
+    "genre": "Run and Gun / Western",
+    "color": "#eab308",
+    "tags": [
+      "SNES",
+      "Konami",
+      "Western"
+    ],
+    "objective": "Cazarrecompensas en el Salvaje Oeste enfrentando forajidos al estilo clásico de Konami.",
+    "controls": [
+      "Flechas: Moverse / Apuntar en 8 direcciones",
+      "Z: Saltar · A: Disparar",
+      "Abajo + Z: Deslizarse · Enter: Start"
+    ]
+  },
+  {
+    "id": "snes_super_bomberman_2",
+    "name": "Super Bomberman 2",
     "fileName": "Super Bomberman 2 (USA).zip",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "icon": "💣",
+    "genre": "Acción / Multijugador",
+    "color": "#6366f1",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "Hudson",
+      "Battle"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Super Bomberman 2 (USA).zip.",
+    "objective": "Coloca bombas, destruye bloques, consigue power-ups y elimina a los 5 Cyborg Bombers.",
     "controls": [
-      "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
-      "Soporte nativo para Gamepad USB/Bluetooth"
+      "Flechas: D-Pad / Moverse",
+      "Z: Colocar bomba · A: Lanzar / Patear bomba",
+      "Enter: Start · Shift: Select"
     ]
   },
   {
-    "id": "snes_super_punchout",
-    "name": "Super PunchOut",
+    "id": "snes_super_punch_out",
+    "name": "Super Punch-Out!!",
     "fileName": "Super PunchOut.zip",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "icon": "🥊",
+    "genre": "Deportes / Boxeo",
+    "color": "#3b82f6",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "Nintendo",
+      "Boxeo"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Super PunchOut.zip.",
+    "objective": "Sube al cuadrilátero, esquiva golpes y noquea a los rivales del Campeonato del Circuito Mundial.",
     "controls": [
-      "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
-      "Soporte nativo para Gamepad USB/Bluetooth"
+      "Flechas: Esquivar / Agacharse / Apuntar",
+      "A / S: Golpes al cuerpo / cara",
+      "Z: Golpe especial Knockout · Enter: Start"
     ]
   },
   {
-    "id": "snes_super_mario_all_stars___world_snes",
-    "name": "Super Mario All Stars & World SNES",
-    "fileName": "Super_Mario_All_Stars_&_World_SNES.zip",
-    "icon": "🎮",
-    "genre": "SNES / Clásico",
-    "color": "#ff3366",
+    "id": "snes_super_star_wars_rotj",
+    "name": "Super Star Wars: Return of the Jedi",
+    "fileName": "Super Star Wars - Return of the Jedi (USA) (Rev 1).zip",
+    "icon": "⚔️",
+    "genre": "Acción / Plataformas",
+    "color": "#10b981",
     "tags": [
       "SNES",
-      "SA-1 Ready"
+      "LucasArts",
+      "Star Wars"
     ],
-    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Super_Mario_All_Stars_&_World_SNES.zip.",
+    "objective": "Batalla por la galaxia como Luke Skywalker, Chewbacca, Leia y Wicket contra el Imperio.",
     "controls": [
-      "Flechas: D-Pad / Mover",
-      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
-      "A: Botón Y (Correr) · S: Botón X (Poder)",
-      "Enter: Start · Shift: Select · Q/W: L/R",
-      "Soporte nativo para Gamepad USB/Bluetooth"
+      "Flechas: Moverse / Apuntar",
+      "Z: Saltar · A: Disparar / Sable de luz",
+      "S: Poder de la Fuerza · Enter: Start"
+    ]
+  },
+  {
+    "id": "snes_super_star_wars_tesb",
+    "name": "Super Star Wars: The Empire Strikes Back",
+    "fileName": "Super Star Wars - The Empire Strikes Back (USA) (Rev 1).zip",
+    "icon": "❄️",
+    "genre": "Acción / Plataformas",
+    "color": "#0284c7",
+    "tags": [
+      "SNES",
+      "LucasArts",
+      "Star Wars"
+    ],
+    "objective": "Lucha en la batalla de Hoth, viaja a Bespin y entrena con el Maestro Yoda en Dagobah.",
+    "controls": [
+      "Flechas: Moverse / Apuntar",
+      "Z: Saltar · A: Disparar / Sable de luz",
+      "Enter: Start · Shift: Select"
+    ]
+  },
+  {
+    "id": "snes_super_street_fighter_ii",
+    "name": "Super Street Fighter II: The New Challengers",
+    "fileName": "Super Street Fighter II (USA).zip",
+    "icon": "👊",
+    "genre": "Lucha / Arcade",
+    "color": "#8b5cf6",
+    "tags": [
+      "SNES",
+      "Capcom",
+      "32 Megas"
+    ],
+    "objective": "16 luchadores mundiales con la incorporación estelar de Cammy, Fei Long, Dee Jay y T. Hawk.",
+    "controls": [
+      "Flechas: Moverse / Saltar / Cubrirse",
+      "A / S / D: Golpes (Débil / Medio / Fuerte)",
+      "Z / X / C: Patadas (Débil / Medio / Fuerte)",
+      "Enter: Start · Shift: Select"
+    ]
+  },
+  {
+    "id": "snes_super_mario_all_stars_world",
+    "name": "Super Mario All-Stars + Super Mario World",
+    "fileName": "Super_Mario_All_Stars_&_World_SNES.zip",
+    "icon": "⭐",
+    "genre": "Plataformas / Clásico",
+    "color": "#ec4899",
+    "tags": [
+      "SNES",
+      "Mario",
+      "Nintendo"
+    ],
+    "objective": "Compilación definitiva de SMB 1, SMB 2, SMB 3, The Lost Levels y Super Mario World.",
+    "controls": [
+      "Flechas: Moverse / Agacharse",
+      "Z: Saltar · A: Correr / Fuego",
+      "Enter: Start · Shift: Select"
+    ]
+  },
+  {
+    "id": "snes_toy_story",
+    "name": "Toy Story",
+    "fileName": "Toy Story (USA).zip",
+    "icon": "🤠",
+    "genre": "Aventura / Plataformas",
+    "color": "#06b6d4",
+    "tags": [
+      "SNES",
+      "Disney",
+      "Pixar"
+    ],
+    "objective": "Acompaña a Woody en su misión para reencontrarse con Andy y salvar a Buzz Lightyear.",
+    "controls": [
+      "Flechas: Moverse / Agacharse",
+      "Z: Saltar · A: Látigo de cuerda para amarrar juguetes",
+      "Enter: Start · Shift: Select"
     ]
   }
 ]

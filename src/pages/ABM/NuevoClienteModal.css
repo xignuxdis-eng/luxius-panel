@@ -230,7 +230,7 @@
 
 .spe-price-input {
     flex: 1;
-    min-width: 0;
+    min-width: 120px;
     height: 38px;
     box-sizing: border-box;
 }
