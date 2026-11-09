@@ -148,6 +148,26 @@ export interface Order {
 
     // Operational Tags
     tags?: string[];
+
+    // Facturación Electrónica ARCA / AFIP
+    facturaElectronica?: {
+        id?: number;
+        tipoComprobante: number; // 1: A, 6: B, 11: C
+        puntoVenta: number;
+        numeroComprobante: number;
+        cae: string;
+        vencimientoCae: string;
+        fechaEmision: string;
+        cuitEmisor: string;
+        cuitReceptor?: string;
+        docTipo: number;
+        docNro: string;
+        importeNeto: number;
+        importeIva: number;
+        importeTotal: number;
+        qrUrl: string;
+        afipResultado: string;
+    };
 }
 
 

@@ -604,3 +604,26 @@ export async function getOrdenesPendientes(): Promise<Order[]> {
     const orders = await getOrdenes();
     return orders.filter(o => pendingStatuses.includes(o.status));
 }
+
+export async function emitirFacturaAfip(orderId: number | string): Promise<{ success: boolean; comprobante: any }> {
+    const res = await fetchWithTimeout(`${API_URL}/orders/${orderId}/facturar`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Error ${res.status} al facturar en AFIP/ARCA`);
+    }
+    const data = await res.json();
+    // Invalidar caché en memoria para refrescar datos fiscales
+    inMemoryOrdersCache = null;
+    return data;
+}
+
+export async function consultarFacturaAfip(orderId: number | string): Promise<{ has_comprobante: boolean; comprobante?: any }> {
+    const res = await fetchWithTimeout(`${API_URL}/orders/${orderId}/factura`);
+    if (!res.ok) return { has_comprobante: false };
+    return await res.json();
+}
