@@ -161,3 +161,4 @@ El sistema **LuXius** queda en un estado técnico óptimo:
 1. **Estabilidad y Seguridad:** Base de datos blindada, código sin credenciales, llamadas a plotters autenticadas y prevención contra archivos dañados.
 2. **Sin Gastos Extra:** Continúa funcionando de forma gratuita en GitHub Pages para tu uso cotidiano.
 3. **Independencia Futura:** Todo el código y la arquitectura están listos para trasladarse a tu propio servidor local o VPS cuando desees centralizarlo físicamente en el taller.
+
