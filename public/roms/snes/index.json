@@ -1,1 +1,142 @@
-[]
+[
+  {
+    "id": "snes_captain_commando__e___t_spa100_chilensis_",
+    "name": "Captain Commando (E) [T+Spa100 Chilensis]",
+    "fileName": "Captain Commando (E) [T+Spa100_Chilensis].smc",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Captain Commando (E) [T+Spa100_Chilensis].smc.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  },
+  {
+    "id": "snes_donkey_kong_country_3___dixie_kong_s_double_trouble__u_____",
+    "name": "Donkey Kong Country 3   Dixie Kong's Double Trouble (U) [!]",
+    "fileName": "Donkey Kong Country 3 - Dixie Kong's Double Trouble (U) [!].smc",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Donkey Kong Country 3 - Dixie Kong's Double Trouble (U) [!].smc.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  },
+  {
+    "id": "snes_donkey_kong_country_snes",
+    "name": "Donkey Kong Country SNES",
+    "fileName": "Donkey_Kong_Country_SNES.zip",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Donkey_Kong_Country_SNES.zip.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  },
+  {
+    "id": "snes_nsmw1_twelve_magic_orbs",
+    "name": "nsmw1 twelve magic orbs",
+    "fileName": "nsmw1_twelve_magic_orbs.sfc",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/nsmw1_twelve_magic_orbs.sfc.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  },
+  {
+    "id": "snes_super_bomberman_2__usa_",
+    "name": "Super Bomberman 2 (USA)",
+    "fileName": "Super Bomberman 2 (USA).zip",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Super Bomberman 2 (USA).zip.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  },
+  {
+    "id": "snes_super_punchout",
+    "name": "Super PunchOut",
+    "fileName": "Super PunchOut.zip",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Super PunchOut.zip.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  },
+  {
+    "id": "snes_super_mario_all_stars___world_snes",
+    "name": "Super Mario All Stars & World SNES",
+    "fileName": "Super_Mario_All_Stars_&_World_SNES.zip",
+    "icon": "🎮",
+    "genre": "SNES / Clásico",
+    "color": "#ff3366",
+    "tags": [
+      "SNES",
+      "SA-1 Ready"
+    ],
+    "objective": "Juego Super Nintendo precargado desde public/roms/snes/Super_Mario_All_Stars_&_World_SNES.zip.",
+    "controls": [
+      "Flechas: D-Pad / Mover",
+      "Z: Botón B (Saltar) · X: Botón A (Salto Giro)",
+      "A: Botón Y (Correr) · S: Botón X (Poder)",
+      "Enter: Start · Shift: Select · Q/W: L/R",
+      "Soporte nativo para Gamepad USB/Bluetooth"
+    ]
+  }
+]

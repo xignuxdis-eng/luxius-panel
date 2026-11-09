@@ -30,6 +30,7 @@ venv/
 *.log
 *.tmp
 *.zip
+!public/roms/**/*.zip
 *.apk
 hs_err_pid*.log
 replay_pid*.log
