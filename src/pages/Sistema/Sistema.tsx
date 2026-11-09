@@ -4,6 +4,7 @@ import Button from '@components/ui/Button'
 import UsuariosView from './UsuariosView'
 import GoogleDriveView from './GoogleDriveView'
 import TelegramView from './TelegramView'
+import WorkshopOnboardingView from './WorkshopOnboardingView'
 import './Sistema.css'
 
 
@@ -300,6 +301,7 @@ export default function Sistema() {
             <Header title="Configuración de Sistema" subtitle="Administración avanzada y mantenimiento" />
 
             <nav className="abm-tabs">
+                <NavLink to="/sistema/onboarding" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>🏢 Configuración Taller</NavLink>
                 <NavLink to="/sistema/usuarios" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Usuarios</NavLink>
                 <NavLink to="/sistema/permisos" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Permisos</NavLink>
                 <NavLink to="/sistema/google-drive" className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}>Google Drive</NavLink>
@@ -310,6 +312,7 @@ export default function Sistema() {
 
             <div className="abm-content">
                 <Routes>
+                    <Route path="onboarding" element={<WorkshopOnboardingView />} />
                     <Route path="usuarios" element={<UsuariosView />} />
                     <Route path="permisos" element={<PermisosView />} />
                     <Route path="google-drive" element={<GoogleDriveView />} />
