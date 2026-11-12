@@ -39,7 +39,7 @@ jobs:
       - name: Instalar herramientas cliente PostgreSQL y age
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-client-16 age
+          sudo apt-get install -y --no-install-recommends postgresql-client age
 
       - name: Setup Python
         uses: actions/setup-python@v5
