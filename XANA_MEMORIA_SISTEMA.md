@@ -393,6 +393,8 @@ Si abres este proyecto en otro IDE (Cursor, VS Code, Windsurf, etc.) o en otra P
 
 > Convención: `[x]` hecho, `[~]` en curso, `[ ]` pendiente. Quien complete una tarea la marca aquí en el mismo commit.
 
+- [ ] **Migración a Servidor Propio (PLANIFICADO 12/11/2026)**: Roadmap completo para orquestador IA en `docs/infra/ROADMAP_MIGRACION_SERVIDOR_PROPIO.md` (fases F0–F12, decisiones D1–D10 pendientes del usuario, corte con rollback, backups 3-2-1, decomiso a 30 días). No iniciar sin aprobar F0.
+
 - [x] **Modularización e Higiene Quirúrgica — Descomposición de God Files (20/10/2026)**: Descomposición atómica de `db.ts` (3.467 a 183 líneas), `XpressViewer.tsx` (2.627 a 226 líneas), `Presupuestador.tsx` (784 a 98 líneas), `NestingStudioModal.tsx` (840 a 260 líneas), `Entrada.tsx` (2.547 a 999 líneas) y `NuevoPedidoModal.tsx` (3.798 a 3.054 líneas). Extracción de motores matemáticos a `src/utils/{pricing,nesting,prepress}/` y metadatos binarios a `fileMetadataParser.ts`. 0 errores en verify (typecheck, lint, 147 unit tests, build).
 
 - [x] **SuiteCraft (PhotoCraft + VectorCraft de Storytold) en Xpress Viewer (20/10/2026)**: Integración oficial de PhotoCraft (ráster) y VectorCraft (vectorial) como sub-aplicaciones estáticas aisladas (Opción A) en Xpress Viewer con dos pestañas independientes en el header, arquitectura Lazy Mount + Keep-Alive en DOM para evitar pérdidas de sesión, controles de pantalla completa y recarga de lienzo.
