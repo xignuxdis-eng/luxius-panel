@@ -140,10 +140,13 @@ export interface Order {
         bobinaUsada?: number;
         bobinaAncho?: number;
         precioML?: number;
+        precioM2?: number;
         costoBase?: number;
         rotated?: boolean;
         tipoCobro?: 'ml' | 'm2';
         consumoML?: number;
+        modalidadManual?: 'final' | 'm2' | 'ml';
+        valorManual?: number;
     };
 
     // Operational Tags

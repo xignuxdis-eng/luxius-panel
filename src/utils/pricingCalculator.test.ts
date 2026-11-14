@@ -11,7 +11,9 @@ import {
     calculateItemPriceDetailed,
     parseSpecialPriceKey,
     buildSpecialPriceKey,
-    resolveSpecialPrice
+    resolveSpecialPrice,
+    applyCustomPriceOverride,
+    resolveItemCustomSubtotal
 } from './pricingCalculator'
 
 /** Siembra un material conocido en localStorage (lo lee getMateriales()). */
@@ -390,5 +392,100 @@ describe('Precios Especiales a Clientes — Discriminación M2 vs ML', () => {
             const total = calculateOrderPrice(order, materiales, clientes)
             expect(total).toBe(25000)
         })
+    })
+})
+
+describe('Personalización de Precio (applyCustomPriceOverride y resolveItemCustomSubtotal)', () => {
+    beforeEach(() => {
+        window.localStorage.clear()
+    })
+
+    it('en modo "m2" recalcula el total dinámicamente al cambiar dimensiones/copias y suma servicios', () => {
+        sembrarMaterial('LONA', {
+            tipoCobro: 'm2',
+            precioM2: 12000,
+            ancho: 1.52,
+            bobinas: []
+        })
+
+        // Caso 1: 2m x 1.5m x 1 copia = 3 m2 -> con tarifa personalizada $9.500/m2 + $2.000 servicios
+        const det1 = calculateItemPriceDetailed('LONA', 2.0, 1.5, 1)
+        const s1 = applyCustomPriceOverride('m2', 9500, [{
+            m2: det1.consumoM2 || 0,
+            ml: det1.consumoML || 0,
+            autoSubtotal: det1.subtotal,
+            servicesTotal: 2000
+        }])
+        expect(s1.totalM2).toBe(3)
+        expect(s1.finalTotal).toBe(3 * 9500 + 2000)
+        expect(s1.effectiveRateM2).toBe(9500)
+
+        // Caso 2: 2 copias -> 6 m2 -> actualiza dinámicamente
+        const det2 = calculateItemPriceDetailed('LONA', 2.0, 1.5, 2)
+        const s2 = applyCustomPriceOverride('m2', 9500, [{
+            m2: det2.consumoM2 || 0,
+            ml: det2.consumoML || 0,
+            autoSubtotal: det2.subtotal,
+            servicesTotal: 2000
+        }])
+        expect(s2.totalM2).toBe(6)
+        expect(s2.finalTotal).toBe(6 * 9500 + 2000)
+    })
+
+    it('en modo "ml" calcula por metro lineal incluso sobre materiales cuyo tipoCobro base es "m2"', () => {
+        sembrarMaterial('FL-M2', {
+            tipoCobro: 'm2',
+            precioM2: 14000,
+            ancho: 1.52,
+            bobinas: []
+        })
+
+        // 0.50m x 1.20m x 3 copias en rollo de 1.52m (entra 3 por fila -> 1.20 ml)
+        const det = calculateItemPriceDetailed('FL-M2', 0.50, 1.20, 3)
+        expect(det.consumoML).toBe(1.2)
+        expect(det.consumoM2).toBe(1.8)
+
+        const res = applyCustomPriceOverride('ml', 18000, [{
+            m2: det.consumoM2 || 0,
+            ml: det.consumoML || 0,
+            autoSubtotal: det.subtotal,
+            servicesTotal: 1500
+        }])
+        expect(res.totalML).toBe(1.2)
+        expect(res.finalTotal).toBe(Math.round(1.2 * 18000) + 1500)
+        expect(res.effectiveRateML).toBe(18000)
+    })
+
+    it('en modo "final" fija el total acordado exacto y prorratea ítems en lote proporcionalmente', () => {
+        const items = [
+            { m2: 2, ml: 1.5, autoSubtotal: 30000, servicesTotal: 0 },
+            { m2: 4, ml: 3.0, autoSubtotal: 70000, servicesTotal: 0 },
+        ]
+        const summary = applyCustomPriceOverride('final', 50000, items)
+        expect(summary.finalTotal).toBe(50000)
+        expect(summary.totalM2).toBe(6)
+        expect(summary.totalML).toBe(4.5)
+
+        const item1Final = resolveItemCustomSubtotal('final', 50000, items[0], 100000, 2)
+        const item2Final = resolveItemCustomSubtotal('final', 50000, items[1], 100000, 2)
+        expect(item1Final).toBe(15000)
+        expect(item2Final).toBe(35000)
+        expect(item1Final + item2Final).toBe(50000)
+    })
+
+    it('en modo "auto" preserva íntegramente el total calculado por tarifario estándar', () => {
+        sembrarMaterial('VV-AUTO', {
+            tipoCobro: 'ml',
+            bobinas: [{ ancho: 1.37, precioML: 25000 }]
+        })
+        const det = calculateItemPriceDetailed('VV-AUTO', 1.0, 2.0, 1)
+        const summary = applyCustomPriceOverride('auto', 99999, [{
+            m2: det.consumoM2 || 0,
+            ml: det.consumoML || 0,
+            autoSubtotal: det.subtotal,
+            servicesTotal: det.servicesTotal || 0
+        }])
+        expect(summary.finalTotal).toBe(det.subtotal)
+        expect(summary.mode).toBe('auto')
     })
 })

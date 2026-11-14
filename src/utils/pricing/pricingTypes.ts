@@ -2,9 +2,14 @@
  * Luxius System - Pricing & Quoting Types
  */
 
+export type CustomPriceOverrideMode = 'auto' | 'final' | 'm2' | 'ml';
+
 export interface PriceCalculationResult {
     subtotal: number;
     consumoEstimado: number;
+    consumoM2?: number;
+    consumoML?: number;
+    servicesTotal?: number;
     bobinaAsignada?: number;
     precioMl?: number;
     rotated: boolean;
@@ -21,5 +26,7 @@ export interface PriceCalculationResult {
         costoBase?: number;
         esParticular?: boolean;
         recargoParticularPct?: number;
+        modalidadManual?: 'final' | 'm2' | 'ml';
+        valorManual?: number;
     };
 }

@@ -5,10 +5,61 @@
 import { getMateriales, getClientes, getServicios, getTarifasXignuxSync } from '@/data/db';
 import type { DemasiasConfig } from '@/types';
 import { getBobinaUsefulWidth } from '../nestingEngine';
-import type { PriceCalculationResult } from './pricingTypes';
+import type { PriceCalculationResult, CustomPriceOverrideMode } from './pricingTypes';
 import { resolveSpecialPrice } from './specialPricing';
 
 export const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
+
+function computeFallbackLinearMeters(
+    w: number,
+    h: number,
+    c: number,
+    bobinas?: Array<{ ancho?: number }>,
+    defaultAncho?: number
+): number {
+    const widths: { ancho: number; usefulWidth: number }[] = [];
+    if (Array.isArray(bobinas)) {
+        bobinas.forEach(b => {
+            if (b && typeof b.ancho === 'number' && b.ancho > 0) {
+                widths.push({ ancho: b.ancho, usefulWidth: getBobinaUsefulWidth(b.ancho) });
+            }
+        });
+    }
+    if (widths.length === 0 && defaultAncho && defaultAncho > 0) {
+        widths.push({ ancho: defaultAncho, usefulWidth: getBobinaUsefulWidth(defaultAncho) });
+    }
+    if (widths.length === 0) {
+        return round2(h * c);
+    }
+
+    widths.sort((a, b) => a.ancho - b.ancho);
+    const candidates: { ml: number; area: number; rotated: boolean }[] = [];
+
+    widths.forEach(({ ancho, usefulWidth }) => {
+        if (w <= usefulWidth) {
+            const fits = Math.max(1, Math.floor(usefulWidth / (w || 1)));
+            const ml = round2(Math.ceil(c / fits) * h);
+            candidates.push({ ml, area: ancho * ml, rotated: false });
+        }
+        if (h <= usefulWidth) {
+            const fits = Math.max(1, Math.floor(usefulWidth / (h || 1)));
+            const ml = round2(Math.ceil(c / fits) * w);
+            candidates.push({ ml, area: ancho * ml, rotated: true });
+        }
+    });
+
+    if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+            if (Math.abs(a.area - b.area) > 0.01) return a.area - b.area;
+            if (Math.abs(a.ml - b.ml) > 0.01) return a.ml - b.ml;
+            if (a.rotated !== b.rotated) return a.rotated ? 1 : -1;
+            return 0;
+        });
+        return candidates[0].ml;
+    }
+
+    return round2(h * c);
+}
 
 /**
  * Motor oficial unificado de calculo de precios y metros lineales de LuXius
@@ -47,6 +98,9 @@ export function calculateItemPriceDetailed(
         return {
             subtotal: 0,
             consumoEstimado: 0,
+            consumoM2: 0,
+            consumoML: 0,
+            servicesTotal: 0,
             bobinaAsignada: undefined,
             precioMl: undefined,
             rotated: false
@@ -232,10 +286,17 @@ export function calculateItemPriceDetailed(
     const subtotal = basePrice + servicesTotal;
 
     const isCalculationMl = tipoCobro === 'ml' && !hasExplicitM2;
+    const surfaceM2 = round2(w * h * c);
+    const effectiveML = linearMeters > 0
+        ? linearMeters
+        : computeFallbackLinearMeters(w, h, c, bobinas, mat.ancho);
 
     return {
         subtotal,
-        consumoEstimado: isCalculationMl ? linearMeters : round2(w * h * c),
+        consumoEstimado: isCalculationMl ? linearMeters : surfaceM2,
+        consumoM2: surfaceM2,
+        consumoML: effectiveML,
+        servicesTotal,
         bobinaAsignada: assignedBobina,
         precioMl: appliedPriceMl,
         rotated,
@@ -258,5 +319,88 @@ export function calculateItemPriceDetailed(
             esParticular: !!isParticular,
             recargoParticularPct: isParticular ? particularMarkupPct : 0
         }
+    };
+}
+
+export interface CustomPriceItemMetrics {
+    m2: number;
+    ml: number;
+    autoSubtotal: number;
+    servicesTotal: number;
+}
+
+export interface CustomPriceCalculationSummary {
+    mode: CustomPriceOverrideMode;
+    rateValue: number;
+    totalM2: number;
+    totalML: number;
+    servicesTotal: number;
+    baseCustomTotal: number;
+    finalTotal: number;
+    effectiveRateM2: number;
+    effectiveRateML: number;
+}
+
+export function resolveItemCustomSubtotal(
+    mode: CustomPriceOverrideMode,
+    customValue: number | null,
+    item: CustomPriceItemMetrics,
+    batchAutoTotal: number = 0,
+    batchCount: number = 1
+): number {
+    if (mode === 'auto' || customValue === null || Number.isNaN(customValue) || customValue < 0) {
+        return Math.round(item.autoSubtotal);
+    }
+    if (mode === 'm2') {
+        return Math.round(round2(item.m2) * customValue) + Math.round(item.servicesTotal);
+    }
+    if (mode === 'ml') {
+        return Math.round(round2(item.ml) * customValue) + Math.round(item.servicesTotal);
+    }
+    // mode === 'final'
+    const targetFinal = Math.round(customValue);
+    if (batchCount <= 1) return targetFinal;
+    if (batchAutoTotal > 0) {
+        return Math.round((item.autoSubtotal / batchAutoTotal) * targetFinal);
+    }
+    return Math.round(targetFinal / batchCount);
+}
+
+export function applyCustomPriceOverride(
+    mode: CustomPriceOverrideMode,
+    customValue: number | null,
+    items: CustomPriceItemMetrics[]
+): CustomPriceCalculationSummary {
+    const totalM2 = round2(items.reduce((acc, it) => acc + (Number(it.m2) || 0), 0));
+    const totalML = round2(items.reduce((acc, it) => acc + (Number(it.ml) || 0), 0));
+    const servicesTotal = Math.round(items.reduce((acc, it) => acc + (Number(it.servicesTotal) || 0), 0));
+    const autoTotal = Math.round(items.reduce((acc, it) => acc + (Number(it.autoSubtotal) || 0), 0));
+
+    let finalTotal = autoTotal;
+    if (mode !== 'auto' && customValue !== null && !Number.isNaN(customValue) && customValue >= 0) {
+        if (mode === 'final') {
+            finalTotal = Math.round(customValue);
+        } else {
+            finalTotal = items.reduce(
+                (acc, it) => acc + resolveItemCustomSubtotal(mode, customValue, it, autoTotal, items.length),
+                0
+            );
+        }
+    }
+
+    const baseCustomTotal = Math.max(0, finalTotal - servicesTotal);
+    const effectiveRateM2 = totalM2 > 0 ? Math.round(baseCustomTotal / totalM2) : 0;
+    const effectiveRateML = totalML > 0 ? Math.round(baseCustomTotal / totalML) : 0;
+
+    return {
+        mode,
+        rateValue: customValue !== null && !Number.isNaN(customValue) ? customValue : 0,
+        totalM2,
+        totalML,
+        servicesTotal,
+        baseCustomTotal,
+        finalTotal,
+        effectiveRateM2,
+        effectiveRateML,
     };
 }

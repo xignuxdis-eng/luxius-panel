@@ -19,7 +19,7 @@ try {
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
 import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS, isDesignerRole } from '@/types'
-import { calculateItemPriceDetailed as calcItemPriceDetailedUtil } from '@/utils/pricingCalculator'
+import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, applyCustomPriceOverride, resolveItemCustomSubtotal, type CustomPriceOverrideMode } from '@/utils/pricingCalculator'
 import { extractMetadata, getPdfThumbnail, type FileMetadata } from './utils/fileMetadataParser'
 import { detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nesting'
 import './NuevoPedidoModal.css'
@@ -177,7 +177,8 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [senaMetodo, setSenaMetodo] = useState<string>('efectivo');
     const [senaPorcentajeOption, setSenaPorcentajeOption] = useState<'0' | '50' | '100' | 'custom'>('0');
 
-    // --- Precio Personalizado (Override Manual) ---
+    // --- Precio Personalizado (Override Manual: Auto / m² / ml / Final) ---
+    const [priceOverrideMode, setPriceOverrideMode] = useState<CustomPriceOverrideMode>('auto');
     const [priceOverride, setPriceOverride] = useState<number | null>(null);
     const [isPriceOverridden, setIsPriceOverridden] = useState<boolean>(false);
 
@@ -519,6 +520,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     // memoización se invalidaba en cada render. Además ESLint no puede verificar
     // una expresión de llamada dentro de las deps. Se extrae a variable.
     const watchedServicios = watch('servicios')
+    const watchedDemasias = watch('demasiasConfig')
 
     // Sincronización entre selector de corte y servicios adicionales (Medio corte / Corte completo)
     useEffect(() => {
@@ -562,38 +564,122 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, activeTab, selectedComboId, setValue, isParticular])
 
-    // Dynamic calculated total according to pricing formulas
-    const calculatedOrderTotal = useMemo(() => {
+    // Métricas normalizadas por ítem para cálculo automático y personalización ($/m², $/ml o final)
+    const pricingItems = useMemo(() => {
         if (activeTab === 'unitario') {
             const w = parseFloat(watchedAncho) || 0;
             const h = parseFloat(watchedAlto) || 0;
             const c = parseInt(watchedCopias) || 1;
-            const services = watchedServicios;
-            return calculateItemPrice(watchedMaterial, w, h, c, services);
+            const det = calcItemPriceDetailedUtil(
+                watchedMaterial,
+                w,
+                h,
+                c,
+                watchedServicios,
+                watchedClientId,
+                watchedDemasias,
+                isParticular
+            );
+            return [{
+                m2: det.consumoM2 ?? 0,
+                ml: det.consumoML ?? 0,
+                autoSubtotal: det.subtotal,
+                servicesTotal: det.servicesTotal ?? 0
+            }];
         } else if (activeTab === 'promos') {
+            const rawW = parseFloat(watchedAncho) || 0;
+            const rawH = parseFloat(watchedAlto) || 0;
+            const w = round2(rawW > 20 ? rawW / 100 : rawW);
+            const h = round2(rawH > 20 ? rawH / 100 : rawH);
             const c = parseInt(watchedCopias) || 1;
             const currentCombo = getCombos().find(cb => cb.id === selectedComboId);
-            return Math.round((currentCombo?.precioFinal || 0) * c);
+            const comboTotal = Math.round((currentCombo?.precioFinal || 0) * c);
+            return [{
+                m2: round2(w * h * c),
+                ml: round2(h * c),
+                autoSubtotal: comboTotal,
+                servicesTotal: 0
+            }];
         } else if (activeTab === 'lote') {
             return batchItems
                 .filter(item => item.confirmed !== false)
-                .reduce((acc, item) => {
+                .map(item => {
                     const itemAncho = round2(Number(item.metadata.width) / 100);
                     const itemAlto = round2(Number(item.metadata.height) / 100);
-                    const priceRes = calculateItemPriceDetailed(item.material, itemAncho, itemAlto, item.copias, item.servicios, watchedClientId);
-                    return acc + priceRes.subtotal;
-                }, 0);
+                    const det = calcItemPriceDetailedUtil(
+                        item.material,
+                        itemAncho,
+                        itemAlto,
+                        item.copias,
+                        item.servicios,
+                        watchedClientId,
+                        item.demasiasConfig,
+                        isParticular
+                    );
+                    return {
+                        m2: det.consumoM2 ?? 0,
+                        ml: det.consumoML ?? 0,
+                        autoSubtotal: det.subtotal,
+                        servicesTotal: det.servicesTotal ?? 0
+                    };
+                });
         }
-        return 0;
-    }, [activeTab, watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, selectedComboId, batchItems, watchedClientId, isParticular]);
+        return [];
+    }, [
+        activeTab,
+        watchedAncho,
+        watchedAlto,
+        watchedCopias,
+        watchedMaterial,
+        watchedServicios,
+        watchedDemasias,
+        selectedComboId,
+        batchItems,
+        watchedClientId,
+        isParticular
+    ]);
 
-    // Dynamic total for current active tab (respeta monto manual personalizado si está activo)
-    const orderTotal = useMemo(() => {
-        if (isPriceOverridden && priceOverride !== null && priceOverride >= 0) {
-            return priceOverride;
+    const calculatedOrderTotal = useMemo(
+        () => Math.round(pricingItems.reduce((acc, it) => acc + (it.autoSubtotal || 0), 0)),
+        [pricingItems]
+    );
+
+    const activeOverrideMode: CustomPriceOverrideMode = isPriceOverridden
+        ? (priceOverrideMode === 'auto' ? 'final' : priceOverrideMode)
+        : 'auto';
+
+    const pricingSummary = useMemo(
+        () => applyCustomPriceOverride(activeOverrideMode, priceOverride, pricingItems),
+        [activeOverrideMode, priceOverride, pricingItems]
+    );
+
+    // Dynamic total for current active tab (respeta monto manual o tarifa $/m² / $/ml si está activo)
+    const orderTotal = pricingSummary.finalTotal;
+
+    const handleSelectPriceMode = (mode: CustomPriceOverrideMode) => {
+        if (mode === 'auto') {
+            setIsPriceOverridden(false);
+            setPriceOverrideMode('auto');
+            setPriceOverride(null);
+            return;
         }
-        return calculatedOrderTotal;
-    }, [isPriceOverridden, priceOverride, calculatedOrderTotal]);
+        if (isPriceOverridden && activeOverrideMode === mode) return;
+
+        const mat = getMateriales().find(
+            m => m.codigo === watchedMaterial || String(m.codigo).toLowerCase() === String(watchedMaterial || '').toLowerCase()
+        );
+        let initialVal = 0;
+        if (mode === 'm2') {
+            initialVal = pricingSummary.effectiveRateM2 || mat?.precioM2 || 0;
+        } else if (mode === 'ml') {
+            initialVal = pricingSummary.effectiveRateML || mat?.bobinas?.[0]?.precioML || 0;
+        } else {
+            initialVal = orderTotal || calculatedOrderTotal || 0;
+        }
+        setIsPriceOverridden(true);
+        setPriceOverrideMode(mode);
+        setPriceOverride(initialVal);
+    };
 
     // Sugerencia de anidado para vinilo vehicular en carga de lotes (Laminado continuo <= 2.90m)
     const vehicularNestingSuggestions = useMemo(() => {
@@ -627,6 +713,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         const num = parseFloat(valStr) || 0;
         setSenaAmount(Math.max(0, num));
     };
+
+    useEffect(() => {
+        if (senaPorcentajeOption === '50') {
+            setSenaAmount(Math.round(orderTotal * 0.5));
+        } else if (senaPorcentajeOption === '100') {
+            setSenaAmount(orderTotal);
+        }
+    }, [orderTotal, senaPorcentajeOption]);
 
     const saldoPendiente = Math.max(0, orderTotal - senaAmount);
     const senaPorcentaje = orderTotal > 0 ? Math.min(100, Math.round((senaAmount / orderTotal) * 100)) : (senaAmount > 0 ? 100 : 0);
@@ -714,15 +808,20 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setSenaAmount(initSena);
             setSenaMetodo(order.senaMetodo || 'efectivo');
 
-            // Cargar y persistir precio personalizado si la orden ya tiene uno o si ya tenía un total histórico
+            // Cargar y persistir precio personalizado si la orden ya tiene modalidad manual ($/m², $/ml o final)
             const manualPrice = order.precioUnitarioManual ?? (order as any).precio_manual ?? (order as any).precioManual;
-            if (manualPrice !== undefined && manualPrice !== null && Number(manualPrice) > 0) {
-                setPriceOverride(Number(manualPrice));
+            const savedMode = order.precioDetalle?.modalidadManual;
+            const savedVal = order.precioDetalle?.valorManual;
+            if (savedMode && ['final', 'm2', 'ml'].includes(savedMode) && savedVal !== undefined && savedVal !== null && Number(savedVal) > 0) {
+                setPriceOverrideMode(savedMode);
+                setPriceOverride(Number(savedVal));
                 setIsPriceOverridden(true);
-            } else if (order.total && Number(order.total) > 0) {
-                setPriceOverride(Number(order.total));
+            } else if ((manualPrice !== undefined && manualPrice !== null && Number(manualPrice) > 0) || (order.total && Number(order.total) > 0)) {
+                setPriceOverrideMode('final');
+                setPriceOverride(Number(manualPrice || order.total));
                 setIsPriceOverridden(true);
             } else {
+                setPriceOverrideMode('auto');
                 setPriceOverride(null);
                 setIsPriceOverridden(false);
             }
@@ -767,6 +866,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 demasiasConfig: { top: false, bottom: false, left: false, right: false }
             });
             setClientSearch('');
+            setPriceOverrideMode('auto');
             setPriceOverride(null);
             setIsPriceOverridden(false);
             setSenaAmount(0);
@@ -1492,6 +1592,30 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
         const clientesList = getClientes()
         const cliente = clientesList.find(c => String(c.id) === String(data.clienteId))
 
+        const buildSavedPrecioDetalle = (
+            baseDetalle: Order['precioDetalle'] | undefined,
+            priceResult: ReturnType<typeof calculateItemPriceDetailed>,
+            appliedSubtotal: number
+        ): Order['precioDetalle'] | undefined => {
+            if (!isPriceOverridden || activeOverrideMode === 'auto') {
+                return baseDetalle;
+            }
+            const manualMode = activeOverrideMode;
+            const rate = priceOverride ?? undefined;
+            return {
+                ...(baseDetalle || { tipoCobro: manualMode === 'm2' ? 'm2' : 'ml' }),
+                tipoCobro: manualMode === 'm2' ? 'm2' : (manualMode === 'ml' ? 'ml' : (baseDetalle?.tipoCobro || 'm2')),
+                precioM2: manualMode === 'm2' ? rate : baseDetalle?.precioM2,
+                precioML: manualMode === 'ml' ? rate : baseDetalle?.precioML,
+                consumoML: manualMode === 'ml'
+                    ? (priceResult.consumoML ?? priceResult.consumoEstimado)
+                    : baseDetalle?.consumoML,
+                costoBase: Math.max(0, Math.round(appliedSubtotal - (priceResult.servicesTotal ?? 0))),
+                modalidadManual: manualMode,
+                valorManual: rate,
+            };
+        };
+
         try {
             if (activeTab === 'lote') {
                 const confirmedItems = batchItems.filter(i => i.confirmed !== false)
@@ -1519,6 +1643,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
 
                 const batchId = `lote_${Date.now()}`
                 const batchName = (data.nombreTarea || '').trim()
+                let allocatedFinalSum = 0
 
                 try {
                     for (let i = 0; i < confirmedItems.length; i++) {
@@ -1529,8 +1654,36 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                             // Convertir cm a metros para backend y cálculo de precio con precisión a 2 decimales (cm)
                             const itemAncho = round2(Number(item.metadata.width) / 100);
                             const itemAlto = round2(Number(item.metadata.height) / 100);
-                            const priceResult = calculateItemPriceDetailed(item.material, itemAncho, itemAlto, item.copias, item.servicios, data.clienteId)
-                            const itemSubtotal = priceResult.subtotal
+                            const priceResult = calcItemPriceDetailedUtil(
+                                item.material,
+                                itemAncho,
+                                itemAlto,
+                                item.copias,
+                                item.servicios,
+                                data.clienteId,
+                                item.demasiasConfig,
+                                isParticular
+                            )
+                            let itemSubtotal = priceResult.subtotal
+                            if (isPriceOverridden) {
+                                if (activeOverrideMode === 'final' && i === confirmedItems.length - 1) {
+                                    itemSubtotal = Math.max(0, Math.round(orderTotal - allocatedFinalSum));
+                                } else {
+                                    itemSubtotal = resolveItemCustomSubtotal(
+                                        activeOverrideMode,
+                                        priceOverride,
+                                        {
+                                            m2: priceResult.consumoM2 ?? 0,
+                                            ml: priceResult.consumoML ?? 0,
+                                            autoSubtotal: priceResult.subtotal,
+                                            servicesTotal: priceResult.servicesTotal ?? 0
+                                        },
+                                        calculatedOrderTotal,
+                                        confirmedItems.length
+                                    );
+                                }
+                            }
+                            allocatedFinalSum += itemSubtotal
 
                             // Upload file
                             let remoteFileName = item.fileName;
@@ -1583,6 +1736,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 calidad: item.calidad || data.calidad || (availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO'),
                                 subtotal: itemSubtotal,
                                 total: itemSubtotal,
+                                precioUnitarioManual: isPriceOverridden ? itemSubtotal : undefined,
                                 sena: itemSena,
                                 senaMonto: itemSena,
                                 senaPorcentaje: senaPorcentaje,
@@ -1591,8 +1745,10 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 montoPagado: itemSena,
                                 bobinaAsignada: priceResult.bobinaAsignada,
                                 consumoEstimado: priceResult.consumoEstimado,
-                                precioMl: priceResult.precioMl,
-                                precioDetalle: priceResult.precioDetalle,
+                                precioMl: (isPriceOverridden && activeOverrideMode === 'ml' && priceOverride !== null)
+                                    ? priceOverride
+                                    : priceResult.precioMl,
+                                precioDetalle: buildSavedPrecioDetalle(priceResult.precioDetalle, priceResult, itemSubtotal),
                                 envio: data.envio || '',
                                 servicios: item.servicios,
                                 demasiasConfig: isLonaOrNotVinilo(item.material) ? item.demasiasConfig : { top: false, bottom: false, left: false, right: false },
@@ -1679,9 +1835,17 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                         }
                     }
 
-                    const finalTotal = (isPriceOverridden && priceOverride !== null && priceOverride >= 0)
-                        ? priceOverride
-                        : (subtotal || orderTotal);
+                    const customComputedTotal = (isPriceOverridden && priceOverride !== null && priceOverride >= 0)
+                        ? (activeTab === 'promos'
+                            ? orderTotal
+                            : applyCustomPriceOverride(activeOverrideMode, priceOverride, [{
+                                m2: priceResult.consumoM2 ?? 0,
+                                ml: priceResult.consumoML ?? 0,
+                                autoSubtotal: subtotal,
+                                servicesTotal: priceResult.servicesTotal ?? 0
+                            }]).finalTotal)
+                        : null;
+                    const finalTotal = customComputedTotal !== null ? customComputedTotal : (subtotal || orderTotal);
                     const finalSaldo = Math.max(0, finalTotal - senaAmount);
                     const finalSenaPorcentaje = finalTotal > 0 ? Math.min(100, Math.round((senaAmount / finalTotal) * 100)) : (senaAmount > 0 ? 100 : 0);
 
@@ -1690,7 +1854,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                         ...numericData,
                         subtotal: finalTotal,
                         total: finalTotal,
-                        precioUnitarioManual: isPriceOverridden ? priceOverride : undefined,
+                        precioUnitarioManual: isPriceOverridden ? finalTotal : undefined,
                         sena: senaAmount,
                         senaMonto: senaAmount,
                         senaPorcentaje: finalSenaPorcentaje,
@@ -1699,8 +1863,10 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                         montoPagado: senaAmount,
                         bobinaAsignada: priceResult.bobinaAsignada,
                         consumoEstimado: priceResult.consumoEstimado,
-                        precioMl: priceResult.precioMl,
-                        precioDetalle: priceResult.precioDetalle,
+                        precioMl: (isPriceOverridden && activeOverrideMode === 'ml' && priceOverride !== null)
+                            ? priceOverride
+                            : priceResult.precioMl,
+                        precioDetalle: buildSavedPrecioDetalle(priceResult.precioDetalle, priceResult, finalTotal),
                         clienteNombre: cliente?.nombre || (data as any).clienteNombre || 'Desconocido',
                         archivos: finalArchivos,
                         archivosOriginales: finalArchivosOriginales,
@@ -3268,7 +3434,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 marginBottom: '8px',
                                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '1.2rem' }}>💰</span>
                                         <div>
@@ -3276,77 +3442,125 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                 Condiciones Comerciales y Seña / Anticipo
                                             </h4>
                                             <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
-                                                Defina el anticipo recibido y las condiciones de cobro del pedido
+                                                Defina tarifa automática, precio por m², m lineal o monto final, y el anticipo recibido
                                             </p>
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '0.72rem', color: isPriceOverridden ? '#f59e0b' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-                                                {isPriceOverridden ? 'Monto Acordado (Manual)' : 'Total Calculado'}
+                                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flex: '1 1 auto' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                            <span style={{ fontSize: '0.7rem', color: isPriceOverridden ? '#fbbf24' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, marginRight: '4px' }}>
+                                                {activeOverrideMode === 'm2'
+                                                    ? 'Tarifa Manual ($/m²)'
+                                                    : activeOverrideMode === 'ml'
+                                                        ? 'Tarifa Manual ($/ml)'
+                                                        : activeOverrideMode === 'final'
+                                                            ? 'Monto Acordado (Manual)'
+                                                            : 'Total Calculado'}
                                             </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    if (isPriceOverridden) {
-                                                        setIsPriceOverridden(false);
-                                                        setPriceOverride(null);
-                                                    } else {
-                                                        setIsPriceOverridden(true);
-                                                        setPriceOverride(orderTotal || calculatedOrderTotal || 0);
-                                                    }
-                                                }}
-                                                style={{
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 600,
-                                                    padding: '3px 8px',
-                                                    borderRadius: '4px',
-                                                    border: '1px solid',
-                                                    borderColor: isPriceOverridden ? '#f59e0b' : 'rgba(56,189,248,0.4)',
-                                                    background: isPriceOverridden ? 'rgba(245,158,11,0.18)' : 'rgba(56,189,248,0.1)',
-                                                    color: isPriceOverridden ? '#fbbf24' : '#38bdf8',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.15s ease'
-                                                }}
-                                                title={isPriceOverridden ? 'Volver al cálculo automático por medidas y material' : 'Personalizar el total manualmente'}
-                                            >
-                                                {isPriceOverridden ? '↺ Restaurar Fórmula' : '✏️ Personalizar Precio'}
-                                            </button>
+                                            {([
+                                                { id: 'auto', label: '⚡ Tarifario Auto', title: 'Calcular automáticamente según tarifario oficial' },
+                                                { id: 'm2', label: '📐 Por m² ($/m²)', title: 'Personalizar precio por metro cuadrado' },
+                                                { id: 'ml', label: '📏 Por m Lineal ($/ml)', title: 'Personalizar precio por metro lineal' },
+                                                { id: 'final', label: '💰 Precio Final ($)', title: 'Fijar monto final acordado manualmente' },
+                                            ] as const).map(opt => {
+                                                const isActive = activeOverrideMode === opt.id;
+                                                const isAutoActive = opt.id === 'auto' && isActive;
+                                                return (
+                                                    <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        onClick={() => handleSelectPriceMode(opt.id)}
+                                                        title={opt.title}
+                                                        style={{
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: isActive ? 700 : 600,
+                                                            padding: '4px 9px',
+                                                            borderRadius: '6px',
+                                                            border: '1px solid',
+                                                            borderColor: isActive
+                                                                ? (isAutoActive ? '#38bdf8' : '#f59e0b')
+                                                                : 'rgba(148,163,184,0.28)',
+                                                            background: isActive
+                                                                ? (isAutoActive ? 'rgba(56,189,248,0.18)' : 'rgba(245,158,11,0.2)')
+                                                                : 'rgba(255,255,255,0.04)',
+                                                            color: isActive
+                                                                ? (isAutoActive ? '#38bdf8' : '#fbbf24')
+                                                                : '#94a3b8',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.15s ease'
+                                                        }}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
+
                                         {isPriceOverridden ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fbbf24' }}>$</span>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={priceOverride === null ? '' : priceOverride}
-                                                    onChange={e => {
-                                                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
-                                                        setPriceOverride(val);
-                                                    }}
-                                                    placeholder="0.00"
-                                                    style={{
-                                                        width: '150px',
-                                                        padding: '4px 8px',
-                                                        fontSize: '1.25rem',
-                                                        fontWeight: 800,
-                                                        color: '#fbbf24',
-                                                        background: 'rgba(0,0,0,0.45)',
-                                                        border: '1px solid #f59e0b',
-                                                        borderRadius: '6px',
-                                                        textAlign: 'right'
-                                                    }}
-                                                />
-                                                {calculatedOrderTotal > 0 && (
-                                                    <span style={{ fontSize: '0.75rem', color: '#64748b', textDecoration: 'line-through', marginLeft: '4px' }} title="Precio sugerido por cálculo original">
-                                                        ${calculatedOrderTotal.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                    <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fbbf24' }}>$</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={priceOverride === null ? '' : priceOverride}
+                                                        onChange={e => {
+                                                            const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                                            setPriceOverride(val);
+                                                        }}
+                                                        placeholder="0.00"
+                                                        style={{
+                                                            width: '140px',
+                                                            padding: '4px 8px',
+                                                            fontSize: '1.2rem',
+                                                            fontWeight: 800,
+                                                            color: '#fbbf24',
+                                                            background: 'rgba(0,0,0,0.45)',
+                                                            border: '1px solid #f59e0b',
+                                                            borderRadius: '6px',
+                                                            textAlign: 'right'
+                                                        }}
+                                                    />
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fbbf24' }}>
+                                                        {activeOverrideMode === 'm2' ? '/ m²' : activeOverrideMode === 'ml' ? '/ ml' : 'Total'}
                                                     </span>
+                                                    {activeOverrideMode !== 'final' && (
+                                                        <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f8fafc', background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '6px', padding: '3px 8px' }}>
+                                                            × {activeOverrideMode === 'm2' ? `${pricingSummary.totalM2.toFixed(2)} m²` : `${pricingSummary.totalML.toFixed(2)} ml`}
+                                                            {pricingSummary.servicesTotal > 0 ? ` + $${pricingSummary.servicesTotal.toLocaleString('es-AR')} serv.` : ''}
+                                                            {` = $${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                        </span>
+                                                    )}
+                                                    {calculatedOrderTotal > 0 && (
+                                                        <span style={{ fontSize: '0.75rem', color: '#64748b', textDecoration: 'line-through', marginLeft: '4px' }} title="Precio sugerido por tarifario original">
+                                                            ${calculatedOrderTotal.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {activeOverrideMode === 'final' && (pricingSummary.totalM2 > 0 || pricingSummary.totalML > 0) && (
+                                                    <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                                                        Equivale a <b style={{ color: '#cbd5e1' }}>~${pricingSummary.effectiveRateM2.toLocaleString('es-AR')}/m²</b> · <b style={{ color: '#cbd5e1' }}>~${pricingSummary.effectiveRateML.toLocaleString('es-AR')}/ml</b>
+                                                        {pricingSummary.servicesTotal > 0 ? ` (desc. $${pricingSummary.servicesTotal.toLocaleString('es-AR')} de servicios)` : ''}
+                                                    </div>
+                                                )}
+                                                {activeOverrideMode !== 'final' && (pricingSummary.totalM2 === 0 && pricingSummary.totalML === 0) && (
+                                                    <div style={{ fontSize: '0.72rem', color: '#f59e0b' }}>
+                                                        ⚠️ Ingresá ancho y alto mayores a 0 para calcular la multiplicación automática
+                                                    </div>
                                                 )}
                                             </div>
                                         ) : (
-                                            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
-                                                ${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
+                                                    ${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                                {(pricingSummary.totalM2 > 0 || pricingSummary.totalML > 0) && (
+                                                    <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                                                        {pricingSummary.totalM2.toFixed(2)} m² · {pricingSummary.totalML.toFixed(2)} ml
+                                                        {pricingSummary.servicesTotal > 0 ? ` · +$${pricingSummary.servicesTotal.toLocaleString('es-AR')} serv.` : ''}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
