@@ -4,7 +4,7 @@ import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import { UniversalFilePreview } from '@components/UniversalFilePreview'
 import { PDFDocument } from 'pdf-lib'
-import { getClientes, getMateriales, getCalidades, DEFAULT_CALIDADES, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, getAuthHeaders, type ComboData } from '@data/db'
+import { getClientes, getMateriales, getCalidades, DEFAULT_CALIDADES, saveOrden, deleteOrden, getLogisticas, uploadFile, saveCliente, API_URL, getServiciosActivos, resolveMediaUrl, getCombos, getServicios, getAuthHeaders, refreshCollection, type ComboData } from '@data/db'
 import * as pdfjsLib from 'pdfjs-dist';
 // @ts-ignore
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -103,6 +103,24 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0, errorCount: 0 })
     const [vendedores, setVendedores] = useState<any[]>([])
     const [selectedTags, setSelectedTags] = useState<string[]>(order?.tags || [])
+    const [materialsVersion, setMaterialsVersion] = useState(0)
+
+    useEffect(() => {
+        const handleMaterialsUpdated = () => setMaterialsVersion(v => v + 1);
+        window.addEventListener('luxius-materials-updated', handleMaterialsUpdated);
+        let cancelled = false;
+        if (isOpen) {
+            refreshCollection('materiales')
+                .then(() => {
+                    if (!cancelled) setMaterialsVersion(v => v + 1);
+                })
+                .catch(() => { /* fallback a cache local */ });
+        }
+        return () => {
+            cancelled = true;
+            window.removeEventListener('luxius-materials-updated', handleMaterialsUpdated);
+        };
+    }, [isOpen]);
     const [uploadProgress, setUploadProgress] = useState<{ percent: number; loaded: string; total: string; fileName: string } | null>(null);
     const [isCloudImporting, setIsCloudImporting] = useState(false)
     const [cloudImportStatus, setCloudImportStatus] = useState<string>('')
@@ -419,10 +437,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
     // Memoized printable materials with full deduplication by normalized code and description
     const availableMaterials = useMemo(() => {
-        const raw = getMateriales().filter(m =>
-            m.habilitado !== false &&
-            !['tinta', 'solvente'].includes((m.tipo || '').toLowerCase())
-        );
+        const raw = getMateriales().filter(m => {
+            if (m.habilitado === false) return false;
+            if (['tinta', 'solvente'].includes((m.tipo || '').toLowerCase())) return false;
+            const normC = (m.codigo || '').trim().toUpperCase().replace(/[-_\s]/g, '');
+            return !normC.startsWith('INK') && !normC.startsWith('FLS');
+        });
         const seen = new Set<string>();
         return raw.filter(m => {
             const codeKey = (m.codigo || '').trim().toUpperCase();
@@ -432,10 +452,14 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             seen.add(key);
             if (descKey) seen.add(descKey);
             return true;
-        }).sort((a, b) => (a.descripcion || '').localeCompare(b.descripcion || ''));
-        // `isOpen` = cache buster: relee localStorage al abrir el modal.
+        }).sort((a, b) =>
+            (a.descripcion || (a as any).nombre || a.codigo || '').localeCompare(
+                b.descripcion || (b as any).nombre || b.codigo || ''
+            )
+        );
+        // `isOpen` y `materialsVersion` = cache busters: releen localStorage al abrir/refrescar.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen]);
+    }, [isOpen, materialsVersion]);
 
     // Auto-select initial default material if empty
     useEffect(() => {
@@ -1963,7 +1987,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                         <select {...register('material', { required: activeTab === 'unitario' && watch('status') === 'orden' })} className="input-field">
                                             <option value="">...</option>
                                             {availableMaterials.map(m => (
-                                                <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                <option key={m.id} value={m.codigo}>{m.descripcion || (m as any).nombre || m.codigo}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -2479,7 +2503,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                             >
                                                 <option value="">Seleccionar material (Obligatorio)...</option>
                                                 {availableMaterials.map(m => (
-                                                    <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                    <option key={m.id} value={m.codigo}>{m.descripcion || (m as any).nombre || m.codigo}</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -2875,7 +2899,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                             >
                                                                 <option value="">Elija material</option>
                                                                 {availableMaterials.map(m => (
-                                                                    <option key={m.id} value={m.codigo}>{m.descripcion}</option>
+                                                                    <option key={m.id} value={m.codigo}>{m.descripcion || (m as any).nombre || m.codigo}</option>
                                                                 ))}
                                                             </select>
                                                         </div>

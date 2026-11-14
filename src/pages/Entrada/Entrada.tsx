@@ -1090,7 +1090,9 @@ export default function Entrada() {
                         onClose={(created) => {
                             setIsModalOpen(false)
                             setEditingOrder(null)
-                            if (created) loadOrders()
+                            if (created) {
+                                void loadOrders(true)
+                            }
                         }}
                     />
                 )
@@ -1161,7 +1163,7 @@ export default function Entrada() {
                     onClose={async (updated) => {
                         setIsEditBatchModalOpen(false);
                         if (updated) {
-                            await loadOrders();
+                            await loadOrders(true);
                         }
                     }}
                     batchOrders={editBatchOrders}

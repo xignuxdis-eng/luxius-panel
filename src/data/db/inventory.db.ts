@@ -168,13 +168,59 @@ export const DEFAULT_MATERIALES: Material[] = [
     }
 ];
 
+function normMaterialCode(code?: string): string {
+    return String(code || '').trim().toUpperCase().replace(/[-_\s]/g, '');
+}
+
+function hydrateMaterialDefaults(item: Material): Material {
+    const rawAny = item as any;
+    const rawCode = (item.codigo || '').trim();
+    const normCode = normMaterialCode(rawCode);
+    const defMatch = DEFAULT_MATERIALES.find(d => normMaterialCode(d.codigo) === normCode);
+
+    const rawDesc = (item.descripcion || '').trim();
+    const rawNombre = typeof rawAny.nombre === 'string' ? rawAny.nombre.trim() : '';
+    const isCodeOnly = !rawDesc || rawDesc.toUpperCase() === rawCode.toUpperCase();
+    const descripcion = isCodeOnly
+        ? ((rawNombre && rawNombre.toUpperCase() !== rawCode.toUpperCase()) ? rawNombre : (defMatch?.descripcion || rawDesc || rawCode))
+        : rawDesc;
+
+    let tipo = (item.tipo || '').trim();
+    if (!tipo) {
+        const cat = String(rawAny.categoria || '').trim().toLowerCase();
+        if (cat === 'tinta' || cat === 'tintas' || normCode.startsWith('INK')) {
+            tipo = 'tinta';
+        } else if (cat === 'solvente' || cat === 'solventes' || normCode.startsWith('FLS')) {
+            tipo = 'solvente';
+        } else {
+            tipo = defMatch?.tipo || 'Sustrato';
+        }
+    }
+
+    let ancho = Number(item.ancho || 0);
+    if (!ancho && !['tinta', 'solvente'].includes(tipo.toLowerCase())) {
+        const maxBobina = Array.isArray(item.bobinas) && item.bobinas.length > 0
+            ? Math.max(...item.bobinas.map(b => Number(b.ancho) || 0))
+            : 0;
+        ancho = maxBobina > 0 ? maxBobina : (defMatch?.ancho || 0);
+    }
+
+    return {
+        ...item,
+        descripcion,
+        tipo,
+        ancho,
+    };
+}
+
 export function deduplicateMaterials(materials: Material[]): Material[] {
     if (!Array.isArray(materials) || materials.length === 0) return [];
 
     const deduped: Material[] = [];
 
-    for (const item of materials) {
-        if (!item) continue;
+    for (const rawItem of materials) {
+        if (!rawItem) continue;
+        const item = hydrateMaterialDefaults(rawItem);
         const codeKey = (item.codigo || '').trim().toUpperCase();
         const descKey = (item.descripcion || '').trim().toLowerCase();
 
@@ -273,7 +319,8 @@ export function getMateriales(): Material[] {
     const validCalidadesMap = new Map(calidadesList.map(c => [c.nombre.trim().toLowerCase(), c.nombre]));
     const defaultCalidadName = calidadesList.find(c => c.habilitado !== false)?.nombre || calidadesList[0]?.nombre || 'Solvente';
 
-    return filteredSession.map(m => {
+    return filteredSession.map(rawMat => {
+        const m = hydrateMaterialDefaults(rawMat);
         let color = m.color;
         if (!color) {
             if (m.codigo === 'INK-C') color = '#00ffff';

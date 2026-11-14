@@ -245,8 +245,6 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         category: (order.category || existing.category || 'impresion') as any,
         updatedAt: now.toISOString(),
     } : {
-        id: Number(nextSeqId) || getNextSequentialId(localOrders),
-        ot: otCode,
         nombreTarea: order.nombreTarea || (order as any).observaciones || '',
         clientId: Number(order.clientId) || 1,
         clienteNombre: order.clienteNombre || 'Cliente',
@@ -264,6 +262,8 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         createdAt: (order as any).createdAt || now.toISOString(),
         fechaEntrega: order.fechaEntrega || now.toISOString().split('T')[0],
         ...order,
+        id: Number(nextSeqId) || getNextSequentialId(localOrders),
+        ot: otCode,
     } as Order;
 
     // Handle HIDDEN_ORDENES_KEY: clear from hidden list if order is being saved/restored
@@ -305,12 +305,42 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
         }
     }
 
+    const syncMemoryCache = (targetOrder: Order, matchKey: number | string | undefined, fallbackOrders: Order[]) => {
+        if (!inMemoryOrdersCache) {
+            inMemoryOrdersCache = [...fallbackOrders];
+            return;
+        }
+        const nextCache = [...inMemoryOrdersCache];
+        const targetKey = (targetOrder as any).uuid || targetOrder.id || targetOrder.ot;
+        let cacheIdx = matchKey !== undefined ? nextCache.findIndex(o => matchesOrderId(o, matchKey)) : -1;
+        if (cacheIdx < 0 && targetKey !== undefined) {
+            cacheIdx = nextCache.findIndex(o => matchesOrderId(o, targetKey));
+        }
+        if (cacheIdx >= 0) {
+            nextCache[cacheIdx] = { ...nextCache[cacheIdx], ...targetOrder };
+        } else {
+            nextCache.unshift(targetOrder);
+        }
+        inMemoryOrdersCache = nextCache;
+    };
+
+    syncMemoryCache(newOrder, newOrder.id, localOrders);
+
     try {
-        const backendTargetId = (newOrder as any).uuid || (existing as any)?.uuid || (order as any).uuid || order.id || existing?.id;
+        const isUpdate = Boolean(
+            (order as any).uuid ||
+            (existing as any)?.uuid ||
+            (order.id && existing)
+        );
+        const backendTargetId = isUpdate
+            ? ((newOrder as any).uuid || (existing as any)?.uuid || (order as any).uuid || order.id || existing?.id)
+            : undefined;
         const method = backendTargetId ? 'PUT' : 'POST';
         const url = backendTargetId ? `${API_URL}/orders/${backendTargetId}` : `${API_URL}/orders`;
 
-        const payloadToSend = backendTargetId ? { ...order, id: backendTargetId } : newOrder;
+        const payloadToSend = backendTargetId
+            ? { ...order, id: backendTargetId }
+            : { ...newOrder, id: undefined, ot: undefined };
 
         const response = await fetchWithTimeout(url, {
             method,
@@ -320,24 +350,41 @@ export async function saveOrden(order: Partial<Order>): Promise<Order> {
 
         if (response.ok) {
             const serverOrder = await response.json();
-            
+            const normalizedServerOrder: Order = {
+                ...newOrder,
+                ...serverOrder,
+                ot: formatOTNumber(serverOrder.ot || serverOrder.id || newOrder.ot),
+            };
+
             try {
                 const currentLocalStr = localStorage.getItem('luxius_session_ordenes') || '[]';
                 const currentLocal: Order[] = JSON.parse(currentLocalStr);
-                const localIdx = currentLocal.findIndex(o => matchesOrderId(o, (serverOrder as any).uuid || serverOrder.id || serverOrder.ot || (newOrder as any).uuid || newOrder.id));
-                if (localIdx >= 0) {
-                    currentLocal[localIdx] = { ...currentLocal[localIdx], ...serverOrder };
-                    localStorage.setItem('luxius_session_ordenes', JSON.stringify(currentLocal));
-                    localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+                const localKey = (newOrder as any).uuid || newOrder.id || newOrder.ot;
+                const serverKey = (serverOrder as any).uuid || serverOrder.id || serverOrder.ot;
+                let localIdx = currentLocal.findIndex(o => matchesOrderId(o, localKey));
+                if (localIdx < 0 && serverKey) {
+                    localIdx = currentLocal.findIndex(o => matchesOrderId(o, serverKey));
                 }
-            } catch(e) { }
+                if (localIdx >= 0) {
+                    currentLocal[localIdx] = { ...currentLocal[localIdx], ...normalizedServerOrder };
+                } else {
+                    currentLocal.unshift(normalizedServerOrder);
+                }
+                localStorage.setItem('luxius_session_ordenes', JSON.stringify(currentLocal));
+                localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+                syncMemoryCache(normalizedServerOrder, localKey, currentLocal);
+            } catch (e) {
+                syncMemoryCache(normalizedServerOrder, (newOrder as any).uuid || newOrder.id || newOrder.ot, localOrders);
+            }
 
-            return serverOrder;
+            return normalizedServerOrder;
         } else {
             console.error('[db] API saveOrden respondió con código no-ok:', response.status);
+            syncMemoryCache(newOrder, newOrder.id, localOrders);
         }
     } catch (error) {
         console.warn('[db] API saveOrden falló o timeout, la orden se conservará localmente:', error);
+        syncMemoryCache(newOrder, newOrder.id, localOrders);
     }
 
     return newOrder;
@@ -364,6 +411,7 @@ export async function deleteOrden(id: number | string): Promise<boolean> {
         localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
         localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
     } catch (e) { }
+    inMemoryOrdersCache = null;
 
     // 2. Delete from remote backend API
     try {
@@ -413,6 +461,7 @@ export async function saveBatchOrders(
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
+        inMemoryOrdersCache = null;
 
     } else if (action === 'update') {
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
@@ -433,6 +482,7 @@ export async function saveBatchOrders(
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
+        inMemoryOrdersCache = null;
 
     } else if (action === 'restore') {
         const localOrdersJson = localStorage.getItem('luxius_session_ordenes') || '[]';
@@ -447,6 +497,7 @@ export async function saveBatchOrders(
             localStorage.setItem('luxius_session_ordenes', JSON.stringify(localOrders));
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
         } catch (e) { }
+        inMemoryOrdersCache = null;
 
         // Remove from tombstone so restored orders become visible again
         try {
@@ -477,6 +528,7 @@ export async function saveBatchOrders(
             throw new Error(`El servidor rechazó la operación por lote (código ${response.status})`);
         } else {
             localStorage.setItem('luxius_ordenes_last_save', String(Date.now()));
+            inMemoryOrdersCache = null;
         }
     } catch (e) {
         console.error('[db] API saveBatchOrders falló:', e);

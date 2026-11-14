@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { saveMaterial, getMateriales, reconcilePendingStockDeductions } from './db'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { saveMaterial, getMateriales, deduplicateMaterials, reconcilePendingStockDeductions, saveOrden, getOrdenes, getCachedOrdenesMemory } from './db'
 import { evaluateOrderStock, enrichOrdersWithCurrentStock } from '@/utils/stockForecast'
 import { getConsumption } from '@/pages/Entrada/utils/entradaCalculations'
 import type { Material, Order } from '@/types'
@@ -383,5 +383,119 @@ describe('Actualización Reactiva de Órdenes según Stock de Materiales', () =>
         expect(resultOrder.stockWarning).toBe(false)
         expect(evaluateOrderStock(terminalOrder, mats).hasStock).toBe(true)
         expect(evaluateOrderStock(terminalOrder, mats).warningReason).toBeUndefined()
+    })
+})
+
+describe('Hidratación de Catálogo de Materiales y Cache de Órdenes', () => {
+    beforeEach(() => {
+        localStorage.clear()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('hidrata descripcion y tipo en deduplicateMaterials y getMateriales cuando el payload solo trae codigo y nombre igual al codigo', () => {
+        const defaults = getMateriales().filter(
+            m => m.codigo && m.descripcion && m.descripcion !== m.codigo && m.tipo
+        )
+        expect(defaults.length).toBeGreaterThanOrEqual(2)
+        const [first, second] = defaults
+
+        const rawSqlRows = [
+            { id: 1, codigo: first.codigo, nombre: first.codigo, categoria: 'General', stockActual: 10 },
+            { id: 2, codigo: second.codigo, nombre: second.codigo, categoria: 'General', stockActual: 15 },
+        ]
+
+        const deduped = deduplicateMaterials(rawSqlRows as unknown as Material[])
+        expect(deduped.find(m => m.codigo === first.codigo)?.descripcion).toBe(first.descripcion)
+        expect(deduped.find(m => m.codigo === first.codigo)?.tipo).toBe(first.tipo)
+
+        localStorage.setItem('luxius_session_materiales', JSON.stringify(rawSqlRows))
+        const mats = getMateriales()
+        for (const sample of [first, second]) {
+            const hydrated = mats.find(m => m.codigo === sample.codigo)
+            expect(hydrated).toBeDefined()
+            expect(hydrated!.descripcion).toBe(sample.descripcion)
+            expect(hydrated!.descripcion).not.toBe(sample.codigo)
+            expect(hydrated!.tipo).toBe(sample.tipo)
+        }
+    })
+
+    it('asigna un id numérico válido con id: undefined y refresca inMemoryOrdersCache para getOrdenes(false)', async () => {
+        vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'))
+
+        const created = await saveOrden({
+            id: undefined,
+            clientId: 1,
+            clienteNombre: 'Cliente Cache Offline',
+            material: 'VV',
+            ancho: 1.5,
+            alto: 2,
+            copias: 1,
+            subtotal: 50000,
+            status: 'orden',
+        })
+
+        expect(typeof created.id).toBe('number')
+        expect(Number(created.id)).toBeGreaterThan(0)
+        expect(created.ot).toMatch(/^OT-/)
+
+        const memCache = getCachedOrdenesMemory()
+        expect(memCache?.some(o => o.id === created.id)).toBe(true)
+
+        const inmediatas = await getOrdenes(false)
+        expect(inmediatas.some(o => o.id === created.id && o.clienteNombre === 'Cliente Cache Offline')).toBe(true)
+    })
+
+    it('envía POST sin id/ot cuando es orden nueva y actualiza inMemoryOrdersCache con la respuesta del servidor', async () => {
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                id: 987,
+                uuid: 'uuid-srv-987',
+                ot: 'OT-0987',
+                clientId: 1,
+                clienteNombre: 'Cliente Online',
+                material: 'VV',
+                calidad: 'Standard',
+                ancho: 1,
+                alto: 1,
+                copias: 1,
+                subtotal: 60000,
+                status: 'orden',
+            }),
+        } as unknown as Response)
+
+        const saved = await saveOrden({
+            id: undefined,
+            clientId: 1,
+            clienteNombre: 'Cliente Online',
+            material: 'VV',
+            ancho: 1,
+            alto: 1,
+            copias: 1,
+            subtotal: 60000,
+            status: 'orden',
+        })
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        const [calledUrl, init] = fetchSpy.mock.calls[0]
+        expect(String(calledUrl)).toMatch(/\/orders(\?|$)/)
+        expect(init?.method).toBe('POST')
+
+        const payload = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>
+        expect(payload.id).toBeUndefined()
+        expect(payload.ot).toBeUndefined()
+
+        const savedWithUuid = saved as Order & { uuid?: string }
+        expect(savedWithUuid.uuid).toBe('uuid-srv-987')
+        expect(saved.ot).toBe('OT-0987')
+
+        const listed = await getOrdenes(false)
+        expect(
+            listed.some(o => (o as Order & { uuid?: string }).uuid === 'uuid-srv-987' && o.ot === 'OT-0987')
+        ).toBe(true)
     })
 })
