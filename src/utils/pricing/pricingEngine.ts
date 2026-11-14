@@ -4,8 +4,15 @@
 
 import { getMateriales, getClientes, getServicios, getTarifasXignuxSync } from '@/data/db';
 import type { DemasiasConfig } from '@/types';
-import { getBobinaUsefulWidth } from '../nestingEngine';
-import type { PriceCalculationResult, CustomPriceOverrideMode } from './pricingTypes';
+import { getBobinaUsefulWidth, runNesting, type NestingItem } from '../nestingEngine';
+import type {
+    PriceCalculationResult,
+    CustomPriceOverrideMode,
+    BatchNestingPriceInputItem,
+    BatchNestingGroupSummary,
+    BatchNestingItemResult,
+    BatchNestingPricingResult
+} from './pricingTypes';
 import { resolveSpecialPrice } from './specialPricing';
 
 export const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
@@ -402,5 +409,348 @@ export function applyCustomPriceOverride(
         finalTotal,
         effectiveRateM2,
         effectiveRateML,
+    };
+}
+
+function normalizeEffectiveDims(
+    rawW: number,
+    rawH: number,
+    demasiasConfig?: DemasiasConfig
+): { w: number; h: number } {
+    let w = round2(rawW > 20 ? rawW / 100 : rawW);
+    let h = round2(rawH > 20 ? rawH / 100 : rawH);
+    if (demasiasConfig) {
+        if (demasiasConfig.left) w += 0.05;
+        if (demasiasConfig.right) w += 0.05;
+        if (demasiasConfig.top) h += 0.05;
+        if (demasiasConfig.bottom) h += 0.05;
+        w = round2(w);
+        h = round2(h);
+    }
+    return { w, h };
+}
+
+/**
+ * Cotiza un conjunto de ítems aplicando nesting 2D multi-bobina opcional.
+ * Agrupa exclusivamente ítems en ML que compartan `material` y `calidad`,
+ * evalúa todas las bobinas disponibles del material y elige la de menor costo total.
+ */
+export function calculateBatchPricingWithNesting(
+    items: BatchNestingPriceInputItem[],
+    clientIdParam?: string | number,
+    defaultCalidad: string = 'ECO'
+): BatchNestingPricingResult {
+    const allMateriales = getMateriales();
+    const allClientes = getClientes();
+    const cliente = clientIdParam
+        ? allClientes.find(cl => String(cl.id) === String(clientIdParam)) || null
+        : null;
+
+    interface AnalyzedEntry {
+        index: number;
+        input: BatchNestingPriceInputItem;
+        individualResult: PriceCalculationResult;
+        effW: number;
+        effH: number;
+        copies: number;
+        areaM2: number;
+        matCode: string;
+        calidadNorm: string;
+        baseNoMarkup: number;
+        mlRaw: number;
+    }
+
+    const analyzed: AnalyzedEntry[] = items.map((input, index) => {
+        const individualResult = calculateItemPriceDetailed(
+            input.material,
+            input.ancho,
+            input.alto,
+            input.copias,
+            input.servicios,
+            clientIdParam,
+            input.demasiasConfig,
+            input.esParticular
+        );
+        const { w: effW, h: effH } = normalizeEffectiveDims(
+            Number(input.ancho) || 0,
+            Number(input.alto) || 0,
+            input.demasiasConfig
+        );
+        const copies = Math.max(1, Math.round(Number(input.copias) || 1));
+        const areaM2 = effW > 0 && effH > 0 ? round2(effW * effH * copies) : 0;
+
+        const matObj = allMateriales.find(
+            m => m.codigo === input.material ||
+                String(m.codigo).toLowerCase() === String(input.material || '').toLowerCase()
+        );
+        const matCode = matObj?.codigo || String(input.material || '').trim();
+        const calidadNorm = String(input.calidad || defaultCalidad || 'ECO').trim().toUpperCase();
+
+        const mlRaw = individualResult.precioDetalle?.tipoCobro === 'ml'
+            ? (individualResult.consumoML ?? individualResult.consumoEstimado ?? 0)
+            : 0;
+        const baseNoMarkup = (individualResult.precioMl && mlRaw > 0)
+            ? Math.round(individualResult.precioMl * mlRaw)
+            : Math.max(0, individualResult.subtotal - (individualResult.servicesTotal ?? 0));
+
+        return {
+            index,
+            input,
+            individualResult,
+            effW,
+            effH,
+            copies,
+            areaM2,
+            matCode,
+            calidadNorm,
+            baseNoMarkup,
+            mlRaw,
+        };
+    });
+
+    const itemResults: BatchNestingItemResult[] = analyzed.map(e => ({
+        id: e.input.id,
+        individualResult: e.individualResult,
+        effectiveResult: e.individualResult,
+        isNested: false,
+        rawSubtotal: e.individualResult.subtotal,
+        nestedSubtotal: e.individualResult.subtotal,
+        savingsAmount: 0,
+    }));
+
+    const subgroupMap = new Map<string, AnalyzedEntry[]>();
+    for (const entry of analyzed) {
+        if (
+            entry.input.skipNesting ||
+            entry.individualResult.precioDetalle?.tipoCobro !== 'ml' ||
+            entry.effW <= 0 ||
+            entry.effH <= 0 ||
+            !entry.matCode
+        ) {
+            continue;
+        }
+        const key = `${entry.matCode.toUpperCase()}|${entry.calidadNorm}`;
+        const bucket = subgroupMap.get(key);
+        if (bucket) {
+            bucket.push(entry);
+        } else {
+            subgroupMap.set(key, [entry]);
+        }
+    }
+
+    const groups: BatchNestingGroupSummary[] = [];
+
+    subgroupMap.forEach((subgroup, groupKey) => {
+        if (subgroup.length < 2) return;
+
+        const mat = allMateriales.find(
+            m => m.codigo === subgroup[0].matCode ||
+                String(m.codigo).toLowerCase() === subgroup[0].matCode.toLowerCase()
+        );
+        if (!mat || mat.tipoCobro !== 'ml' || !Array.isArray(mat.bobinas) || mat.bobinas.length === 0) {
+            return;
+        }
+
+        const rawMlTotal = round2(subgroup.reduce((acc, e) => acc + e.mlRaw, 0));
+        const rawBaseNoMarkupSum = subgroup.reduce((acc, e) => acc + e.baseNoMarkup, 0);
+
+        const nestingItems: NestingItem[] = subgroup.map(e => ({
+            id: e.input.id,
+            width: e.effW,
+            height: e.effH,
+            copies: e.copies,
+            material: mat.codigo,
+        }));
+
+        const narrowItems: NestingItem[] = nestingItems.map(item => ({
+            ...item,
+            width: Math.min(item.width, item.height),
+            height: Math.max(item.width, item.height),
+        }));
+        const hasOrientedDiff = narrowItems.some((it, idx) => it.width !== nestingItems[idx].width);
+
+        interface BobinaCandidate {
+            bobina: number;
+            priceMl: number;
+            nestedMl: number;
+            baseCostNoMarkup: number;
+            areaUsed: number;
+        }
+
+        const candidates: BobinaCandidate[] = [];
+        for (const b of mat.bobinas) {
+            if (!b || typeof b.ancho !== 'number' || b.ancho <= 0 || typeof b.precioML !== 'number') {
+                continue;
+            }
+            // Evaluar heurística con rotación libre y empaquetado uniforme sin rotar
+            // (para evitar que girar la primera pieza bloquee carriles paralelos).
+            const layouts = [
+                runNesting(nestingItems, { rollWidth: b.ancho, allowRotation: true }),
+                runNesting(nestingItems, { rollWidth: b.ancho, allowRotation: false }),
+                ...(hasOrientedDiff ? [runNesting(narrowItems, { rollWidth: b.ancho, allowRotation: false })] : []),
+            ].filter(res => res.unplacedPieces.length === 0);
+
+            if (layouts.length === 0) continue;
+            layouts.sort((a, z) => a.linearMeters - z.linearMeters);
+            const nRes = layouts[0];
+
+            const specialRes = resolveSpecialPrice(cliente, mat.codigo, b.ancho, mat.tipoCobro);
+            const priceMl = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : b.precioML;
+            const nestedMl = round2(nRes.linearMeters);
+            const baseCostNoMarkup = Math.round(priceMl * nestedMl);
+
+            candidates.push({
+                bobina: b.ancho,
+                priceMl,
+                nestedMl,
+                baseCostNoMarkup,
+                areaUsed: round2(b.ancho * nestedMl),
+            });
+        }
+
+        if (candidates.length === 0) return;
+
+        candidates.sort((a, b) => {
+            if (a.baseCostNoMarkup !== b.baseCostNoMarkup) {
+                return a.baseCostNoMarkup - b.baseCostNoMarkup;
+            }
+            if (Math.abs(a.areaUsed - b.areaUsed) > 0.01) {
+                return a.areaUsed - b.areaUsed;
+            }
+            if (Math.abs(a.nestedMl - b.nestedMl) > 0.01) {
+                return a.nestedMl - b.nestedMl;
+            }
+            return a.bobina - b.bobina;
+        });
+
+        const best = candidates[0];
+        const improvesCost = best.baseCostNoMarkup < rawBaseNoMarkupSum;
+        const improvesMlTie = best.baseCostNoMarkup === rawBaseNoMarkupSum && best.nestedMl < rawMlTotal - 0.01;
+        if (!improvesCost && !improvesMlTie) return;
+
+        const totalArea = subgroup.reduce((acc, e) => acc + e.areaM2, 0);
+        let allocatedMl = 0;
+        let allocatedBaseCost = 0;
+        let groupRawCostTotal = 0;
+        let groupNestedCostTotal = 0;
+
+        const rawCostTotalPreview = subgroup.reduce((acc, e) => acc + e.individualResult.subtotal, 0);
+        const subgroupPctEstimate = rawMlTotal > 0
+            ? Math.round(((rawMlTotal - best.nestedMl) / rawMlTotal) * 100)
+            : 0;
+
+        subgroup.forEach((entry, subIdx) => {
+            const isLast = subIdx === subgroup.length - 1;
+            const weight = totalArea > 0 ? (entry.areaM2 / totalArea) : (1 / subgroup.length);
+
+            const itemNestedMl = isLast
+                ? Math.max(0, round2(best.nestedMl - allocatedMl))
+                : round2(weight * best.nestedMl);
+            allocatedMl = round2(allocatedMl + itemNestedMl);
+
+            const itemBaseNoMarkup = isLast
+                ? Math.max(0, Math.round(best.baseCostNoMarkup - allocatedBaseCost))
+                : Math.round(weight * best.baseCostNoMarkup);
+            allocatedBaseCost += itemBaseNoMarkup;
+
+            const pct = entry.individualResult.recargoParticularPct || 0;
+            const itemCostoBase = pct > 0
+                ? Math.round(itemBaseNoMarkup * (1 + pct / 100))
+                : itemBaseNoMarkup;
+            const servicesTotal = entry.individualResult.servicesTotal ?? 0;
+            const nestedSubtotal = itemCostoBase + servicesTotal;
+
+            groupRawCostTotal += entry.individualResult.subtotal;
+            groupNestedCostTotal += nestedSubtotal;
+
+            const baseDetalle = entry.individualResult.precioDetalle;
+            const effectiveResult: PriceCalculationResult = {
+                ...entry.individualResult,
+                subtotal: nestedSubtotal,
+                consumoEstimado: itemNestedMl,
+                consumoML: itemNestedMl,
+                bobinaAsignada: best.bobina,
+                precioMl: best.priceMl,
+                precioDetalle: {
+                    ...(baseDetalle || { tipoCobro: 'ml' }),
+                    tipoCobro: 'ml',
+                    bobinaAncho: best.bobina,
+                    bobinaUsada: best.bobina,
+                    precioML: best.priceMl,
+                    consumoML: itemNestedMl,
+                    costoBase: itemCostoBase,
+                    nestingAplicado: true,
+                    mlSinNesting: entry.mlRaw,
+                    mlConNesting: itemNestedMl,
+                    ahorroNestingPct: subgroupPctEstimate,
+                },
+            };
+
+            itemResults[entry.index] = {
+                id: entry.input.id,
+                individualResult: entry.individualResult,
+                effectiveResult,
+                isNested: true,
+                rawSubtotal: entry.individualResult.subtotal,
+                nestedSubtotal,
+                savingsAmount: Math.max(0, entry.individualResult.subtotal - nestedSubtotal),
+            };
+        });
+
+        const savingsAmount = Math.max(0, groupRawCostTotal - groupNestedCostTotal);
+        const savingsMl = Math.max(0, round2(rawMlTotal - best.nestedMl));
+        const savingsPct = rawCostTotalPreview > 0
+            ? Math.round((savingsAmount / rawCostTotalPreview) * 100)
+            : (rawMlTotal > 0 ? Math.round((savingsMl / rawMlTotal) * 100) : 0);
+
+        groups.push({
+            groupKey,
+            material: mat.codigo,
+            calidad: subgroup[0].calidadNorm,
+            itemIds: subgroup.map(e => e.input.id),
+            bobinaGanadora: best.bobina,
+            precioMLAplicado: best.priceMl,
+            rawMlTotal,
+            nestedMlTotal: best.nestedMl,
+            savingsMl,
+            savingsPct,
+            rawCostTotal: groupRawCostTotal,
+            nestedCostTotal: groupNestedCostTotal,
+            savingsAmount,
+        });
+    });
+
+    const rawBatchTotal = Math.round(itemResults.reduce((acc, r) => acc + r.rawSubtotal, 0));
+    const nestedBatchTotal = Math.round(itemResults.reduce((acc, r) => acc + r.nestedSubtotal, 0));
+    const totalSavingsAmount = Math.max(0, rawBatchTotal - nestedBatchTotal);
+
+    const totalRawMl = round2(
+        itemResults.reduce((acc, r) => {
+            if (r.individualResult.precioDetalle?.tipoCobro !== 'ml') return acc;
+            return acc + (r.individualResult.consumoML ?? r.individualResult.consumoEstimado ?? 0);
+        }, 0)
+    );
+    const totalNestedMl = round2(
+        itemResults.reduce((acc, r) => {
+            if (r.effectiveResult.precioDetalle?.tipoCobro !== 'ml') return acc;
+            return acc + (r.effectiveResult.consumoML ?? r.effectiveResult.consumoEstimado ?? 0);
+        }, 0)
+    );
+    const totalSavingsMl = Math.max(0, round2(totalRawMl - totalNestedMl));
+    const totalSavingsPct = rawBatchTotal > 0
+        ? Math.round((totalSavingsAmount / rawBatchTotal) * 100)
+        : (totalRawMl > 0 ? Math.round((totalSavingsMl / totalRawMl) * 100) : 0);
+
+    return {
+        items: itemResults,
+        groups,
+        hasNestingOpportunity: groups.length > 0,
+        rawBatchTotal,
+        nestedBatchTotal,
+        totalSavingsAmount,
+        totalRawMl,
+        totalNestedMl,
+        totalSavingsMl,
+        totalSavingsPct,
     };
 }

@@ -514,3 +514,36 @@
         grid-template-columns: 1fr;
     }
 }
+
+.edit-batch-price-mode-btn.active-nesting {
+    font-weight: 700;
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.22);
+    color: #34d399;
+}
+
+.edit-batch-price-mode-btn.opportunity-nesting {
+    border-color: rgba(16, 185, 129, 0.48);
+    background: rgba(16, 185, 129, 0.1);
+    color: #6ee7b7;
+}
+
+.edit-batch-nesting-banner {
+    font-size: 0.76rem;
+    color: #94a3b8;
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+.edit-batch-nesting-banner.has-savings {
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.edit-batch-item-price-input.is-nested {
+    border-color: rgba(16, 185, 129, 0.55);
+    color: #6ee7b7;
+}

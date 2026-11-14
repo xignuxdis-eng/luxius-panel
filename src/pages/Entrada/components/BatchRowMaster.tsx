@@ -354,6 +354,14 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                         >
                             <span className="currency">$</span>
                             <span className="amount">{item.totalPrice.toLocaleString()}</span>
+                            {item.orders.some(o => o.precioDetalle?.nestingAplicado) && (
+                                <span
+                                    title="Precio optimizado con Nesting 2D"
+                                    style={{ marginLeft: '4px', fontSize: '0.78rem' }}
+                                >
+                                    🧩
+                                </span>
+                            )}
                             <span className="price-edit-hint">✏️</span>
                         </div>
                     </td>

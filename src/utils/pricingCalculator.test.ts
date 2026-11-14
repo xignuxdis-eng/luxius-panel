@@ -13,7 +13,8 @@ import {
     buildSpecialPriceKey,
     resolveSpecialPrice,
     applyCustomPriceOverride,
-    resolveItemCustomSubtotal
+    resolveItemCustomSubtotal,
+    calculateBatchPricingWithNesting
 } from './pricingCalculator'
 
 /** Siembra un material conocido en localStorage (lo lee getMateriales()). */
@@ -487,5 +488,92 @@ describe('Personalización de Precio (applyCustomPriceOverride y resolveItemCust
         }])
         expect(summary.finalTotal).toBe(det.subtotal)
         expect(summary.mode).toBe('auto')
+    })
+})
+
+describe('calculateBatchPricingWithNesting (optimización 2D por material y calidad)', () => {
+    beforeEach(() => {
+        window.localStorage.clear()
+    })
+
+    it('anida piezas ML que comparten material y calidad, reduce costo/ml y conserva suma exacta prorrateada', () => {
+        sembrarMaterial('VV-NEST', {
+            tipoCobro: 'ml',
+            bobinas: [
+                { ancho: 1.07, precioML: 22000 },
+                { ancho: 1.37, precioML: 28000 },
+                { ancho: 1.52, precioML: 31000 },
+            ]
+        })
+
+        // Dos piezas de 0.65m x 1.00m en bobina 1.37m entran lado a lado (1.31m <= 1.365m útil)
+        // Individualmente hubieran usado ~2.00 ml (1.00 + 1.00); juntas consumen ~1.01 ml en 1.37m
+        const res = calculateBatchPricingWithNesting([
+            { id: 'p1', material: 'VV-NEST', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+            { id: 'p2', material: 'VV-NEST', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+        ])
+
+        expect(res.hasNestingOpportunity).toBe(true)
+        expect(res.groups.length).toBe(1)
+        expect(res.totalNestedMl).toBeLessThan(res.totalRawMl)
+        expect(res.nestedBatchTotal).toBeLessThan(res.rawBatchTotal)
+        expect(res.nestedBatchTotal).toBeGreaterThan(0)
+        expect(Number.isNaN(res.nestedBatchTotal)).toBe(false)
+
+        const sumItems = res.items.reduce((acc, it) => acc + it.nestedSubtotal, 0)
+        expect(sumItems).toBe(res.nestedBatchTotal)
+
+        const sumItemMl = round2(res.items.reduce((acc, it) => acc + (it.effectiveResult.consumoML ?? 0), 0))
+        expect(sumItemMl).toBe(res.totalNestedMl)
+
+        expect(res.items.every(it => it.isNested && it.effectiveResult.precioDetalle?.nestingAplicado === true)).toBe(true)
+    })
+
+    it('NO anida juntas piezas del mismo material si tienen distinta calidad', () => {
+        sembrarMaterial('VV-QUAL', {
+            tipoCobro: 'ml',
+            bobinas: [
+                { ancho: 1.37, precioML: 28000 },
+                { ancho: 1.52, precioML: 31000 },
+            ]
+        })
+
+        const res = calculateBatchPricingWithNesting([
+            { id: 'q1', material: 'VV-QUAL', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+            { id: 'q2', material: 'VV-QUAL', calidad: 'Alta', ancho: 0.65, alto: 1.00, copias: 1 },
+        ])
+
+        expect(res.hasNestingOpportunity).toBe(false)
+        expect(res.groups.length).toBe(0)
+        expect(res.nestedBatchTotal).toBe(res.rawBatchTotal)
+        expect(res.items.every(it => !it.isNested)).toBe(true)
+    })
+
+    it('no altera piezas en M2 ni piezas marcadas con skipNesting', () => {
+        const mats = [
+            {
+                id: 1, codigo: 'LONA-M2', descripcion: 'Lona M2',
+                calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2',
+                precioM2: 12000, ancho: 1.52, habilitado: true, bobinas: []
+            },
+            {
+                id: 2, codigo: 'VV-ML', descripcion: 'Vinilo ML',
+                calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'ml',
+                precioM2: 28000, ancho: 1.52, habilitado: true,
+                bobinas: [{ ancho: 1.37, precioML: 28000 }]
+            }
+        ]
+        window.localStorage.setItem('luxius_session_materiales', JSON.stringify(mats))
+
+        const res = calculateBatchPricingWithNesting([
+            { id: 'm1', material: 'LONA-M2', calidad: 'ECO', ancho: 0.5, alto: 1.0, copias: 1 },
+            { id: 'm2', material: 'LONA-M2', calidad: 'ECO', ancho: 0.5, alto: 1.0, copias: 1 },
+            { id: 'v1', material: 'VV-ML', calidad: 'ECO', ancho: 0.60, alto: 1.0, copias: 1, skipNesting: true },
+            { id: 'v2', material: 'VV-ML', calidad: 'ECO', ancho: 0.60, alto: 1.0, copias: 1 },
+        ])
+
+        expect(res.hasNestingOpportunity).toBe(false)
+        expect(res.nestedBatchTotal).toBe(res.rawBatchTotal)
+        expect(res.items.every(it => !it.isNested && it.nestedSubtotal === it.rawSubtotal)).toBe(true)
     })
 })

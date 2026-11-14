@@ -148,6 +148,10 @@ export interface Order {
         consumoML?: number;
         modalidadManual?: 'final' | 'm2' | 'ml';
         valorManual?: number;
+        nestingAplicado?: boolean;
+        mlSinNesting?: number;
+        mlConNesting?: number;
+        ahorroNestingPct?: number;
     };
 
     // Operational Tags

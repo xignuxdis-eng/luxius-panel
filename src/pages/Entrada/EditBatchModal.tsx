@@ -6,6 +6,7 @@ import {
     calculateItemPriceDetailed,
     applyCustomPriceOverride,
     resolveItemCustomSubtotal,
+    calculateBatchPricingWithNesting,
     round2,
     type CustomPriceOverrideMode,
     type PriceCalculationResult
@@ -30,6 +31,7 @@ interface PieceState {
     ot: string
     itemDesc: string
     material: string
+    calidad: string
     ancho: number
     alto: number
     copias: number
@@ -49,6 +51,7 @@ interface ComputedPiece {
     autoSubtotal: number
     effectiveSubtotal: number
     isCustom: boolean
+    isNested: boolean
     modalMode?: 'final' | 'm2' | 'ml'
     modalVal?: number
     hasPricingUpdate: boolean
@@ -107,6 +110,7 @@ export default function EditBatchModal({
     const [priceOverrideMode, setPriceOverrideMode] = useState<CustomPriceOverrideMode>('auto')
     const [priceOverrideValue, setPriceOverrideValue] = useState<number | null>(null)
     const [isBatchPriceModified, setIsBatchPriceModified] = useState<boolean>(false)
+    const [useBatchNesting, setUseBatchNesting] = useState<boolean>(false)
     const [pieces, setPieces] = useState<PieceState[]>([])
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -160,12 +164,16 @@ export default function EditBatchModal({
                 manualValues.length === batchOrders.length &&
                 new Set(manualValues).size === 1
 
+            const hasNestingSaved = !hasSharedRateMode && batchOrders.some(o => o.precioDetalle?.nestingAplicado === true)
+
             if (hasSharedRateMode) {
                 setPriceOverrideMode(manualModes[0])
                 setPriceOverrideValue(manualValues[0])
+                setUseBatchNesting(false)
             } else {
                 setPriceOverrideMode('auto')
                 setPriceOverrideValue(null)
+                setUseBatchNesting(hasNestingSaved)
             }
 
             const initialPieces: PieceState[] = batchOrders.map(order => {
@@ -185,6 +193,7 @@ export default function EditBatchModal({
                     ot: order.ot || `OT-${order.id}`,
                     itemDesc: pieceName,
                     material: order.material || '',
+                    calidad: order.calidad || 'ECO',
                     ancho: Number(order.ancho) || 0,
                     alto: Number(order.alto) || 0,
                     copias: Number(order.copias) || 1,
@@ -199,12 +208,33 @@ export default function EditBatchModal({
             setPieces(initialPieces)
     }, [isOpen, batchOrders, currentBatchName, currentBatchId, availableMaterials, clientes])
 
-    const { computedPieces, totalCopies, totalM2, totalMl, autoBatchTotal, activeBatchTotal, pricingSummary } = useMemo(() => {
+    const { computedPieces, totalCopies, totalM2, totalMl, autoBatchTotal, activeBatchTotal, pricingSummary, batchNestingCalc } = useMemo(() => {
+        const effectiveBatchClientId = clientId || pieces.find(p => !p.unlinked)?.orderRef.clientId
+        const nestingCalc = calculateBatchPricingWithNesting(
+            pieces.map(piece => {
+                const matchedMat = findMatchingMaterial(piece.material, availableMaterials)
+                return {
+                    id: piece.id,
+                    material: matchedMat?.codigo || piece.material || '',
+                    calidad: piece.calidad || 'ECO',
+                    ancho: piece.ancho,
+                    alto: piece.alto,
+                    copias: piece.copias,
+                    servicios: piece.orderRef.servicios,
+                    demasiasConfig: piece.orderRef.demasiasConfig,
+                    esParticular: Boolean(piece.orderRef.esParticular),
+                    skipNesting: piece.unlinked || piece.isPiecePriceManual,
+                }
+            }),
+            effectiveBatchClientId
+        )
+        const nestingById = new Map(nestingCalc.items.map(it => [String(it.id), it]))
+
         const baseCalcs = pieces.map(piece => {
             const matchedMat = findMatchingMaterial(piece.material, availableMaterials)
             const matCode = matchedMat?.codigo || piece.material || ''
             const effectiveClientId = clientId || piece.orderRef.clientId
-            const priceResult = calculateItemPriceDetailed(
+            const individualResult = calculateItemPriceDetailed(
                 matCode,
                 piece.ancho,
                 piece.alto,
@@ -214,6 +244,16 @@ export default function EditBatchModal({
                 piece.orderRef.demasiasConfig,
                 Boolean(piece.orderRef.esParticular)
             )
+            const nestedEntry = nestingById.get(String(piece.id))
+            const isNestedPiece = Boolean(
+                useBatchNesting &&
+                priceOverrideMode === 'auto' &&
+                !piece.unlinked &&
+                !piece.isPiecePriceManual &&
+                nestedEntry?.isNested
+            )
+            const priceResult = (isNestedPiece && nestedEntry) ? nestedEntry.effectiveResult : individualResult
+
             const w = round2(piece.ancho > 20 ? piece.ancho / 100 : piece.ancho)
             const h = round2(piece.alto > 20 ? piece.alto / 100 : piece.alto)
             const c = Math.max(1, piece.copias || 1)
@@ -223,6 +263,7 @@ export default function EditBatchModal({
             return {
                 piece,
                 priceResult,
+                isNestedPiece,
                 m2,
                 ml,
                 autoSubtotal: priceResult.subtotal > 0 ? priceResult.subtotal : piece.subtotal,
@@ -247,7 +288,7 @@ export default function EditBatchModal({
         let seenAutoPoolIdx = 0
 
         const computed: ComputedPiece[] = baseCalcs.map(entry => {
-            const { piece, priceResult, m2, ml, autoSubtotal, servicesTotal } = entry
+            const { piece, priceResult, isNestedPiece, m2, ml, autoSubtotal, servicesTotal } = entry
             const materialChanged = (piece.material || '') !== (piece.orderRef.material || '')
             const clientChanged = String(clientId || '') !== String(piece.orderRef.clientId || '')
 
@@ -290,7 +331,7 @@ export default function EditBatchModal({
                         activeNonManualCount
                     )
                 }
-            } else if (isBatchPriceModified || materialChanged || clientChanged) {
+            } else if (isNestedPiece || isBatchPriceModified || materialChanged || clientChanged) {
                 effectiveSubtotal = autoSubtotal
             } else {
                 effectiveSubtotal = piece.subtotal
@@ -300,6 +341,7 @@ export default function EditBatchModal({
                 piece.isPiecePriceManual ||
                 piece.priceDirty ||
                 (!piece.unlinked && isBatchPriceModified) ||
+                isNestedPiece ||
                 materialChanged ||
                 clientChanged
             )
@@ -312,6 +354,7 @@ export default function EditBatchModal({
                 autoSubtotal,
                 effectiveSubtotal,
                 isCustom,
+                isNested: isNestedPiece,
                 modalMode,
                 modalVal,
                 hasPricingUpdate
@@ -343,9 +386,10 @@ export default function EditBatchModal({
             totalMl: mlSum,
             autoBatchTotal: autoSum,
             activeBatchTotal: totalSum,
-            pricingSummary: summary
+            pricingSummary: summary,
+            batchNestingCalc: nestingCalc
         }
-    }, [pieces, availableMaterials, clientId, priceOverrideMode, priceOverrideValue, isBatchPriceModified])
+    }, [pieces, availableMaterials, clientId, priceOverrideMode, priceOverrideValue, isBatchPriceModified, useBatchNesting])
 
     const activeCount = pieces.filter(p => !p.unlinked).length
 
@@ -377,6 +421,7 @@ export default function EditBatchModal({
             setPriceOverrideValue(null)
             setIsBatchPriceModified(false)
         }
+        setUseBatchNesting(false)
         setPieces(prev => prev.map(p => {
             if (p.id === id) {
                 return {
@@ -399,6 +444,7 @@ export default function EditBatchModal({
 
     const handleSelectPriceMode = (mode: CustomPriceOverrideMode) => {
         setIsBatchPriceModified(true)
+        setUseBatchNesting(false)
         setPieces(prev => prev.map(p =>
             p.unlinked ? p : { ...p, isPiecePriceManual: false, priceDirty: true }
         ))
@@ -423,6 +469,44 @@ export default function EditBatchModal({
         }
         setPriceOverrideMode(mode)
         setPriceOverrideValue(initialVal)
+    }
+
+    const handleToggleBatchNesting = () => {
+        setIsBatchPriceModified(true)
+        setPriceOverrideMode('auto')
+        setPriceOverrideValue(null)
+
+        if (useBatchNesting && priceOverrideMode === 'auto') {
+            setUseBatchNesting(false)
+            setPieces(prev => prev.map(p =>
+                p.unlinked ? p : { ...p, isPiecePriceManual: false, priceDirty: true }
+            ))
+            return
+        }
+
+        setUseBatchNesting(true)
+        // Al activar nesting, unificar calidad por material entre piezas activas para impresión conjunta
+        setPieces(prev => {
+            const qualByMat = new Map<string, string>()
+            for (const p of prev) {
+                if (p.unlinked || !p.material) continue
+                const matKey = p.material.trim().toUpperCase()
+                if (!qualByMat.has(matKey)) {
+                    qualByMat.set(matKey, p.calidad || 'ECO')
+                }
+            }
+            return prev.map(p => {
+                if (p.unlinked) return p
+                const matKey = (p.material || '').trim().toUpperCase()
+                const targetQual = qualByMat.get(matKey) || p.calidad || 'ECO'
+                return {
+                    ...p,
+                    calidad: targetQual,
+                    isPiecePriceManual: false,
+                    priceDirty: true,
+                }
+            })
+        })
     }
 
     const handleToggleUnlink = (id: number | string) => {
@@ -462,6 +546,7 @@ export default function EditBatchModal({
                         itemDesc: cp.piece.itemDesc,
                         unlinked: cp.piece.unlinked,
                         material: cp.piece.material,
+                        calidad: cp.piece.calidad,
                     }
 
                     if (!cp.hasPricingUpdate) {
@@ -472,7 +557,10 @@ export default function EditBatchModal({
                     const saldo = Math.max(0, Math.round((cp.effectiveSubtotal - paid) * 100) / 100)
                     const precioDetalle = (cp.isCustom && cp.modalMode)
                         ? buildManualPrecioDetalle(cp.priceResult, cp.effectiveSubtotal, cp.ml, cp.modalMode, cp.modalVal)
-                        : cp.priceResult.precioDetalle
+                        : {
+                            ...(cp.priceResult.precioDetalle || { tipoCobro: 'ml' as const }),
+                            nestingAplicado: Boolean(cp.isNested),
+                        }
 
                     return {
                         ...baseItem,
@@ -671,22 +759,28 @@ export default function EditBatchModal({
                             <span className="total-value">
                                 ${activeBatchTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            {autoBatchTotal > 0 && Math.abs(activeBatchTotal - autoBatchTotal) >= 1 && (
-                                <span className="auto-compare" title="Total calculado automáticamente por tarifario">
-                                    Tarifario: ${autoBatchTotal.toLocaleString('es-AR')}
+                            {useBatchNesting && priceOverrideMode === 'auto' && batchNestingCalc.totalSavingsAmount > 0 ? (
+                                <span className="auto-compare" title="Total individual sin nesting">
+                                    Individual: ${batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')}
                                 </span>
+                            ) : (
+                                autoBatchTotal > 0 && Math.abs(activeBatchTotal - autoBatchTotal) >= 1 && (
+                                    <span className="auto-compare" title="Total calculado automáticamente por tarifario">
+                                        Tarifario: ${autoBatchTotal.toLocaleString('es-AR')}
+                                    </span>
+                                )
                             )}
                         </div>
                     </div>
 
                     <div className="edit-batch-price-modes">
                         {([
-                            { id: 'auto', label: '⚡ Tarifario Auto', title: 'Calcular automáticamente según tarifario y precios especiales del cliente' },
+                            { id: 'auto', label: '⚡ Tarifario Auto', title: 'Calcular automáticamente según tarifario individual y precios especiales del cliente' },
                             { id: 'm2', label: '📐 Por m² ($/m²)', title: 'Fijar tarifa única por metro cuadrado para todas las piezas activas' },
                             { id: 'ml', label: '📏 Por m Lineal ($/ml)', title: 'Fijar tarifa única por metro lineal para todas las piezas activas' },
                             { id: 'final', label: '💰 Precio Final ($)', title: 'Fijar monto total final acordado y distribuirlo entre las piezas activas' },
                         ] as const).map(opt => {
-                            const isActive = priceOverrideMode === opt.id
+                            const isActive = priceOverrideMode === opt.id && !(opt.id === 'auto' && useBatchNesting)
                             const isAutoActive = opt.id === 'auto' && isActive
                             return (
                                 <button
@@ -700,6 +794,18 @@ export default function EditBatchModal({
                                 </button>
                             )
                         })}
+                        <button
+                            type="button"
+                            onClick={handleToggleBatchNesting}
+                            title="Optimizar el monto del lote aplicando nesting 2D por material y calidad (unifica calidad por material al activar)"
+                            className={`edit-batch-price-mode-btn ${(useBatchNesting && priceOverrideMode === 'auto') ? 'active-nesting' : (batchNestingCalc.hasNestingOpportunity ? 'opportunity-nesting' : '')}`}
+                        >
+                            {(useBatchNesting && priceOverrideMode === 'auto')
+                                ? '🧩 Nesting Activo'
+                                : (batchNestingCalc.hasNestingOpportunity
+                                    ? `🧩 Calcular con Nesting (-${batchNestingCalc.totalSavingsPct}%)`
+                                    : '🧩 Tarifario con Nesting')}
+                        </button>
                     </div>
 
                     {priceOverrideMode !== 'auto' ? (
@@ -738,6 +844,21 @@ export default function EditBatchModal({
                                 )
                             )}
                         </div>
+                    ) : useBatchNesting ? (
+                        <div className={`edit-batch-nesting-banner ${batchNestingCalc.hasNestingOpportunity ? 'has-savings' : ''}`}>
+                            {batchNestingCalc.hasNestingOpportunity ? (
+                                <>
+                                    🧩 <strong>Nesting activo por material y calidad:</strong>{' '}
+                                    {batchNestingCalc.totalRawMl.toFixed(2)} ml → <strong>{batchNestingCalc.totalNestedMl.toFixed(2)} ml</strong> · Ahorro{' '}
+                                    <strong>${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')} (-{batchNestingCalc.totalSavingsPct}%)</strong> vs. Tarifario Individual ($
+                                    {batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')})
+                                </>
+                            ) : (
+                                <>
+                                    🧩 Nesting activo (sin ahorro adicional para la combinación actual de material, calidad y medidas). {totalM2.toFixed(2)} m² · {totalMl.toFixed(2)} ml
+                                </>
+                            )}
+                        </div>
                     ) : (
                         (totalM2 > 0 || totalMl > 0) && (
                             <div className="edit-batch-auto-hint">
@@ -759,7 +880,7 @@ export default function EditBatchModal({
                     </div>
 
                     <div className="edit-batch-items-list">
-                        {computedPieces.map(({ piece, effectiveSubtotal, isCustom }) => {
+                        {computedPieces.map(({ piece, effectiveSubtotal, isCustom, isNested }) => {
                             const hasDirectMatOption = availableMaterials.some(m => m.codigo === piece.material)
                             const displayedPriceVal = piece.isPiecePriceManual ? piece.customPriceInput : String(effectiveSubtotal)
 
@@ -799,18 +920,19 @@ export default function EditBatchModal({
 
                                     <div className="edit-batch-item-meta">
                                         <span>
-                                            {piece.ancho}×{piece.alto}m ({piece.copias} cop)
+                                            {piece.ancho}×{piece.alto}m ({piece.copias} cop) · {piece.calidad}
+                                            {isNested ? ' · 🧩' : ''}
                                         </span>
                                     </div>
 
-                                    <div className="edit-batch-item-price-wrap" title="Precio individual de esta orden">
+                                    <div className="edit-batch-item-price-wrap" title={isNested ? 'Precio individual prorrateado con Nesting 2D' : 'Precio individual de esta orden'}>
                                         <span className="currency">$</span>
                                         <input
                                             type="number"
                                             min="0"
                                             step="1"
                                             disabled={piece.unlinked}
-                                            className={`edit-batch-item-price-input ${(piece.isPiecePriceManual || isCustom) ? 'is-custom' : ''}`}
+                                            className={`edit-batch-item-price-input ${(piece.isPiecePriceManual || isCustom) ? 'is-custom' : (isNested ? 'is-nested' : '')}`}
                                             value={displayedPriceVal}
                                             onChange={(e) => handlePiecePriceChange(piece.id, e.target.value)}
                                         />

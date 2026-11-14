@@ -19,7 +19,7 @@ try {
 import { useAuthStore } from '@store/authStore'
 import { blobStore } from '@/data/blobStore'
 import { type Order, type DemasiasConfig, PRESET_ORDER_TAGS, isDesignerRole } from '@/types'
-import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, applyCustomPriceOverride, resolveItemCustomSubtotal, type CustomPriceOverrideMode } from '@/utils/pricingCalculator'
+import { calculateItemPriceDetailed as calcItemPriceDetailedUtil, applyCustomPriceOverride, resolveItemCustomSubtotal, calculateBatchPricingWithNesting, type CustomPriceOverrideMode } from '@/utils/pricingCalculator'
 import { extractMetadata, getPdfThumbnail, type FileMetadata } from './utils/fileMetadataParser'
 import { detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nesting'
 import './NuevoPedidoModal.css'
@@ -177,10 +177,11 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [senaMetodo, setSenaMetodo] = useState<string>('efectivo');
     const [senaPorcentajeOption, setSenaPorcentajeOption] = useState<'0' | '50' | '100' | 'custom'>('0');
 
-    // --- Precio Personalizado (Override Manual: Auto / m² / ml / Final) ---
+    // --- Precio Personalizado (Override Manual: Auto / m² / ml / Final) y Nesting Opcional ---
     const [priceOverrideMode, setPriceOverrideMode] = useState<CustomPriceOverrideMode>('auto');
     const [priceOverride, setPriceOverride] = useState<number | null>(null);
     const [isPriceOverridden, setIsPriceOverridden] = useState<boolean>(false);
+    const [useBatchNesting, setUseBatchNesting] = useState<boolean>(false);
 
     // --- Guardias de Ciclo de Vida: Prevenir refrescos automáticos de versión mientras el modal esté abierto ---
     useEffect(() => {
@@ -564,6 +565,39 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         }
     }, [watchedAncho, watchedAlto, watchedCopias, watchedMaterial, watchedServicios, activeTab, selectedComboId, setValue, isParticular])
 
+    const defaultQualFallback = availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO';
+
+    const batchNestingCalc = useMemo(() => {
+        if (activeTab !== 'lote') return null;
+        const confirmed = batchItems.filter(item => item.confirmed !== false);
+        if (confirmed.length === 0) return null;
+        return calculateBatchPricingWithNesting(
+            confirmed.map(item => ({
+                id: item.id,
+                material: item.material,
+                calidad: item.calidad || watchedCalidad || defaultQualFallback,
+                ancho: round2(Number(item.metadata.width) / 100),
+                alto: round2(Number(item.metadata.height) / 100),
+                copias: item.copias || 1,
+                servicios: item.servicios,
+                demasiasConfig: item.demasiasConfig,
+                esParticular: isParticular,
+            })),
+            watchedClientId,
+            watchedCalidad || defaultQualFallback
+        );
+    }, [activeTab, batchItems, watchedCalidad, defaultQualFallback, watchedClientId, isParticular]);
+
+    const batchNestingById = useMemo(() => {
+        const map = new Map<string, NonNullable<typeof batchNestingCalc>['items'][number]>();
+        if (batchNestingCalc) {
+            for (const r of batchNestingCalc.items) {
+                map.set(String(r.id), r);
+            }
+        }
+        return map;
+    }, [batchNestingCalc]);
+
     // Métricas normalizadas por ítem para cálculo automático y personalización ($/m², $/ml o final)
     const pricingItems = useMemo(() => {
         if (activeTab === 'unitario') {
@@ -604,6 +638,18 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             return batchItems
                 .filter(item => item.confirmed !== false)
                 .map(item => {
+                    const nestedEntry = batchNestingById.get(String(item.id));
+                    if (nestedEntry) {
+                        const chosen = (useBatchNesting && !isPriceOverridden)
+                            ? nestedEntry.effectiveResult
+                            : nestedEntry.individualResult;
+                        return {
+                            m2: chosen.consumoM2 ?? 0,
+                            ml: chosen.consumoML ?? 0,
+                            autoSubtotal: chosen.subtotal,
+                            servicesTotal: chosen.servicesTotal ?? 0
+                        };
+                    }
                     const itemAncho = round2(Number(item.metadata.width) / 100);
                     const itemAlto = round2(Number(item.metadata.height) / 100);
                     const det = calcItemPriceDetailedUtil(
@@ -635,6 +681,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         watchedDemasias,
         selectedComboId,
         batchItems,
+        batchNestingById,
+        useBatchNesting,
+        isPriceOverridden,
         watchedClientId,
         isParticular
     ]);
@@ -663,6 +712,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setPriceOverride(null);
             return;
         }
+        setUseBatchNesting(false);
         if (isPriceOverridden && activeOverrideMode === mode) return;
 
         const mat = getMateriales().find(
@@ -679,6 +729,34 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
         setIsPriceOverridden(true);
         setPriceOverrideMode(mode);
         setPriceOverride(initialVal);
+    };
+
+    const handleToggleBatchNesting = () => {
+        if (useBatchNesting && !isPriceOverridden) {
+            setUseBatchNesting(false);
+            return;
+        }
+        setIsPriceOverridden(false);
+        setPriceOverrideMode('auto');
+        setPriceOverride(null);
+        setUseBatchNesting(true);
+        // Al activar nesting, unificar la calidad por material para asegurar impresión conjunta consistente
+        setBatchItems(prev => {
+            const qualByMat = new Map<string, string>();
+            for (const item of prev) {
+                if (item.confirmed === false || !item.material) continue;
+                const matKey = item.material.trim().toUpperCase();
+                if (!qualByMat.has(matKey)) {
+                    qualByMat.set(matKey, watchedCalidad || item.calidad || defaultQualFallback);
+                }
+            }
+            return prev.map(item => {
+                if (item.confirmed === false || !item.material) return item;
+                const matKey = item.material.trim().toUpperCase();
+                const targetQual = qualByMat.get(matKey) || watchedCalidad || defaultQualFallback;
+                return item.calidad === targetQual ? item : { ...item, calidad: targetQual };
+            });
+        });
     };
 
     // Sugerencia de anidado para vinilo vehicular en carga de lotes (Laminado continuo <= 2.90m)
@@ -825,6 +903,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setPriceOverride(null);
                 setIsPriceOverridden(false);
             }
+            setUseBatchNesting(false);
 
             const tot = Number(order.total || order.subtotal || 0);
             if (initSena === 0) setSenaPorcentajeOption('0');
@@ -869,6 +948,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setPriceOverrideMode('auto');
             setPriceOverride(null);
             setIsPriceOverridden(false);
+            setUseBatchNesting(false);
             setSenaAmount(0);
             setSelectedTags([]);
             setSenaMetodo('efectivo');
@@ -1654,7 +1734,8 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                             // Convertir cm a metros para backend y cálculo de precio con precisión a 2 decimales (cm)
                             const itemAncho = round2(Number(item.metadata.width) / 100);
                             const itemAlto = round2(Number(item.metadata.height) / 100);
-                            const priceResult = calcItemPriceDetailedUtil(
+                            const nestedEntry = batchNestingById.get(String(item.id));
+                            const rawPriceResult = calcItemPriceDetailedUtil(
                                 item.material,
                                 itemAncho,
                                 itemAlto,
@@ -1663,8 +1744,11 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 data.clienteId,
                                 item.demasiasConfig,
                                 isParticular
-                            )
-                            let itemSubtotal = priceResult.subtotal
+                            );
+                            const priceResult = (useBatchNesting && !isPriceOverridden && nestedEntry)
+                                ? nestedEntry.effectiveResult
+                                : rawPriceResult;
+                            let itemSubtotal = priceResult.subtotal;
                             if (isPriceOverridden) {
                                 if (activeOverrideMode === 'final' && i === confirmedItems.length - 1) {
                                     itemSubtotal = Math.max(0, Math.round(orderTotal - allocatedFinalSum));
@@ -3455,7 +3539,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                         ? 'Tarifa Manual ($/ml)'
                                                         : activeOverrideMode === 'final'
                                                             ? 'Monto Acordado (Manual)'
-                                                            : 'Total Calculado'}
+                                                            : (useBatchNesting ? 'Total con Nesting Smart' : 'Total Calculado')}
                                             </span>
                                             {([
                                                 { id: 'auto', label: '⚡ Tarifario Auto', title: 'Calcular automáticamente según tarifario oficial' },
@@ -3463,13 +3547,16 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                 { id: 'ml', label: '📏 Por m Lineal ($/ml)', title: 'Personalizar precio por metro lineal' },
                                                 { id: 'final', label: '💰 Precio Final ($)', title: 'Fijar monto final acordado manualmente' },
                                             ] as const).map(opt => {
-                                                const isActive = activeOverrideMode === opt.id;
+                                                const isActive = activeOverrideMode === opt.id && !(opt.id === 'auto' && useBatchNesting);
                                                 const isAutoActive = opt.id === 'auto' && isActive;
                                                 return (
                                                     <button
                                                         key={opt.id}
                                                         type="button"
-                                                        onClick={() => handleSelectPriceMode(opt.id)}
+                                                        onClick={() => {
+                                                            if (opt.id === 'auto') setUseBatchNesting(false);
+                                                            handleSelectPriceMode(opt.id);
+                                                        }}
                                                         title={opt.title}
                                                         style={{
                                                             fontSize: '0.72rem',
@@ -3494,6 +3581,37 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                     </button>
                                                 );
                                             })}
+                                            {activeTab === 'lote' && batchItems.filter(i => i.confirmed !== false).length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleToggleBatchNesting}
+                                                    title="Optimizar el monto del lote anidando 2D las piezas que comparten material y calidad (unifica calidad por material al activar)"
+                                                    style={{
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: (useBatchNesting && !isPriceOverridden) ? 700 : 600,
+                                                        padding: '4px 9px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid',
+                                                        borderColor: (useBatchNesting && !isPriceOverridden)
+                                                            ? '#10b981'
+                                                            : (batchNestingCalc?.hasNestingOpportunity ? 'rgba(16, 185, 129, 0.5)' : 'rgba(148,163,184,0.28)'),
+                                                        background: (useBatchNesting && !isPriceOverridden)
+                                                            ? 'rgba(16, 185, 129, 0.22)'
+                                                            : (batchNestingCalc?.hasNestingOpportunity ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.04)'),
+                                                        color: (useBatchNesting && !isPriceOverridden)
+                                                            ? '#34d399'
+                                                            : (batchNestingCalc?.hasNestingOpportunity ? '#6ee7b7' : '#94a3b8'),
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                >
+                                                    {(useBatchNesting && !isPriceOverridden)
+                                                        ? '🧩 Nesting Activo'
+                                                        : (batchNestingCalc?.hasNestingOpportunity
+                                                            ? `🧩 Aplicar Nesting (-${batchNestingCalc.totalSavingsPct}% / -$${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')})`
+                                                            : '🧩 Calcular con Nesting')}
+                                                </button>
+                                            )}
                                         </div>
 
                                         {isPriceOverridden ? (
@@ -3552,13 +3670,20 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                             </div>
                                         ) : (
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
+                                                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: useBatchNesting ? '#34d399' : '#38bdf8', letterSpacing: '-0.5px' }}>
                                                     ${orderTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
                                                 {(pricingSummary.totalM2 > 0 || pricingSummary.totalML > 0) && (
                                                     <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
                                                         {pricingSummary.totalM2.toFixed(2)} m² · {pricingSummary.totalML.toFixed(2)} ml
                                                         {pricingSummary.servicesTotal > 0 ? ` · +$${pricingSummary.servicesTotal.toLocaleString('es-AR')} serv.` : ''}
+                                                    </div>
+                                                )}
+                                                {activeTab === 'lote' && useBatchNesting && batchNestingCalc && (
+                                                    <div style={{ fontSize: '0.72rem', color: batchNestingCalc.hasNestingOpportunity ? '#34d399' : '#94a3b8' }}>
+                                                        {batchNestingCalc.hasNestingOpportunity
+                                                            ? `🧩 Nesting aplicado (mismo material y calidad): ${batchNestingCalc.totalRawMl.toFixed(2)} ml → ${batchNestingCalc.totalNestedMl.toFixed(2)} ml (Ahorro: $${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')} · Sin nesting: $${batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')})`
+                                                            : '🧩 Nesting activo (sin ahorro adicional para la combinación actual de material/calidad)'}
                                                     </div>
                                                 )}
                                             </div>

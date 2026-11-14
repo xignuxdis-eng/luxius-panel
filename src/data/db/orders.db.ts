@@ -560,6 +560,7 @@ export async function updateBatchGroup(
         const itemParam = params.items?.find(i => matchesOrderId(order, i.id));
         const specUpdates: Partial<Order> = {};
         if (itemParam?.material !== undefined) specUpdates.material = itemParam.material;
+        if (itemParam?.calidad !== undefined) specUpdates.calidad = itemParam.calidad;
         if (itemParam?.subtotal !== undefined) specUpdates.subtotal = itemParam.subtotal;
         if (itemParam?.total !== undefined) specUpdates.total = itemParam.total;
         if (itemParam?.precioUnitarioManual !== undefined) {

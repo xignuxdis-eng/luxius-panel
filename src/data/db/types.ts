@@ -52,6 +52,7 @@ export interface UpdateBatchGroupParams {
         itemDesc?: string;
         unlinked?: boolean;
         material?: string;
+        calidad?: string;
         subtotal?: number;
         total?: number;
         precioUnitarioManual?: number | null;
