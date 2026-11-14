@@ -547,3 +547,37 @@
     border-color: rgba(16, 185, 129, 0.55);
     color: #6ee7b7;
 }
+
+.edit-batch-nesting-bobinas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.edit-batch-nesting-bobina-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: #cbd5e1;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(52, 211, 153, 0.35);
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+.edit-batch-nesting-bobina-chip select {
+    background: transparent;
+    border: none;
+    color: #34d399;
+    font-weight: 700;
+    font-size: 0.72rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.edit-batch-nesting-bobina-chip select option {
+    background: #0f172a;
+    color: #e2e8f0;
+}

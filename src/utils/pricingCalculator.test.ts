@@ -576,4 +576,56 @@ describe('calculateBatchPricingWithNesting (optimización 2D por material y cali
         expect(res.nestedBatchTotal).toBe(res.rawBatchTotal)
         expect(res.items.every(it => !it.isNested && it.nestedSubtotal === it.rawSubtotal)).toBe(true)
     })
+
+    it('adapta material m2 a ML cuando el cliente tiene tarifa especial en ML y normaliza ancho 150 -> 1.50m con nesting', () => {
+        const mats = [
+            {
+                id: 6, codigo: 'VM', descripcion: 'Vinilo Microperforado',
+                calidad: 'ECO', tipo: 'Sustrato', tipoCobro: 'm2',
+                precioM2: 18000, ancho: 150, habilitado: true, bobinas: []
+            }
+        ]
+        window.localStorage.setItem('luxius_session_materiales', JSON.stringify(mats))
+        sembrarCliente(77, { 'VM:ml': 16000 })
+
+        const res = calculateBatchPricingWithNesting([
+            { id: 'vm1', material: 'VM', calidad: 'ECO', ancho: 0.92, alto: 0.69, copias: 1 },
+            { id: 'vm2', material: 'VM', calidad: 'ECO', ancho: 0.92, alto: 0.50, copias: 1 },
+            { id: 'vm3', material: 'VM', calidad: 'ECO', ancho: 0.81, alto: 1.68, copias: 1 },
+            { id: 'vm4', material: 'VM', calidad: 'ECO', ancho: 0.81, alto: 1.68, copias: 1 },
+            { id: 'vm5', material: 'VM', calidad: 'ECO', ancho: 0.80, alto: 1.68, copias: 1 },
+        ], 77)
+
+        expect(res.hasNestingOpportunity).toBe(true)
+        expect(res.groups[0].bobinaGanadora).toBe(1.5)
+        expect(res.groups[0].precioMLAplicado).toBe(16000)
+        expect(res.totalNestedMl).toBeLessThan(res.totalRawMl)
+        expect(res.nestedBatchTotal).toBeLessThan(res.rawBatchTotal)
+    })
+
+    it('permite seleccionar manualmente la bobina objetivo mediante bobinaOverrides', () => {
+        sembrarMaterial('VV-SEL', {
+            tipoCobro: 'ml',
+            bobinas: [
+                { ancho: 1.37, precioML: 28000 },
+                { ancho: 1.52, precioML: 32000 },
+            ]
+        })
+
+        const autoRes = calculateBatchPricingWithNesting([
+            { id: 's1', material: 'VV-SEL', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+            { id: 's2', material: 'VV-SEL', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+        ])
+        expect(autoRes.groups[0].bobinaGanadora).toBe(1.37)
+        expect(autoRes.groups[0].availableBobinas).toEqual([1.37, 1.52])
+
+        const forcedRes = calculateBatchPricingWithNesting([
+            { id: 's1', material: 'VV-SEL', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+            { id: 's2', material: 'VV-SEL', calidad: 'ECO', ancho: 0.65, alto: 1.00, copias: 1 },
+        ], undefined, { bobinaOverrides: { 'VV-SEL|ECO': 1.52 } })
+
+        expect(forcedRes.groups[0].bobinaGanadora).toBe(1.52)
+        expect(forcedRes.groups[0].precioMLAplicado).toBe(32000)
+        expect(forcedRes.nestedBatchTotal).toBeGreaterThan(autoRes.nestedBatchTotal)
+    })
 })

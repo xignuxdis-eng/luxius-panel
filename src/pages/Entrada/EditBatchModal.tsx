@@ -111,6 +111,7 @@ export default function EditBatchModal({
     const [priceOverrideValue, setPriceOverrideValue] = useState<number | null>(null)
     const [isBatchPriceModified, setIsBatchPriceModified] = useState<boolean>(false)
     const [useBatchNesting, setUseBatchNesting] = useState<boolean>(false)
+    const [nestingBobinaOverrides, setNestingBobinaOverrides] = useState<Record<string, number>>({})
     const [pieces, setPieces] = useState<PieceState[]>([])
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -226,7 +227,11 @@ export default function EditBatchModal({
                     skipNesting: piece.unlinked || piece.isPiecePriceManual,
                 }
             }),
-            effectiveBatchClientId
+            effectiveBatchClientId,
+            {
+                defaultCalidad: 'ECO',
+                bobinaOverrides: nestingBobinaOverrides,
+            }
         )
         const nestingById = new Map(nestingCalc.items.map(it => [String(it.id), it]))
 
@@ -389,7 +394,7 @@ export default function EditBatchModal({
             pricingSummary: summary,
             batchNestingCalc: nestingCalc
         }
-    }, [pieces, availableMaterials, clientId, priceOverrideMode, priceOverrideValue, isBatchPriceModified, useBatchNesting])
+    }, [pieces, availableMaterials, clientId, priceOverrideMode, priceOverrideValue, isBatchPriceModified, useBatchNesting, nestingBobinaOverrides])
 
     const activeCount = pieces.filter(p => !p.unlinked).length
 
@@ -846,17 +851,49 @@ export default function EditBatchModal({
                         </div>
                     ) : useBatchNesting ? (
                         <div className={`edit-batch-nesting-banner ${batchNestingCalc.hasNestingOpportunity ? 'has-savings' : ''}`}>
-                            {batchNestingCalc.hasNestingOpportunity ? (
-                                <>
-                                    🧩 <strong>Nesting activo por material y calidad:</strong>{' '}
-                                    {batchNestingCalc.totalRawMl.toFixed(2)} ml → <strong>{batchNestingCalc.totalNestedMl.toFixed(2)} ml</strong> · Ahorro{' '}
-                                    <strong>${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')} (-{batchNestingCalc.totalSavingsPct}%)</strong> vs. Tarifario Individual ($
-                                    {batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')})
-                                </>
-                            ) : (
-                                <>
-                                    🧩 Nesting activo (sin ahorro adicional para la combinación actual de material, calidad y medidas). {totalM2.toFixed(2)} m² · {totalMl.toFixed(2)} ml
-                                </>
+                            <div className="edit-batch-nesting-summary">
+                                {batchNestingCalc.hasNestingOpportunity ? (
+                                    <>
+                                        🧩 <strong>Nesting activo por material y calidad:</strong>{' '}
+                                        {batchNestingCalc.totalRawMl.toFixed(2)} ml → <strong>{batchNestingCalc.totalNestedMl.toFixed(2)} ml</strong> · Ahorro{' '}
+                                        <strong>${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')} (-{batchNestingCalc.totalSavingsPct}%)</strong> vs. Tarifario Individual ($
+                                        {batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')})
+                                    </>
+                                ) : (
+                                    <>
+                                        🧩 Nesting activo (sin ahorro adicional para la combinación actual de material, calidad y medidas). {totalM2.toFixed(2)} m² · {totalMl.toFixed(2)} ml
+                                    </>
+                                )}
+                            </div>
+                            {batchNestingCalc.groups.length > 0 && (
+                                <div className="edit-batch-nesting-bobinas">
+                                    {batchNestingCalc.groups.map(g => (
+                                        <label key={g.groupKey} className="edit-batch-nesting-bobina-chip">
+                                            <span>Bobina {g.material} ({g.calidad}):</span>
+                                            <select
+                                                value={nestingBobinaOverrides[g.groupKey] ?? ''}
+                                                onChange={(e) => {
+                                                    const v = e.target.value ? Number(e.target.value) : 0
+                                                    setIsBatchPriceModified(true)
+                                                    setNestingBobinaOverrides(prev => {
+                                                        const next = { ...prev }
+                                                        if (v > 0) next[g.groupKey] = v
+                                                        else delete next[g.groupKey]
+                                                        return next
+                                                    })
+                                                    setPieces(prev => prev.map(p =>
+                                                        p.unlinked ? p : { ...p, isPiecePriceManual: false, priceDirty: true }
+                                                    ))
+                                                }}
+                                            >
+                                                <option value="">Auto ({g.bobinaGanadora.toFixed(2)}m)</option>
+                                                {(g.availableBobinas || [g.bobinaGanadora]).map(b => (
+                                                    <option key={b} value={b}>{b.toFixed(2)}m</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     ) : (

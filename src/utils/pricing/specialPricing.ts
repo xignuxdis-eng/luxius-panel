@@ -205,3 +205,58 @@ export function resolveSpecialPrice(
     return { hasSpecialPrice: false };
 }
 
+export function normalizeRollWidthMeters(rawAncho: number): number {
+    if (!Number.isFinite(rawAncho) || rawAncho <= 0) return 0;
+    const normalized = rawAncho > 20 ? rawAncho / 100 : rawAncho;
+    return Math.round((normalized + Number.EPSILON) * 100) / 100;
+}
+
+export interface ClientMlSpecialInfo {
+    hasMlSpecial: boolean;
+    explicitWidths: number[];
+    generalMlPrice?: number;
+}
+
+/**
+ * Detecta si un cliente tiene configurado un precio especial explícito por metro lineal (`ml`)
+ * para un material (por ej. `VM:ml`, `VM:1.50`, `VM:ml:1.50`), incluso si el material base
+ * en el catálogo está configurado por `m2`.
+ */
+export function getClientMlSpecialInfo(
+    cliente: Cliente | null | undefined,
+    materialCode: string
+): ClientMlSpecialInfo {
+    if (!cliente || !cliente.preciosEspeciales || typeof cliente.preciosEspeciales !== 'object') {
+        return { hasMlSpecial: false, explicitWidths: [] };
+    }
+
+    const targetMat = materialCode.trim().toLowerCase();
+    const widthSet = new Set<number>();
+    let generalMlPrice: number | undefined;
+
+    for (const [key, val] of Object.entries(cliente.preciosEspeciales)) {
+        if (typeof val !== 'number' || isNaN(val) || val <= 0) continue;
+        // Solo consideramos claves explícitamente en ML (`:ml`, `:ml:ancho`, `:ancho`),
+        // pasando allMaterials undefined y chequeando key con ':'.
+        if (!key.includes(':')) continue;
+        const parsed = parseSpecialPriceKey(key, val);
+        if (parsed.materialCode.trim().toLowerCase() !== targetMat) continue;
+        if (parsed.unit !== 'ml') continue;
+
+        if (parsed.ancho && parsed.ancho > 0) {
+            const w = normalizeRollWidthMeters(parsed.ancho);
+            if (w > 0) widthSet.add(w);
+        } else {
+            generalMlPrice = val;
+        }
+    }
+
+    const explicitWidths = Array.from(widthSet).sort((a, b) => a - b);
+    return {
+        hasMlSpecial: explicitWidths.length > 0 || generalMlPrice !== undefined,
+        explicitWidths,
+        generalMlPrice,
+    };
+}
+
+

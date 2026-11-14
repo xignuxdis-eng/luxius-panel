@@ -56,6 +56,7 @@ export interface BatchNestingGroupSummary {
     calidad: string;
     itemIds: Array<string | number>;
     bobinaGanadora: number;
+    availableBobinas?: number[];
     precioMLAplicado: number;
     rawMlTotal: number;
     nestedMlTotal: number;
@@ -64,6 +65,12 @@ export interface BatchNestingGroupSummary {
     rawCostTotal: number;
     nestedCostTotal: number;
     savingsAmount: number;
+}
+
+export interface BatchNestingOptions {
+    defaultCalidad?: string;
+    /** Mapa opcional de `groupKey` (`MAT|CALIDAD`) o código de material en mayúsculas al ancho de bobina elegido manualmente */
+    bobinaOverrides?: Record<string, number>;
 }
 
 export interface BatchNestingItemResult {

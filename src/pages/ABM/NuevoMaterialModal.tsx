@@ -4,6 +4,7 @@ import Modal from '@components/ui/Modal'
 import Button from '@components/ui/Button'
 import { Input } from '@components/ui/Input'
 import { saveMaterial, getCalidades } from '@data/db'
+import { normalizeRollWidthMeters } from '@/utils/pricing/specialPricing'
 import type { Material, Calidad } from '@/types'
 import { Plus, Trash2 } from 'lucide-react'
 
@@ -42,9 +43,22 @@ export default function NuevoMaterialModal({ isOpen, onClose, onSave, material }
     }, [isOpen, material, reset])
 
     const onSubmit = (data: Partial<Material>) => {
+        // Normalizar anchos ingresados en cm (>20, ej. 150 -> 1.50m)
+        const normalizedAncho = data.ancho !== undefined && data.ancho !== null
+            ? normalizeRollWidthMeters(Number(data.ancho)) || Number(data.ancho)
+            : data.ancho
+        const normalizedBobinas = Array.isArray(data.bobinas)
+            ? data.bobinas.map((b: any) => ({
+                ...b,
+                ancho: normalizeRollWidthMeters(Number(b?.ancho)) || Number(b?.ancho)
+            }))
+            : data.bobinas
+
         // Prepare data for saving
         const finalData = {
             ...data,
+            ancho: normalizedAncho,
+            bobinas: normalizedBobinas,
             id: material?.id,
             habilitado: Boolean(data.habilitado)
         }

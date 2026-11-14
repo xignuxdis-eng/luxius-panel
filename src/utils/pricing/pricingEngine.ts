@@ -3,7 +3,7 @@
  */
 
 import { getMateriales, getClientes, getServicios, getTarifasXignuxSync } from '@/data/db';
-import type { DemasiasConfig } from '@/types';
+import type { DemasiasConfig, Cliente } from '@/types';
 import { getBobinaUsefulWidth, runNesting, type NestingItem } from '../nestingEngine';
 import type {
     PriceCalculationResult,
@@ -11,9 +11,10 @@ import type {
     BatchNestingPriceInputItem,
     BatchNestingGroupSummary,
     BatchNestingItemResult,
-    BatchNestingPricingResult
+    BatchNestingPricingResult,
+    BatchNestingOptions
 } from './pricingTypes';
-import { resolveSpecialPrice } from './specialPricing';
+import { resolveSpecialPrice, getClientMlSpecialInfo, normalizeRollWidthMeters } from './specialPricing';
 
 export const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
 
@@ -66,6 +67,64 @@ function computeFallbackLinearMeters(
     }
 
     return round2(h * c);
+}
+
+function resolveEffectiveMaterialBobinas(
+    mat: {
+        codigo?: string;
+        tipoCobro?: 'm2' | 'ml';
+        precioM2?: number;
+        ancho?: number;
+        bobinas?: Array<{ ancho?: number; precioML?: number }>;
+    },
+    cliente: Cliente | null | undefined,
+    materialCode: string
+): { useMlMode: boolean; bobinas: Array<{ ancho: number; precioML: number }> } {
+    const explicitResolution = resolveSpecialPrice(cliente, materialCode, undefined, mat.tipoCobro);
+    const hasExplicitM2 = explicitResolution.hasSpecialPrice && explicitResolution.unit === 'm2';
+    const mlSpecialInfo = getClientMlSpecialInfo(cliente, materialCode);
+    const hasExplicitMl = mlSpecialInfo.hasMlSpecial;
+
+    const useMlMode = !hasExplicitM2 && (mat.tipoCobro === 'ml' || hasExplicitMl);
+    if (!useMlMode) {
+        return { useMlMode: false, bobinas: [] };
+    }
+
+    const bobinaMap = new Map<number, number>();
+    if (Array.isArray(mat.bobinas)) {
+        for (const b of mat.bobinas) {
+            if (!b || typeof b.ancho !== 'number') continue;
+            const normAncho = normalizeRollWidthMeters(b.ancho);
+            if (normAncho <= 0) continue;
+            const price = typeof b.precioML === 'number' && b.precioML > 0
+                ? b.precioML
+                : (mlSpecialInfo.generalMlPrice || mat.precioM2 || 0);
+            bobinaMap.set(normAncho, price);
+        }
+    }
+
+    if (bobinaMap.size === 0) {
+        const fallbackPrice = mlSpecialInfo.generalMlPrice || mat.precioM2 || 0;
+        for (const w of mlSpecialInfo.explicitWidths) {
+            if (w > 0 && !bobinaMap.has(w)) {
+                bobinaMap.set(w, fallbackPrice);
+            }
+        }
+        const matAnchoNorm = normalizeRollWidthMeters(Number(mat.ancho) || 0);
+        if (matAnchoNorm > 0 && !bobinaMap.has(matAnchoNorm)) {
+            bobinaMap.set(matAnchoNorm, fallbackPrice);
+        }
+        if (bobinaMap.size === 0) {
+            bobinaMap.set(1.37, fallbackPrice);
+            bobinaMap.set(1.52, fallbackPrice);
+        }
+    }
+
+    const bobinas = Array.from(bobinaMap.entries())
+        .map(([ancho, precioML]) => ({ ancho, precioML }))
+        .sort((a, b) => a.ancho - b.ancho);
+
+    return { useMlMode: true, bobinas };
 }
 
 /**
@@ -123,10 +182,9 @@ export function calculateItemPriceDetailed(
         cliente = clientList.find(cl => String(cl.id) === String(clientIdParam));
     }
 
-    // Verificar si el cliente tiene un precio especial explícito por M2 para este material
-    // (Por ejemplo: "VV:m2" para cotizar vinilo en M2 plano, o "VBB:m2" / "VBB" en materiales M2)
-    const explicitM2Resolution = resolveSpecialPrice(cliente, materialCode, undefined, tipoCobro);
-    const hasExplicitM2 = explicitM2Resolution.hasSpecialPrice && explicitM2Resolution.unit === 'm2';
+    // Adaptar el tipo de cobro: si el cliente tiene precio especial explícito en ML (ej: VM:ml o VM:1.50),
+    // se respeta el cobro por metro lineal aunque el material base esté en m².
+    const { useMlMode, bobinas: effectiveBobinas } = resolveEffectiveMaterialBobinas(mat, cliente, materialCode);
 
     let basePrice = 0;
     let assignedBobina: number | undefined;
@@ -135,20 +193,12 @@ export function calculateItemPriceDetailed(
     let rotated = false;
     let linearMeters = 0;
 
-    if (tipoCobro === 'ml' && !hasExplicitM2) {
-        const availableWidths: { ancho: number; precioML: number; usefulWidth: number }[] = [];
-        
-        if (Array.isArray(bobinas) && bobinas.length > 0) {
-            bobinas.forEach(b => {
-                if (b && typeof b.ancho === 'number' && typeof b.precioML === 'number') {
-                    availableWidths.push({
-                        ancho: b.ancho,
-                        precioML: b.precioML,
-                        usefulWidth: getBobinaUsefulWidth(b.ancho)
-                    });
-                }
-            });
-        }
+    if (useMlMode) {
+        const availableWidths: { ancho: number; precioML: number; usefulWidth: number }[] = effectiveBobinas.map(b => ({
+            ancho: b.ancho,
+            precioML: b.precioML,
+            usefulWidth: getBobinaUsefulWidth(b.ancho)
+        }));
 
         availableWidths.sort((a, b) => a.ancho - b.ancho);
 
@@ -161,7 +211,7 @@ export function calculateItemPriceDetailed(
         }[] = [];
 
         availableWidths.forEach(({ ancho: bobinaAncho, precioML, usefulWidth }) => {
-            const specialRes = resolveSpecialPrice(cliente, materialCode, bobinaAncho, tipoCobro);
+            const specialRes = resolveSpecialPrice(cliente, materialCode, bobinaAncho, 'ml');
             const priceToUse = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : precioML;
 
             // 1. Orientacion Normal (Ancho de la pieza a lo ancho de la bobina)
@@ -292,11 +342,11 @@ export function calculateItemPriceDetailed(
 
     const subtotal = basePrice + servicesTotal;
 
-    const isCalculationMl = tipoCobro === 'ml' && !hasExplicitM2;
+    const isCalculationMl = useMlMode;
     const surfaceM2 = round2(w * h * c);
     const effectiveML = linearMeters > 0
         ? linearMeters
-        : computeFallbackLinearMeters(w, h, c, bobinas, mat.ancho);
+        : computeFallbackLinearMeters(w, h, c, effectiveBobinas.length > 0 ? effectiveBobinas : bobinas, normalizeRollWidthMeters(Number(mat.ancho) || 0));
 
     return {
         subtotal,
@@ -438,8 +488,15 @@ function normalizeEffectiveDims(
 export function calculateBatchPricingWithNesting(
     items: BatchNestingPriceInputItem[],
     clientIdParam?: string | number,
-    defaultCalidad: string = 'ECO'
+    defaultCalidadOrOptions: string | BatchNestingOptions = 'ECO'
 ): BatchNestingPricingResult {
+    const defaultCalidad = typeof defaultCalidadOrOptions === 'string'
+        ? defaultCalidadOrOptions
+        : (defaultCalidadOrOptions.defaultCalidad || 'ECO');
+    const bobinaOverrides = typeof defaultCalidadOrOptions === 'object' && defaultCalidadOrOptions !== null
+        ? defaultCalidadOrOptions.bobinaOverrides
+        : undefined;
+
     const allMateriales = getMateriales();
     const allClientes = getClientes();
     const cliente = clientIdParam
@@ -547,7 +604,10 @@ export function calculateBatchPricingWithNesting(
             m => m.codigo === subgroup[0].matCode ||
                 String(m.codigo).toLowerCase() === subgroup[0].matCode.toLowerCase()
         );
-        if (!mat || mat.tipoCobro !== 'ml' || !Array.isArray(mat.bobinas) || mat.bobinas.length === 0) {
+        if (!mat) return;
+
+        const { useMlMode, bobinas: effectiveBobinas } = resolveEffectiveMaterialBobinas(mat, cliente, mat.codigo);
+        if (!useMlMode || effectiveBobinas.length === 0) {
             return;
         }
 
@@ -578,10 +638,7 @@ export function calculateBatchPricingWithNesting(
         }
 
         const candidates: BobinaCandidate[] = [];
-        for (const b of mat.bobinas) {
-            if (!b || typeof b.ancho !== 'number' || b.ancho <= 0 || typeof b.precioML !== 'number') {
-                continue;
-            }
+        for (const b of effectiveBobinas) {
             // Evaluar heurística con rotación libre y empaquetado uniforme sin rotar
             // (para evitar que girar la primera pieza bloquee carriles paralelos).
             const layouts = [
@@ -594,7 +651,7 @@ export function calculateBatchPricingWithNesting(
             layouts.sort((a, z) => a.linearMeters - z.linearMeters);
             const nRes = layouts[0];
 
-            const specialRes = resolveSpecialPrice(cliente, mat.codigo, b.ancho, mat.tipoCobro);
+            const specialRes = resolveSpecialPrice(cliente, mat.codigo, b.ancho, 'ml');
             const priceMl = (specialRes.hasSpecialPrice && specialRes.price) ? specialRes.price : b.precioML;
             const nestedMl = round2(nRes.linearMeters);
             const baseCostNoMarkup = Math.round(priceMl * nestedMl);
@@ -610,6 +667,8 @@ export function calculateBatchPricingWithNesting(
 
         if (candidates.length === 0) return;
 
+        const availableBobinas = Array.from(new Set(candidates.map(c => c.bobina))).sort((a, b) => a - b);
+
         candidates.sort((a, b) => {
             if (a.baseCostNoMarkup !== b.baseCostNoMarkup) {
                 return a.baseCostNoMarkup - b.baseCostNoMarkup;
@@ -623,10 +682,17 @@ export function calculateBatchPricingWithNesting(
             return a.bobina - b.bobina;
         });
 
-        const best = candidates[0];
+        const rawOverride = bobinaOverrides?.[groupKey] ?? bobinaOverrides?.[mat.codigo.toUpperCase()];
+        const normOverride = rawOverride ? normalizeRollWidthMeters(rawOverride) : 0;
+        const forcedCandidate = normOverride > 0
+            ? candidates.find(c => Math.abs(c.bobina - normOverride) < 0.02)
+            : undefined;
+
+        const best = forcedCandidate ?? candidates[0];
+        const isForcedBobina = Boolean(forcedCandidate);
         const improvesCost = best.baseCostNoMarkup < rawBaseNoMarkupSum;
         const improvesMlTie = best.baseCostNoMarkup === rawBaseNoMarkupSum && best.nestedMl < rawMlTotal - 0.01;
-        if (!improvesCost && !improvesMlTie) return;
+        if (!improvesCost && !improvesMlTie && !isForcedBobina) return;
 
         const totalArea = subgroup.reduce((acc, e) => acc + e.areaM2, 0);
         let allocatedMl = 0;
@@ -709,6 +775,7 @@ export function calculateBatchPricingWithNesting(
             calidad: subgroup[0].calidadNorm,
             itemIds: subgroup.map(e => e.input.id),
             bobinaGanadora: best.bobina,
+            availableBobinas,
             precioMLAplicado: best.priceMl,
             rawMlTotal,
             nestedMlTotal: best.nestedMl,

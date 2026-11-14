@@ -182,6 +182,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [priceOverride, setPriceOverride] = useState<number | null>(null);
     const [isPriceOverridden, setIsPriceOverridden] = useState<boolean>(false);
     const [useBatchNesting, setUseBatchNesting] = useState<boolean>(false);
+    const [nestingBobinaOverrides, setNestingBobinaOverrides] = useState<Record<string, number>>({});
 
     // --- Guardias de Ciclo de Vida: Prevenir refrescos automáticos de versión mientras el modal esté abierto ---
     useEffect(() => {
@@ -584,9 +585,12 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 esParticular: isParticular,
             })),
             watchedClientId,
-            watchedCalidad || defaultQualFallback
+            {
+                defaultCalidad: watchedCalidad || defaultQualFallback,
+                bobinaOverrides: nestingBobinaOverrides,
+            }
         );
-    }, [activeTab, batchItems, watchedCalidad, defaultQualFallback, watchedClientId, isParticular]);
+    }, [activeTab, batchItems, watchedCalidad, defaultQualFallback, watchedClientId, isParticular, nestingBobinaOverrides]);
 
     const batchNestingById = useMemo(() => {
         const map = new Map<string, NonNullable<typeof batchNestingCalc>['items'][number]>();
@@ -3680,10 +3684,46 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                                     </div>
                                                 )}
                                                 {activeTab === 'lote' && useBatchNesting && batchNestingCalc && (
-                                                    <div style={{ fontSize: '0.72rem', color: batchNestingCalc.hasNestingOpportunity ? '#34d399' : '#94a3b8' }}>
-                                                        {batchNestingCalc.hasNestingOpportunity
-                                                            ? `🧩 Nesting aplicado (mismo material y calidad): ${batchNestingCalc.totalRawMl.toFixed(2)} ml → ${batchNestingCalc.totalNestedMl.toFixed(2)} ml (Ahorro: $${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')} · Sin nesting: $${batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')})`
-                                                            : '🧩 Nesting activo (sin ahorro adicional para la combinación actual de material/calidad)'}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', marginTop: '2px' }}>
+                                                        <div style={{ fontSize: '0.72rem', color: batchNestingCalc.hasNestingOpportunity ? '#34d399' : '#94a3b8' }}>
+                                                            {batchNestingCalc.hasNestingOpportunity
+                                                                ? `🧩 Nesting aplicado (mismo material y calidad): ${batchNestingCalc.totalRawMl.toFixed(2)} ml → ${batchNestingCalc.totalNestedMl.toFixed(2)} ml (Ahorro: $${batchNestingCalc.totalSavingsAmount.toLocaleString('es-AR')} · Sin nesting: $${batchNestingCalc.rawBatchTotal.toLocaleString('es-AR')})`
+                                                                : '🧩 Nesting activo (sin ahorro adicional para la combinación actual de material/calidad)'}
+                                                        </div>
+                                                        {batchNestingCalc.groups.length > 0 && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
+                                                                {batchNestingCalc.groups.map(g => (
+                                                                    <label
+                                                                        key={g.groupKey}
+                                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#cbd5e1', background: 'rgba(15,23,42,0.55)', border: '1px solid rgba(52,211,153,0.3)', borderRadius: '6px', padding: '2px 6px' }}
+                                                                    >
+                                                                        <span>Bobina {g.material} ({g.calidad}):</span>
+                                                                        <select
+                                                                            value={nestingBobinaOverrides[g.groupKey] ?? ''}
+                                                                            onChange={(e) => {
+                                                                                const v = e.target.value ? Number(e.target.value) : 0;
+                                                                                setNestingBobinaOverrides(prev => {
+                                                                                    const next = { ...prev };
+                                                                                    if (v > 0) next[g.groupKey] = v;
+                                                                                    else delete next[g.groupKey];
+                                                                                    return next;
+                                                                                });
+                                                                            }}
+                                                                            style={{ background: 'transparent', color: '#34d399', border: 'none', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', outline: 'none' }}
+                                                                        >
+                                                                            <option value="" style={{ background: '#0f172a', color: '#e2e8f0' }}>
+                                                                                Auto ({g.bobinaGanadora.toFixed(2)}m)
+                                                                            </option>
+                                                                            {(g.availableBobinas || [g.bobinaGanadora]).map(b => (
+                                                                                <option key={b} value={b} style={{ background: '#0f172a', color: '#e2e8f0' }}>
+                                                                                    {b.toFixed(2)}m
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
