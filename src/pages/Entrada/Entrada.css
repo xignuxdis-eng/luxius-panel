@@ -1357,4 +1357,29 @@
     background: #ef4444 !important;
     color: #fff !important;
     border: none !important;
-}
+}
+
+
+.price-cell.price-cell-editable {
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 6px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.price-cell.price-cell-editable:hover {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.price-cell-editable .price-edit-hint {
+    font-size: 10px;
+    margin-left: 3px;
+    opacity: 0.45;
+    transition: opacity 0.15s ease;
+}
+
+.price-cell-editable:hover .price-edit-hint {
+    opacity: 1;
+}

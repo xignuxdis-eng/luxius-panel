@@ -558,6 +558,33 @@ export async function updateBatchGroup(
         allIds.push(orderId);
 
         const itemParam = params.items?.find(i => matchesOrderId(order, i.id));
+        const specUpdates: Partial<Order> = {};
+        if (itemParam?.material !== undefined) specUpdates.material = itemParam.material;
+        if (itemParam?.subtotal !== undefined) specUpdates.subtotal = itemParam.subtotal;
+        if (itemParam?.total !== undefined) specUpdates.total = itemParam.total;
+        if (itemParam?.precioUnitarioManual !== undefined) {
+            specUpdates.precioUnitarioManual = itemParam.precioUnitarioManual;
+        }
+        if (itemParam?.precioMl !== undefined) specUpdates.precioMl = itemParam.precioMl;
+        if (itemParam?.bobinaAsignada !== undefined) specUpdates.bobinaAsignada = itemParam.bobinaAsignada;
+        if (itemParam?.consumoEstimado !== undefined) specUpdates.consumoEstimado = itemParam.consumoEstimado;
+        if (itemParam?.precioDetalle !== undefined) specUpdates.precioDetalle = itemParam.precioDetalle;
+        if (itemParam?.saldoPendiente !== undefined) {
+            specUpdates.saldoPendiente = itemParam.saldoPendiente;
+        } else if (itemParam?.total !== undefined || itemParam?.subtotal !== undefined) {
+            const newTotal = Number(itemParam.total ?? itemParam.subtotal ?? order.total ?? order.subtotal ?? 0);
+            const paid = Number(order.montoPagado ?? order.sena ?? order.senaMonto ?? 0);
+            specUpdates.saldoPendiente = Math.max(0, Math.round((newTotal - paid) * 100) / 100);
+        }
+
+        const sharedItemUpdates: Partial<Order> = {
+            ...(params.clientId ? { clientId: params.clientId, clienteNombre: params.clienteNombre } : {}),
+            ...(params.fechaEntrega !== undefined ? { fechaEntrega: params.fechaEntrega } : {}),
+            ...(params.envio !== undefined ? { envio: params.envio } : {}),
+            ...(params.observaciones !== undefined ? { observaciones: params.observaciones, comments: params.observaciones } : {}),
+            ...specUpdates,
+        };
+
         if (itemParam?.unlinked) {
             // Desvincular orden del lote: quitar batchId y loteNombre
             const baseDesc = order.descripcionItem || (order.nombreTarea && order.nombreTarea.includes(' - ') ? order.nombreTarea.split(' - ').slice(1).join(' - ').trim() : '') || order.archivosOriginales?.[0] || 'OT Individual';
@@ -567,17 +594,14 @@ export async function updateBatchGroup(
                 loteNombre: '',
                 nombreTarea: baseDesc,
                 descripcion: baseDesc,
-                ...(params.clientId ? { clientId: params.clientId, clienteNombre: params.clienteNombre } : {}),
-                ...(params.fechaEntrega !== undefined ? { fechaEntrega: params.fechaEntrega } : {}),
-                ...(params.envio !== undefined ? { envio: params.envio } : {}),
-                ...(params.observaciones !== undefined ? { observaciones: params.observaciones, comments: params.observaciones } : {})
+                ...sharedItemUpdates,
             });
         } else {
             // Mantener en el lote con el nuevo nombre y datos compartidos
             const pieceDesc = itemParam?.itemDesc !== undefined
                 ? itemParam.itemDesc.trim()
                 : (order.descripcionItem || (order.nombreTarea && order.nombreTarea.includes(' - ') ? order.nombreTarea.split(' - ').slice(1).join(' - ').trim() : '') || order.archivosOriginales?.[0] || '');
-            
+
             const newNombreTarea = pieceDesc ? `${cleanBatchName} - ${pieceDesc}` : cleanBatchName;
 
             itemsToUpdate.push({
@@ -587,10 +611,7 @@ export async function updateBatchGroup(
                 descripcionItem: pieceDesc,
                 nombreTarea: newNombreTarea,
                 descripcion: newNombreTarea,
-                ...(params.clientId ? { clientId: params.clientId, clienteNombre: params.clienteNombre } : {}),
-                ...(params.fechaEntrega !== undefined ? { fechaEntrega: params.fechaEntrega } : {}),
-                ...(params.envio !== undefined ? { envio: params.envio } : {}),
-                ...(params.observaciones !== undefined ? { observaciones: params.observaciones, comments: params.observaciones } : {})
+                ...sharedItemUpdates,
             });
         }
     }

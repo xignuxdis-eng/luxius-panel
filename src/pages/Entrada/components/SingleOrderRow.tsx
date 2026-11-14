@@ -216,11 +216,19 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
             </td>
             {isAdmin && (
                 <td>
-                    <div className="price-cell">
+                    <div
+                        className="price-cell price-cell-editable"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEditOrder(order);
+                        }}
+                        title="Click para editar precio o material de la orden"
+                    >
                         <span className="currency">$</span>
                         <span className="amount">
                             {calculateOrderPrice(order, allMateriales, allClientes).toLocaleString()}
                         </span>
+                        <span className="price-edit-hint">✏️</span>
                     </div>
                 </td>
             )}
@@ -271,6 +279,15 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                                 }}
                             >
                                 <span style={{ pointerEvents: 'none' }}>📥</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-icon-action"
+                                onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
+                                title="Editar Pedido / Material y Precio"
+                                style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
+                            >
+                                <span style={{ pointerEvents: 'none' }}>✏️</span>
                             </button>
                             <div className="action-menu-container">
                                 <button
@@ -350,7 +367,7 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                                                 onEditOrder(order);
                                             }}
                                         >
-                                            <span>✏️</span> Editar Pedido
+                                            <span>✏️</span> Editar Pedido / Material y Precio
                                         </button>
                                         <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
                                         <button

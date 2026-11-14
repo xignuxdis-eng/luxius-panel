@@ -808,7 +808,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
             setSenaAmount(initSena);
             setSenaMetodo(order.senaMetodo || 'efectivo');
 
-            // Cargar y persistir precio personalizado si la orden ya tiene modalidad manual ($/m², $/ml o final)
+            // Cargar y persistir precio personalizado solo si la orden tiene modalidad manual o monto manual explícito
             const manualPrice = order.precioUnitarioManual ?? (order as any).precio_manual ?? (order as any).precioManual;
             const savedMode = order.precioDetalle?.modalidadManual;
             const savedVal = order.precioDetalle?.valorManual;
@@ -816,9 +816,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                 setPriceOverrideMode(savedMode);
                 setPriceOverride(Number(savedVal));
                 setIsPriceOverridden(true);
-            } else if ((manualPrice !== undefined && manualPrice !== null && Number(manualPrice) > 0) || (order.total && Number(order.total) > 0)) {
+            } else if (manualPrice !== undefined && manualPrice !== null && Number(manualPrice) > 0) {
                 setPriceOverrideMode('final');
-                setPriceOverride(Number(manualPrice || order.total));
+                setPriceOverride(Number(manualPrice));
                 setIsPriceOverridden(true);
             } else {
                 setPriceOverrideMode('auto');
@@ -1736,7 +1736,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 calidad: item.calidad || data.calidad || (availableCalidades.length > 0 ? availableCalidades[0].nombre : 'ECO'),
                                 subtotal: itemSubtotal,
                                 total: itemSubtotal,
-                                precioUnitarioManual: isPriceOverridden ? itemSubtotal : undefined,
+                                precioUnitarioManual: isPriceOverridden ? itemSubtotal : null,
                                 sena: itemSena,
                                 senaMonto: itemSena,
                                 senaPorcentaje: senaPorcentaje,
@@ -1854,7 +1854,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                         ...numericData,
                         subtotal: finalTotal,
                         total: finalTotal,
-                        precioUnitarioManual: isPriceOverridden ? finalTotal : undefined,
+                        precioUnitarioManual: isPriceOverridden ? finalTotal : null,
                         sena: senaAmount,
                         senaMonto: senaAmount,
                         senaPorcentaje: finalSenaPorcentaje,

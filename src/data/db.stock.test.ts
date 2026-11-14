@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { saveMaterial, getMateriales, deduplicateMaterials, reconcilePendingStockDeductions, saveOrden, getOrdenes, getCachedOrdenesMemory } from './db'
+import { saveMaterial, getMateriales, deduplicateMaterials, reconcilePendingStockDeductions, saveOrden, getOrdenes, getCachedOrdenesMemory, updateBatchGroup } from './db'
 import { evaluateOrderStock, enrichOrdersWithCurrentStock } from '@/utils/stockForecast'
-import { getConsumption } from '@/pages/Entrada/utils/entradaCalculations'
+import { getConsumption, calculateOrderPrice } from '@/pages/Entrada/utils/entradaCalculations'
 import type { Material, Order } from '@/types'
 
 describe('Persistencia de Materiales y Rollos/Bobinas', () => {
@@ -497,5 +497,122 @@ describe('Hidratación de Catálogo de Materiales y Cache de Órdenes', () => {
         expect(
             listed.some(o => (o as Order & { uuid?: string }).uuid === 'uuid-srv-987' && o.ot === 'OT-0987')
         ).toBe(true)
+    })
+
+    it('updateBatchGroup persiste cambios de material, precios personalizados, saldoPendiente e invalida inMemoryOrdersCache', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true, count: 2 }),
+        } as unknown as Response)
+
+        const o1 = await saveOrden({
+            id: 7001,
+            ot: 'OT-7001',
+            batchId: 'lote_edit_precio',
+            loteNombre: 'Carteleria Edit',
+            descripcionItem: 'Frente',
+            clientId: 1,
+            clienteNombre: 'Cliente Test',
+            material: 'FL',
+            ancho: 2,
+            alto: 1,
+            copias: 1,
+            subtotal: 20000,
+            total: 20000,
+            sena: 5000,
+            montoPagado: 5000,
+            saldoPendiente: 15000,
+            status: 'orden',
+        })
+        const o2 = await saveOrden({
+            id: 7002,
+            ot: 'OT-7002',
+            batchId: 'lote_edit_precio',
+            loteNombre: 'Carteleria Edit',
+            descripcionItem: 'Lateral',
+            clientId: 1,
+            clienteNombre: 'Cliente Test',
+            material: 'FL',
+            ancho: 1,
+            alto: 1,
+            copias: 1,
+            subtotal: 10000,
+            total: 10000,
+            sena: 0,
+            montoPagado: 0,
+            saldoPendiente: 10000,
+            status: 'orden',
+        })
+
+        expect(getCachedOrdenesMemory()?.length).toBeGreaterThanOrEqual(2)
+
+        await updateBatchGroup([o1, o2], {
+            batchId: 'lote_edit_precio',
+            batchName: 'Carteleria Edit Updated',
+            items: [
+                {
+                    id: o1.id,
+                    itemDesc: 'Frente BL',
+                    material: 'BL',
+                    subtotal: 32000,
+                    total: 32000,
+                    precioUnitarioManual: 32000,
+                    precioDetalle: { tipoCobro: 'm2', precioM2: 16000, modalidadManual: 'm2', valorManual: 16000 },
+                },
+                {
+                    id: o2.id,
+                    itemDesc: 'Lateral ML',
+                    material: 'VV',
+                    subtotal: 28000,
+                    total: 28000,
+                    precioUnitarioManual: 28000,
+                    precioMl: 28000,
+                    precioDetalle: { tipoCobro: 'ml', precioML: 28000, consumoML: 1, modalidadManual: 'ml', valorManual: 28000 },
+                },
+            ],
+        })
+
+        // Cache en memoria debe haberse invalidado para reflejar cambios inmediatamente
+        expect(getCachedOrdenesMemory()).toBeNull()
+
+        const updatedOrders = await getOrdenes(false)
+        const u1 = updatedOrders.find(o => o.id === 7001)!
+        const u2 = updatedOrders.find(o => o.id === 7002)!
+
+        expect(u1.material).toBe('BL')
+        expect(u1.total).toBe(32000)
+        expect(u1.saldoPendiente).toBe(27000)
+        expect(u1.precioDetalle?.modalidadManual).toBe('m2')
+        expect(calculateOrderPrice(u1, getMateriales(), [])).toBe(32000)
+
+        expect(u2.material).toBe('VV')
+        expect(u2.total).toBe(28000)
+        expect(u2.saldoPendiente).toBe(28000)
+        expect(u2.precioDetalle?.modalidadManual).toBe('ml')
+        expect(calculateOrderPrice(u2, getMateriales(), [])).toBe(28000)
+
+        // Reset a modo automático limpiando precioUnitarioManual con null
+        await updateBatchGroup([u1, u2], {
+            batchId: 'lote_edit_precio',
+            batchName: 'Carteleria Edit Updated',
+            items: [
+                {
+                    id: u1.id,
+                    material: 'BL',
+                    subtotal: 24000,
+                    total: 24000,
+                    precioUnitarioManual: null,
+                    precioDetalle: { tipoCobro: 'm2', precioM2: 12000 },
+                },
+            ],
+        })
+
+        const resetOrders = await getOrdenes(false)
+        const r1 = resetOrders.find(o => o.id === 7001)!
+        expect(r1.precioUnitarioManual).toBeNull()
+        expect(r1.total).toBe(24000)
+        expect(r1.saldoPendiente).toBe(19000)
+        expect(calculateOrderPrice(r1, getMateriales(), [])).toBe(24000)
     })
 })

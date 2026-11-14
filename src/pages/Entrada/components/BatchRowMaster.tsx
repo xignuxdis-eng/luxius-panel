@@ -342,9 +342,18 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                 </td>
                 {isAdmin && (
                     <td>
-                        <div className="price-cell" style={{ fontWeight: 800, color: '#10b981' }}>
+                        <div
+                            className="price-cell price-cell-editable"
+                            style={{ fontWeight: 800, color: '#10b981' }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
+                            }}
+                            title="Click para editar precios o material del grupo"
+                        >
                             <span className="currency">$</span>
                             <span className="amount">{item.totalPrice.toLocaleString()}</span>
+                            <span className="price-edit-hint">✏️</span>
                         </div>
                     </td>
                 )}
@@ -361,6 +370,18 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                             style={{ background: 'rgba(16, 185, 129, 0.25)', border: '1px solid rgba(16, 185, 129, 0.6)' }}
                         >
                             <span style={{ pointerEvents: 'none' }}>📥</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-icon-action"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
+                            }}
+                            title="Editar Grupo / Material y Precios"
+                            style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
+                        >
+                            <span style={{ pointerEvents: 'none' }}>✏️</span>
                         </button>
                         <div className="action-menu-container">
                             <button
@@ -387,7 +408,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                             onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
                                         }}
                                     >
-                                        <span>✏️</span> Editar Grupo / Proyecto
+                                        <span>✏️</span> Editar Grupo / Material y Precios
                                     </button>
                                     <button
                                         type="button"
@@ -655,11 +676,19 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                         </td>
                         {isAdmin && (
                             <td>
-                                <div className="price-cell">
+                                <div
+                                    className="price-cell price-cell-editable"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onEditOrder(order);
+                                    }}
+                                    title="Click para editar precio o material de esta orden"
+                                >
                                     <span className="currency">$</span>
                                     <span className="amount">
                                         {calculateOrderPrice(order, allMateriales, allClientes).toLocaleString()}
                                     </span>
+                                    <span className="price-edit-hint">✏️</span>
                                 </div>
                             </td>
                         )}
@@ -688,6 +717,15 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                     }}
                                 >
                                     <span style={{ pointerEvents: 'none' }}>📥</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn-icon-action"
+                                    onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
+                                    title="Editar Pedido / Material y Precio"
+                                    style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
+                                >
+                                    <span style={{ pointerEvents: 'none' }}>✏️</span>
                                 </button>
                                 <div className="action-menu-container">
                                     <button
@@ -767,7 +805,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                                     onEditOrder(order);
                                                 }}
                                             >
-                                                <span>✏️</span> Editar Pedido
+                                                <span>✏️</span> Editar Pedido / Material y Precio
                                             </button>
                                             <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
                                             <button

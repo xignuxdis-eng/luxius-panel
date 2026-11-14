@@ -51,6 +51,15 @@ export interface UpdateBatchGroupParams {
         id: number | string;
         itemDesc?: string;
         unlinked?: boolean;
+        material?: string;
+        subtotal?: number;
+        total?: number;
+        precioUnitarioManual?: number | null;
+        precioMl?: number;
+        bobinaAsignada?: number;
+        consumoEstimado?: number;
+        precioDetalle?: Order['precioDetalle'];
+        saldoPendiente?: number;
     }>;
 }
 

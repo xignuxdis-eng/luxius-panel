@@ -56,7 +56,8 @@ export interface Order {
     isCustom?: boolean;
     conceptoPersonalizado?: string;
     unidadMedida?: UnidadMedida;
-    precioUnitarioManual?: number;
+    precioUnitarioManual?: number | null;
+    esParticular?: boolean;
 
     // Material specs
     material: string

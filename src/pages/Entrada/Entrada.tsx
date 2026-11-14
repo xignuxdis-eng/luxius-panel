@@ -1170,6 +1170,7 @@ export default function Entrada() {
                     currentBatchName={editBatchName}
                     currentBatchId={editBatchId}
                     clientes={allClientes}
+                    materiales={allMateriales}
                 />
             )}
             {downloadProgress && (
