@@ -4,6 +4,7 @@ import { statusColors, statusLabels } from '@/types/orden'
 import { OrderTagBadges } from './OrderTagBadges'
 import { OrderConsumptionBadge } from './OrderConsumptionBadge'
 import { calculateOrderPrice, getConsumption, isSpecialLaminationOrder } from '../utils/entradaCalculations'
+import { formatArgDate } from '@/utils/dateTime'
 
 export interface SingleOrderRowProps {
     order: Order;
@@ -209,7 +210,7 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                             })() : '--'}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            Ingreso: {order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : (order.fechaCreacion || '-')}
+                            Ingreso: {order.createdAt ? formatArgDate(order.createdAt, { day: '2-digit', month: '2-digit', year: undefined }) : (order.fechaCreacion || '-')}
                         </span>
                     </div>
                 </div>

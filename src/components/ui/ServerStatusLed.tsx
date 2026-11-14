@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API_URL } from '@/data/db'
+import { formatArgTime } from '@/utils/dateTime'
 
 type ServerStatus = 'online' | 'offline' | 'waking'
 
@@ -38,8 +39,7 @@ export default function ServerStatusLed() {
             setLatency(null)
         }
 
-        const now = new Date()
-        setLastCheck(now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))
+        setLastCheck(formatArgTime(new Date()))
     }
 
     useEffect(() => {

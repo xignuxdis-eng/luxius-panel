@@ -9,6 +9,7 @@ import { API_URL, getMateriales, getClientes, getAuthHeaders, uploadFile } from 
 import { blobStore } from '../data/blobStore';
 import { extractMetadata } from '../pages/Entrada/utils/fileMetadataParser';
 import { calculateItemPriceDetailed } from '../utils/pricingCalculator';
+import { formatArgTime } from '../utils/dateTime';
 import './XanaAssistant.css';
 
 import XanaSmartOrderCard, { SmartDraftOrder, SmartCartelItem } from './XanaSmartOrderCard';
@@ -153,7 +154,7 @@ export default function XanaAssistant() {
         { 
             role: 'bot', 
             text: '¡Hola! 👋 Soy **Xana AI**, tu copiloto de LuXius.\n\n¿En qué te puedo ayudar hoy? Puedes pegarme directamente un enlace de **WeTransfer** o **Google Drive** y armaré tu orden cotizada al instante con análisis de bobinas.',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            time: formatArgTime(new Date())
         }
     ]);
 const [input, setInput] = useState('');
@@ -281,7 +282,7 @@ const menuRef = useRef<HTMLDivElement>(null);
         if (!textToSend || isLoading) return;
 
         const capturedLogs: RecordedError[] = sendLogs ? getRecentLogs() : [];
-        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeNow = formatArgTime(new Date());
         
         setMessages(prev => [
             ...prev, 
@@ -315,7 +316,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                 const clientInfo = inferClientFromText(textToSend);
 
                 // Mensaje provisional de progreso
-                const progressTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const progressTime = formatArgTime(new Date());
                 setMessages(prev => [
                     ...prev,
                     {
@@ -499,7 +500,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                         role: 'bot',
                                         text: `✨ ¡Enlace analizado con éxito! Procesé **${parsedCarteles.length} archivo(s)** con vista previa, medidas reales, DPI, asignación de bobina y cotización oficial.\n\nRevisa o ajusta tu pedido a continuación:`,
                                         smartDraftOrder: draftOrder,
-                                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                        time: formatArgTime(new Date())
                                     }
                                 ]);
                                 return;
@@ -534,7 +535,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                 role: 'bot',
                                 text: `✨ ¡Procesé el enlace con éxito! He analizado **${initData.draft_order.carteles?.length || 1} archivo(s)**.\n\nRevisa el borrador interactivo a continuación:`,
                                 smartDraftOrder: initData.draft_order,
-                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                time: formatArgTime(new Date())
                             }
                         ]);
                         return;
@@ -565,7 +566,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                                 role: 'bot',
                                                 text: `✨ ¡Procesé el enlace con éxito! He descargado y analizado **${pollData.draft_order.carteles?.length || 1} archivo(s)**, extrayendo dimensiones, DPI y calculando el descarte óptimo de bobina.\n\nRevisa el borrador interactivo a continuación:`,
                                                 smartDraftOrder: pollData.draft_order,
-                                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                time: formatArgTime(new Date())
                                             }
                                         ]);
                                         return;
@@ -576,7 +577,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                             {
                                                 role: 'bot',
                                                 text: `⚠️ **No se pudo procesar el enlace:** ${pollData.error || 'Error desconocido'}`,
-                                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                time: formatArgTime(new Date())
                                             }
                                         ]);
                                         return;
@@ -599,7 +600,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                             {
                                 role: 'bot',
                                 text: `⚠️ **No se pudo procesar el enlace:** ${errMsg}`,
-                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                time: formatArgTime(new Date())
                             }
                         ]);
                         return;
@@ -610,7 +611,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                         {
                             role: 'bot',
                             text: `⚠️ Error al conectar con el servidor: ${fetchErr.message || 'Verifica tu conexión.'}`,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            time: formatArgTime(new Date())
                         }
                     ]);
                     return;
@@ -655,7 +656,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                 { 
                     role: 'bot', 
                     text: data.reply || 'Respuesta recibida.',
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    time: formatArgTime(new Date())
                 }
             ]);
         } catch (error) {
@@ -665,7 +666,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                 { 
                     role: 'bot', 
                     text: '⚠️ No pude procesar tu solicitud en este momento. Por favor verifica tu conexión o intenta nuevamente.',
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    time: formatArgTime(new Date())
                 }
             ]);
         } finally {
@@ -679,7 +680,7 @@ const menuRef = useRef<HTMLDivElement>(null);
             { 
                 role: 'bot', 
                 text: 'Conversación reiniciada. ¿En qué puedo asistirte ahora?',
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                time: formatArgTime(new Date())
             }
         ]);
         setIsMenuOpen(false);
@@ -959,7 +960,7 @@ const menuRef = useRef<HTMLDivElement>(null);
                                                     {
                                                         role: 'bot',
                                                         text: `✅ **Orden N° ${order.numero_presupuesto || order.id?.slice(0, 8)} confirmada y encolada en producción.**\n\nEl archivo master y sus especificaciones técnicas ya están disponibles en el panel de Entrada y listos para el Daemon de Taller.`,
-                                                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                        time: formatArgTime(new Date())
                                                     }
                                                 ]);
                                             }}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@store/authStore'
 import { getUsuarios, initializeData, getMateriales, getOrdenes } from '@data/db'
 import { computeStockForecast, canViewStockAlerts } from '@/utils/stockForecast'
+import { ARGENTINA_TIME_ZONE, formatArgDate, formatArgTime } from '@/utils/dateTime'
 import PerfilModal from '../../pages/Sistema/PerfilModal'
 import { ArcadeModal } from '@components/arcade/ArcadeModal'
 import './Header.css'
@@ -19,7 +20,15 @@ export default function Header({ title, subtitle }: HeaderProps) {
     const [isArcadeOpen, setIsArcadeOpen] = useState(false)
     const [isSyncing, setIsSyncing] = useState(false)
     const [stockAlertCount, setStockAlertCount] = useState(0)
+    const [now, setNow] = useState<Date>(() => new Date())
     const canViewAlerts = canViewStockAlerts(user?.role)
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setNow(new Date())
+        }, 5000)
+        return () => clearInterval(timer)
+    }, [])
 
     useEffect(() => {
         if (!canViewAlerts) return
@@ -46,10 +55,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
     const dbUser = user ? getUsuarios().find(u => u.id === user.id) : null
     const avatarUrl = dbUser?.avatar
 
-    const now = new Date()
-    const timeString = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
-    const dateString = now.toLocaleDateString('es-AR', {
-        timeZone: 'America/Argentina/Buenos_Aires',
+    const timeString = formatArgTime(now)
+    const dateString = formatArgDate(now, {
+        timeZone: ARGENTINA_TIME_ZONE,
         weekday: 'short',
         day: 'numeric',
         month: 'short',

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Modal from '@components/ui/Modal'
 import { getLogs } from '@data/db'
 import type { SystemLog } from '@/types/auth'
+import { formatArgDateTime } from '@/utils/dateTime'
 
 interface LogViewerModalProps {
     isOpen: boolean
@@ -43,7 +44,7 @@ export default function LogViewerModal({ isOpen, onClose, filterType }: LogViewe
                         {logs.map(log => (
                             <tr key={log.id}>
                                 <td style={{ fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                                    {new Date(log.timestamp).toLocaleString()}
+                                    {formatArgDateTime(log.timestamp, { showSeconds: true })}
                                 </td>
                                 <td>
                                     <span className="code-badge">{log.action}</span>

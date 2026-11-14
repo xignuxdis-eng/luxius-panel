@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getMovimientosStock } from '@data/db'
 import type { MovimientoStock } from '@/types'
 import { generateStockReportPdf } from '@/utils/generateStockReportPdf'
+import { formatArgDateTime } from '@/utils/dateTime'
 import { FileDown } from 'lucide-react'
 import './StockNewsFeed.css'
 
@@ -165,9 +166,7 @@ export default function StockNewsFeed() {
                     <div className="stock-feed-track" style={{ animationDuration: `${animationDuration}s` }}>
                         {trackItems.map((m, i) => {
                             const meta = TIPO_META[m.tipo]
-                            const fecha = m.fecha
-                                ? new Date(m.fecha).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-                                : '-'
+                            const fecha = formatArgDateTime(m.fecha, { shortYear: true })
                             return (
                                 <div className="stock-feed-item" key={`${m.id}-${i}`}>
                                     <div className={`feed-badge ${meta.className}`} title={meta.label}>

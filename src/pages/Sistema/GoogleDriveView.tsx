@@ -7,6 +7,7 @@ import {
     Archive
 } from 'lucide-react';
 import { API_URL, getAuthHeaders } from '@data/db';
+import { formatArgDateTime } from '@/utils/dateTime';
 
 interface GoogleDriveStatus {
     configured: boolean;
@@ -640,7 +641,7 @@ export default function GoogleDriveView() {
 
                     {latestAudit && (
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={13} /> Última auditoría: {new Date(latestAudit.started_at).toLocaleString()}
+                            <Clock size={13} /> Última auditoría: {formatArgDateTime(latestAudit.started_at)}
                         </span>
                     )}
                 </div>

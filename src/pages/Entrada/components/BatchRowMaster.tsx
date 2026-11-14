@@ -7,6 +7,7 @@ import { OrderConsumptionBadge } from './OrderConsumptionBadge'
 import { calculateOrderPrice, getConsumption, isSpecialLaminationOrder } from '../utils/entradaCalculations'
 import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
 import { detectVehicularNestingSuggestions, type NestingCandidateItem } from '@/utils/nesting'
+import { formatArgDate, formatArgTime } from '@/utils/dateTime'
 
 export interface BatchRowMasterProps {
     item: GroupedBatch;
@@ -335,7 +336,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                 })() : '--'}
                             </span>
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                Ingreso: {item.primaryOrder.createdAt ? new Date(item.primaryOrder.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : (item.primaryOrder.fechaCreacion || '-')}
+                                Ingreso: {item.primaryOrder.createdAt ? formatArgDate(item.primaryOrder.createdAt, { day: '2-digit', month: '2-digit', year: undefined }) : (item.primaryOrder.fechaCreacion || '-')}
                             </span>
                         </div>
                     </div>
@@ -669,7 +670,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                         })() : '--'}
                                     </span>
                                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                        Hora: {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                        Hora: {formatArgTime(order.createdAt)}
                                     </span>
                                 </div>
                             </div>
