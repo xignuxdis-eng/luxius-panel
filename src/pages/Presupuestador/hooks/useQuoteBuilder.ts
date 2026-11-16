@@ -187,7 +187,7 @@ export function useQuoteBuilder() {
     const handleAddCalcoItem = (e: React.FormEvent) => {
         e.preventDefault();
         if (!calcoQuote.valido) {
-            alert('Las medidas del calco superan el ancho útil del plotter Mimaki (0.60 m).');
+            alert('Las medidas del calco superan el ancho útil de corte configurado.');
             return;
         }
         const corteLabel = calcoTipoCorte === 'medio' ? 'Medio corte' : 'Corte completo';
@@ -195,7 +195,7 @@ export function useQuoteBuilder() {
 
         const newItem: PresupuestoItem = {
             id: `item-${Date.now()}`,
-            concepto: `Calcos ${calcoMaterial} ${calcoAnchoCm}x${calcoAltoCm}cm (${corteLabel} · Mimaki 0.60m: ${calcoQuote.calcosPorFila}×${calcoQuote.filas}, ${calcoQuote.largoNecesarioM.toFixed(2)}m / ${calcoQuote.areaRolloM2.toFixed(2)}m²)`,
+            concepto: `Calcos ${calcoMaterial} ${calcoAnchoCm}x${calcoAltoCm}cm (${corteLabel} · ${calcoQuote.calcosPorFila}×${calcoQuote.filas}, ${calcoQuote.largoNecesarioM.toFixed(2)}m / ${calcoQuote.areaRolloM2.toFixed(2)}m²)`,
             unidadMedida: 'u',
             cantidad,
             precioUnitario: calcoQuote.precioUnitario,

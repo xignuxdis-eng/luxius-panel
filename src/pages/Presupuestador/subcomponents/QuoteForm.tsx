@@ -160,7 +160,7 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     className={`item-tab-btn ${activeTab === 'calcos' ? 'active' : ''}`}
                     onClick={() => setActiveTab('calcos')}
                 >
-                    🏷️ Calcos (Mimaki)
+                    🏷️ Calcos y Stickers
                 </button>
                 <button
                     type="button"
@@ -284,7 +284,7 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     </div>
 
                     <div className="form-group">
-                        <label>Tipo de Corte (Plotter Mimaki CG-60SR · 0.60 m)</label>
+                        <label>Tipo de Corte</label>
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <button
                                 type="button"
@@ -369,7 +369,7 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                             />
                         </div>
                         <div className="form-group">
-                            <label>Ancho útil Mimaki (cm, máx 60)</label>
+                            <label>Ancho útil de corte (cm)</label>
                             <input
                                 type="number"
                                 min="10"
@@ -417,7 +417,7 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     }}>
                         {calcoQuote.excedeAnchoMimaki ? (
                             <div style={{ color: '#fca5a5', fontWeight: 700 }}>
-                                ⚠️ El calco supera el ancho útil del plotter Mimaki ({calcoUsableWidthCm} cm).
+                                ⚠️ El calco supera el ancho útil de corte configurado ({calcoUsableWidthCm} cm).
                             </div>
                         ) : !calcoQuote.valido ? (
                             <div style={{ color: '#cbd5e1' }}>Ingresá medidas válidas para calcular el aprovechamiento.</div>
@@ -425,7 +425,7 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                             <>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
                                     <strong style={{ color: '#6ee7b7' }}>
-                                        📐 Aprovechamiento Mimaki CG-60SR (0.60 m)
+                                        📐 Aprovechamiento en Pliego / Rollo
                                     </strong>
                                     <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '999px', background: 'rgba(16, 185, 129, 0.2)', color: '#a7f3d0', fontWeight: 700 }}>
                                         {calcoQuote.aprovechamientoPct}% aprovechamiento {calcoQuote.rotado ? '· Rotado 90°' : ''}
