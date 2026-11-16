@@ -55,13 +55,21 @@ export default function Diseno() {
             return false;
         }
 
-        // Filtro por pestaña de vista
-        if (viewTab === 'diseno') {
-            const isDesignTask = ['preorden', 'diseno', 'rebotado'].includes(order.status) || order.category === 'diseno';
-            if (!isDesignTask) return false;
-        } else if (viewTab === 'seguimiento') {
-            const isFollowUp = ['orden', 'impreso', 'post', 'completo', 'entregado', 'finalizado'].includes(order.status);
-            if (!isFollowUp) return false;
+        // Ocultar estados terminales por defecto salvo que el usuario filtre explícitamente por uno
+        const isTerminal = ['entregado', 'finalizado', 'anulado'].includes(order.status);
+        if (statusFilter === '' && isTerminal) {
+            return false;
+        }
+
+        // Filtro por pestaña de vista (si no hay un estado específico elegido)
+        if (statusFilter === '') {
+            if (viewTab === 'diseno') {
+                const isDesignTask = ['preorden', 'diseno', 'rebotado'].includes(order.status);
+                if (!isDesignTask) return false;
+            } else if (viewTab === 'seguimiento') {
+                const isFollowUp = ['orden', 'impreso', 'post', 'completo'].includes(order.status);
+                if (!isFollowUp) return false;
+            }
         }
 
         const matchesSearch =
@@ -266,7 +274,7 @@ export default function Diseno() {
                         onChange={(e) => setStatusFilter(e.target.value)}
                         title="Filtrar por Estado"
                     >
-                        <option value="">Todos los Estados</option>
+                        <option value="">Todos los Estados (Activos)</option>
                         <option value="diseno">En Diseño</option>
                         <option value="preorden">Diseño (Legacy / Preorden)</option>
                         <option value="rebotado">Rechazado / Rebotado</option>
