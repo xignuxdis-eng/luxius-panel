@@ -70,30 +70,30 @@ except ImportError:
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
-R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "luxius-media")
-R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL", f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else "")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME") or "luxius-media"
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL") or (f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else "")
 
 GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
 GOOGLE_OAUTH_TOKEN_JSON = os.getenv("GOOGLE_OAUTH_TOKEN_JSON")
-GOOGLE_OAUTH_TOKEN_FILE = os.getenv("GOOGLE_OAUTH_TOKEN_FILE", "token.json")
+GOOGLE_OAUTH_TOKEN_FILE = os.getenv("GOOGLE_OAUTH_TOKEN_FILE") or "token.json"
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/luxius_db")
-DIAS_ANTIGUEDAD = int(os.getenv("DIAS_ANTIGUEDAD", "5"))
+DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://user:password@localhost:5432/luxius_db"
+DIAS_ANTIGUEDAD = int(os.getenv("DIAS_ANTIGUEDAD") or "5")
 
-EXCLUIR_PREFIJOS = [p.strip() for p in os.getenv("EXCLUIR_PREFIJOS", "thumbnails/").split(",") if p.strip()]
-CARPETA_HUERFANOS = os.getenv("CARPETA_HUERFANOS", "_Huerfanos_SinClasificar")
+EXCLUIR_PREFIJOS = [p.strip() for p in (os.getenv("EXCLUIR_PREFIJOS") or "thumbnails/").split(",") if p.strip()]
+CARPETA_HUERFANOS = os.getenv("CARPETA_HUERFANOS") or "_Huerfanos_SinClasificar"
 
-DRY_RUN = os.getenv("DRY_RUN", "false").strip().lower() in ("true", "1", "yes")
+DRY_RUN = (os.getenv("DRY_RUN") or "false").strip().lower() in ("true", "1", "yes")
 
-MAX_REINTENTOS = int(os.getenv("MAX_REINTENTOS_DRIVE", "5"))
-BACKOFF_BASE_SEGUNDOS = float(os.getenv("BACKOFF_BASE_SEGUNDOS", "2"))
+MAX_REINTENTOS = int(os.getenv("MAX_REINTENTOS_DRIVE") or "5")
+BACKOFF_BASE_SEGUNDOS = float(os.getenv("BACKOFF_BASE_SEGUNDOS") or "2")
 CODIGOS_HTTP_REINTENTABLES = {429, 500, 502, 503, 504}
 
 SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_PORT = int(os.getenv("SMTP_PORT") or "587")
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER or "")
+SMTP_FROM = os.getenv("SMTP_FROM") or SMTP_USER or ""
 SMTP_TO = os.getenv("SMTP_TO")
 
 
