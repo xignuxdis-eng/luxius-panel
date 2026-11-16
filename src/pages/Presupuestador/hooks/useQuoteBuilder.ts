@@ -1,12 +1,13 @@
 // src/pages/Presupuestador/hooks/useQuoteBuilder.ts
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getClientes, getMateriales, getCalidades, saveOrden, getCombos, type ComboData } from '@/data/db';
+import { getClientes, getMateriales, getCalidades, getServicios, saveOrden, getCombos, type ComboData } from '@/data/db';
 import { useAuthStore } from '@/store/authStore';
 import { downloadPresupuestoPDF, type PresupuestoItem, type PresupuestoData } from '@/utils/presupuestoPdf';
 import type { UnidadMedida } from '@/types/orden';
 import { isDesignerRole } from '@/types';
 import { resolveSpecialPrice } from '@/utils/pricing/specialPricing';
+import { calculateCalcosMimakiQuote, type TipoCorteCalco } from '../utils/calcosCalculator';
 
 export function useQuoteBuilder() {
     const navigate = useNavigate();
@@ -63,8 +64,8 @@ export function useQuoteBuilder() {
     // Item List
     const [items, setItems] = useState<PresupuestoItem[]>([]);
 
-    // Form Tab State: 'catalog' | 'combos' | 'custom'
-    const [activeTab, setActiveTab] = useState<'catalog' | 'combos' | 'custom'>('catalog');
+    // Form Tab State: 'catalog' | 'calcos' | 'combos' | 'custom'
+    const [activeTab, setActiveTab] = useState<'catalog' | 'calcos' | 'combos' | 'custom'>('catalog');
 
     // Combos Form State
     const [selectedComboId, setSelectedComboId] = useState<number | null>(null);
@@ -112,6 +113,106 @@ export function useQuoteBuilder() {
     const [customUnidad, setCustomUnidad] = useState<UnidadMedida>('u');
     const [customCantidad, setCustomCantidad] = useState<number>(1);
     const [customPrecioUnitario, setCustomPrecioUnitario] = useState<number>(15000);
+
+    // Calcos / Stickers (Plotter de corte Mimaki CG-60SR) State
+    const [calcoMaterial, setCalcoMaterial] = useState<string>(() => {
+        const vinyl = printMaterials.find(m =>
+            (m.descripcion || m.codigo || '').toLowerCase().includes('vinil')
+        );
+        const initial = vinyl || printMaterials[0];
+        return initial ? (initial.descripcion || initial.codigo) : 'Vinilo Blanco Brillante';
+    });
+    const [calcoCalidad, setCalcoCalidad] = useState<string>(() => {
+        const initial = printCalidades[0];
+        return initial ? initial.nombre : 'Estándar 720DPI';
+    });
+    const [calcoTipoCorte, setCalcoTipoCorte] = useState<TipoCorteCalco>('medio');
+    const [calcoAnchoCm, setCalcoAnchoCm] = useState<number>(7);
+    const [calcoAltoCm, setCalcoAltoCm] = useState<number>(7);
+    const [calcoCantidad, setCalcoCantidad] = useState<number>(100);
+    const [calcoGapMm, setCalcoGapMm] = useState<number>(3);
+    const [calcoUsableWidthCm, setCalcoUsableWidthCm] = useState<number>(56);
+    const [calcoPrecioImpresionM2, setCalcoPrecioImpresionM2] = useState<number>(12000);
+    const [calcoPrecioCorteM2, setCalcoPrecioCorteM2] = useState<number>(0);
+
+    // Auto-update Calcos print M2 price based on material & client special pricing
+    useEffect(() => {
+        const allMats = getMateriales();
+        const mat = allMats.find(m => (m.descripcion || m.codigo) === calcoMaterial);
+        if (mat) {
+            const selectedClient = clientes.find(c => c.id === Number(selectedClientId));
+            const special = resolveSpecialPrice(selectedClient, mat.codigo, undefined, mat.tipoCobro);
+            if (special.hasSpecialPrice && special.price) {
+                setCalcoPrecioImpresionM2(special.price);
+            } else if (mat.precioM2) {
+                setCalcoPrecioImpresionM2(mat.precioM2);
+            }
+        }
+    }, [calcoMaterial, selectedClientId, clientes]);
+
+    // Auto-update Calcos cut M2 price from Servicios (MEDC / CORT)
+    useEffect(() => {
+        const servicios = getServicios();
+        const targetCode = calcoTipoCorte === 'medio' ? 'MEDC' : 'CORT';
+        const svc = servicios.find(s =>
+            s.codigo === targetCode ||
+            (calcoTipoCorte === 'medio'
+                ? s.nombre.toLowerCase().includes('medio') && s.nombre.toLowerCase().includes('corte')
+                : s.nombre.toLowerCase().includes('corte') && s.nombre.toLowerCase().includes('completo'))
+        );
+        if (svc && typeof svc.precioBase === 'number' && svc.precioBase > 0) {
+            setCalcoPrecioCorteM2(svc.precioBase);
+        }
+    }, [calcoTipoCorte]);
+
+    const calcoQuote = useMemo(() => calculateCalcosMimakiQuote({
+        anchoCm: calcoAnchoCm,
+        altoCm: calcoAltoCm,
+        cantidad: calcoCantidad,
+        gapMm: calcoGapMm,
+        usableWidthCm: calcoUsableWidthCm,
+        rollWidthCm: 60,
+        precioImpresionM2: calcoPrecioImpresionM2,
+        precioCorteM2: calcoPrecioCorteM2,
+    }), [
+        calcoAnchoCm,
+        calcoAltoCm,
+        calcoCantidad,
+        calcoGapMm,
+        calcoUsableWidthCm,
+        calcoPrecioImpresionM2,
+        calcoPrecioCorteM2,
+    ]);
+
+    const handleAddCalcoItem = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!calcoQuote.valido) {
+            alert('Las medidas del calco superan el ancho útil del plotter Mimaki (0.60 m).');
+            return;
+        }
+        const corteLabel = calcoTipoCorte === 'medio' ? 'Medio corte' : 'Corte completo';
+        const cantidad = Math.max(1, Math.floor(calcoCantidad || 1));
+
+        const newItem: PresupuestoItem = {
+            id: `item-${Date.now()}`,
+            concepto: `Calcos ${calcoMaterial} ${calcoAnchoCm}x${calcoAltoCm}cm (${corteLabel} · Mimaki 0.60m: ${calcoQuote.calcosPorFila}×${calcoQuote.filas}, ${calcoQuote.largoNecesarioM.toFixed(2)}m / ${calcoQuote.areaRolloM2.toFixed(2)}m²)`,
+            unidadMedida: 'u',
+            cantidad,
+            precioUnitario: calcoQuote.precioUnitario,
+            subtotal: calcoQuote.total,
+            isCustom: false,
+            calcosMeta: {
+                material: calcoMaterial,
+                calidad: calcoCalidad,
+                anchoM: Math.round((calcoAnchoCm / 100) * 1000) / 1000,
+                altoM: Math.round((calcoAltoCm / 100) * 1000) / 1000,
+                copias: cantidad,
+                tipoCorte: calcoTipoCorte,
+            },
+        };
+
+        setItems([...items, newItem]);
+    };
 
     // Auto-update Catalog M2 Price based on material and client special pricing
     useEffect(() => {
@@ -262,17 +363,18 @@ export function useQuoteBuilder() {
 
         let createdCount = 0;
         items.forEach((item) => {
+            const cm = item.calcosMeta;
             saveOrden({
                 clientId: Number(selectedClientId) || 1,
                 clienteNombre: clienteNombre,
                 status: 'diseno',
                 nombreTarea: item.concepto,
                 origen: 'web',
-                material: item.isCustom ? 'TRABAJO ESPECIAL' : item.concepto.split(' - ')[0],
-                calidad: 'Estándar',
-                alto: 1,
-                ancho: 1,
-                copias: item.cantidad,
+                material: cm ? cm.material : (item.isCustom ? 'TRABAJO ESPECIAL' : item.concepto.split(' - ')[0]),
+                calidad: cm ? cm.calidad : 'Estándar',
+                alto: cm ? cm.altoM : 1,
+                ancho: cm ? cm.anchoM : 1,
+                copias: cm ? cm.copias : item.cantidad,
                 subtotal: item.subtotal,
                 demasias: 0,
                 accesorios: [],
@@ -280,6 +382,8 @@ export function useQuoteBuilder() {
                 bordado: false,
                 panelizado: false,
                 portabanners: 0,
+                corte: cm ? { tipo: cm.tipoCorte, estado: 'pendiente' } : undefined,
+                maquinaId: cm ? 3 : undefined,
                 envio: 'retiro',
                 emergencia: false,
                 fechaCreacion: new Date().toISOString(),
@@ -359,6 +463,28 @@ export function useQuoteBuilder() {
         customPrecioUnitario,
         setCustomPrecioUnitario,
         handleAddCatalogItem,
+        calcoMaterial,
+        setCalcoMaterial,
+        calcoCalidad,
+        setCalcoCalidad,
+        calcoTipoCorte,
+        setCalcoTipoCorte,
+        calcoAnchoCm,
+        setCalcoAnchoCm,
+        calcoAltoCm,
+        setCalcoAltoCm,
+        calcoCantidad,
+        setCalcoCantidad,
+        calcoGapMm,
+        setCalcoGapMm,
+        calcoUsableWidthCm,
+        setCalcoUsableWidthCm,
+        calcoPrecioImpresionM2,
+        setCalcoPrecioImpresionM2,
+        calcoPrecioCorteM2,
+        setCalcoPrecioCorteM2,
+        calcoQuote,
+        handleAddCalcoItem,
         comboPrecio,
         comboMaterial,
         comboServicios,

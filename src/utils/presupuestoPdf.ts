@@ -9,6 +9,14 @@ export interface PresupuestoItem {
     precioUnitario: number;
     subtotal: number;
     isCustom?: boolean;
+    calcosMeta?: {
+        material: string;
+        calidad: string;
+        anchoM: number;
+        altoM: number;
+        copias: number;
+        tipoCorte: 'medio' | 'completo';
+    };
 }
 
 export interface PresupuestoData {

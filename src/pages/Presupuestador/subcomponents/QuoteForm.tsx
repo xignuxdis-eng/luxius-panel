@@ -2,10 +2,11 @@
 import React from 'react';
 import type { ComboData } from '@/data/db';
 import type { UnidadMedida } from '@/types/orden';
+import type { CalcosQuoteResult, TipoCorteCalco } from '../utils/calcosCalculator';
 
 interface QuoteFormProps {
-    activeTab: 'catalog' | 'combos' | 'custom';
-    setActiveTab: (tab: 'catalog' | 'combos' | 'custom') => void;
+    activeTab: 'catalog' | 'calcos' | 'combos' | 'custom';
+    setActiveTab: (tab: 'catalog' | 'calcos' | 'combos' | 'custom') => void;
     combos: ComboData[];
     printMaterials: any[];
     printCalidades: any[];
@@ -23,6 +24,29 @@ interface QuoteFormProps {
     catPrecioM2: number;
     setCatPrecioM2: (val: number) => void;
     handleAddCatalogItem: (e: React.FormEvent) => void;
+    // Calcos (Mimaki CG-60SR) Form
+    calcoMaterial: string;
+    setCalcoMaterial: (val: string) => void;
+    calcoCalidad: string;
+    setCalcoCalidad: (val: string) => void;
+    calcoTipoCorte: TipoCorteCalco;
+    setCalcoTipoCorte: (val: TipoCorteCalco) => void;
+    calcoAnchoCm: number;
+    setCalcoAnchoCm: (val: number) => void;
+    calcoAltoCm: number;
+    setCalcoAltoCm: (val: number) => void;
+    calcoCantidad: number;
+    setCalcoCantidad: (val: number) => void;
+    calcoGapMm: number;
+    setCalcoGapMm: (val: number) => void;
+    calcoUsableWidthCm: number;
+    setCalcoUsableWidthCm: (val: number) => void;
+    calcoPrecioImpresionM2: number;
+    setCalcoPrecioImpresionM2: (val: number) => void;
+    calcoPrecioCorteM2: number;
+    setCalcoPrecioCorteM2: (val: number) => void;
+    calcoQuote: CalcosQuoteResult;
+    handleAddCalcoItem: (e: React.FormEvent) => void;
     // Combos Form
     comboSearch: string;
     setComboSearch: (val: string) => void;
@@ -71,6 +95,28 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
     catPrecioM2,
     setCatPrecioM2,
     handleAddCatalogItem,
+    calcoMaterial,
+    setCalcoMaterial,
+    calcoCalidad,
+    setCalcoCalidad,
+    calcoTipoCorte,
+    setCalcoTipoCorte,
+    calcoAnchoCm,
+    setCalcoAltoCm,
+    calcoAltoCm,
+    setCalcoAnchoCm,
+    calcoCantidad,
+    setCalcoCantidad,
+    calcoGapMm,
+    setCalcoGapMm,
+    calcoUsableWidthCm,
+    setCalcoUsableWidthCm,
+    calcoPrecioImpresionM2,
+    setCalcoPrecioImpresionM2,
+    calcoPrecioCorteM2,
+    setCalcoPrecioCorteM2,
+    calcoQuote,
+    handleAddCalcoItem,
     comboSearch,
     setComboSearch,
     comboCategories,
@@ -108,6 +154,13 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     onClick={() => setActiveTab('catalog')}
                 >
                     🖨️ Impresión de Catálogo
+                </button>
+                <button
+                    type="button"
+                    className={`item-tab-btn ${activeTab === 'calcos' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('calcos')}
+                >
+                    🏷️ Calcos (Mimaki)
                 </button>
                 <button
                     type="button"
@@ -199,6 +252,201 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
 
                     <button type="submit" className="btn-add">
                         ➕ Agregar Ítem de Imprenta
+                    </button>
+                </form>
+            ) : activeTab === 'calcos' ? (
+                <form onSubmit={handleAddCalcoItem}>
+                    <div className="form-grid-2">
+                        <div className="form-group">
+                            <label>Vinilo / Material</label>
+                            <select
+                                className="form-select"
+                                value={calcoMaterial}
+                                onChange={(e) => setCalcoMaterial(e.target.value)}
+                            >
+                                {printMaterials.map(m => (
+                                    <option key={m.id} value={m.descripcion || m.codigo}>{m.descripcion || m.codigo}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Calidad de Impresión</label>
+                            <select
+                                className="form-select"
+                                value={calcoCalidad}
+                                onChange={(e) => setCalcoCalidad(e.target.value)}
+                            >
+                                {printCalidades.map(c => (
+                                    <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label>Tipo de Corte (Plotter Mimaki CG-60SR · 0.60 m)</label>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                onClick={() => setCalcoTipoCorte('medio')}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    border: calcoTipoCorte === 'medio' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.12)',
+                                    background: calcoTipoCorte === 'medio' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(15, 23, 42, 0.5)',
+                                    color: calcoTipoCorte === 'medio' ? '#7dd3fc' : '#cbd5e1',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ✂️ Medio Corte (pliego / rollo)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCalcoTipoCorte('completo')}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    border: calcoTipoCorte === 'completo' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.12)',
+                                    background: calcoTipoCorte === 'completo' ? 'rgba(245, 158, 11, 0.16)' : 'rgba(15, 23, 42, 0.5)',
+                                    color: calcoTipoCorte === 'completo' ? '#fcd34d' : '#cbd5e1',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                🔪 Corte Completo (individuales)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="form-grid-3">
+                        <div className="form-group">
+                            <label>Ancho Calco (cm)</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0.5"
+                                className="form-input"
+                                value={calcoAnchoCm}
+                                onChange={(e) => setCalcoAnchoCm(Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Alto Calco (cm)</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0.5"
+                                className="form-input"
+                                value={calcoAltoCm}
+                                onChange={(e) => setCalcoAltoCm(Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Cantidad (unid.)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                className="form-input"
+                                value={calcoCantidad}
+                                onChange={(e) => setCalcoCantidad(Number(e.target.value))}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-grid-2">
+                        <div className="form-group">
+                            <label>Separación entre calcos (mm)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                className="form-input"
+                                value={calcoGapMm}
+                                onChange={(e) => setCalcoGapMm(Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Ancho útil Mimaki (cm, máx 60)</label>
+                            <input
+                                type="number"
+                                min="10"
+                                max="60"
+                                step="1"
+                                className="form-input"
+                                value={calcoUsableWidthCm}
+                                onChange={(e) => setCalcoUsableWidthCm(Number(e.target.value))}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-grid-2">
+                        <div className="form-group">
+                            <label>Precio Impresión / m² ($)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="form-input"
+                                value={calcoPrecioImpresionM2}
+                                onChange={(e) => setCalcoPrecioImpresionM2(Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Precio {calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'} / m² ($)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="form-input"
+                                value={calcoPrecioCorteM2}
+                                onChange={(e) => setCalcoPrecioCorteM2(Number(e.target.value))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Panel de Aprovechamiento Mimaki en Vivo */}
+                    <div style={{
+                        padding: '12px 14px',
+                        marginBottom: '14px',
+                        borderRadius: '10px',
+                        background: calcoQuote.valido ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.1)',
+                        border: calcoQuote.valido ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(239, 68, 68, 0.4)',
+                        fontSize: '0.85rem',
+                        color: '#e2e8f0'
+                    }}>
+                        {calcoQuote.excedeAnchoMimaki ? (
+                            <div style={{ color: '#fca5a5', fontWeight: 700 }}>
+                                ⚠️ El calco supera el ancho útil del plotter Mimaki ({calcoUsableWidthCm} cm).
+                            </div>
+                        ) : !calcoQuote.valido ? (
+                            <div style={{ color: '#cbd5e1' }}>Ingresá medidas válidas para calcular el aprovechamiento.</div>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
+                                    <strong style={{ color: '#6ee7b7' }}>
+                                        📐 Aprovechamiento Mimaki CG-60SR (0.60 m)
+                                    </strong>
+                                    <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '999px', background: 'rgba(16, 185, 129, 0.2)', color: '#a7f3d0', fontWeight: 700 }}>
+                                        {calcoQuote.aprovechamientoPct}% aprovechamiento {calcoQuote.rotado ? '· Rotado 90°' : ''}
+                                    </span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', color: '#cbd5e1' }}>
+                                    <div>Entran: <strong>{calcoQuote.calcosPorFila}</strong>/fila × <strong>{calcoQuote.filas}</strong> filas</div>
+                                    <div>Largo rollo: <strong>{calcoQuote.largoNecesarioM.toFixed(2)} m</strong> ({calcoQuote.areaRolloM2.toFixed(2)} m²)</div>
+                                    <div>Impresión: <strong>${calcoQuote.costoImpresion.toLocaleString('es-AR')}</strong></div>
+                                    <div>Corte: <strong>${calcoQuote.costoCorte.toLocaleString('es-AR')}</strong></div>
+                                </div>
+                                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                                    <span>Unitario: ${calcoQuote.precioUnitario.toLocaleString('es-AR', { minimumFractionDigits: 2 })} / calco</span>
+                                    <span style={{ color: '#34d399', fontSize: '0.95rem' }}>Subtotal: ${calcoQuote.total.toLocaleString('es-AR')}</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <button type="submit" className="btn-add" disabled={!calcoQuote.valido}>
+                        ➕ Agregar Calcos al Presupuesto
                     </button>
                 </form>
             ) : activeTab === 'combos' ? (
