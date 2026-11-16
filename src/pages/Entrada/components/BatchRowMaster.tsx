@@ -20,6 +20,7 @@ export interface BatchRowMasterProps {
     allMateriales: Material[];
     allClientes: Cliente[];
     isAdmin: boolean;
+    restrictToProduction?: boolean;
     onDownloadBatch: (orders: Order[], batchName: string) => void;
     actionMenuOrderId: number | string | null;
     setActionMenuOrderId: React.Dispatch<React.SetStateAction<number | string | null>>;
@@ -54,6 +55,7 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
     allMateriales,
     allClientes,
     isAdmin,
+    restrictToProduction = false,
     onDownloadBatch,
     actionMenuOrderId,
     setActionMenuOrderId,
@@ -380,18 +382,20 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                         >
                             <span style={{ pointerEvents: 'none' }}>📥</span>
                         </button>
-                        <button
-                            type="button"
-                            className="btn-icon-action"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
-                            }}
-                            title="Editar Grupo / Material y Precios"
-                            style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
-                        >
-                            <span style={{ pointerEvents: 'none' }}>✏️</span>
-                        </button>
+                        {!restrictToProduction && (
+                            <button
+                                type="button"
+                                className="btn-icon-action"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
+                                }}
+                                title="Editar Grupo / Material y Precios"
+                                style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
+                            >
+                                <span style={{ pointerEvents: 'none' }}>✏️</span>
+                            </button>
+                        )}
                         <div className="action-menu-container">
                             <button
                                 type="button"
@@ -409,16 +413,18 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                             </button>
                             {actionMenuOrderId === batchMenuId && (
                                 <div className={`action-menu-popover ${openUpwards ? 'open-upwards' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                        type="button"
-                                        className="action-menu-item"
-                                        onClick={() => {
-                                            setActionMenuOrderId(null);
-                                            onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
-                                        }}
-                                    >
-                                        <span>✏️</span> Editar Grupo / Material y Precios
-                                    </button>
+                                    {!restrictToProduction && (
+                                        <button
+                                            type="button"
+                                            className="action-menu-item"
+                                            onClick={() => {
+                                                setActionMenuOrderId(null);
+                                                onOpenEditBatchModal(item.orders, item.batchName, item.batchId);
+                                            }}
+                                        >
+                                            <span>✏️</span> Editar Grupo / Material y Precios
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         className="action-menu-item"
@@ -429,22 +435,24 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                     >
                                         <span>📐</span> Nesting Studio 2D
                                     </button>
-                                    <button
-                                        type="button"
-                                        className="action-menu-item"
-                                        onClick={() => {
-                                            setActionMenuOrderId(null);
-                                            const clientObj = allClientes.find(c => String(c.id) === String(item.primaryOrder.clientId));
-                                            generatePdfClientReport(item.orders, {
-                                                clienteNombre: item.primaryOrder.clienteNombre,
-                                                clienteEmpresa: clientObj?.empresa,
-                                                clienteTelefono: clientObj?.telefono,
-                                                clienteEmail: clientObj?.email
-                                            });
-                                        }}
-                                    >
-                                        <span>📄</span> Reporte PDF para el cliente
-                                    </button>
+                                    {!restrictToProduction && (
+                                        <button
+                                            type="button"
+                                            className="action-menu-item"
+                                            onClick={() => {
+                                                setActionMenuOrderId(null);
+                                                const clientObj = allClientes.find(c => String(c.id) === String(item.primaryOrder.clientId));
+                                                generatePdfClientReport(item.orders, {
+                                                    clienteNombre: item.primaryOrder.clienteNombre,
+                                                    clienteEmpresa: clientObj?.empresa,
+                                                    clienteTelefono: clientObj?.telefono,
+                                                    clienteEmail: clientObj?.email
+                                                });
+                                            }}
+                                        >
+                                            <span>📄</span> Reporte PDF para el cliente
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         className="action-menu-item"
@@ -455,17 +463,21 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                     >
                                         <span>⚙️</span> Cambiar estado del lote
                                     </button>
-                                    <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
-                                    <button
-                                        type="button"
-                                        className="action-menu-item danger"
-                                        onClick={() => {
-                                            setActionMenuOrderId(null);
-                                            onSoftDeleteBatch(item.orders, item.batchName);
-                                        }}
-                                    >
-                                        <span>🗑️</span> Enviar lote a Papelera
-                                    </button>
+                                    {!restrictToProduction && (
+                                        <>
+                                            <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                            <button
+                                                type="button"
+                                                className="action-menu-item danger"
+                                                onClick={() => {
+                                                    setActionMenuOrderId(null);
+                                                    onSoftDeleteBatch(item.orders, item.batchName);
+                                                }}
+                                            >
+                                                <span>🗑️</span> Enviar lote a Papelera
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -727,15 +739,17 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                 >
                                     <span style={{ pointerEvents: 'none' }}>📥</span>
                                 </button>
-                                <button
-                                    type="button"
-                                    className="btn-icon-action"
-                                    onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
-                                    title="Editar Pedido / Material y Precio"
-                                    style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
-                                >
-                                    <span style={{ pointerEvents: 'none' }}>✏️</span>
-                                </button>
+                                {!restrictToProduction && (
+                                    <button
+                                        type="button"
+                                        className="btn-icon-action"
+                                        onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
+                                        title="Editar Pedido / Material y Precio"
+                                        style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
+                                    >
+                                        <span style={{ pointerEvents: 'none' }}>✏️</span>
+                                    </button>
+                                )}
                                 <div className="action-menu-container">
                                     <button
                                         type="button"
@@ -776,16 +790,18 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                                     <span>🎨</span> SuiteCraft
                                                 </button>
                                             )}
-                                            <button
-                                                type="button"
-                                                className="action-menu-item"
-                                                onClick={() => {
-                                                    setActionMenuOrderId(null);
-                                                    onOpenPdfMode(order);
-                                                }}
-                                            >
-                                                <span>📄</span> Presupuesto PDF
-                                            </button>
+                                            {!restrictToProduction && (
+                                                <button
+                                                    type="button"
+                                                    className="action-menu-item"
+                                                    onClick={() => {
+                                                        setActionMenuOrderId(null);
+                                                        onOpenPdfMode(order);
+                                                    }}
+                                                >
+                                                    <span>📄</span> Presupuesto PDF
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
                                                 className="action-menu-item"
@@ -806,27 +822,31 @@ export const BatchRowMaster = React.memo(function BatchRowMaster({
                                             >
                                                 <span>⚙️</span> Cambiar Estado
                                             </button>
-                                            <button
-                                                type="button"
-                                                className="action-menu-item"
-                                                onClick={() => {
-                                                    setActionMenuOrderId(null);
-                                                    onEditOrder(order);
-                                                }}
-                                            >
-                                                <span>✏️</span> Editar Pedido / Material y Precio
-                                            </button>
-                                            <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
-                                            <button
-                                                type="button"
-                                                className="action-menu-item danger"
-                                                onClick={() => {
-                                                    setActionMenuOrderId(null);
-                                                    onSoftDeleteSingle(order);
-                                                }}
-                                            >
-                                                <span>🗑️</span> Enviar a Papelera
-                                            </button>
+                                            {!restrictToProduction && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        className="action-menu-item"
+                                                        onClick={() => {
+                                                            setActionMenuOrderId(null);
+                                                            onEditOrder(order);
+                                                        }}
+                                                    >
+                                                        <span>✏️</span> Editar Pedido / Material y Precio
+                                                    </button>
+                                                    <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                                    <button
+                                                        type="button"
+                                                        className="action-menu-item danger"
+                                                        onClick={() => {
+                                                            setActionMenuOrderId(null);
+                                                            onSoftDeleteSingle(order);
+                                                        }}
+                                                    >
+                                                        <span>🗑️</span> Enviar a Papelera
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>

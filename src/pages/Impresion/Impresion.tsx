@@ -1,22 +1,109 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
-import { getMaquinas, getOrdenes, saveOrden, deductStockForOrder, revertStockForOrder, fetchPrinterLiveStatus, type PrinterLiveStatus } from '@data/db'
+import {
+    getMaquinas,
+    getOrdenes,
+    getMateriales,
+    getClientes,
+    saveOrden,
+    mergeOrdersIntoBatch,
+    deleteOrden,
+    deductStockForOrder,
+    resolveMediaUrl,
+    fetchPrinterLiveStatus,
+    type PrinterLiveStatus
+} from '@data/db'
 import { useAuthStore } from '@store/authStore'
-import type { Order } from '@/types'
-import { statusColors, statusLabels, isDesignerRole, isDesignerOwner } from '@/types'
+import type { Order, Cliente, Material } from '@/types'
+import { isDesignerRole, isDesignerOwner, getOrderTag } from '@/types'
 import SharedFileViewerModal from '@components/shared/SharedFileViewerModal'
-import { downloadSingleOrderFiles } from '@/utils/orderFileDownloader'
+import OrderChatModal from '@components/shared/OrderChatModal'
+import NestingStudioModal from '@components/workshop/NestingStudioModal'
+import StatusChangeModal from '../Entrada/StatusChangeModal'
+import EditBatchModal from '../Entrada/EditBatchModal'
+import NuevoPedidoModal from '../Entrada/NuevoPedidoModal'
+import PdfModeModal from '@components/PdfModeModal'
+import { BatchRowMaster } from '../Entrada/components/BatchRowMaster'
+import { SingleOrderRow } from '../Entrada/components/SingleOrderRow'
+import { FloatingBatchDock } from '../Entrada/components/FloatingBatchDock'
+import type { GroupedItem } from '../Entrada/types/entrada.types'
+import { groupOrdersIntoBatches } from '../Entrada/utils/batchGrouping'
+import { calculateOrderPrice, getConsumption } from '../Entrada/utils/entradaCalculations'
+import { computeStockForecast, canViewStockAlerts } from '@/utils/stockForecast'
+import { generateProductionLabel } from '@/utils/generateLabelPdf'
+import { generatePdfBudget, generatePdfBatch, type BudgetPdfMode } from '@/utils/generatePdfBudget'
+import { generatePdfClientReport } from '@/utils/generatePdfClientReport'
+import {
+    downloadSingleOrderFiles,
+    downloadBatchOrdersZip,
+    buildProductionFilename,
+    type DownloadProgressState
+} from '@/utils/orderFileDownloader'
+import '../Entrada/Entrada.css'
 import './Impresion.css'
 
 export default function Impresion() {
+    const navigate = useNavigate()
     const { user } = useAuthStore()
+
+    const isAdmin =
+        (user?.role as string) === 'administrador' ||
+        (user?.role as string) === 'principal' ||
+        (user?.role as string) === 'sistema'
+
     const [maquinas] = useState(() => getMaquinas())
+    const [allClientes, setAllClientes] = useState<Cliente[]>(getClientes())
+    const [allMateriales, setAllMateriales] = useState<Material[]>(getMateriales())
     const [livePrinters, setLivePrinters] = useState<PrinterLiveStatus[]>([])
     const [selectedPrinterTelemetry, setSelectedPrinterTelemetry] = useState<PrinterLiveStatus | null>(null)
+
     const [orders, setOrders] = useState<Order[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<'cola' | 'historial'>('cola')
-    const [viewingOrder, setViewingOrder] = useState<Order | null>(null)
+
+    // Filters
+    const [searchTerm, setSearchTerm] = useState('')
+    const [plotterFilter, setPlotterFilter] = useState<'' | 'rs640' | 'soljet'>('')
+    const [corteFilter, setCorteFilter] = useState<'' | 'con_corte' | 'sin_corte'>('')
+    const [materialFilter, setMaterialFilter] = useState('')
+
+    // Batch & selection
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
+    const [actionMenuOrderId, setActionMenuOrderId] = useState<number | string | null>(null)
+    const [tagPopoverOrderId, setTagPopoverOrderId] = useState<number | string | null>(null)
+
+    // Modals
+    const [previewOrder, setPreviewOrder] = useState<Order | null>(null)
+    const [chatOrder, setChatOrder] = useState<Order | null>(null)
+    const [statusOrder, setStatusOrder] = useState<Order | null>(null)
+    const [statusBatchOrders, setStatusBatchOrders] = useState<Order[] | undefined>(undefined)
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+
+    const [isNestingModalOpen, setIsNestingModalOpen] = useState(false)
+    const [nestingModalOrders, setNestingModalOrders] = useState<Order[]>([])
+    const [nestingModalBatchName, setNestingModalBatchName] = useState('')
+
+    const [isEditBatchModalOpen, setIsEditBatchModalOpen] = useState(false)
+    const [editBatchOrders, setEditBatchOrders] = useState<Order[]>([])
+    const [editBatchName, setEditBatchName] = useState('')
+    const [editBatchId, setEditBatchId] = useState('')
+
+    const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+    const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false)
+    const [pdfModeTarget, setPdfModeTarget] = useState<{ orders: Order[]; label: string } | null>(null)
+    const [downloadProgress, setDownloadProgress] = useState<DownloadProgressState | null>(null)
+
+    // Close popovers on outside click
+    useEffect(() => {
+        const handleOutsideClick = () => {
+            setActionMenuOrderId(null)
+            setTagPopoverOrderId(null)
+        }
+        window.addEventListener('click', handleOutsideClick)
+        return () => window.removeEventListener('click', handleOutsideClick)
+    }, [])
 
     // Polling de telemetría de impresoras en tiempo real (cada 4s)
     useEffect(() => {
@@ -39,28 +126,22 @@ export default function Impresion() {
         }
     }, [])
 
-    const loadOrders = async () => {
+    const loadOrders = async (forceRefresh = false) => {
         try {
             setLoading(true)
-            const allOrders = await getOrdenes()
-
-            // Filter logic inside the effect
-            // We fetch everything and then filter in render or here?
-            // Let's filter here for the active view to avoid huge lists
-            // Actually, better to fetch all relevant to printing (both pending and done)
-            // For now, let's keep fetching "active" ones for queue, but we need history.
-            // Simplified: Fetch all that are printed OR pending
+            const allOrders = await getOrdenes(forceRefresh)
             const statuses = ['orden', 'impreso']
             let filtered = allOrders.filter(o =>
                 statuses.includes(o.status) || o.category === 'impresion'
             )
 
-            // Filter for Artist: only show prints originating from their designs
             if (isDesignerRole(user?.role)) {
                 filtered = filtered.filter(o => isDesignerOwner(o, user))
             }
 
             setOrders(filtered)
+            setAllClientes(getClientes())
+            setAllMateriales(getMateriales())
         } catch (e) {
             console.error(e)
         } finally {
@@ -74,87 +155,287 @@ export default function Impresion() {
 
     useEffect(() => {
         const onStockUpdate = () => loadOrders()
-        window.addEventListener("luxius-materials-updated", onStockUpdate)
-        window.addEventListener("luxius-stock-updated", onStockUpdate)
+        window.addEventListener('luxius-materials-updated', onStockUpdate)
+        window.addEventListener('luxius-stock-updated', onStockUpdate)
         return () => {
-            window.removeEventListener("luxius-materials-updated", onStockUpdate)
-            window.removeEventListener("luxius-stock-updated", onStockUpdate)
+            window.removeEventListener('luxius-materials-updated', onStockUpdate)
+            window.removeEventListener('luxius-stock-updated', onStockUpdate)
         }
     }, [])
 
-    const handleMarkAsPrinted = async (order: Order) => {
-        setOrders(prev => prev.map(o => (o.uuid || o.id) === (order.uuid || order.id) ? { ...o, status: 'impreso', stockDescontado: true } : o))
+    const availableMaterials = useMemo(() => {
+        const set = new Set<string>()
+        orders.forEach(o => {
+            if (o.material) set.add(o.material)
+        })
+        return Array.from(set).sort()
+    }, [orders])
 
+    const displayedOrders = useMemo(() => {
+        const targetStatus = activeTab === 'cola' ? 'orden' : 'impreso'
+        const q = searchTerm.trim().toLowerCase()
+
+        return orders.filter(order => {
+            if (order.status !== targetStatus) return false
+
+            if (q) {
+                const matchesSearch =
+                    (order.clienteNombre?.toLowerCase() || '').includes(q) ||
+                    (order.ot?.toLowerCase() || '').includes(q) ||
+                    (order.id?.toString() || '').includes(q) ||
+                    (order.material?.toLowerCase() || '').includes(q) ||
+                    (order.nombreTarea?.toLowerCase() || '').includes(q) ||
+                    (order.loteNombre?.toLowerCase() || '').includes(q) ||
+                    (order.descripcionItem?.toLowerCase() || '').includes(q) ||
+                    (order.observaciones?.toLowerCase() || '').includes(q) ||
+                    (order.tags && order.tags.some(t => {
+                        const def = getOrderTag(t)
+                        return t.toLowerCase().includes(q) || (def && def.label.toLowerCase().includes(q))
+                    }))
+                if (!matchesSearch) return false
+            }
+
+            if (materialFilter && order.material !== materialFilter) return false
+
+            if (plotterFilter) {
+                const isSoljet = order.maquinaId === 2 || (order.ancho && Number(order.ancho) > 1.60)
+                if (plotterFilter === 'soljet' && !isSoljet) return false
+                if (plotterFilter === 'rs640' && isSoljet) return false
+            }
+
+            if (corteFilter === 'con_corte' && !order.corte) return false
+            if (corteFilter === 'sin_corte' && order.corte) return false
+
+            return true
+        })
+    }, [orders, activeTab, searchTerm, materialFilter, plotterFilter, corteFilter])
+
+    const groupedOrders = useMemo<GroupedItem[]>(() => {
+        return groupOrdersIntoBatches(displayedOrders, selectedIds, allMateriales, allClientes)
+    }, [displayedOrders, selectedIds, allMateriales, allClientes])
+
+    const forecast = useMemo(() => computeStockForecast(orders, allMateriales), [orders, allMateriales])
+    const canViewAlerts = canViewStockAlerts(user?.role)
+    const forecastGroupByKey = useMemo(() => {
+        const map = new Map<string, string>()
+        forecast.groups.forEach(g => map.set(g.key, g.riskLevel))
+        return map
+    }, [forecast])
+
+    const toggleExpandBatch = (batchId: string) => {
+        setExpandedBatches(prev => {
+            const next = new Set(prev)
+            if (next.has(batchId)) next.delete(batchId)
+            else next.add(batchId)
+            return next
+        })
+    }
+
+    const toggleSelection = (id: string | number) => {
+        const sid = String(id)
+        setSelectedIds(prev => {
+            const next = new Set(prev)
+            if (next.has(sid)) next.delete(sid)
+            else next.add(sid)
+            return next
+        })
+    }
+
+    const toggleSelectBatch = (batchOrders: Order[]) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev)
+            const batchIds = batchOrders.map(o => String(o.id || o.ot))
+            const allChecked = batchIds.every(id => next.has(id))
+            if (allChecked) batchIds.forEach(id => next.delete(id))
+            else batchIds.forEach(id => next.add(id))
+            return next
+        })
+    }
+
+    const selectedOrdersList = useMemo(
+        () => orders.filter(o => selectedIds.has(String(o.id || o.ot))),
+        [orders, selectedIds]
+    )
+
+    const selectedTotals = useMemo(() => {
+        let m2 = 0
+        let ml = 0
+        let price = 0
+        selectedOrdersList.forEach(o => {
+            const cons = getConsumption(o, allMateriales)
+            if (cons.unit === 'ml') ml += cons.value
+            else m2 += cons.value
+            price += calculateOrderPrice(o, allMateriales, allClientes)
+        })
+        return { m2, ml, price }
+    }, [selectedOrdersList, allMateriales, allClientes])
+
+    const handleToggleTag = async (order: Order, tagId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation()
+        const currentTags = order.tags || []
+        const newTags = currentTags.includes(tagId)
+            ? currentTags.filter(t => t !== tagId)
+            : [...currentTags, tagId]
+        setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, tags: newTags } : o)))
         try {
-            // Descontar automáticamente del stock si no fue descontado
+            await saveOrden({ id: order.id, ot: order.ot, tags: newTags })
+        } catch (err) {
+            console.error('Error guardando etiqueta:', err)
+        }
+    }
+
+    const handleBulkApplyTag = async (tagId: string) => {
+        if (selectedOrdersList.length === 0) return
+        setOrders(prev => prev.map(o => {
+            if (selectedIds.has(String(o.id || o.ot))) {
+                const cur = o.tags || []
+                return { ...o, tags: cur.includes(tagId) ? cur : [...cur, tagId] }
+            }
+            return o
+        }))
+        for (const order of selectedOrdersList) {
+            const cur = order.tags || []
+            if (!cur.includes(tagId)) {
+                try {
+                    await saveOrden({ id: order.id, ot: order.ot, tags: [...cur, tagId] })
+                } catch (err) {
+                    console.error(`Error aplicando etiqueta a ${order.ot}:`, err)
+                }
+            }
+        }
+    }
+
+    const handleDownloadSingle = async (order: Order) => {
+        try {
+            await downloadSingleOrderFiles(order, (p) => {
+                setDownloadProgress(p)
+                if (!p.active) {
+                    setTimeout(() => setDownloadProgress(null), 3000)
+                }
+            })
+        } catch (e) {
+            console.error('Error al descargar orden:', e)
+            setDownloadProgress(null)
+        }
+    }
+
+    const handleDownloadBatch = async (batchOrders: Order[], batchName: string) => {
+        try {
+            await downloadBatchOrdersZip(batchOrders, batchName, (p) => {
+                setDownloadProgress(p)
+                if (!p.active) {
+                    setTimeout(() => setDownloadProgress(null), 3000)
+                }
+            })
+        } catch (e) {
+            console.error('Error al descargar lote:', e)
+            setDownloadProgress(null)
+        }
+    }
+
+    const handleDownloadSelected = async () => {
+        if (selectedOrdersList.length === 0) return
+        await handleDownloadBatch(selectedOrdersList, `Impresion_Seleccion_${selectedOrdersList.length}`)
+    }
+
+    const handleOpenNestingModal = (targetOrders: Order[], batchName: string) => {
+        setNestingModalOrders(targetOrders)
+        setNestingModalBatchName(batchName)
+        setIsNestingModalOpen(true)
+    }
+
+    const handleOpenNestingForSelected = () => {
+        if (selectedOrdersList.length === 0) return
+        handleOpenNestingModal(selectedOrdersList, `Impresión (${selectedOrdersList.length} órdenes)`)
+    }
+
+    const handleMergeSelectedIntoBatch = async () => {
+        if (selectedOrdersList.length < 2) {
+            alert('Seleccioná al menos 2 órdenes para agruparlas en un lote.')
+            return
+        }
+        const loteName = window.prompt('Nombre del grupo/lote de impresión:', selectedOrdersList[0].clienteNombre || 'Lote Impresión')
+        if (!loteName) return
+        try {
+            await mergeOrdersIntoBatch(selectedOrdersList.map(o => o.id), loteName.trim())
+            setSelectedIds(new Set())
+            await loadOrders(true)
+        } catch (err) {
+            console.error('Error agrupando órdenes:', err)
+            alert('No se pudo agrupar las órdenes.')
+        }
+    }
+
+    const handleBatchStatus = async (targetStatus: 'impreso' | 'entregado') => {
+        if (selectedOrdersList.length === 0) return
+        for (const order of selectedOrdersList) {
             let stockDescontado = order.stockDescontado || false
-            if (!stockDescontado) {
+            if (targetStatus === 'impreso' && !stockDescontado) {
                 stockDescontado = deductStockForOrder(order, 'impreso')
             }
+            await saveOrden({ ...order, status: targetStatus, stockDescontado })
+        }
+        setSelectedIds(new Set())
+        await loadOrders(true)
+    }
 
-            await saveOrden({ ...order, status: 'impreso', stockDescontado })
-            console.log(`Orden ${order.ot || order.id} marcada como IMPRESA (Stock descontado: ${stockDescontado})`)
-        } catch (e) {
-            console.error("Error updating status", e)
-            alert("Error al actualizar estado")
-            loadOrders()
+    const handleSoftDelete = async (order: Order) => {
+        if (!isAdmin) return
+        if (!window.confirm(`¿Enviar la orden ${order.ot || order.id} a la papelera?`)) return
+        await deleteOrden(order.id)
+        await loadOrders(true)
+    }
+
+    const handleSoftDeleteBatch = async (batchOrders: Order[], batchName: string) => {
+        if (!isAdmin) return
+        if (!window.confirm(`¿Enviar el lote "${batchName}" (${batchOrders.length} órdenes) a la papelera?`)) return
+        for (const o of batchOrders) {
+            await deleteOrden(o.id)
+        }
+        await loadOrders(true)
+    }
+
+    const handleOpenSuiteCraft = (o: Order) => {
+        if (!o.archivos?.length) return
+        const firstFile = resolveMediaUrl(o.archivos[0])
+        const orig = o.archivosOriginales?.[0] || o.archivos[0].split('/').pop()?.split('?')[0] || 'diseno'
+        const prod = buildProductionFilename(o, 0, orig)
+        navigate(`/xpress-viewer?fileUrl=${encodeURIComponent(firstFile)}&fileName=${encodeURIComponent(prod)}&orderId=${o.id}&tab=suitecraft`)
+    }
+
+    const handleConfirmPdfMode = async (mode: BudgetPdfMode) => {
+        if (!pdfModeTarget) return
+        const { orders: targetOrders } = pdfModeTarget
+        setPdfModeTarget(null)
+        if (targetOrders.length === 1) {
+            generatePdfBudget(targetOrders[0], { mode })
+        } else {
+            generatePdfBatch(targetOrders, { mode })
         }
     }
 
-    const handleRevert = async (order: Order) => {
-        try {
-            // Revertir deducción de stock si estaba descontado
-            if (order.stockDescontado) {
-                revertStockForOrder(order)
-            }
-            await saveOrden({ ...order, status: 'orden', stockDescontado: false })
-            loadOrders()
-        } catch (e) {
-            console.error("Error reverting", e)
-            alert("No se pudo revertir la acción")
-        }
-    }
-
-    const handleBounce = async (order: Order) => {
-        const reason = window.prompt("Ingrese el motivo del rebote (volverá a Diseño):", "Error en archivo") || "Rebotado a Diseño"
-
-        try {
-            if (order.stockDescontado) {
-                revertStockForOrder(order)
-            }
-            await saveOrden({ ...order, status: 'preorden', comments: reason, stockDescontado: false })
-            loadOrders()
-        } catch (e) {
-            console.error("Error bouncing", e)
-            alert("No se pudo rebotar la orden")
-        }
-    }
-
-    const displayedOrders = orders.filter(o => {
-        if (activeTab === 'cola') return o.status === 'orden'
-        if (activeTab === 'historial') return o.status === 'impreso'
-        return false
-    })
+    const colaCount = useMemo(() => orders.filter(o => o.status === 'orden').length, [orders])
+    const histCount = useMemo(() => orders.filter(o => o.status === 'impreso').length, [orders])
 
     return (
         <div className="impresion-page">
             <Header
                 title="Impresión"
-                subtitle={isDesignerRole(user?.role) ? "Mis diseños en cola de impresión" : "Gestión de producción"}
+                subtitle={isDesignerRole(user?.role) ? 'Mis diseños en cola de impresión' : 'Gestión de producción y lotes'}
             />
 
             <div className="impresion-tabs">
                 <button
                     className={`tab-btn ${activeTab === 'cola' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('cola')}
+                    onClick={() => { setActiveTab('cola'); setSelectedIds(new Set()) }}
                 >
-                    Cola de Impresión
+                    Cola de Impresión ({colaCount})
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'historial' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('historial')}
+                    onClick={() => { setActiveTab('historial'); setSelectedIds(new Set()) }}
                 >
-                    Historial Reciente
+                    Historial Reciente ({histCount})
                 </button>
             </div>
 
@@ -211,204 +492,371 @@ export default function Impresion() {
                 </div>
             )}
 
+            {/* Barra de búsqueda y herramientas de taller */}
+            <div className="filters-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+                <input
+                    className="input-field"
+                    type="text"
+                    placeholder="Buscar por Cliente, OT, Material, Lote..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ flex: '1 1 240px', maxWidth: '360px' }}
+                />
+                <select
+                    className="input-field"
+                    value={materialFilter}
+                    onChange={(e) => setMaterialFilter(e.target.value)}
+                    title="Filtrar por Material"
+                >
+                    <option value="">Todos los Materiales</option>
+                    {availableMaterials.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                    ))}
+                </select>
+                <select
+                    className="input-field"
+                    value={plotterFilter}
+                    onChange={(e) => setPlotterFilter(e.target.value as '' | 'rs640' | 'soljet')}
+                    title="Filtrar por Plotter"
+                >
+                    <option value="">Todos los Plotters</option>
+                    <option value="rs640">RS-640 (≤ 1.6m)</option>
+                    <option value="soljet">SolJet (1.9m)</option>
+                </select>
+                <select
+                    className="input-field"
+                    value={corteFilter}
+                    onChange={(e) => setCorteFilter(e.target.value as '' | 'con_corte' | 'sin_corte')}
+                    title="Filtrar por Corte"
+                >
+                    <option value="">Con y Sin Corte</option>
+                    <option value="con_corte">📐 Solo con Corte</option>
+                    <option value="sin_corte">Sin Corte</option>
+                </select>
+                {(searchTerm || materialFilter || plotterFilter || corteFilter) && (
+                    <button
+                        type="button"
+                        className="btn-telemetry-toggle"
+                        onClick={() => {
+                            setSearchTerm('')
+                            setMaterialFilter('')
+                            setPlotterFilter('')
+                            setCorteFilter('')
+                        }}
+                    >
+                        Limpiar filtros
+                    </button>
+                )}
+                <button
+                    type="button"
+                    className="btn-telemetry-toggle"
+                    onClick={() => loadOrders(true)}
+                    title="Recargar órdenes"
+                    style={{ marginLeft: 'auto' }}
+                >
+                    🔄 Actualizar ({displayedOrders.length})
+                </button>
+            </div>
+
+            {downloadProgress && (
+                <div className="download-progress-toast">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {downloadProgress.active ? '⏳ Descargando Archivos' : '✅ Descarga Lista'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
+                            {downloadProgress.percent}%
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginBottom: '8px', wordBreak: 'break-all' }}>
+                        {downloadProgress.message}
+                    </div>
+                    <div style={{ width: '100%', height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                            width: `${downloadProgress.percent}%`,
+                            height: '100%',
+                            background: downloadProgress.active ? 'linear-gradient(90deg, #10b981, #06b6d4)' : '#10b981',
+                            transition: 'width 0.2s ease',
+                            borderRadius: '3px'
+                        }} />
+                    </div>
+                </div>
+            )}
+
             <div className="orders-table-container animate-fade-in">
                 {loading ? (
                     <div className="loading-state">Cargando...</div>
-                ) : displayedOrders.length === 0 ? (
+                ) : groupedOrders.length === 0 ? (
                     <div className="empty-state">No hay órdenes en {activeTab === 'cola' ? 'la cola' : 'el historial reciente'}</div>
                 ) : (
                     <table className="orders-table">
                         <thead>
                             <tr>
-                                <th>OT / ID</th>
-                                <th>Estado</th>
-                                <th>Cliente</th>
-                                <th>Material / Plotter</th>
-                                <th>Medidas</th>
-                                <th>Cant.</th>
-                                <th>m²</th>
-                                <th>Demasías</th>
-                                <th>Acciones</th>
+                                <th style={{ width: '40px' }}></th>
+                                <th style={{ width: '90px' }}>OT / ID</th>
+                                <th style={{ minWidth: '180px' }}>Cliente / Lote</th>
+                                <th style={{ minWidth: '210px' }}>Trabajo / Material</th>
+                                <th style={{ minWidth: '170px' }}>Estado &amp; Entrega</th>
+                                {isAdmin && (
+                                    <th style={{ width: '100px', textAlign: 'right' }}>Importe</th>
+                                )}
+                                <th style={{ width: '130px', textAlign: 'center' }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {displayedOrders.map(order => (
-                                <tr key={order.id} className="hover-row">
-                                    <td>
-                                        <div className="order-id">
-                                            <span className="ot-text" style={{ fontWeight: 800, color: '#ff9800', fontSize: '0.95rem' }}>{order.ot || `OT-${order.id}`}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className="status-badge" style={{
-                                            backgroundColor: statusColors[order.status],
-                                            boxShadow: `0 0 8px ${statusColors[order.status]}40`
-                                        }}>
-                                            {statusLabels[order.status]}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="client-cell">
-                                            <span className="font-medium">{order.clienteNombre}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <span className="material-tag-sm">{order.material}</span>
-                                                {order.stockWarning && !order.stockDescontado && (
-                                                    <span style={{
-                                                        fontSize: '9px',
-                                                        padding: '1px 5px',
-                                                        borderRadius: '3px',
-                                                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                                                        color: '#f87171',
-                                                        border: '1px solid rgba(239, 68, 68, 0.4)',
-                                                        fontWeight: 700
-                                                    }} title="Stock insuficiente del material en inventario">
-                                                        ⚠ Sin Stock
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                                <span style={{
-                                                    fontSize: '9px',
-                                                    padding: '1px 5px',
-                                                    borderRadius: '3px',
-                                                    backgroundColor: (order.maquinaId === 2 || (order.ancho && Number(order.ancho) > 1.60)) ? '#0284c7' : '#166534',
-                                                    color: '#fff',
-                                                    fontWeight: 700
-                                                }}>
-                                                    {(order.maquinaId === 2 || (order.ancho && Number(order.ancho) > 1.60)) ? 'SolJet 1.9m' : 'RS-640 1.6m'}
-                                                </span>
-                                                {order.corte && (
-                                                    <span style={{
-                                                        fontSize: '9px',
-                                                        padding: '1px 5px',
-                                                        borderRadius: '3px',
-                                                        backgroundColor: order.corte.estado === 'cortado' ? '#059669' : '#0369a1',
-                                                        color: '#fff',
-                                                        fontWeight: 700
-                                                    }}>
-                                                        📐 {order.corte.tipo === 'medio' ? 'Medio Corte' : 'Corte Completo'}{order.corte.estado === 'cortado' ? ' ✓' : ''}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {(() => {
-                                            const rawW = Number(order.ancho) || 0;
-                                            const rawH = Number(order.alto) || 0;
-                                            const realW = rawW > 20 ? rawW / 100 : rawW;
-                                            const realH = rawH > 20 ? rawH / 100 : rawH;
-                                            return <span className="dims-text">{realW.toFixed(2)} x {realH.toFixed(2)} m</span>;
-                                        })()}
-                                    </td>
-                                    <td>
-                                        <span className="copies-badge">{order.copias}</span>
-                                    </td>
-                                    <td>
-                                        {(() => {
-                                            const rawW = Number(order.ancho) || 0;
-                                            const rawH = Number(order.alto) || 0;
-                                            const realW = rawW > 20 ? rawW / 100 : rawW;
-                                            const realH = rawH > 20 ? rawH / 100 : rawH;
-                                            const c = Number(order.copias) || 1;
-                                            const m2 = realW * realH * c;
-                                            return (
-                                                <span className="m2-text font-mono text-muted">
-                                                    {m2.toFixed(2)}
-                                                </span>
-                                            );
-                                        })()}
-                                    </td>
-                                    <td>
-                                        {order.demasiasConfig && Object.values(order.demasiasConfig).some(v => v === true) ? (
-                                            <div className="demasia-indicator-group">
-                                                <span className="demasia-arrows">
-                                                    {order.demasiasConfig.top ? '↑' : ''}
-                                                    {order.demasiasConfig.bottom ? '↓' : ''}
-                                                    {order.demasiasConfig.left ? '←' : ''}
-                                                    {order.demasiasConfig.right ? '→' : ''}
-                                                </span>
-                                                <span className="demasia-target">🎯</span>
-                                            </div>
-                                        ) : (
-                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <div className="order-actions-row">
-                                            {activeTab === 'cola' ? (
-                                                <>
-                                                    <button
-                                                        className="btn-icon-action"
-                                                        title={`Archivos (${order.archivos?.length || 0})`}
-                                                        onClick={() => setViewingOrder(order)}
-                                                    >
-                                                        📄
-                                                    </button>
-                                                    <button
-                                                        className="btn-icon-action"
-                                                        title={order.archivos?.length ? `Descargar archivo(s) (${order.archivos.length})` : 'Sin archivos adjuntos'}
-                                                        disabled={!order.archivos?.length}
-                                                        onClick={() => downloadSingleOrderFiles(order)}
-                                                        style={{
-                                                            color: order.archivos?.length ? '#10b981' : 'var(--text-muted)',
-                                                            opacity: order.archivos?.length ? 1 : 0.4,
-                                                            cursor: order.archivos?.length ? 'pointer' : 'not-allowed'
-                                                        }}
-                                                    >
-                                                        📥
-                                                    </button>
-                                                    <button
-                                                        className="btn-icon-action"
-                                                        onClick={() => handleBounce(order)}
-                                                        title="Rebotar a Diseño (Error)"
-                                                        style={{ color: 'var(--destructive)' }}
-                                                    >
-                                                        🚫
-                                                    </button>
-                                                    <button
-                                                        className="btn-icon-action"
-                                                        onClick={() => handleMarkAsPrinted(order)}
-                                                        title="Marcar como Impreso"
-                                                        style={{ color: 'var(--success)' }}
-                                                    >
-                                                        🖨️
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <button
-                                                    className="btn-icon-action"
-                                                    onClick={() => handleRevert(order)}
-                                                    title="Devolver a Cola (Deshacer)"
-                                                    style={{ color: 'var(--accent)' }}
-                                                >
-                                                    ↩️
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {groupedOrders.map(item => {
+                                if (item.isBatch) {
+                                    const matKey = `${(item.primaryOrder.material || '').trim()}|${getConsumption(item.primaryOrder, allMateriales).bobina || '1.52'}`
+                                    const fLevel = forecastGroupByKey.get(matKey)
+                                    const forecastStatus = fLevel === 'critical' ? 'critical' : fLevel === 'low' ? 'low' : undefined
+
+                                    return (
+                                        <BatchRowMaster
+                                            key={item.batchId}
+                                            item={item}
+                                            isExpanded={expandedBatches.has(item.batchId)}
+                                            onToggleExpand={toggleExpandBatch}
+                                            onToggleSelectBatch={toggleSelectBatch}
+                                            onOpenEditBatchModal={(ords, bName, bId) => {
+                                                if (!isAdmin) return
+                                                setEditBatchOrders(ords)
+                                                setEditBatchName(bName)
+                                                setEditBatchId(bId)
+                                                setIsEditBatchModalOpen(true)
+                                            }}
+                                            canViewAlerts={canViewAlerts}
+                                            forecastStatus={forecastStatus}
+                                            allMateriales={allMateriales}
+                                            allClientes={allClientes}
+                                            isAdmin={isAdmin}
+                                            restrictToProduction={!isAdmin}
+                                            onDownloadBatch={handleDownloadBatch}
+                                            actionMenuOrderId={actionMenuOrderId}
+                                            setActionMenuOrderId={setActionMenuOrderId}
+                                            onOpenNestingModal={handleOpenNestingModal}
+                                            onSetStatusBatch={(primary, ords) => {
+                                                setStatusOrder(primary)
+                                                setStatusBatchOrders(ords)
+                                                setIsStatusModalOpen(true)
+                                            }}
+                                            onSoftDeleteBatch={handleSoftDeleteBatch}
+                                            selectedIds={selectedIds}
+                                            onToggleSelection={toggleSelection}
+                                            onPreview={(o) => setPreviewOrder(o)}
+                                            tagPopoverOrderId={tagPopoverOrderId}
+                                            setTagPopoverOrderId={setTagPopoverOrderId}
+                                            onToggleTag={handleToggleTag}
+                                            onDownloadSingle={handleDownloadSingle}
+                                            onOpenChat={(o) => setChatOrder(o)}
+                                            onOpenSuiteCraft={handleOpenSuiteCraft}
+                                            onOpenPdfMode={(o) => setPdfModeTarget({ orders: [o], label: o.ot || `OT-${o.id}` })}
+                                            onGenerateLabel={(o) => generateProductionLabel([o])}
+                                            onEditOrder={(o) => {
+                                                if (!isAdmin) return
+                                                setEditingOrder(o)
+                                                setIsEditOrderModalOpen(true)
+                                            }}
+                                            onStatusSingle={(o) => {
+                                                setStatusOrder(o)
+                                                setStatusBatchOrders(undefined)
+                                                setIsStatusModalOpen(true)
+                                            }}
+                                            onSoftDeleteSingle={handleSoftDelete}
+                                        />
+                                    )
+                                }
+
+                                const order = item.order
+                                return (
+                                    <SingleOrderRow
+                                        key={String(order.id || order.ot)}
+                                        order={order}
+                                        isSelected={selectedIds.has(String(order.id || order.ot))}
+                                        onToggleSelect={toggleSelection}
+                                        onPreview={(o) => setPreviewOrder(o)}
+                                        tagPopoverOrderId={tagPopoverOrderId}
+                                        setTagPopoverOrderId={setTagPopoverOrderId}
+                                        onToggleTag={handleToggleTag}
+                                        allMateriales={allMateriales}
+                                        allClientes={allClientes}
+                                        isAdmin={isAdmin}
+                                        restrictToProduction={!isAdmin}
+                                        canViewAlerts={canViewAlerts}
+                                        onStatusClick={(o) => {
+                                            setStatusOrder(o)
+                                            setStatusBatchOrders(undefined)
+                                            setIsStatusModalOpen(true)
+                                        }}
+                                        actionMenuOrderId={actionMenuOrderId}
+                                        setActionMenuOrderId={setActionMenuOrderId}
+                                        onRestoreOrder={() => {}}
+                                        onPermanentDelete={() => {}}
+                                        onDownloadSingle={handleDownloadSingle}
+                                        onOpenChat={(o) => setChatOrder(o)}
+                                        onOpenSuiteCraft={handleOpenSuiteCraft}
+                                        onOpenPdfMode={(o) => setPdfModeTarget({ orders: [o], label: o.ot || `OT-${o.id}` })}
+                                        onGenerateLabel={(o) => generateProductionLabel([o])}
+                                        onEditOrder={(o) => {
+                                            if (!isAdmin) return
+                                            setEditingOrder(o)
+                                            setIsEditOrderModalOpen(true)
+                                        }}
+                                        onSoftDelete={handleSoftDelete}
+                                    />
+                                )
+                            })}
                         </tbody>
                     </table>
                 )}
             </div>
 
+            <FloatingBatchDock
+                selectedIds={selectedIds}
+                setSelectedIds={setSelectedIds}
+                selectedTotals={selectedTotals}
+                isAdmin={isAdmin}
+                onBulkApplyTag={handleBulkApplyTag}
+                onOpenNesting={handleOpenNestingForSelected}
+                onMergeBatch={handleMergeSelectedIntoBatch}
+                onDownloadSelected={handleDownloadSelected}
+                downloadProgressActive={!!downloadProgress?.active}
+                onExportClientReportPdf={() => {
+                    if (selectedOrdersList.length === 0) return
+                    const first = selectedOrdersList[0]
+                    const clientObj = allClientes.find(c => String(c.id) === String(first.clientId))
+                    generatePdfClientReport(selectedOrdersList, {
+                        clienteNombre: first.clienteNombre,
+                        clienteEmpresa: clientObj?.empresa,
+                        clienteTelefono: clientObj?.telefono,
+                        clienteEmail: clientObj?.email
+                    })
+                }}
+                onBatchPdf={() => {
+                    if (!isAdmin || selectedOrdersList.length === 0) return
+                    setPdfModeTarget({ orders: selectedOrdersList, label: `${selectedOrdersList.length} órdenes` })
+                }}
+                onBatchLabel={() => generateProductionLabel(selectedOrdersList)}
+                viewTab={activeTab === 'cola' ? 'active' : 'history'}
+                onBatchStatus={handleBatchStatus}
+                onBatchRestore={() => {}}
+                onBatchDelete={async () => {
+                    if (!isAdmin || selectedOrdersList.length === 0) return
+                    if (!window.confirm(`¿Enviar ${selectedOrdersList.length} órdenes seleccionadas a la papelera?`)) return
+                    for (const o of selectedOrdersList) {
+                        await deleteOrden(o.id)
+                    }
+                    setSelectedIds(new Set())
+                    await loadOrders(true)
+                }}
+            />
+
             {/* File Viewer Modal */}
-            {viewingOrder && (
+            {previewOrder && (
                 <SharedFileViewerModal
-                    isOpen={!!viewingOrder}
-                    onClose={() => setViewingOrder(null)}
-                    order={viewingOrder}
+                    isOpen={!!previewOrder}
+                    onClose={() => setPreviewOrder(null)}
+                    order={previewOrder}
                     showStandardize={true}
                     onUpdate={() => {
-                        loadOrders()
-                        setViewingOrder(null)
+                        loadOrders(true)
+                        setPreviewOrder(null)
                     }}
+                />
+            )}
+
+            {/* Chat Modal */}
+            {chatOrder && (
+                <OrderChatModal
+                    isOpen={!!chatOrder}
+                    onClose={() => setChatOrder(null)}
+                    order={chatOrder}
+                />
+            )}
+
+            {/* Status Change Modal */}
+            {isStatusModalOpen && statusOrder && (
+                <StatusChangeModal
+                    isOpen={isStatusModalOpen}
+                    onClose={(updated) => {
+                        setIsStatusModalOpen(false)
+                        setStatusOrder(null)
+                        setStatusBatchOrders(undefined)
+                        if (updated) void loadOrders(true)
+                    }}
+                    order={statusOrder}
+                    batchOrders={statusBatchOrders}
+                />
+            )}
+
+            {/* Nesting Studio Modal */}
+            {isNestingModalOpen && (
+                <NestingStudioModal
+                    isOpen={isNestingModalOpen}
+                    orders={nestingModalOrders}
+                    initialBatchName={nestingModalBatchName}
+                    onClose={() => {
+                        setIsNestingModalOpen(false)
+                        setNestingModalOrders([])
+                    }}
+                    onSaveBatch={async (batchName, _updatedConsumptionMl, updatedCopies) => {
+                        if (updatedCopies) {
+                            for (const o of nestingModalOrders) {
+                                const key = o.id || o.ot || ''
+                                const newCopies = updatedCopies[key]
+                                if (newCopies !== undefined && newCopies !== o.copias) {
+                                    await saveOrden({ ...o, copias: newCopies })
+                                }
+                            }
+                        }
+                        if (nestingModalOrders.length > 1 && batchName) {
+                            await mergeOrdersIntoBatch(nestingModalOrders.map(o => o.id), batchName.trim())
+                        }
+                        await loadOrders(true)
+                        setIsNestingModalOpen(false)
+                    }}
+                />
+            )}
+
+            {/* Admin-only Edit Modals */}
+            {isAdmin && isEditBatchModalOpen && (
+                <EditBatchModal
+                    isOpen={isEditBatchModalOpen}
+                    onClose={async (updated) => {
+                        setIsEditBatchModalOpen(false)
+                        if (updated) {
+                            await loadOrders(true)
+                        }
+                    }}
+                    batchOrders={editBatchOrders}
+                    currentBatchName={editBatchName}
+                    currentBatchId={editBatchId}
+                    clientes={allClientes}
+                    materiales={allMateriales}
+                />
+            )}
+
+            {isAdmin && isEditOrderModalOpen && (
+                <NuevoPedidoModal
+                    isOpen={isEditOrderModalOpen}
+                    order={editingOrder}
+                    defaultStatus="orden"
+                    onClose={(created) => {
+                        setIsEditOrderModalOpen(false)
+                        setEditingOrder(null)
+                        if (created) {
+                            void loadOrders(true)
+                        }
+                    }}
+                />
+            )}
+
+            {isAdmin && (
+                <PdfModeModal
+                    isOpen={!!pdfModeTarget}
+                    title="Generar PDF"
+                    subtitle={pdfModeTarget?.label}
+                    onClose={() => setPdfModeTarget(null)}
+                    onSelect={handleConfirmPdfMode}
                 />
             )}
 
@@ -481,4 +929,3 @@ export default function Impresion() {
         </div>
     )
 }
-

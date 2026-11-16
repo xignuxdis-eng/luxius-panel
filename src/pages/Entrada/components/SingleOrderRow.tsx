@@ -17,6 +17,7 @@ export interface SingleOrderRowProps {
     allMateriales: Material[];
     allClientes: Cliente[];
     isAdmin: boolean;
+    restrictToProduction?: boolean;
     canViewAlerts?: boolean;
     onStatusClick: (order: Order) => void;
     actionMenuOrderId: number | string | null;
@@ -43,6 +44,7 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
     allMateriales,
     allClientes,
     isAdmin,
+    restrictToProduction = false,
     canViewAlerts,
     onStatusClick,
     actionMenuOrderId,
@@ -281,15 +283,17 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                             >
                                 <span style={{ pointerEvents: 'none' }}>📥</span>
                             </button>
-                            <button
-                                type="button"
-                                className="btn-icon-action"
-                                onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
-                                title="Editar Pedido / Material y Precio"
-                                style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
-                            >
-                                <span style={{ pointerEvents: 'none' }}>✏️</span>
-                            </button>
+                            {!restrictToProduction && (
+                                <button
+                                    type="button"
+                                    className="btn-icon-action"
+                                    onClick={(e) => { e.stopPropagation(); onEditOrder(order); }}
+                                    title="Editar Pedido / Material y Precio"
+                                    style={{ background: 'rgba(245, 158, 11, 0.18)', border: '1px solid rgba(245, 158, 11, 0.45)' }}
+                                >
+                                    <span style={{ pointerEvents: 'none' }}>✏️</span>
+                                </button>
+                            )}
                             <div className="action-menu-container">
                                 <button
                                     type="button"
@@ -330,16 +334,18 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                                                 <span>🎨</span> SuiteCraft
                                             </button>
                                         )}
-                                        <button
-                                            type="button"
-                                            className="action-menu-item"
-                                            onClick={() => {
-                                                setActionMenuOrderId(null);
-                                                onOpenPdfMode(order);
-                                            }}
-                                        >
-                                            <span>📄</span> Presupuesto PDF
-                                        </button>
+                                        {!restrictToProduction && (
+                                            <button
+                                                type="button"
+                                                className="action-menu-item"
+                                                onClick={() => {
+                                                    setActionMenuOrderId(null);
+                                                    onOpenPdfMode(order);
+                                                }}
+                                            >
+                                                <span>📄</span> Presupuesto PDF
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             className="action-menu-item"
@@ -360,27 +366,31 @@ export const SingleOrderRow = React.memo(function SingleOrderRow({
                                         >
                                             <span>⚙️</span> Cambiar Estado
                                         </button>
-                                        <button
-                                            type="button"
-                                            className="action-menu-item"
-                                            onClick={() => {
-                                                setActionMenuOrderId(null);
-                                                onEditOrder(order);
-                                            }}
-                                        >
-                                            <span>✏️</span> Editar Pedido / Material y Precio
-                                        </button>
-                                        <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
-                                        <button
-                                            type="button"
-                                            className="action-menu-item danger"
-                                            onClick={() => {
-                                                setActionMenuOrderId(null);
-                                                onSoftDelete(order);
-                                            }}
-                                        >
-                                            <span>🗑️</span> Enviar a Papelera
-                                        </button>
+                                        {!restrictToProduction && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className="action-menu-item"
+                                                    onClick={() => {
+                                                        setActionMenuOrderId(null);
+                                                        onEditOrder(order);
+                                                    }}
+                                                >
+                                                    <span>✏️</span> Editar Pedido / Material y Precio
+                                                </button>
+                                                <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                                                <button
+                                                    type="button"
+                                                    className="action-menu-item danger"
+                                                    onClick={() => {
+                                                        setActionMenuOrderId(null);
+                                                        onSoftDelete(order);
+                                                    }}
+                                                >
+                                                    <span>🗑️</span> Enviar a Papelera
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
