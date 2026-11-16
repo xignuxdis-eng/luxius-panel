@@ -592,14 +592,23 @@ export default function Impresion() {
                     <table className="orders-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '40px' }}></th>
-                                <th style={{ width: '90px' }}>OT / ID</th>
-                                <th style={{ minWidth: '180px' }}>Cliente / Lote</th>
-                                <th style={{ minWidth: '210px' }}>Trabajo / Material</th>
+                                <th style={{ width: '42px', textAlign: 'center' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={displayedOrders.length > 0 && displayedOrders.every(o => selectedIds.has(String(o.id || o.ot)))}
+                                        onChange={() => {
+                                            if (displayedOrders.every(o => selectedIds.has(String(o.id || o.ot)))) {
+                                                setSelectedIds(new Set())
+                                            } else {
+                                                setSelectedIds(new Set(displayedOrders.map(o => String(o.id || o.ot))))
+                                            }
+                                        }}
+                                        style={{ accentColor: 'var(--primary-color)', cursor: 'pointer', transform: 'scale(1.2)' }}
+                                    />
+                                </th>
+                                <th style={{ minWidth: '220px' }}>Trabajo &amp; Cliente</th>
+                                <th style={{ minWidth: '230px' }}>Especificaciones Técnicas</th>
                                 <th style={{ minWidth: '170px' }}>Estado &amp; Entrega</th>
-                                {isAdmin && (
-                                    <th style={{ width: '100px', textAlign: 'right' }}>Importe</th>
-                                )}
                                 <th style={{ width: '130px', textAlign: 'center' }}>Acciones</th>
                             </tr>
                         </thead>
@@ -628,8 +637,8 @@ export default function Impresion() {
                                             forecastStatus={forecastStatus}
                                             allMateriales={allMateriales}
                                             allClientes={allClientes}
-                                            isAdmin={isAdmin}
-                                            restrictToProduction={!isAdmin}
+                                            isAdmin={false}
+                                            restrictToProduction={true}
                                             onDownloadBatch={handleDownloadBatch}
                                             actionMenuOrderId={actionMenuOrderId}
                                             setActionMenuOrderId={setActionMenuOrderId}
@@ -679,8 +688,8 @@ export default function Impresion() {
                                         onToggleTag={handleToggleTag}
                                         allMateriales={allMateriales}
                                         allClientes={allClientes}
-                                        isAdmin={isAdmin}
-                                        restrictToProduction={!isAdmin}
+                                        isAdmin={false}
+                                        restrictToProduction={true}
                                         canViewAlerts={canViewAlerts}
                                         onStatusClick={(o) => {
                                             setStatusOrder(o)
@@ -714,7 +723,7 @@ export default function Impresion() {
                 selectedIds={selectedIds}
                 setSelectedIds={setSelectedIds}
                 selectedTotals={selectedTotals}
-                isAdmin={isAdmin}
+                isAdmin={false}
                 onBulkApplyTag={handleBulkApplyTag}
                 onOpenNesting={handleOpenNestingForSelected}
                 onMergeBatch={handleMergeSelectedIntoBatch}
@@ -757,6 +766,7 @@ export default function Impresion() {
                     onClose={() => setPreviewOrder(null)}
                     order={previewOrder}
                     showStandardize={true}
+                    hidePrices={true}
                     onUpdate={() => {
                         loadOrders(true)
                         setPreviewOrder(null)

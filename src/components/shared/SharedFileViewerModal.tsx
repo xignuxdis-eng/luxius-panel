@@ -15,6 +15,7 @@ interface FileViewerModalProps {
     order: Order | null
     onUpdate?: () => void
     showStandardize?: boolean
+    hidePrices?: boolean
 }
 
 export default function SharedFileViewerModal({
@@ -22,7 +23,8 @@ export default function SharedFileViewerModal({
     onClose,
     order,
     onUpdate,
-    showStandardize = false
+    showStandardize = false,
+    hidePrices = false
 }: FileViewerModalProps) {
     const navigate = useNavigate()
     const [renaming, setRenaming] = useState(false)
@@ -233,25 +235,27 @@ export default function SharedFileViewerModal({
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                            onClick={handlePrintPdf}
-                            style={{
-                                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '0.6rem 1.2rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            📄 Ver / Imprimir PDF Presupuesto
-                        </button>
+                        {!hidePrices && (
+                            <button
+                                onClick={handlePrintPdf}
+                                style={{
+                                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '0.6rem 1.2rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                📄 Ver / Imprimir PDF Presupuesto
+                            </button>
+                        )}
                         <button
                             onClick={handlePrintLabel}
                             style={{
