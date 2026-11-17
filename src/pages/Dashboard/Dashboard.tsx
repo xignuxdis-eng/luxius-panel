@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '@components/layout/Header'
 import { useAuthStore } from '@store/authStore'
-import { getStats, getOrdenes, getMateriales, saveOrden, API_URL } from '@data/db'
+import { getStats, getOrdenes, getMateriales, saveOrden, getAuthHeaders, API_URL } from '@data/db'
 import CalendarView from './CalendarView'
 import QuickNotes from './QuickNotes'
 import { Order, isDesignerRole, isDesignerOwner } from '@/types'
@@ -309,6 +309,10 @@ export default function Dashboard() {
                     {/* Visual Stock Alerts Widget for Admins */}
                     {isAdmin && (
                         <StockAlertsWidget />
+                    )}
+                    {/* System Access Log Feed for Admins */}
+                    {isAdmin && (
+                        <AccessLogFeedWidget />
                     )}
                     {/* Ink Coverage Analytics Widget */}
                     {user?.role !== 'cliente' && (
@@ -624,6 +628,245 @@ function StockAlertsWidget() {
                     </div>
                 ))}
             </div>
+        </div>
+    )
+}
+
+
+interface AccessLogEntry {
+    id: number
+    user_id: number | null
+    username: string | null
+    nombre?: string
+    user_rol: string | null
+    action: string
+    details?: { reason?: string; email?: string; nombre?: string }
+    ip_address?: string | null
+    created_at?: string | null
+}
+
+interface AccessLogsResponse {
+    total: number
+    success_count: number
+    failure_count: number
+    unique_users: number
+    logs: AccessLogEntry[]
+}
+
+const PERIOD_OPTIONS: Array<{ id: 'day' | 'week' | 'month'; label: string }> = [
+    { id: 'day', label: 'Hoy (24h)' },
+    { id: 'week', label: 'Semana (7d)' },
+    { id: 'month', label: 'Mes (30d)' },
+]
+
+function AccessLogFeedWidget() {
+    const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week')
+    const [data, setData] = useState<AccessLogsResponse>({
+        total: 0,
+        success_count: 0,
+        failure_count: 0,
+        unique_users: 0,
+        logs: [],
+    })
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
+    const [refreshTick, setRefreshTick] = useState(0)
+
+    useEffect(() => {
+        let active = true
+        const loadLogs = async () => {
+            setLoading(true)
+            setError('')
+            try {
+                const res = await fetch(`${API_URL}/auth/access-logs?period=${period}`, {
+                    headers: getAuthHeaders(),
+                    cache: 'no-store',
+                })
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`)
+                }
+                const json = (await res.json()) as AccessLogsResponse
+                if (active) {
+                    setData({
+                        total: json.total || 0,
+                        success_count: json.success_count || 0,
+                        failure_count: json.failure_count || 0,
+                        unique_users: json.unique_users || 0,
+                        logs: Array.isArray(json.logs) ? json.logs : [],
+                    })
+                }
+            } catch {
+                if (active) {
+                    setError('No se pudo cargar el registro de accesos.')
+                }
+            } finally {
+                if (active) setLoading(false)
+            }
+        }
+        loadLogs()
+        return () => { active = false }
+    }, [period, refreshTick])
+
+    const formatAccessTime = (iso?: string | null) => {
+        if (!iso) return '—'
+        try {
+            return new Intl.DateTimeFormat('es-AR', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            }).format(new Date(iso))
+        } catch {
+            return iso
+        }
+    }
+
+    return (
+        <div
+            className="animate-slide-up"
+            style={{
+                marginTop: '1rem',
+                background: 'var(--bg-mid)',
+                borderRadius: '12px',
+                padding: '1.25rem',
+                border: '1px solid rgba(148, 163, 184, 0.14)',
+            }}
+        >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🔐</span>
+                    <span>Registro de Accesos al Sistema</span>
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    {PERIOD_OPTIONS.map(opt => {
+                        const active = period === opt.id
+                        return (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setPeriod(opt.id)}
+                                style={{
+                                    padding: '5px 10px',
+                                    borderRadius: '999px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    border: active ? '1px solid #38bdf8' : '1px solid rgba(148, 163, 184, 0.25)',
+                                    background: active ? 'rgba(56, 189, 248, 0.18)' : 'rgba(15, 23, 42, 0.45)',
+                                    color: active ? '#7dd3fc' : '#cbd5e1',
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        )
+                    })}
+                    <button
+                        type="button"
+                        onClick={() => setRefreshTick(t => t + 1)}
+                        title="Actualizar registro de accesos"
+                        style={{
+                            padding: '5px 9px',
+                            borderRadius: '999px',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            border: '1px solid rgba(148, 163, 184, 0.25)',
+                            background: 'rgba(15, 23, 42, 0.45)',
+                            color: '#cbd5e1',
+                        }}
+                    >
+                        🔄
+                    </button>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ background: 'rgba(15, 23, 42, 0.45)', borderRadius: '8px', padding: '8px 10px', border: '1px solid rgba(148,163,184,0.12)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Total Accesos</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc' }}>{data.total}</div>
+                </div>
+                <div style={{ background: 'rgba(16, 185, 129, 0.08)', borderRadius: '8px', padding: '8px 10px', border: '1px solid rgba(16,185,129,0.22)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#6ee7b7' }}>✅ Exitosos</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#34d399' }}>{data.success_count}</div>
+                </div>
+                <div style={{ background: 'rgba(239, 68, 68, 0.08)', borderRadius: '8px', padding: '8px 10px', border: '1px solid rgba(239,68,68,0.22)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#fca5a5' }}>🚫 Fallidos</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f87171' }}>{data.failure_count}</div>
+                </div>
+                <div style={{ background: 'rgba(56, 189, 248, 0.08)', borderRadius: '8px', padding: '8px 10px', border: '1px solid rgba(56,189,248,0.22)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#7dd3fc' }}>👥 Usuarios Únicos</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#38bdf8' }}>{data.unique_users}</div>
+                </div>
+            </div>
+
+            {loading ? (
+                <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: '#94a3b8' }}>
+                    Cargando historial de accesos...
+                </div>
+            ) : error ? (
+                <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.82rem', color: '#fca5a5' }}>
+                    {error}
+                </div>
+            ) : data.logs.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: '#94a3b8' }}>
+                    Sin registros de acceso para este período.
+                </div>
+            ) : (
+                <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px' }}>
+                    {data.logs.map(entry => {
+                        const isSuccess = entry.action === 'LOGIN_SUCCESS'
+                        return (
+                            <div
+                                key={entry.id}
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    padding: '8px 10px',
+                                    borderRadius: '8px',
+                                    background: isSuccess ? 'rgba(15, 23, 42, 0.45)' : 'rgba(239, 68, 68, 0.08)',
+                                    border: isSuccess ? '1px solid rgba(148, 163, 184, 0.12)' : '1px solid rgba(239, 68, 68, 0.25)',
+                                    fontSize: '0.8rem',
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, color: isSuccess ? '#34d399' : '#f87171', whiteSpace: 'nowrap' }}>
+                                        {isSuccess ? '✅ Ingreso' : '🚫 Fallido'}
+                                    </span>
+                                    <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                        {entry.nombre || entry.username || 'Desconocido'}
+                                    </span>
+                                    {entry.username && (
+                                        <span style={{ color: '#94a3b8' }}>@{entry.username}</span>
+                                    )}
+                                    {entry.user_rol && (
+                                        <span style={{
+                                            fontSize: '0.7rem',
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            background: 'rgba(99, 102, 241, 0.2)',
+                                            color: '#c7d2fe',
+                                            fontWeight: 600,
+                                        }}>
+                                            {entry.user_rol}
+                                        </span>
+                                    )}
+                                    {!isSuccess && entry.details?.reason && (
+                                        <span style={{ fontSize: '0.72rem', color: '#fca5a5' }}>
+                                            · {entry.details.reason}
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ textAlign: 'right', flexShrink: 0, color: '#94a3b8', fontSize: '0.74rem' }}>
+                                    <div style={{ color: '#cbd5e1', fontWeight: 600 }}>{formatAccessTime(entry.created_at)}</div>
+                                    {entry.ip_address && <div>IP: {entry.ip_address}</div>}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
         </div>
     )
 }
