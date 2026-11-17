@@ -20,10 +20,31 @@ describe('calculateCalcosMimakiQuote (Mimaki CG-60SR 60cm)', () => {
         expect(res.filas).toBe(Math.ceil(100 / res.calcosPorFila));
         expect(res.largoNecesarioM).toBeGreaterThan(0);
         expect(res.areaRolloM2).toBeGreaterThan(0);
+        expect(res.areaFacturableM2).toBeGreaterThanOrEqual(1);
         expect(res.aprovechamientoPct).toBeGreaterThan(0);
         expect(res.aprovechamientoPct).toBeLessThanOrEqual(100);
         expect(res.total).toBe(res.costoImpresion + res.costoCorte);
         expect(Number.isFinite(res.precioUnitario)).toBe(true);
+    });
+
+    it('aplica mínimo facturable de 1 m² cuando el consumo real del rollo es menor a 1 m²', () => {
+        const res = calculateCalcosMimakiQuote({
+            anchoCm: 5,
+            altoCm: 5,
+            cantidad: 100,
+            gapMm: 3,
+            usableWidthCm: 56,
+            rollWidthCm: 60,
+            precioImpresionM2: 0,
+            precioCorteM2: 27000,
+        });
+
+        expect(res.valido).toBe(true);
+        expect(res.areaRolloM2).toBeLessThan(1);
+        expect(res.areaFacturableM2).toBe(1);
+        expect(res.costoImpresion).toBe(0);
+        expect(res.costoCorte).toBe(27000);
+        expect(res.total).toBe(27000);
     });
 
     it('elige automáticamente rotación 90° cuando reduce el largo consumido en Mimaki', () => {

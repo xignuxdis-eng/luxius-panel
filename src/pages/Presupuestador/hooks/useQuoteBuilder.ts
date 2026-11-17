@@ -170,7 +170,6 @@ export function useQuoteBuilder() {
     const [calcoCantidad, setCalcoCantidad] = useState<number>(100);
     const [calcoGapMm, setCalcoGapMm] = useState<number>(3);
     const [calcoUsableWidthCm, setCalcoUsableWidthCm] = useState<number>(56);
-    const [calcoPrecioImpresionM2, setCalcoPrecioImpresionM2] = useState<number>(0);
     const [calcoPrecioCorteM2, setCalcoPrecioCorteM2] = useState<number>(0);
 
     const resolveMaterialTarifarioM2 = (matNameOrCode: string): number => {
@@ -191,12 +190,6 @@ export function useQuoteBuilder() {
         }
         return Number(mat.precioM2) || 0;
     };
-
-    // Auto-update Calcos print M2 price based on material, tarifario & client special pricing
-    useEffect(() => {
-        setCalcoPrecioImpresionM2(resolveMaterialTarifarioM2(calcoMaterial));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [calcoMaterial, selectedClientId, clientes, tarifas]);
 
     // Auto-update Calcos cut M2 price from Tarifas Xignux / Servicios (MEDC / CORT)
     useEffect(() => {
@@ -226,7 +219,7 @@ export function useQuoteBuilder() {
         gapMm: calcoGapMm,
         usableWidthCm: calcoUsableWidthCm,
         rollWidthCm: 60,
-        precioImpresionM2: calcoPrecioImpresionM2,
+        precioImpresionM2: 0,
         precioCorteM2: calcoPrecioCorteM2,
     }), [
         calcoAnchoCm,
@@ -234,7 +227,6 @@ export function useQuoteBuilder() {
         calcoCantidad,
         calcoGapMm,
         calcoUsableWidthCm,
-        calcoPrecioImpresionM2,
         calcoPrecioCorteM2,
     ]);
 
@@ -247,9 +239,13 @@ export function useQuoteBuilder() {
         const corteLabel = calcoTipoCorte === 'medio' ? 'Medio corte' : 'Corte completo';
         const cantidad = Math.max(1, Math.floor(calcoCantidad || 1));
 
+        const m2Note = calcoQuote.areaRolloM2 < 1
+            ? `${calcoQuote.areaFacturableM2.toFixed(2)}m² facturables - mín. 1 m²`
+            : `${calcoQuote.areaFacturableM2.toFixed(2)}m²`;
+
         const newItem: PresupuestoItem = {
             id: `item-${Date.now()}`,
-            concepto: `Calcos ${calcoMaterial} ${calcoAnchoCm}x${calcoAltoCm}cm (${corteLabel} · ${calcoQuote.calcosPorFila}×${calcoQuote.filas}, ${calcoQuote.largoNecesarioM.toFixed(2)}m / ${calcoQuote.areaRolloM2.toFixed(2)}m²)`,
+            concepto: `Calcos ${calcoMaterial} ${calcoAnchoCm}x${calcoAltoCm}cm (${corteLabel} · ${calcoQuote.calcosPorFila}×${calcoQuote.filas}, ${calcoQuote.largoNecesarioM.toFixed(2)}m / ${m2Note})`,
             unidadMedida: 'u',
             cantidad,
             precioUnitario: calcoQuote.precioUnitario,
@@ -534,8 +530,6 @@ export function useQuoteBuilder() {
         setCalcoGapMm,
         calcoUsableWidthCm,
         setCalcoUsableWidthCm,
-        calcoPrecioImpresionM2,
-        setCalcoPrecioImpresionM2,
         calcoPrecioCorteM2,
         setCalcoPrecioCorteM2,
         calcoQuote,

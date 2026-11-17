@@ -7,7 +7,7 @@ export interface CalcosQuoteInput {
     gapMm?: number;
     usableWidthCm?: number;
     rollWidthCm?: number;
-    precioImpresionM2: number;
+    precioImpresionM2?: number;
     precioCorteM2: number;
 }
 
@@ -19,6 +19,7 @@ export interface CalcosQuoteResult {
     filas: number;
     largoNecesarioM: number;
     areaRolloM2: number;
+    areaFacturableM2: number;
     areaNetaCalcosM2: number;
     aprovechamientoPct: number;
     costoImpresion: number;
@@ -51,6 +52,7 @@ export function calculateCalcosMimakiQuote(input: CalcosQuoteInput): CalcosQuote
             filas: 0,
             largoNecesarioM: 0,
             areaRolloM2: 0,
+            areaFacturableM2: 0,
             areaNetaCalcosM2: 0,
             aprovechamientoPct: 0,
             costoImpresion: 0,
@@ -72,6 +74,7 @@ export function calculateCalcosMimakiQuote(input: CalcosQuoteInput): CalcosQuote
             filas: 0,
             largoNecesarioM: 0,
             areaRolloM2: 0,
+            areaFacturableM2: 0,
             areaNetaCalcosM2: 0,
             aprovechamientoPct: 0,
             costoImpresion: 0,
@@ -94,11 +97,13 @@ export function calculateCalcosMimakiQuote(input: CalcosQuoteInput): CalcosQuote
     const largoNecesarioM = Math.max(0.01, Math.round(largoRawM * 100) / 100);
 
     const areaRolloM2 = Math.max(0.01, Math.round((rollWidthCm / 100) * largoNecesarioM * 100) / 100);
+    // Regla comercial: mínimo 1 m² facturable por trabajo de calcos/stickers
+    const areaFacturableM2 = Math.max(1, areaRolloM2);
     const areaNetaCalcosM2 = Math.round(((anchoCm * altoCm * cantidad) / 10000) * 100) / 100;
     const aprovechamientoPct = Math.min(100, Math.max(1, Math.round((areaNetaCalcosM2 / areaRolloM2) * 100)));
 
-    const costoImpresion = Math.round(areaRolloM2 * precioImpresionM2);
-    const costoCorte = Math.round(areaRolloM2 * precioCorteM2);
+    const costoImpresion = Math.round(areaFacturableM2 * precioImpresionM2);
+    const costoCorte = Math.round(areaFacturableM2 * precioCorteM2);
     const total = costoImpresion + costoCorte;
     const precioUnitario = Math.round((total / cantidad) * 100) / 100;
 
@@ -110,6 +115,7 @@ export function calculateCalcosMimakiQuote(input: CalcosQuoteInput): CalcosQuote
         filas,
         largoNecesarioM,
         areaRolloM2,
+        areaFacturableM2,
         areaNetaCalcosM2,
         aprovechamientoPct,
         costoImpresion,

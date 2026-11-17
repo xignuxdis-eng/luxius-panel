@@ -42,8 +42,6 @@ interface QuoteFormProps {
     setCalcoGapMm: (val: number) => void;
     calcoUsableWidthCm: number;
     setCalcoUsableWidthCm: (val: number) => void;
-    calcoPrecioImpresionM2: number;
-    setCalcoPrecioImpresionM2: (val: number) => void;
     calcoPrecioCorteM2: number;
     setCalcoPrecioCorteM2: (val: number) => void;
     calcoQuote: CalcosQuoteResult;
@@ -113,8 +111,6 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
     setCalcoGapMm,
     calcoUsableWidthCm,
     setCalcoUsableWidthCm,
-    calcoPrecioImpresionM2,
-    setCalcoPrecioImpresionM2,
     calcoPrecioCorteM2,
     setCalcoPrecioCorteM2,
     calcoQuote,
@@ -390,23 +386,13 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                         </div>
                     </div>
 
-                    <div className="form-grid-2">
+                    <div className="form-grid-2" style={{ alignItems: 'end' }}>
                         <div className="form-group">
-                            <label>{isClientUser ? 'Precio Tarifario Impresión / m² ($)' : 'Precio Impresión / m² ($)'}</label>
-                            <input
-                                type="number"
-                                min="0"
-                                className="form-input"
-                                value={calcoPrecioImpresionM2}
-                                readOnly={isClientUser}
-                                disabled={isClientUser}
-                                onChange={(e) => {
-                                    if (!isClientUser) setCalcoPrecioImpresionM2(Number(e.target.value));
-                                }}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>{isClientUser ? `Precio Tarifario ${calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'} / m² ($)` : `Precio ${calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'} / m² ($)`}</label>
+                            <label>
+                                {isClientUser
+                                    ? `Precio Tarifario Sticker (${calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'}) / m² ($)`
+                                    : `Precio Sticker (${calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'}) / m² ($)`}
+                            </label>
                             <input
                                 type="number"
                                 min="0"
@@ -418,6 +404,27 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                                     if (!isClientUser) setCalcoPrecioCorteM2(Number(e.target.value));
                                 }}
                             />
+                        </div>
+                        <div
+                            className="form-group"
+                            style={{
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                background: calcoTipoCorte === 'medio' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                                border: calcoTipoCorte === 'medio' ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                                color: '#e2e8f0',
+                                fontSize: '0.82rem',
+                                lineHeight: 1.4
+                            }}
+                        >
+                            <div style={{ fontWeight: 700, color: calcoTipoCorte === 'medio' ? '#7dd3fc' : '#fcd34d' }}>
+                                {calcoTipoCorte === 'medio'
+                                    ? '✂️ Sticker con Medio Corte (pliego / rollo)'
+                                    : '🔪 Sticker con Corte Completo (individuales)'}
+                            </div>
+                            <div style={{ color: '#cbd5e1', marginTop: '2px' }}>
+                                Regla de facturación: <strong>mínimo 1 m²</strong> por pedido.
+                            </div>
                         </div>
                     </div>
 
@@ -449,9 +456,14 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', color: '#cbd5e1' }}>
                                     <div>Entran: <strong>{calcoQuote.calcosPorFila}</strong>/fila × <strong>{calcoQuote.filas}</strong> filas</div>
-                                    <div>Largo rollo: <strong>{calcoQuote.largoNecesarioM.toFixed(2)} m</strong> ({calcoQuote.areaRolloM2.toFixed(2)} m²)</div>
-                                    <div>Impresión: <strong>${calcoQuote.costoImpresion.toLocaleString('es-AR')}</strong></div>
-                                    <div>Corte: <strong>${calcoQuote.costoCorte.toLocaleString('es-AR')}</strong></div>
+                                    <div>Largo rollo: <strong>{calcoQuote.largoNecesarioM.toFixed(2)} m</strong> (real: {calcoQuote.areaRolloM2.toFixed(2)} m²)</div>
+                                    <div>
+                                        A cobrar: <strong>{calcoQuote.areaFacturableM2.toFixed(2)} m²</strong>
+                                        {calcoQuote.areaRolloM2 < 1 && (
+                                            <span style={{ color: '#fcd34d', marginLeft: '4px', fontSize: '0.78rem' }}>(mín. 1 m²)</span>
+                                        )}
+                                    </div>
+                                    <div>Tarifa ({calcoTipoCorte === 'medio' ? 'Medio corte' : 'Corte completo'}): <strong>${calcoPrecioCorteM2.toLocaleString('es-AR')}/m²</strong></div>
                                 </div>
                                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                                     <span>Unitario: ${calcoQuote.precioUnitario.toLocaleString('es-AR', { minimumFractionDigits: 2 })} / calco</span>

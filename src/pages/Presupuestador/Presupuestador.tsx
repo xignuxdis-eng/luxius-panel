@@ -73,8 +73,6 @@ export function Presupuestador() {
                         setCalcoGapMm={quote.setCalcoGapMm}
                         calcoUsableWidthCm={quote.calcoUsableWidthCm}
                         setCalcoUsableWidthCm={quote.setCalcoUsableWidthCm}
-                        calcoPrecioImpresionM2={quote.calcoPrecioImpresionM2}
-                        setCalcoPrecioImpresionM2={quote.setCalcoPrecioImpresionM2}
                         calcoPrecioCorteM2={quote.calcoPrecioCorteM2}
                         setCalcoPrecioCorteM2={quote.setCalcoPrecioCorteM2}
                         calcoQuote={quote.calcoQuote}
