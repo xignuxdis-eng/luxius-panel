@@ -38,6 +38,7 @@ export function Presupuestador() {
                     />
 
                     <QuoteForm
+                        isClientUser={quote.isClientUser}
                         activeTab={quote.activeTab}
                         setActiveTab={quote.setActiveTab}
                         combos={quote.combos}
@@ -114,6 +115,7 @@ export function Presupuestador() {
                 {/* Sidebar Summary Panel */}
                 <div>
                     <QuoteSummary
+                        isClientUser={quote.isClientUser}
                         rawSubtotal={quote.rawSubtotal}
                         descuento={quote.descuento}
                         setDescuento={quote.setDescuento}

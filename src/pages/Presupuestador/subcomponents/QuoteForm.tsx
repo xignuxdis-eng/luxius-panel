@@ -5,6 +5,7 @@ import type { UnidadMedida } from '@/types/orden';
 import type { CalcosQuoteResult, TipoCorteCalco } from '../utils/calcosCalculator';
 
 interface QuoteFormProps {
+    isClientUser?: boolean;
     activeTab: 'catalog' | 'calcos' | 'combos' | 'custom';
     setActiveTab: (tab: 'catalog' | 'calcos' | 'combos' | 'custom') => void;
     combos: ComboData[];
@@ -77,6 +78,7 @@ interface QuoteFormProps {
 }
 
 export const QuoteForm: React.FC<QuoteFormProps> = ({
+    isClientUser = false,
     activeTab,
     setActiveTab,
     combos,
@@ -169,13 +171,15 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                 >
                     🎁 Promos y Combos ({combos.length})
                 </button>
-                <button
-                    type="button"
-                    className={`item-tab-btn ${activeTab === 'custom' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('custom')}
-                >
-                    📦 Trabajo Especial / Tercerizado
-                </button>
+                {!isClientUser && (
+                    <button
+                        type="button"
+                        className={`item-tab-btn ${activeTab === 'custom' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('custom')}
+                    >
+                        📦 Trabajo Especial / Tercerizado
+                    </button>
+                )}
             </div>
 
             {activeTab === 'catalog' ? (
@@ -241,12 +245,16 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     </div>
 
                     <div className="form-group">
-                        <label>Precio m² ($)</label>
+                        <label>{isClientUser ? 'Precio Tarifario m² ($)' : 'Precio m² ($)'}</label>
                         <input
                             type="number"
                             className="form-input"
                             value={catPrecioM2}
-                            onChange={(e) => setCatPrecioM2(Number(e.target.value))}
+                            readOnly={isClientUser}
+                            disabled={isClientUser}
+                            onChange={(e) => {
+                                if (!isClientUser) setCatPrecioM2(Number(e.target.value));
+                            }}
                         />
                     </div>
 
@@ -384,23 +392,31 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
 
                     <div className="form-grid-2">
                         <div className="form-group">
-                            <label>Precio Impresión / m² ($)</label>
+                            <label>{isClientUser ? 'Precio Tarifario Impresión / m² ($)' : 'Precio Impresión / m² ($)'}</label>
                             <input
                                 type="number"
                                 min="0"
                                 className="form-input"
                                 value={calcoPrecioImpresionM2}
-                                onChange={(e) => setCalcoPrecioImpresionM2(Number(e.target.value))}
+                                readOnly={isClientUser}
+                                disabled={isClientUser}
+                                onChange={(e) => {
+                                    if (!isClientUser) setCalcoPrecioImpresionM2(Number(e.target.value));
+                                }}
                             />
                         </div>
                         <div className="form-group">
-                            <label>Precio {calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'} / m² ($)</label>
+                            <label>{isClientUser ? `Precio Tarifario ${calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'} / m² ($)` : `Precio ${calcoTipoCorte === 'medio' ? 'Medio Corte' : 'Corte Completo'} / m² ($)`}</label>
                             <input
                                 type="number"
                                 min="0"
                                 className="form-input"
                                 value={calcoPrecioCorteM2}
-                                onChange={(e) => setCalcoPrecioCorteM2(Number(e.target.value))}
+                                readOnly={isClientUser}
+                                disabled={isClientUser}
+                                onChange={(e) => {
+                                    if (!isClientUser) setCalcoPrecioCorteM2(Number(e.target.value));
+                                }}
                             />
                         </div>
                     </div>
@@ -526,7 +542,9 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     {selectedComboId && (() => {
                         const currentCombo = combos.find(c => c.id === selectedComboId);
                         if (!currentCombo) return null;
-                        const effectivePrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : comboPrecio(currentCombo);
+                        const effectivePrice = !isClientUser && typeof comboCustomPrecio === 'number'
+                            ? comboCustomPrecio
+                            : comboPrecio(currentCombo);
                         const totalCombo = (comboCopias || 1) * effectivePrice;
                         return (
                             <form onSubmit={handleAddComboItem} className="presupuesto-combo-action-box">
@@ -545,12 +563,18 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>Precio Unitario Cotizado ($)</label>
+                                        <label>{isClientUser ? 'Precio Unitario Tarifario ($)' : 'Precio Unitario Cotizado ($)'}</label>
                                         <input
                                             type="number"
                                             className="form-input"
-                                            value={comboCustomPrecio}
-                                            onChange={(e) => setComboCustomPrecio(e.target.value === '' ? '' : Number(e.target.value))}
+                                            value={isClientUser ? comboPrecio(currentCombo) : comboCustomPrecio}
+                                            readOnly={isClientUser}
+                                            disabled={isClientUser}
+                                            title={isClientUser ? 'Precio fijo según tarifario' : undefined}
+                                            onChange={(e) => {
+                                                if (isClientUser) return;
+                                                setComboCustomPrecio(e.target.value === '' ? '' : Number(e.target.value));
+                                            }}
                                         />
                                     </div>
                                 </div>

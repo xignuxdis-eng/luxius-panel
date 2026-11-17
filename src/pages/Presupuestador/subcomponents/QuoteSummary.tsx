@@ -2,6 +2,7 @@
 import React from 'react';
 
 interface QuoteSummaryProps {
+    isClientUser?: boolean;
     rawSubtotal: number;
     descuento: number;
     setDescuento: (val: number) => void;
@@ -13,6 +14,7 @@ interface QuoteSummaryProps {
 }
 
 export const QuoteSummary: React.FC<QuoteSummaryProps> = ({
+    isClientUser = false,
     rawSubtotal,
     descuento,
     setDescuento,
@@ -31,15 +33,17 @@ export const QuoteSummary: React.FC<QuoteSummaryProps> = ({
                 <span>${rawSubtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
 
-            <div className="form-group" style={{ marginTop: '12px' }}>
-                <label>Bonificación / Descuento ($)</label>
-                <input
-                    type="number"
-                    className="form-input"
-                    value={descuento}
-                    onChange={(e) => setDescuento(Number(e.target.value))}
-                />
-            </div>
+            {!isClientUser && (
+                <div className="form-group" style={{ marginTop: '12px' }}>
+                    <label>Bonificación / Descuento ($)</label>
+                    <input
+                        type="number"
+                        className="form-input"
+                        value={descuento}
+                        onChange={(e) => setDescuento(Number(e.target.value))}
+                    />
+                </div>
+            )}
 
             <div className="summary-total">
                 <span>Total Neto:</span>

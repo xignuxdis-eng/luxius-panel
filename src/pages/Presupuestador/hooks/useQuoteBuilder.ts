@@ -181,14 +181,12 @@ export function useQuoteBuilder() {
         const servicios = getServicios();
         const targetCode = calcoTipoCorte === 'medio' ? 'MEDC' : 'CORT';
         const svc = servicios.find(s =>
-            s.codigo === targetCode ||
+            (s.codigo || '').toUpperCase() === targetCode ||
             (calcoTipoCorte === 'medio'
                 ? s.nombre.toLowerCase().includes('medio') && s.nombre.toLowerCase().includes('corte')
                 : s.nombre.toLowerCase().includes('corte') && s.nombre.toLowerCase().includes('completo'))
         );
-        if (svc && typeof svc.precioBase === 'number' && svc.precioBase > 0) {
-            setCalcoPrecioCorteM2(svc.precioBase);
-        }
+        setCalcoPrecioCorteM2(svc && typeof svc.precioBase === 'number' ? svc.precioBase : 0);
     }, [calcoTipoCorte]);
 
     const calcoQuote = useMemo(() => calculateCalcosMimakiQuote({
@@ -299,7 +297,9 @@ export function useQuoteBuilder() {
             return;
         }
 
-        const unitPrice = typeof comboCustomPrecio === 'number' ? comboCustomPrecio : comboPrecio(combo);
+        const unitPrice = !isClientUser && typeof comboCustomPrecio === 'number'
+            ? comboCustomPrecio
+            : comboPrecio(combo);
         const qty = comboCopias > 0 ? comboCopias : 1;
         const subtotal = qty * unitPrice;
 
@@ -346,8 +346,9 @@ export function useQuoteBuilder() {
     };
 
     // Calculation Totals
+    const effectiveDescuento = isClientUser ? 0 : descuento;
     const rawSubtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
-    const finalTotal = Math.max(0, rawSubtotal - descuento);
+    const finalTotal = Math.max(0, rawSubtotal - effectiveDescuento);
 
     // PDF Export
     const handleExportPDF = () => {
@@ -368,7 +369,7 @@ export function useQuoteBuilder() {
             clienteEmail: selectedClient?.email || '',
             items,
             subtotal: rawSubtotal,
-            descuento,
+            descuento: effectiveDescuento,
             total: finalTotal,
             observaciones,
             vendedorNombre: user?.name || 'Ventas'
