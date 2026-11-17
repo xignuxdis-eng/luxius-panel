@@ -74,10 +74,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
     useSessionInactivity()
     const [isInitializing, setIsInitializing] = useState(true)
+    const userRole = useAuthStore((s) => s.user?.role)
+
+    useEffect(() => {
+        if (userRole === 'cliente') {
+            const cur = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'pixel'
+            if (cur === 'pixel') {
+                document.documentElement.setAttribute('data-theme', 'dark')
+                document.body.classList.remove('pixel-theme')
+                localStorage.setItem('theme', 'dark')
+            }
+        }
+    }, [userRole])
 
     useEffect(() => {
         const init = async () => {
-            const currentTheme = localStorage.getItem('theme') || 'pixel'
+            const savedTheme = localStorage.getItem('theme') || 'pixel'
+            const isClientInit = useAuthStore.getState().user?.role === 'cliente'
+            const currentTheme = isClientInit && savedTheme === 'pixel' ? 'dark' : savedTheme
             document.documentElement.setAttribute('data-theme', currentTheme)
             if (currentTheme === 'pixel') {
                 document.body.classList.add('pixel-theme')

@@ -130,13 +130,15 @@ export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, 
                         </div>
                         <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <ThemeToggle />
-                            <button
-                                className="sidebar-arcade-btn"
-                                onClick={() => setIsArcadeOpen(true)}
-                                title="Abrir Arcade Center de Minijuegos"
-                            >
-                                🕹️ Arcade
-                            </button>
+                            {user?.role !== 'cliente' && (
+                                <button
+                                    className="sidebar-arcade-btn"
+                                    onClick={() => setIsArcadeOpen(true)}
+                                    title="Abrir Arcade Center de Minijuegos"
+                                >
+                                    🕹️ Arcade
+                                </button>
+                            )}
                             <button className="logout-btn" onClick={handleLogout}>
                                 Salir
                             </button>
@@ -146,14 +148,16 @@ export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, 
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                         <ServerStatusLed />
                         <ThemeToggle />
-                        <button
-                            className="sidebar-arcade-btn"
-                            onClick={() => setIsArcadeOpen(true)}
-                            title="Abrir Arcade"
-                            style={{ padding: '6px', minWidth: '32px' }}
-                        >
-                            🕹️
-                        </button>
+                        {user?.role !== 'cliente' && (
+                            <button
+                                className="sidebar-arcade-btn"
+                                onClick={() => setIsArcadeOpen(true)}
+                                title="Abrir Arcade"
+                                style={{ padding: '6px', minWidth: '32px' }}
+                            >
+                                🕹️
+                            </button>
+                        )}
                         <button
                             className="logout-btn"
                             onClick={handleLogout}
@@ -177,7 +181,9 @@ export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, 
                 )}
             </div>
 
-            <ArcadeModal isOpen={isArcadeOpen} onClose={() => setIsArcadeOpen(false)} />
+            {user?.role !== 'cliente' && (
+                <ArcadeModal isOpen={isArcadeOpen} onClose={() => setIsArcadeOpen(false)} />
+            )}
         </aside>
     )
 }

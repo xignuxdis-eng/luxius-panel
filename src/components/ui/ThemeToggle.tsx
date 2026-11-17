@@ -1,9 +1,21 @@
 import { useState, useEffect } from 'react'
+import { useAuthStore } from '@store/authStore'
 
 export default function ThemeToggle() {
-    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'pixel')
+    const user = useAuthStore((s) => s.user)
+    const isClient = user?.role === 'cliente'
+
+    const [theme, setTheme] = useState(() => {
+        const saved = localStorage.getItem('theme') || 'pixel'
+        return isClient && saved === 'pixel' ? 'dark' : saved
+    })
 
     useEffect(() => {
+        if (isClient && theme === 'pixel') {
+            setTheme('dark')
+            return
+        }
+
         document.documentElement.setAttribute('data-theme', theme)
         localStorage.setItem('theme', theme)
 
@@ -27,6 +39,9 @@ export default function ThemeToggle() {
 
     const toggleTheme = () => {
         setTheme(prev => {
+            if (isClient) {
+                return prev === 'dark' ? 'light' : 'dark'
+            }
             if (prev === 'pixel') return 'dark'
             if (prev === 'dark') return 'light'
             return 'pixel'

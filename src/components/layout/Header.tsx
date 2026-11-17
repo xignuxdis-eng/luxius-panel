@@ -119,14 +119,16 @@ export default function Header({ title, subtitle }: HeaderProps) {
                     <span>{isSyncing ? 'SINCRONIZANDO...' : 'SINCRONIZAR'}</span>
                 </button>
 
-                <button
-                    className="header-action-btn header-arcade-btn"
-                    onClick={() => setIsArcadeOpen(true)}
-                    title="Abrir Arcade Center de Minijuegos"
-                >
-                    <span>🕹️</span>
-                    <span>ARCADE</span>
-                </button>
+                {user?.role !== 'cliente' && (
+                    <button
+                        className="header-action-btn header-arcade-btn"
+                        onClick={() => setIsArcadeOpen(true)}
+                        title="Abrir Arcade Center de Minijuegos"
+                    >
+                        <span>🕹️</span>
+                        <span>ARCADE</span>
+                    </button>
+                )}
 
                 <div className="header-datetime">
                     <span className="header-time">{timeString}</span>
@@ -144,7 +146,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
             </div>
 
             <PerfilModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
-            <ArcadeModal isOpen={isArcadeOpen} onClose={() => setIsArcadeOpen(false)} />
+            {user?.role !== 'cliente' && (
+                <ArcadeModal isOpen={isArcadeOpen} onClose={() => setIsArcadeOpen(false)} />
+            )}
         </header>
     )
 }
