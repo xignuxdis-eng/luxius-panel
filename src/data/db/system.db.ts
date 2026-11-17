@@ -168,7 +168,9 @@ export function getUsuarioByUsername(username: string): Usuario | undefined {
     return getUsuarios().find(u => u.username?.toLowerCase() === username?.toLowerCase());
 }
 
-export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
+export async function saveUsuario(
+    usuario: Partial<Usuario> & { empresa?: string; direccion?: string }
+): Promise<Usuario> {
     const sessionItems = getUsuarios();
 
     const existingIndex = sessionItems.findIndex(u => 
@@ -211,6 +213,11 @@ export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
         if (result.id && result.id > 0) {
             payload.id = result.id;
         }
+        if (usuario.avatar !== undefined) payload.avatar = usuario.avatar;
+        if (usuario.phone !== undefined) payload.phone = usuario.phone;
+        if (usuario.bio !== undefined) payload.bio = usuario.bio;
+        if (usuario.empresa !== undefined) payload.empresa = usuario.empresa;
+        if (usuario.direccion !== undefined) payload.direccion = usuario.direccion;
         if (usuario.password && usuario.password.trim() !== '') {
             payload.password = usuario.password.trim();
         }
@@ -238,6 +245,31 @@ export async function saveUsuario(usuario: Partial<Usuario>): Promise<Usuario> {
             }
             localStorage.setItem(SESSION_USUARIOS_KEY, JSON.stringify(currentUsers));
             result = serverUser;
+
+            // Sincronizar ficha local de Cliente si el usuario tiene clientId vinculado
+            const linkedClientId = serverUser.clientId || result.clientId || usuario.clientId;
+            if (linkedClientId) {
+                try {
+                    const rawClients = localStorage.getItem('luxius_session_clientes');
+                    if (rawClients) {
+                        const clientsList = JSON.parse(rawClients);
+                        if (Array.isArray(clientsList)) {
+                            const cIdx = clientsList.findIndex((c: any) => String(c.id) === String(linkedClientId));
+                            if (cIdx !== -1) {
+                                clientsList[cIdx] = {
+                                    ...clientsList[cIdx],
+                                    ...(serverUser.nombre ? { nombre: serverUser.nombre } : {}),
+                                    ...(serverUser.email !== undefined ? { email: serverUser.email } : {}),
+                                    ...(usuario.phone !== undefined ? { telefono: usuario.phone } : {}),
+                                    ...(usuario.empresa !== undefined ? { empresa: usuario.empresa } : {}),
+                                    ...(usuario.direccion !== undefined ? { direccion: usuario.direccion } : {}),
+                                };
+                                localStorage.setItem('luxius_session_clientes', JSON.stringify(clientsList));
+                            }
+                        }
+                    }
+                } catch { /* ignore local client cache sync error */ }
+            }
         } else {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.error || `Error del servidor (${res.status})`);

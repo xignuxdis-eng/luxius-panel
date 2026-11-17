@@ -53,7 +53,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
 
     // Get live Avatar from DB if possible
     const dbUser = user ? getUsuarios().find(u => u.id === user.id) : null
-    const avatarUrl = dbUser?.avatar
+    const avatarUrl = dbUser?.avatar || user?.avatar
 
     const timeString = formatArgTime(now)
     const dateString = formatArgDate(now, {

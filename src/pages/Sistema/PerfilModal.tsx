@@ -1,10 +1,9 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { saveUsuario } from '@data/db'
+import { saveUsuario, getUsuarios, getClientes } from '@data/db'
 import Modal from '@components/ui/Modal'
 import { useAuthStore } from '@store/authStore'
-import { getUsuarios } from '@data/db'
 
 interface PerfilModalProps {
     isOpen: boolean
@@ -16,20 +15,34 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
     const { register, handleSubmit, reset, watch, setValue } = useForm<any>()
     const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
     const [showPassword, setShowPassword] = useState(false)
-    // `isSaving` solo se escribía, nunca se leía: el modal no muestra spinner.
-    const [, setIsSaving] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const isClientUser = authUser?.role === 'cliente'
 
     useEffect(() => {
         if (isOpen && authUser) {
             setShowPassword(false)
             const dbUsers = getUsuarios()
             const fullUser = dbUsers.find(u => u.id === authUser.id)
+            const linkedClientId = fullUser?.clientId || authUser.clientId
+            const linkedClient = linkedClientId
+                ? getClientes().find(c => String(c.id) === String(linkedClientId))
+                : getClientes().find(c =>
+                    (c.username || '').toLowerCase() === (authUser.username || '').toLowerCase()
+                )
 
-            if (fullUser) {
-                reset({ ...fullUser, password: '' })
-                setPreviewAvatar(fullUser.avatar || null)
-            }
+            const initialAvatar = fullUser?.avatar || authUser.avatar || ''
+            reset({
+                nombre: fullUser?.nombre || linkedClient?.nombre || authUser.name || '',
+                email: fullUser?.email || linkedClient?.email || '',
+                phone: fullUser?.phone || linkedClient?.telefono || authUser.phone || '',
+                empresa: linkedClient?.empresa || '',
+                direccion: linkedClient?.direccion || '',
+                bio: fullUser?.bio || authUser.bio || '',
+                avatar: initialAvatar,
+                password: '',
+            })
+            setPreviewAvatar(initialAvatar || null)
         }
     }, [isOpen, authUser, reset])
 
@@ -67,9 +80,18 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
         try {
             const updateData: any = {
                 id: authUser.id,
-                avatar: data.avatar,
-                bio: data.bio,
-                phone: data.phone
+                username: authUser.username,
+                clientId: authUser.clientId,
+                nombre: (data.nombre || '').trim() || authUser.name,
+                email: (data.email || '').trim(),
+                avatar: data.avatar || '',
+                bio: data.bio || '',
+                phone: (data.phone || '').trim(),
+            }
+
+            if (isClientUser || authUser.clientId) {
+                updateData.empresa = (data.empresa || '').trim()
+                updateData.direccion = (data.direccion || '').trim()
             }
 
             if (data.password && data.password.trim() !== '') {
@@ -80,7 +102,10 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
 
             setUser({
                 ...authUser,
-                name: updatedUser.nombre,
+                name: updatedUser.nombre || updateData.nombre,
+                avatar: updatedUser.avatar ?? updateData.avatar,
+                phone: updatedUser.phone ?? updateData.phone,
+                bio: updatedUser.bio ?? updateData.bio,
             })
 
             alert('Perfil actualizado correctamente')
@@ -189,7 +214,37 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
                 </div>
 
                 {/* Info Section */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                        <label style={{ fontWeight: 600 }}>Nombre / Contacto</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            {...register('nombre')}
+                            placeholder="Tu nombre..."
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label style={{ fontWeight: 600 }}>Email de contacto</label>
+                        <input
+                            type="email"
+                            className="input-field"
+                            {...register('email')}
+                            placeholder="correo@ejemplo.com"
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label style={{ fontWeight: 600 }}>Teléfono / WhatsApp</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            {...register('phone')}
+                            placeholder="+54 9 11..."
+                        />
+                    </div>
+
                     <div className="form-group">
                         <label style={{ fontWeight: 600 }}>Contraseña</label>
                         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -225,18 +280,30 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
                             </button>
                         </div>
                     </div>
-
-
-                    <div className="form-group">
-                        <label style={{ fontWeight: 600 }}>Teléfono</label>
-                        <input
-                            type="text"
-                            className="input-field"
-                            {...register('phone')}
-                            placeholder="+54 9 11..."
-                        />
-                    </div>
                 </div>
+
+                {(isClientUser || authUser?.clientId) && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="form-group">
+                            <label style={{ fontWeight: 600 }}>Empresa / Razón Social</label>
+                            <input
+                                type="text"
+                                className="input-field"
+                                {...register('empresa')}
+                                placeholder="Nombre de tu empresa o Particular"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label style={{ fontWeight: 600 }}>Dirección de entrega</label>
+                            <input
+                                type="text"
+                                className="input-field"
+                                {...register('direccion')}
+                                placeholder="Calle, altura, localidad..."
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <div className="form-group">
                     <label style={{ fontWeight: 600 }}>Bio / Notas</label>
@@ -261,10 +328,11 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
                     </button>
                     <button
                         type="submit"
+                        disabled={isSaving}
                         className="btn-primary"
-                        style={{ flex: 1, padding: '12px', borderRadius: '8px', justifySelf: 'stretch', cursor: 'pointer' }}
+                        style={{ flex: 1, padding: '12px', borderRadius: '8px', justifySelf: 'stretch', cursor: isSaving ? 'wait' : 'pointer', opacity: isSaving ? 0.7 : 1 }}
                     >
-                        Guardar Cambios
+                        {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
                 </div>
             </form>

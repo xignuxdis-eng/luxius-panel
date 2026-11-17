@@ -74,6 +74,8 @@ export interface Usuario {
     habilitado: boolean;
     password?: string;
     avatar?: string;
+    phone?: string;
+    bio?: string;
     clientId?: number;
 }
 
