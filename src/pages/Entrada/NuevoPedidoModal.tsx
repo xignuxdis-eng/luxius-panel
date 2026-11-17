@@ -2159,35 +2159,37 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                     </div>
                                 )}
                             </div>
-                            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '2px', marginBottom: '6px' }}>
-                                <label style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    cursor: 'pointer',
-                                    background: isParticular ? 'rgba(234, 179, 8, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                                    border: isParticular ? '1px solid rgba(234, 179, 8, 0.45)' : '1px solid var(--border)',
-                                    padding: '6px 12px',
-                                    borderRadius: '6px',
-                                    userSelect: 'none',
-                                    transition: 'all 0.2s ease'
-                                }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isParticular}
-                                        onChange={(e) => setIsParticular(e.target.checked)}
-                                        style={{ width: '16px', height: '16px', accentColor: '#eab308', cursor: 'pointer' }}
-                                    />
-                                    <span style={{ fontSize: '13px', fontWeight: 600, color: isParticular ? '#eab308' : 'var(--text-primary)' }}>
-                                        👤 Cliente Particular
-                                    </span>
-                                    {isParticular && (
-                                        <span style={{ fontSize: '10px', background: '#eab308', color: '#000', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px' }}>
-                                            RECARGO PARTICULAR ACTIVO
+                            {user?.role !== 'cliente' && (
+                                <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '2px', marginBottom: '6px' }}>
+                                    <label style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        background: isParticular ? 'rgba(234, 179, 8, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                                        border: isParticular ? '1px solid rgba(234, 179, 8, 0.45)' : '1px solid var(--border)',
+                                        padding: '6px 12px',
+                                        borderRadius: '6px',
+                                        userSelect: 'none',
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isParticular}
+                                            onChange={(e) => setIsParticular(e.target.checked)}
+                                            style={{ width: '16px', height: '16px', accentColor: '#eab308', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontSize: '13px', fontWeight: 600, color: isParticular ? '#eab308' : 'var(--text-primary)' }}>
+                                            👤 Cliente Particular
                                         </span>
-                                    )}
-                                </label>
-                            </div>
+                                        {isParticular && (
+                                            <span style={{ fontSize: '10px', background: '#eab308', color: '#000', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px' }}>
+                                                RECARGO PARTICULAR ACTIVO
+                                            </span>
+                                        )}
+                                    </label>
+                                </div>
+                            )}
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>🏷️ Proyecto / Etiqueta / Nombre Trabajo</label>
                                 <input
