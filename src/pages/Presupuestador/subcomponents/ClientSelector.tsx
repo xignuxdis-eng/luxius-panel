@@ -3,6 +3,8 @@ import React from 'react';
 
 interface ClientSelectorProps {
     clientes: any[];
+    isClientUser?: boolean;
+    clientLockedName?: string;
     selectedClientId: number | '';
     setSelectedClientId: (id: number) => void;
     clientSearch: string;
@@ -18,6 +20,8 @@ interface ClientSelectorProps {
 
 export const ClientSelector: React.FC<ClientSelectorProps> = ({
     clientes,
+    isClientUser = false,
+    clientLockedName = '',
     selectedClientId,
     setSelectedClientId,
     clientSearch,
@@ -36,6 +40,16 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
             <div className="form-grid-2">
                 <div className="form-group">
                     <label>Cliente</label>
+                    {isClientUser ? (
+                        <input
+                            type="text"
+                            className="form-input"
+                            value={clientLockedName}
+                            readOnly
+                            disabled
+                            style={{ opacity: 0.9, cursor: 'default' }}
+                        />
+                    ) : (
                     <div className="relative" ref={clientDropdownRef}>
                         <input
                             type="text"
@@ -80,6 +94,7 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
                             </div>
                         )}
                     </div>
+                    )}
                 </div>
                 <div className="form-grid-2">
                     <div className="form-group">

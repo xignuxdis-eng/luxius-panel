@@ -22,6 +22,8 @@ export function Presupuestador() {
                 <div>
                     <ClientSelector
                         clientes={quote.clientes}
+                        isClientUser={quote.isClientUser}
+                        clientLockedName={quote.clientLockedName}
                         selectedClientId={quote.selectedClientId}
                         setSelectedClientId={quote.setSelectedClientId}
                         clientSearch={quote.clientSearch}

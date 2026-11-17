@@ -25,7 +25,7 @@ export const rolePermissions: Record<string, string[]> = {
     vendedor: ['/', '/entrada', '/presupuestador', '/abm/clientes', '/utilidades', '/mobile'],
     impresion: ['/', '/impresion', '/stock', '/utilidades', '/mobile'],
     artista: ['/', '/entrada', '/diseno', '/impresion', '/presupuestador', '/utilidades', '/xpress-viewer', '/mobile'],
-    cliente: ['/', '/entrada', '/utilidades', '/mobile'],
+    cliente: ['/', '/entrada', '/presupuestador', '/xpress-viewer', '/utilidades'],
     visitante: ['/', '/entrada', '/presupuestador', '/xpress-viewer', '/diseno', '/impresion', '/stock', '/analiticas', '/utilidades', '/mobile'],
 }
 

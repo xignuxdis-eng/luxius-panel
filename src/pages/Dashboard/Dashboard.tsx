@@ -16,7 +16,8 @@ export default function Dashboard() {
     const navigate = useNavigate()
     const user = useAuthStore((state) => state.user)
     const isVisitor = user?.role === 'visitante'
-    const [viewMode, setViewMode] = useState<'workshop' | 'standard'>(() => isVisitor ? 'standard' : 'workshop')
+    const isClient = user?.role === 'cliente'
+    const [viewMode, setViewMode] = useState<'workshop' | 'standard'>(() => (isVisitor || isClient) ? 'standard' : 'workshop')
     const [showBriefing, setShowBriefing] = useState(false)
 
     // States for async data
@@ -157,6 +158,7 @@ export default function Dashboard() {
                     title="Panel de Control Luxius"
                     subtitle={`Bienvenido de nuevo, ${user?.name?.split(' ')[0] || 'Usuario'}.`}
                 />
+                {!isClient && (
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button
                         onClick={() => setShowBriefing(true)}
@@ -209,9 +211,10 @@ export default function Dashboard() {
                         📊 Vista Estándar
                     </button>
                 </div>
+                )}
             </div>
 
-            {viewMode === 'workshop' ? (
+            {viewMode === 'workshop' && !isClient ? (
                 <div style={{ marginBottom: '24px' }}>
                     {isVisitor ? (
                         <div style={{

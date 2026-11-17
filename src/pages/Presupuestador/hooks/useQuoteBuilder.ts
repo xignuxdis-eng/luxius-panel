@@ -14,7 +14,28 @@ export function useQuoteBuilder() {
     const { user } = useAuthStore();
 
     // Data lists
-    const clientes = getClientes();
+    const isClientUser = user?.role === 'cliente';
+    const rawClientes = getClientes();
+    const ownClient = useMemo(() => {
+        if (!isClientUser || !user) return null;
+        return (
+            rawClientes.find(c => user.clientId && String(c.id) === String(user.clientId)) ||
+            rawClientes.find(c =>
+                (c.nombre || '').toLowerCase() === (user.name || '').toLowerCase() ||
+                (c.username || '').toLowerCase() === (user.username || '').toLowerCase()
+            ) ||
+            null
+        );
+    }, [isClientUser, user, rawClientes]);
+    const clientes = useMemo(() => {
+        if (!isClientUser) return rawClientes;
+        return ownClient ? [ownClient] : [];
+    }, [isClientUser, rawClientes, ownClient]);
+    const clientLockedName = useMemo(() => {
+        if (!isClientUser) return '';
+        if (ownClient) return `${ownClient.nombre} (${ownClient.empresa || 'Particular'})`;
+        return user?.name || user?.username || 'Mi Cuenta';
+    }, [isClientUser, ownClient, user]);
     const combos = useMemo(() => getCombos().filter(c => c.habilitado !== false), []);
 
     // Unify printable materials filtering
@@ -39,7 +60,12 @@ export function useQuoteBuilder() {
     }, []);
 
     // Presupuesto Meta State
-    const [selectedClientId, setSelectedClientId] = useState<number | ''>(clientes[0]?.id || '');
+    const [selectedClientId, setSelectedClientId] = useState<number | ''>(() => {
+        if (user?.role === 'cliente') {
+            return ownClient?.id || user.clientId || '';
+        }
+        return clientes[0]?.id || '';
+    });
 
     // Searchable Client Dropdown State
     const [clientSearch, setClientSearch] = useState('');
@@ -358,14 +384,19 @@ export function useQuoteBuilder() {
             return;
         }
 
-        const selectedClient = clientes.find(c => c.id === Number(selectedClientId));
-        const clienteNombre = selectedClient?.nombre || 'Cliente General';
+        const resolvedClientId = isClientUser
+            ? (ownClient?.id || user?.clientId || 1)
+            : (Number(selectedClientId) || 1);
+        const selectedClient = clientes.find(c => c.id === Number(resolvedClientId));
+        const clienteNombre = isClientUser
+            ? (ownClient?.nombre || user?.name || user?.username || 'Cliente')
+            : (selectedClient?.nombre || 'Cliente General');
 
         let createdCount = 0;
         items.forEach((item) => {
             const cm = item.calcosMeta;
             saveOrden({
-                clientId: Number(selectedClientId) || 1,
+                clientId: Number(resolvedClientId),
                 clienteNombre: clienteNombre,
                 status: 'diseno',
                 nombreTarea: item.concepto,
@@ -410,6 +441,8 @@ export function useQuoteBuilder() {
 
     return {
         clientes,
+        isClientUser,
+        clientLockedName,
         combos,
         printMaterials,
         printCalidades,
