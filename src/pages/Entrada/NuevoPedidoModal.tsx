@@ -102,6 +102,9 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
     const [saving, setSaving] = useState(false)
     const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0, errorCount: 0 })
     const [vendedores, setVendedores] = useState<any[]>([])
+    const isClientRole = user?.role === 'cliente'
+    const sistemaVendedor = vendedores.find(v => String(v.nombre || '').toLowerCase().includes('sistema'))
+    const sistemaVendedorId = sistemaVendedor ? String(sistemaVendedor.id) : (vendedores[0] ? String(vendedores[0].id) : '1')
     const [selectedTags, setSelectedTags] = useState<string[]>(order?.tags || [])
     const [materialsVersion, setMaterialsVersion] = useState(0)
 
@@ -328,7 +331,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                     try {
                         const parsed = JSON.parse(storedVendedores);
                         setVendedores(parsed);
-                        if (!getValues('vendedorId') && parsed.length > 0) {
+                        if (isClientRole) {
+                            const sys = parsed.find((v: any) => String(v.nombre || '').toLowerCase().includes('sistema'));
+                            setValue('vendedorId', String(sys?.id || parsed[0]?.id || '1'), { shouldValidate: true });
+                        } else if (!getValues('vendedorId') && parsed.length > 0) {
                             setValue('vendedorId', String(parsed[0].id), { shouldValidate: true });
                         }
                     } catch (e) { console.error("Error localStorage vendedores", e); }
@@ -375,7 +381,10 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
                         if (Array.isArray(data) && data.length > 0) {
                             setVendedores(data);
                             localStorage.setItem('luxius_session_vendedores', JSON.stringify(data));
-                            if (!getValues('vendedorId')) {
+                            if (isClientRole) {
+                                const sys = data.find((v: any) => String(v.nombre || '').toLowerCase().includes('sistema'));
+                                setValue('vendedorId', String(sys?.id || data[0]?.id || '1'), { shouldValidate: true });
+                            } else if (!getValues('vendedorId')) {
                                 setValue('vendedorId', String(data[0].id), { shouldValidate: true });
                             }
                         }
@@ -935,7 +944,7 @@ export default function NuevoPedidoModal({ isOpen, onClose, order, defaultStatus
 
             reset({
                 clienteId: '',
-                vendedorId: (vendedores.length > 0 ? String(vendedores[0].id) : '1'),
+                vendedorId: isClientRole ? sistemaVendedorId : (vendedores.length > 0 ? String(vendedores[0].id) : '1'),
                 status: currentDefaultStatus,
                 material: '',
                 calidad: defaultCalidad,
@@ -2226,12 +2235,21 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
 
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Vendedor Asignado</label>
-                                <select {...register('vendedorId', { required: true })} className="input-field">
-                                    {vendedores.map(v => (
-                                        <option key={v.id} value={v.id}>{v.nombre || `Vendedor ${v.id}`}</option>
-                                    ))}
-                                    {vendedores.length === 0 && <option value="1">Administrador (Vendedor 1)</option>}
-                                </select>
+                                {isClientRole ? (
+                                    <>
+                                        <input type="hidden" {...register('vendedorId', { required: true })} value={sistemaVendedorId} />
+                                        <select className="input-field" value={sistemaVendedorId} disabled>
+                                            <option value={sistemaVendedorId}>Sistema</option>
+                                        </select>
+                                    </>
+                                ) : (
+                                    <select {...register('vendedorId', { required: true })} className="input-field">
+                                        {vendedores.map(v => (
+                                            <option key={v.id} value={v.id}>{v.nombre || `Vendedor ${v.id}`}</option>
+                                        ))}
+                                        {vendedores.length === 0 && <option value="1">Administrador (Vendedor 1)</option>}
+                                    </select>
+                                )}
                              </div>
 
                              <div className="form-group" style={{ gridColumn: 'span 2' }}>
