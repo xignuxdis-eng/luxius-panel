@@ -2209,9 +2209,18 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 <label>🚚 Logística / Envío</label>
                                 <select {...register('envio')} className="input-field">
                                     <option value="">-- Retiro en Local / Sin especificar --</option>
-                                    {getLogisticas().filter(l => l.habilitado !== false).map((l: any) => (
-                                        <option key={l.id} value={l.nombre}>{l.nombre}</option>
-                                    ))}
+                                    {getLogisticas()
+                                        .filter((l: any) => {
+                                            if (l.habilitado === false) return false;
+                                            if (user?.role === 'cliente') {
+                                                const name = String(l.nombre || '').toLowerCase();
+                                                if (name.includes('quique') || name.includes('tincho')) return false;
+                                            }
+                                            return true;
+                                        })
+                                        .map((l: any) => (
+                                            <option key={l.id} value={l.nombre}>{l.nombre}</option>
+                                        ))}
                                 </select>
                             </div>
 
@@ -3508,7 +3517,16 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                             <label>Logística / Envío</label>
                                             <select {...register('envio')} className="input-field">
                                                 <option value="">Seleccionar...</option>
-                                                {getLogisticas().map((l: any) => <option key={l.id} value={l.nombre}>{l.nombre}</option>)}
+                                                {getLogisticas()
+                                                    .filter((l: any) => {
+                                                        if (l.habilitado === false) return false;
+                                                        if (user?.role === 'cliente') {
+                                                            const name = String(l.nombre || '').toLowerCase();
+                                                            if (name.includes('quique') || name.includes('tincho')) return false;
+                                                        }
+                                                        return true;
+                                                    })
+                                                    .map((l: any) => <option key={l.id} value={l.nombre}>{l.nombre}</option>)}
                                             </select>
                                         </div>
                                     </div>
