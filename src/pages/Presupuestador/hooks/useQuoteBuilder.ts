@@ -1,7 +1,7 @@
 // src/pages/Presupuestador/hooks/useQuoteBuilder.ts
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getClientes, getMateriales, getCalidades, getServicios, saveOrden, getCombos, type ComboData } from '@/data/db';
+import { getClientes, getMateriales, getCalidades, getServicios, saveOrden, getCombos, getTarifasXignux, getTarifasXignuxSync, type ComboData, type TarifasXignux } from '@/data/db';
 import { useAuthStore } from '@/store/authStore';
 import { downloadPresupuestoPDF, type PresupuestoItem, type PresupuestoData } from '@/utils/presupuestoPdf';
 import type { UnidadMedida } from '@/types/orden';
@@ -12,6 +12,18 @@ import { calculateCalcosMimakiQuote, type TipoCorteCalco } from '../utils/calcos
 export function useQuoteBuilder() {
     const navigate = useNavigate();
     const { user } = useAuthStore();
+
+    const [tarifas, setTarifas] = useState<TarifasXignux>(() => getTarifasXignuxSync());
+
+    useEffect(() => {
+        let active = true;
+        getTarifasXignux().then((fresh) => {
+            if (active && fresh && typeof fresh === 'object') {
+                setTarifas(fresh);
+            }
+        });
+        return () => { active = false; };
+    }, []);
 
     // Data lists
     const isClientUser = user?.role === 'cliente';
@@ -132,7 +144,7 @@ export function useQuoteBuilder() {
     const [catAncho, setCatAncho] = useState<number>(1);
     const [catAlto, setCatAlto] = useState<number>(1);
     const [catCopias, setCatCopias] = useState<number>(1);
-    const [catPrecioM2, setCatPrecioM2] = useState<number>(12000);
+    const [catPrecioM2, setCatPrecioM2] = useState<number>(0);
 
     // Custom Item Form State
     const [customConcepto, setCustomConcepto] = useState<string>('');
@@ -158,25 +170,35 @@ export function useQuoteBuilder() {
     const [calcoCantidad, setCalcoCantidad] = useState<number>(100);
     const [calcoGapMm, setCalcoGapMm] = useState<number>(3);
     const [calcoUsableWidthCm, setCalcoUsableWidthCm] = useState<number>(56);
-    const [calcoPrecioImpresionM2, setCalcoPrecioImpresionM2] = useState<number>(12000);
+    const [calcoPrecioImpresionM2, setCalcoPrecioImpresionM2] = useState<number>(0);
     const [calcoPrecioCorteM2, setCalcoPrecioCorteM2] = useState<number>(0);
 
-    // Auto-update Calcos print M2 price based on material & client special pricing
-    useEffect(() => {
+    const resolveMaterialTarifarioM2 = (matNameOrCode: string): number => {
         const allMats = getMateriales();
-        const mat = allMats.find(m => (m.descripcion || m.codigo) === calcoMaterial);
-        if (mat) {
-            const selectedClient = clientes.find(c => c.id === Number(selectedClientId));
-            const special = resolveSpecialPrice(selectedClient, mat.codigo, undefined, mat.tipoCobro);
-            if (special.hasSpecialPrice && special.price) {
-                setCalcoPrecioImpresionM2(special.price);
-            } else if (mat.precioM2) {
-                setCalcoPrecioImpresionM2(mat.precioM2);
-            }
-        }
-    }, [calcoMaterial, selectedClientId, clientes]);
+        const mat = allMats.find(m => (m.descripcion || m.codigo) === matNameOrCode);
+        if (!mat) return 0;
 
-    // Auto-update Calcos cut M2 price from Servicios (MEDC / CORT)
+        const selectedClient = clientes.find(c => c.id === Number(selectedClientId));
+        const special = resolveSpecialPrice(selectedClient, mat.codigo, undefined, mat.tipoCobro);
+        if (special.hasSpecialPrice && special.price) {
+            return special.price;
+        }
+
+        const key = mat.codigo?.toLowerCase() || (mat.descripcion || '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        const tarifaEntry = tarifas[key];
+        if (tarifaEntry && typeof tarifaEntry.precio === 'number') {
+            return tarifaEntry.precio;
+        }
+        return Number(mat.precioM2) || 0;
+    };
+
+    // Auto-update Calcos print M2 price based on material, tarifario & client special pricing
+    useEffect(() => {
+        setCalcoPrecioImpresionM2(resolveMaterialTarifarioM2(calcoMaterial));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [calcoMaterial, selectedClientId, clientes, tarifas]);
+
+    // Auto-update Calcos cut M2 price from Tarifas Xignux / Servicios (MEDC / CORT)
     useEffect(() => {
         const servicios = getServicios();
         const targetCode = calcoTipoCorte === 'medio' ? 'MEDC' : 'CORT';
@@ -186,8 +208,16 @@ export function useQuoteBuilder() {
                 ? s.nombre.toLowerCase().includes('medio') && s.nombre.toLowerCase().includes('corte')
                 : s.nombre.toLowerCase().includes('corte') && s.nombre.toLowerCase().includes('completo'))
         );
-        setCalcoPrecioCorteM2(svc && typeof svc.precioBase === 'number' ? svc.precioBase : 0);
-    }, [calcoTipoCorte]);
+        const sKey = svc?.codigo?.toLowerCase()
+            || (svc?.nombre || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')
+            || targetCode.toLowerCase();
+        const tarifaEntry = tarifas[sKey] || tarifas[targetCode.toLowerCase()];
+        if (tarifaEntry && typeof tarifaEntry.precio === 'number') {
+            setCalcoPrecioCorteM2(tarifaEntry.precio);
+        } else {
+            setCalcoPrecioCorteM2(svc && typeof svc.precioBase === 'number' ? svc.precioBase : 0);
+        }
+    }, [calcoTipoCorte, tarifas]);
 
     const calcoQuote = useMemo(() => calculateCalcosMimakiQuote({
         anchoCm: calcoAnchoCm,
@@ -238,20 +268,11 @@ export function useQuoteBuilder() {
         setItems([...items, newItem]);
     };
 
-    // Auto-update Catalog M2 Price based on material and client special pricing
+    // Auto-update Catalog M2 Price based on material, tarifario and client special pricing
     useEffect(() => {
-        const allMats = getMateriales();
-        const mat = allMats.find(m => (m.descripcion || m.codigo) === catMaterial);
-        if (mat) {
-            const selectedClient = clientes.find(c => c.id === Number(selectedClientId));
-            const special = resolveSpecialPrice(selectedClient, mat.codigo, undefined, mat.tipoCobro);
-            if (special.hasSpecialPrice && special.price) {
-                setCatPrecioM2(special.price);
-            } else if (mat.precioM2) {
-                setCatPrecioM2(mat.precioM2);
-            }
-        }
-    }, [catMaterial, selectedClientId, clientes]);
+        setCatPrecioM2(resolveMaterialTarifarioM2(catMaterial));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [catMaterial, selectedClientId, clientes, tarifas]);
 
     const handleAddCatalogItem = (e: React.FormEvent) => {
         e.preventDefault();
