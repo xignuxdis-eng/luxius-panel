@@ -58,8 +58,8 @@ export default function PerfilModal({ isOpen, onClose }: PerfilModalProps) {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
-            if (file.size > 5000000) { // 5MB limit
-                alert('La imagen es muy pesada. Máximo 5MB.')
+            if (file.size > 500 * 1024) { // 500 KB limit
+                alert('La imagen supera el máximo de 500 KB.')
                 return
             }
 

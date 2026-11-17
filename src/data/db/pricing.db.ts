@@ -30,7 +30,10 @@ export type { TarifaEntry, TarifasXignux, ComboItemComponent, ComboData };
 
 export async function getTarifasXignux(): Promise<TarifasXignux> {
     try {
-        const res = await fetch(`${API_URL}/tarifas`, { cache: 'no-store' });
+        const res = await fetch(`${API_URL}/tarifas`, {
+            headers: getAuthHeaders(),
+            cache: 'no-store'
+        });
         if (res.ok) {
             const data = await res.json();
             localStorage.setItem('luxius_tarifas_xignux', JSON.stringify(data));
