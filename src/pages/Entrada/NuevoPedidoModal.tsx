@@ -2619,43 +2619,45 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
 
                                     {/* Selector de Plotter de Impresión y Servicio de Corte Mimaki */}
                                     <div className="form-group" style={{ gridColumn: 'span 4', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginTop: '6px' }}>
-                                        {/* Plotter de Impresión */}
-                                        <div style={{
-                                            background: 'var(--bg-card)',
-                                            border: '1px solid var(--border)',
-                                            borderRadius: 'var(--radius-md)',
-                                            padding: '10px 12px'
-                                        }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                                <label style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span>🖨️</span> Plotter de Impresión
-                                                </label>
-                                                {exceedsRS640 && (
-                                                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#0284c7', color: '#fff', fontWeight: 700 }}>
-                                                        Ancho &gt; 1.60m: SolJet Pro III
-                                                    </span>
+                                        {/* Plotter de Impresión (solo personal interno) */}
+                                        {user?.role !== 'cliente' && (
+                                            <div style={{
+                                                background: 'var(--bg-card)',
+                                                border: '1px solid var(--border)',
+                                                borderRadius: 'var(--radius-md)',
+                                                padding: '10px 12px'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                    <label style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span>🖨️</span> Plotter de Impresión
+                                                    </label>
+                                                    {exceedsRS640 && (
+                                                        <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#0284c7', color: '#fff', fontWeight: 700 }}>
+                                                            Ancho &gt; 1.60m: SolJet Pro III
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <select
+                                                    {...register('maquinaId', { valueAsNumber: true })}
+                                                    value={exceedsRS640 ? 2 : (watchedMaquinaId || 1)}
+                                                    onChange={(e) => setValue('maquinaId', Number(e.target.value))}
+                                                    className="input-field"
+                                                    style={{ width: '100%', fontSize: '0.85rem' }}
+                                                >
+                                                    <option value={1} disabled={exceedsRS640}>
+                                                        Roland VersaArt RS-640 (Ancho máx: 1.60m){exceedsRS640 ? ' — No cabe' : ''}
+                                                    </option>
+                                                    <option value={2}>
+                                                        Roland SolJet Pro III (Ancho máx: 1.90m)
+                                                    </option>
+                                                </select>
+                                                {exceedsSoljet && (
+                                                    <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px' }}>
+                                                        ⚠️ Medida ({minDim.toFixed(2)}m) supera 1.90m. Requerirá armado por paños/soldadura.
+                                                    </div>
                                                 )}
                                             </div>
-                                            <select
-                                                {...register('maquinaId', { valueAsNumber: true })}
-                                                value={exceedsRS640 ? 2 : (watchedMaquinaId || 1)}
-                                                onChange={(e) => setValue('maquinaId', Number(e.target.value))}
-                                                className="input-field"
-                                                style={{ width: '100%', fontSize: '0.85rem' }}
-                                            >
-                                                <option value={1} disabled={exceedsRS640}>
-                                                    Roland VersaArt RS-640 (Ancho máx: 1.60m){exceedsRS640 ? ' — No cabe' : ''}
-                                                </option>
-                                                <option value={2}>
-                                                    Roland SolJet Pro III (Ancho máx: 1.90m)
-                                                </option>
-                                            </select>
-                                            {exceedsSoljet && (
-                                                <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px' }}>
-                                                    ⚠️ Medida ({minDim.toFixed(2)}m) supera 1.90m. Requerirá armado por paños/soldadura.
-                                                </div>
-                                            )}
-                                        </div>
+                                        )}
 
                                         {/* Servicio de Corte */}
                                         <div style={{
@@ -3513,7 +3515,8 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                 </div>
                             )}
 
-                            {/* CONDICIONES COMERCIALES, SEÑA Y SALDO */}
+                            {/* CONDICIONES COMERCIALES, SEÑA Y SALDO (solo personal interno) */}
+                            {user?.role !== 'cliente' && (
                             <div className="commercial-payment-card" style={{
                                 gridColumn: 'span 4',
                                 background: 'linear-gradient(145deg, rgba(26, 29, 36, 0.95), rgba(18, 20, 26, 0.95))',
@@ -3883,6 +3886,7 @@ pageFile = new File([pdfBytes as BlobPart], pageName, { type: 'application/pdf' 
                                     </div>
                                 </div>
                             </div>
+                            )}
 
                         </div> {/* Closes compact-grid */}
 
