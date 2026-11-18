@@ -37,9 +37,7 @@
     font-size: 2.2rem;
     font-weight: 700;
     margin: 0;
-    background: linear-gradient(135deg, #a855f7, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-primary);
 }
 
 .xana-subtitle {
@@ -304,7 +302,7 @@
 
 /* Commits (Fase 4) */
 .commit-card {
-    border-left: 3px solid #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
 .xana-commit-hash {
