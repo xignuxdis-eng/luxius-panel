@@ -56,7 +56,6 @@
 .login-logo .logo-icon {
     font-size: 56px;
     color: var(--accent);
-    filter: drop-shadow(0 0 20px var(--accent-glow));
 }
 
 .login-logo .logo-text {
@@ -64,14 +63,14 @@
     font-size: 48px;
     font-weight: 900;
     letter-spacing: -1.5px;
-    text-shadow: 0 0 30px rgba(255, 107, 0, 0.2);
+    margin: 0;
 }
 
 .logo-subtitle {
     font-size: 13px;
     font-style: italic;
     color: var(--text-muted);
-    margin-bottom: 32px;
+    margin: 0 0 6px;
     opacity: 0.9;
     letter-spacing: 0.5px;
 }
@@ -83,8 +82,9 @@
 }
 
 .login-subtitle {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 14px;
+    margin: 0;
 }
 
 .login-form {
@@ -127,12 +127,12 @@
 
 .login-button {
     padding: 14px 24px;
-    background: linear-gradient(135deg, var(--accent), #ff8c00);
-    color: white;
+    background: linear-gradient(135deg, #c2410c, #9a3412);
+    color: #ffffff;
     font-size: 16px;
     font-weight: 600;
     border-radius: var(--radius-md);
-    transition: all 0.3s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -141,12 +141,117 @@
 
 .login-button:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-glow);
+    box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.45);
+    filter: brightness(1.08);
 }
 
 .login-button:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+}
+
+.password-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-field input {
+    width: 100%;
+    padding-right: 44px;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.15rem;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+    user-select: none;
+    border-radius: 6px;
+}
+
+.password-toggle-btn:hover {
+    opacity: 1;
+}
+
+.demo-login-wrap {
+    margin-top: 6px;
+    text-align: center;
+}
+
+.demo-login-button {
+    width: 100%;
+    padding: 10px 14px;
+    background-color: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 8px;
+    color: #7dd3fc;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.demo-login-button:hover:not(:disabled) {
+    background-color: rgba(56, 189, 248, 0.18);
+    border-color: rgba(56, 189, 248, 0.6);
+}
+
+.waking-server-banner {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #bfdbfe;
+    font-size: 0.8rem;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.waking-spinner {
+    width: 12px;
+    height: 12px;
+}
+
+.login-version {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.login-version-tag {
+    font-weight: 700;
+    color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-card,
+    .loading-spinner {
+        animation: none;
+    }
+    .login-button {
+        transition: none;
+    }
 }
 
 .loading-spinner {
