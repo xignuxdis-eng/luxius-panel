@@ -6,7 +6,7 @@ export default function ThemeToggle() {
     const isClient = user?.role === 'cliente'
 
     const [theme, setTheme] = useState(() => {
-        const saved = localStorage.getItem('theme') || 'pixel'
+        const saved = localStorage.getItem('theme') || 'light'
         return isClient && saved === 'pixel' ? 'dark' : saved
     })
 

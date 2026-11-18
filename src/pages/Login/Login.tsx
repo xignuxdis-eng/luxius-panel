@@ -5,6 +5,7 @@ import { useAuthStore } from '@store/authStore'
 import { isCapacitorNative } from '@/data/db'
 import { SHOW_DEMO_BUTTON } from '@/config/demoConfig'
 import type { LoginCredentials } from '@/types'
+import ThemeToggle from '@components/ui/ThemeToggle'
 import './Login.css'
 
 export default function Login() {
@@ -63,6 +64,9 @@ export default function Login() {
 
             <div className="login-container">
                 <div className="login-card">
+                    <div className="login-theme-bar">
+                        <ThemeToggle />
+                    </div>
                     <div className="login-header">
                         <div className="login-logo">
                             <span className="logo-icon" aria-hidden="true">✦</span>

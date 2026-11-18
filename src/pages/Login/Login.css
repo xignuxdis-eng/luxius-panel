@@ -46,6 +46,12 @@
     margin-bottom: 32px;
 }
 
+.login-theme-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
 .login-logo {
     display: inline-flex;
     align-items: center;
@@ -207,6 +213,25 @@
 .demo-login-button:hover:not(:disabled) {
     background-color: rgba(56, 189, 248, 0.18);
     border-color: rgba(56, 189, 248, 0.6);
+}
+
+[data-theme='light'] .demo-login-button,
+body.light-theme .demo-login-button {
+    color: #0369a1;
+    background-color: rgba(3, 105, 161, 0.08);
+    border-color: rgba(3, 105, 161, 0.35);
+}
+
+[data-theme='light'] .demo-login-button:hover:not(:disabled),
+body.light-theme .demo-login-button:hover:not(:disabled) {
+    background-color: rgba(3, 105, 161, 0.15);
+    border-color: rgba(3, 105, 161, 0.6);
+}
+
+[data-theme='light'] .waking-server-banner,
+body.light-theme .waking-server-banner {
+    color: #1e40af;
+    background: rgba(59, 130, 246, 0.12);
 }
 
 .waking-server-banner {

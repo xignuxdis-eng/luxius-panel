@@ -14,11 +14,13 @@ initAuthFetch()
 initErrorRecorder()
 initVersionEngine()
 
-// Initial theme setup
-const savedTheme = localStorage.getItem('theme') || 'pixel'
+// Initial theme setup (light by default)
+const savedTheme = localStorage.getItem('theme') || 'light'
 document.documentElement.setAttribute('data-theme', savedTheme)
 if (savedTheme === 'pixel') {
     document.body.classList.add('pixel-theme')
+} else if (savedTheme === 'light') {
+    document.body.classList.add('light-theme')
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
