@@ -87,16 +87,16 @@
 }
 
 [data-theme='light'] {
-    --bg-main: #f8fafc;
-    --bg-sidebar: #ffffff;
-    --bg-card: rgba(255, 255, 255, 0.9);
-    --bg-input: rgba(241, 245, 249, 0.95);
+    --bg-main: #ebe8e1;
+    --bg-sidebar: #f4f1ea;
+    --bg-card: #faf8f5;
+    --bg-input: #e5e1d8;
 
     --text-primary: #0f172a;
     --text-secondary: #334155;
-    --text-muted: #64748b;
+    --text-muted: #57534e;
 
-    /* Colores de estado y marca calibrados para texto sobre fondo claro (WCAG AA >= 4.5:1; el original no llegaba: 2.05 a 3.76) */
+    /* Colores de estado y marca calibrados para texto sobre fondo claro (WCAG AA >= 4.5:1) */
     --accent: #c2410c;
     --accent-glow: rgba(194, 65, 12, 0.25);
     --accent-light: rgba(194, 65, 12, 0.08);
@@ -106,16 +106,16 @@
     --warning: #b45309;
     --danger: #dc2626;
 
-    --border: rgba(0, 0, 0, 0.1);
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+    --border: rgba(28, 25, 23, 0.14);
+    --shadow-sm: 0 2px 8px rgba(28, 25, 23, 0.06);
+    --shadow-md: 0 4px 16px rgba(28, 25, 23, 0.08);
+    --shadow-lg: 0 8px 32px rgba(28, 25, 23, 0.11);
 
     --glass: blur(10px) saturate(150%);
 
     /* Ergonomic Semantic Theme Tokens (Light Mode - WCAG Compliant) */
     --ot-color: #c2410c; /* High contrast amber-orange */
-    --metric-cyan: #0284c7; /* Deep blue-cyan */
+    --metric-cyan: #0369a1; /* Deep blue-cyan */
     --metric-cyan-bg: #e0f2fe;
     --metric-cyan-border: #bae6fd;
     --badge-purple-color: #7e22ce; /* Deep purple */
@@ -127,12 +127,12 @@
     --badge-green-color: #047857; /* Deep emerald */
     --badge-green-bg: #d1fae5;
     --badge-green-border: #a7f3d0;
-    --table-header-bg: #f1f5f9;
-    --table-border-subtle: #e2e8f0;
-    --table-row-hover: #f1f5f9;
+    --table-header-bg: #e5e1d8;
+    --table-border-subtle: #d6d1c6;
+    --table-row-hover: #f2efe8;
     --table-row-selected: #fff7ed;
-    --dock-bg: rgba(255, 255, 255, 0.95);
-    --dock-border: #cbd5e1;
+    --dock-bg: rgba(250, 248, 245, 0.96);
+    --dock-border: #d6d1c6;
 }
 
 /* Reset */

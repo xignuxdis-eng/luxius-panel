@@ -19,7 +19,7 @@ const buildCommitSha = process.env.GITHUB_SHA || null
 // propios campos y podian divergir sin que nada lo indicara.
 function buildVersionData(): string {
     return JSON.stringify({
-        version: '1.1.0',
+        version: '1.2.0',
         commitSha: buildCommitSha,
         buildTime: buildTimestamp,
         generatedAt: Date.now()

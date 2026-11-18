@@ -157,7 +157,9 @@ export const WorkshopDashboard: React.FC = () => {
         <div style={{
             position: 'relative',
             width: '100%',
-            backgroundColor: '#0f172a',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-md)',
             borderRadius: '12px',
             padding: '16px',
             boxSizing: 'border-box'
@@ -168,16 +170,15 @@ export const WorkshopDashboard: React.FC = () => {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '12px',
-                color: '#f8fafc',
-                fontFamily: 'sans-serif',
+                color: 'var(--text-primary)',
                 flexWrap: 'wrap',
                 gap: '8px'
             }}>
                 <div>
-                    <h2 style={{ margin: 0, fontSize: '20px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--metric-cyan, #0369a1)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         🏭 XignuX Print Den <span style={{ fontSize: '12px', backgroundColor: '#0369a1', color: '#ffffff', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>Luxius Interactive Workshop</span>
                     </h2>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#cbd5e1' }}>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
                         Haz clic en las estaciones del taller o en cualquier orden para ver detalles, archivos o navegar a cada área.
                     </p>
                 </div>
@@ -186,16 +187,16 @@ export const WorkshopDashboard: React.FC = () => {
                     {/* Engine Switcher */}
                     <div style={{
                         display: 'flex',
-                        backgroundColor: '#1e293b',
+                        backgroundColor: 'var(--bg-main)',
                         padding: '2px',
                         borderRadius: '6px',
-                        border: '1px solid #334155'
+                        border: '1px solid var(--border)'
                     }}>
                         <button
                             onClick={() => toggleRenderer('legacy')}
                             style={{
-                                backgroundColor: rendererType === 'legacy' ? '#38bdf8' : 'transparent',
-                                color: rendererType === 'legacy' ? '#0f172a' : '#94a3b8',
+                                backgroundColor: rendererType === 'legacy' ? '#0284c7' : 'transparent',
+                                color: rendererType === 'legacy' ? '#ffffff' : 'var(--text-secondary)',
                                 border: 'none',
                                 padding: '5px 10px',
                                 borderRadius: '4px',
@@ -211,8 +212,8 @@ export const WorkshopDashboard: React.FC = () => {
                         <button
                             onClick={() => toggleRenderer('pixi')}
                             style={{
-                                backgroundColor: rendererType === 'pixi' ? '#38bdf8' : 'transparent',
-                                color: rendererType === 'pixi' ? '#0f172a' : '#94a3b8',
+                                backgroundColor: rendererType === 'pixi' ? '#0284c7' : 'transparent',
+                                color: rendererType === 'pixi' ? '#ffffff' : 'var(--text-secondary)',
                                 border: 'none',
                                 padding: '5px 10px',
                                 borderRadius: '4px',

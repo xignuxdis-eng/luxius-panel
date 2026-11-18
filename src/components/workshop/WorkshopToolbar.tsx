@@ -46,12 +46,12 @@ export interface WorkshopToolbarProps {
     onRadio?: () => void;
 }
 
-const chip = (active: boolean, accent = '#38bdf8'): React.CSSProperties => ({
-    background: active ? `${accent}26` : '#0b1220',
-    color: active ? '#f8fafc' : '#94a3b8',
-    border: `1px solid ${active ? accent : '#1e293b'}`,
+const chip = (active: boolean, accent = '#0284c7'): React.CSSProperties => ({
+    background: active ? accent : 'var(--bg-main)',
+    color: active ? '#ffffff' : 'var(--text-primary)',
+    border: `1px solid ${active ? accent : 'var(--border)'}`,
     borderRadius: 6,
-    padding: '3px 8px',
+    padding: '4px 9px',
     fontSize: 11,
     fontFamily: 'monospace',
     fontWeight: 700,
@@ -157,7 +157,7 @@ export const WorkshopToolbar: React.FC<WorkshopToolbarProps> = ({
                 )}
             </div>
             {fxOpen && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', justifyContent: 'center', padding: '6px 10px', background: 'rgba(11, 18, 32, 0.75)', borderRadius: 8, border: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', justifyContent: 'center', padding: '6px 10px', background: 'var(--bg-main)', borderRadius: 8, border: '1px solid var(--border)' }}>
                     {fxKeys.map((k) => (
                         <button key={k} type="button" style={chip(fx[k], '#a78bfa')} onClick={() => onToggleFx(k)} title={FX_LABEL[k].title} aria-pressed={fx[k]}>
                             {FX_LABEL[k].icon} {FX_LABEL[k].label} {fx[k] ? 'ON' : 'OFF'}

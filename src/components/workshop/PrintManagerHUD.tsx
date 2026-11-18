@@ -32,25 +32,25 @@ export const PrintManagerHUD: React.FC<PrintManagerHUDProps> = ({
         <div className="hud-container pixel-box-cyan" style={{
             position: 'relative',
             width: '100%',
-            backgroundColor: 'var(--pixel-bg-card)',
-            border: '3px solid #000',
+            backgroundColor: 'var(--bg-main)',
+            border: '1px solid var(--border)',
+            borderRadius: '10px',
             padding: '10px',
-            color: '#f8fafc',
-            fontFamily: 'var(--font-pixel-ui)',
+            color: 'var(--text-primary)',
             boxSizing: 'border-box'
         }}>
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                borderBottom: '1px solid #334155',
+                borderBottom: '1px solid var(--border)',
                 paddingBottom: '6px',
                 marginBottom: '8px'
             }}>
-                <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--metric-cyan, #0369a1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     📋 Print Manager
                 </span>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {orders.length} Órdenes
                 </span>
             </div>

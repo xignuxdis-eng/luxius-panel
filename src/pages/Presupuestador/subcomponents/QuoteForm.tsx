@@ -255,7 +255,7 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({
                     </div>
 
                     <button type="submit" className="btn-add">
-                        ➕ Agregar Ítem de Imprenta
+                        ➕ Agregar ítem a presupuesto
                     </button>
                 </form>
             ) : activeTab === 'calcos' ? (
