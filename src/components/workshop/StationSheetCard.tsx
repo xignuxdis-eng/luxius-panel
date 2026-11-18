@@ -154,7 +154,7 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
                             <span style={{ background: '#122538', padding: '1px 5px', borderRadius: 3, fontSize: 9, color: '#f8fafc' }}>{statusText}</span>
                         </div>
                         {isPrinting && tele.current_job && (
-                            <div style={{ background: '#122538', padding: 6, borderRadius: 4, borderLeft: '3px solid #38bdf8', margin: '6px 0' }}>
+                            <div style={{ background: '#122538', padding: 6, borderRadius: 4, border: '1px solid rgba(56, 189, 248, 0.45)', margin: '6px 0' }}>
                                 <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: 11, wordBreak: 'break-all' }}>📄 {tele.current_job.job_name}</div>
                                 <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
                                     {tele.current_job.size_str ? `📏 ${tele.current_job.size_str} ` : ''}

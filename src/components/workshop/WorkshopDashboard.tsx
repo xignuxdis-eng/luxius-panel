@@ -174,10 +174,10 @@ export const WorkshopDashboard: React.FC = () => {
                 gap: '8px'
             }}>
                 <div>
-                    <h2 style={{ margin: 0, fontSize: '20px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🏭 XignuX Print Den <span style={{ fontSize: '12px', backgroundColor: '#0284c7', padding: '2px 8px', borderRadius: '10px' }}>Luxius Interactive Workshop</span>
+                    <h2 style={{ margin: 0, fontSize: '20px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        🏭 XignuX Print Den <span style={{ fontSize: '12px', backgroundColor: '#0369a1', color: '#ffffff', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>Luxius Interactive Workshop</span>
                     </h2>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#cbd5e1' }}>
                         Haz clic en las estaciones del taller o en cualquier orden para ver detalles, archivos o navegar a cada área.
                     </p>
                 </div>
@@ -228,9 +228,11 @@ export const WorkshopDashboard: React.FC = () => {
                     </div>
 
                     <button
+                        type="button"
                         onClick={toggleAudio}
+                        aria-pressed={!isMuted}
                         style={{
-                            backgroundColor: isMuted ? '#ef4444' : '#22c55e',
+                            backgroundColor: isMuted ? '#dc2626' : '#15803d',
                             color: '#ffffff',
                             border: 'none',
                             padding: '6px 12px',
