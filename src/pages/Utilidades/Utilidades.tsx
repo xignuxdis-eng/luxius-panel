@@ -1,4 +1,5 @@
 
+import { useMemo, useState } from 'react'
 import Header from '@components/layout/Header'
 import './Utilidades.css'
 
@@ -155,7 +156,7 @@ const resources: { category: string, items: Resource[] }[] = [
         items: [
             {
                 title: "Pinterest",
-                description: "Descubre recetas, ideas para el hogar, estilo y más.",
+                description: "Tableros visuales, referencias gráficas y moodboards para diseño.",
                 url: "https://www.pinterest.es/",
                 icon: "📌",
                 tags: ["Ideas", "Moodboard"]
@@ -172,37 +173,112 @@ const resources: { category: string, items: Resource[] }[] = [
 ]
 
 export default function Utilidades() {
+    const [selectedCategory, setSelectedCategory] = useState<string>('all')
+    const [query, setQuery] = useState('')
+
+    const totalCount = useMemo(
+        () => resources.reduce((sum, sec) => sum + sec.items.length, 0),
+        []
+    )
+
+    const flatItems = useMemo(() => {
+        const q = query.trim().toLowerCase()
+        return resources.flatMap((section) =>
+            section.items
+                .filter(() => selectedCategory === 'all' || section.category === selectedCategory)
+                .filter((item) => {
+                    if (!q) return true
+                    return (
+                        item.title.toLowerCase().includes(q) ||
+                        item.description.toLowerCase().includes(q) ||
+                        section.category.toLowerCase().includes(q) ||
+                        item.tags.some((t) => t.toLowerCase().includes(q))
+                    )
+                })
+                .map((item) => ({ ...item, category: section.category }))
+        )
+    }, [selectedCategory, query])
+
     return (
         <div className="utilidades-page">
             <Header title="Utilidades" subtitle="Recursos y herramientas de diseño para el equipo" />
 
-            {resources.map((section, idx) => (
-                <section key={idx}>
-                    <h2 className="section-title">{section.category}</h2>
-                    <div className="resources-grid">
-                        {section.items.map((item, i) => (
-                            <a
-                                key={i}
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="resource-card"
-                            >
-                                <div className="resource-header">
-                                    <div className="resource-icon">{item.icon}</div>
-                                    <h3 className="resource-title">{item.title}</h3>
+            <div className="utilidades-toolbar">
+                <div className="utilidades-filters" role="group" aria-label="Filtrar recursos por categoría">
+                    <button
+                        type="button"
+                        className={`util-filter-btn ${selectedCategory === 'all' ? 'is-active' : ''}`}
+                        aria-pressed={selectedCategory === 'all'}
+                        onClick={() => setSelectedCategory('all')}
+                    >
+                        Todas ({totalCount})
+                    </button>
+                    {resources.map((sec) => (
+                        <button
+                            key={sec.category}
+                            type="button"
+                            className={`util-filter-btn ${selectedCategory === sec.category ? 'is-active' : ''}`}
+                            aria-pressed={selectedCategory === sec.category}
+                            onClick={() => setSelectedCategory(sec.category)}
+                        >
+                            {sec.category} ({sec.items.length})
+                        </button>
+                    ))}
+                </div>
+
+                <input
+                    type="search"
+                    className="utilidades-search"
+                    placeholder="Buscar recurso o etiqueta (ej. PDF, vector, fondo)..."
+                    aria-label="Buscar recursos de diseño"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                />
+            </div>
+
+            {flatItems.length === 0 ? (
+                <div className="utilidades-empty">
+                    <p>No se encontraron recursos para "{query}".</p>
+                    <button
+                        type="button"
+                        className="util-filter-btn is-active"
+                        onClick={() => {
+                            setQuery('')
+                            setSelectedCategory('all')
+                        }}
+                    >
+                        Limpiar filtros
+                    </button>
+                </div>
+            ) : (
+                <div className="resources-grid" role="list">
+                    {flatItems.map((item) => (
+                        <a
+                            key={`${item.category}-${item.title}`}
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="resource-card"
+                            role="listitem"
+                        >
+                            <div className="resource-header">
+                                <div className="resource-icon" aria-hidden="true">{item.icon}</div>
+                                <div className="resource-title-wrap">
+                                    <h2 className="resource-title">{item.title}</h2>
+                                    <span className="resource-category">{item.category}</span>
                                 </div>
-                                <p className="resource-desc">{item.description}</p>
-                                <div className="resource-tags">
-                                    {item.tags.map(tag => (
-                                        <span key={tag} className="resource-tag">{tag}</span>
-                                    ))}
-                                </div>
-                            </a>
-                        ))}
-                    </div>
-                </section>
-            ))}
+                                <span className="resource-ext" aria-hidden="true">↗</span>
+                            </div>
+                            <p className="resource-desc">{item.description}</p>
+                            <div className="resource-tags">
+                                {item.tags.map((tag) => (
+                                    <span key={tag} className="resource-tag">{tag}</span>
+                                ))}
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }
