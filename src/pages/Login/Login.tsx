@@ -12,7 +12,7 @@ export default function Login() {
     const navigate = useNavigate()
     const login = useAuthStore((state) => state.login)
 
-    const buildTime = '2026-11-18 16:09'
+    const buildTime = '2026-11-18 17:12'
     const [isLoading, setIsLoading] = useState(false)
     const [isWakingServer, setIsWakingServer] = useState(false)
     const [error, setError] = useState('')
@@ -169,7 +169,7 @@ export default function Login() {
                     <div className="login-footer">
                         <p>Sistema de Gestión de Impresión</p>
                         <div className="login-version">
-                            <span className="login-version-tag">v1.2.0</span>
+                            <span className="login-version-tag">v1.3.0</span>
                             <span aria-hidden="true">•</span>
                             <span>Build: {buildTime}</span>
                         </div>

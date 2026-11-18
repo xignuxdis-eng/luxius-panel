@@ -78,7 +78,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 4px;
+    flex: 1;
+    min-width: 0;
 }
 
 [data-theme='pixel'] .sidebar {
@@ -88,9 +90,15 @@
 
 [data-theme='pixel'] .logo-text {
     font-family: var(--font-pixel-title);
-    font-size: 26px;
+    font-size: 22px;
     color: var(--pixel-neon-cyan);
     text-shadow: 3px 3px 0px #000;
+}
+
+[data-theme='pixel'] .logo-subtitle {
+    font-size: 10px;
+    letter-spacing: 0;
+    white-space: nowrap;
 }
 
 [data-theme='pixel'] .nav-item {
@@ -284,7 +292,7 @@
 }
 
 .sidebar-close-btn {
-    display: none;
+    display: none !important;
 }
 
 /* ==========================================================================
@@ -317,8 +325,12 @@
         border-bottom: 1px solid var(--border);
     }
 
+    .sidebar-collapse-btn {
+        display: none !important;
+    }
+
     .sidebar-close-btn {
-        display: flex;
+        display: flex !important;
         align-items: center;
         justify-content: center;
         width: 44px;

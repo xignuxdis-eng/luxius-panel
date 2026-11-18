@@ -125,7 +125,7 @@ export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, 
                                 border: '1px solid rgba(255, 107, 0, 0.25)',
                                 fontFamily: 'monospace'
                             }} title="Versión del Sistema LuXius">
-                                v1.1.0
+                                v1.3.0
                             </span>
                         </div>
                         <div className="sidebar-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>

@@ -17,7 +17,7 @@ export default function Dashboard() {
     const user = useAuthStore((state) => state.user)
     const isVisitor = user?.role === 'visitante'
     const isClient = user?.role === 'cliente'
-    const [viewMode, setViewMode] = useState<'workshop' | 'standard'>(() => (isVisitor || isClient) ? 'standard' : 'workshop')
+    const [viewMode, setViewMode] = useState<'workshop' | 'standard'>(() => isVisitor ? 'standard' : 'workshop')
     const [showBriefing, setShowBriefing] = useState(false)
 
     // States for async data
@@ -158,16 +158,17 @@ export default function Dashboard() {
                     title="Panel de Control Luxius"
                     subtitle={`Bienvenido de nuevo, ${user?.name?.split(' ')[0] || 'Usuario'}.`}
                 />
-                {!isClient && (
                 <div className="dashboard-topbar-actions">
-                    <button
-                        type="button"
-                        className="dashboard-briefing-btn"
-                        onClick={() => setShowBriefing(true)}
-                        title="Ver resumen matutino de taller y secuencia recomendada"
-                    >
-                        ☀️ Briefing del Día
-                    </button>
+                    {!isClient && (
+                        <button
+                            type="button"
+                            className="dashboard-briefing-btn"
+                            onClick={() => setShowBriefing(true)}
+                            title="Ver resumen matutino de taller y secuencia recomendada"
+                        >
+                            ☀️ Briefing del Día
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={`dashboard-mode-btn ${viewMode === 'workshop' ? 'is-active' : ''}`}
@@ -185,10 +186,9 @@ export default function Dashboard() {
                         📊 Vista Estándar
                     </button>
                 </div>
-                )}
             </div>
 
-            {viewMode === 'workshop' && !isClient ? (
+            {viewMode === 'workshop' ? (
                 <div style={{ marginBottom: '24px' }}>
                     {isVisitor ? (
                         <div style={{

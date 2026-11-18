@@ -52,7 +52,7 @@ import {
 import { WorkshopFx } from './workshopFx';
 import { currentSeason, buildSeasonDecor } from './workshopSeason';
 import { orderTalkLine } from './workshopOrderTalk';
-import { EVENT_TEXTS } from './content/texts';
+import { CLIENT_TALK, EVENT_TEXTS } from './content/texts';
 import { WorkshopSky } from './workshopSky';
 import { GuestManager } from './workshopGuests';
 import { PetManager, type PetProfile } from './workshopPet';
@@ -502,8 +502,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         try {
             const now = workshopNow();
             let list: StationAlert[] = [];
+            const isClientView = authUserRef.current?.role === 'cliente';
             try {
-                list = computeStationAlerts(orders, getMateriales(), getMaquinas(), getPixiStations(), now);
+                if (!isClientView) {
+                    list = computeStationAlerts(orders, getMateriales(), getMaquinas(), getPixiStations(), now);
+                }
             } catch (_) {}
             const key = JSON.stringify(list);
             if (key !== alertsKeyRef.current) {
@@ -512,7 +515,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             }
             applyAlerts(list);
             updateBoard(orders);
-            if (orders.length > 0) {
+            if (orders.length > 0 && !isClientView) {
                 const ach = computeAchievements(orders, now, loadUnlocked()?.ids ?? []);
                 const achKey = ach.map((a) => `${a.id}:${a.unlocked ? 1 : 0}:${a.progress}`).join('|');
                 if (achKey !== achKeyRef.current) {
@@ -530,10 +533,41 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
         }
     }, [orders]);
 
-    // Alertas visibles solo si el usuario no las apagó
+    // Alertas visibles solo si el usuario no las apagó (y nunca para clientes)
     useEffect(() => {
-        applyAlerts(alertsRef.current);
-    }, [fxToggles.alerts]);
+        applyAlerts(authUser?.role === 'cliente' ? [] : alertsRef.current);
+    }, [fxToggles.alerts, authUser?.role]);
+
+    // Bienvenida cordial y diálogos frikis periódicos cuando entra un cliente registrado
+    useEffect(() => {
+        if (authUser?.role !== 'cliente') return;
+        const cName = (authUser.name || authUser.username || 'Invitado').trim();
+        const pickFilled = (pool: string[]) =>
+            pool[Math.floor(Math.random() * pool.length)].replace(/\{cliente\}/g, cName);
+
+        const welcomeTimer = window.setTimeout(() => {
+            if (!crewRef.current || crewRef.current.isSpeaking()) return;
+            const line = pickFilled(CLIENT_TALK.welcome);
+            crewRef.current.announce([line], 1, 'chat');
+        }, 2500);
+
+        const periodicPool = [
+            ...CLIENT_TALK.geekDisclaimer,
+            ...CLIENT_TALK.compliments,
+            ...CLIENT_TALK.hospitality,
+            ...CLIENT_TALK.welcome
+        ];
+        const chatTimer = window.setInterval(() => {
+            if (!crewRef.current || crewRef.current.isSpeaking()) return;
+            const line = pickFilled(periodicPool);
+            crewRef.current.announce([line], 1, 'chat');
+        }, 40000);
+
+        return () => {
+            window.clearTimeout(welcomeTimer);
+            window.clearInterval(chatTimer);
+        };
+    }, [authUser?.role, authUser?.name, authUser?.username]);
 
     // Mascota y eventos: encendido/apagado individual (se recuerda en el navegador)
     useEffect(() => {
@@ -806,7 +840,11 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                             y: Math.round(hallLanes.topEdge + 10 + Math.random() * Math.max(4, hallLanes.bottomEdge - hallLanes.topEdge - 16))
                         }),
                         onPowerBack: () => petRef.current?.reunion(),
-                        orderLine: () => orderTalkLine(ordersRef.current, workshopNow()),
+                        orderLine: () => {
+                            const u = authUserRef.current;
+                            const cName = u?.role === 'cliente' ? (u.name || u.username || 'Invitado') : null;
+                            return orderTalkLine(ordersRef.current, workshopNow(), Math.random, cName);
+                        },
                         breakSpot: () => {
                             const br = getPixiStations().find((s) => s.id === 'refrigerios');
                             return br ? { x: Math.round(br.x + br.width / 2), y: Math.round(br.y + br.height + 10) } : null;
@@ -819,7 +857,7 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     skyRef.current?.setWeather(fxToggleRef.current.weather && weatherRef.current ? weatherRef.current.kind : null);
                     rainOnRef.current = false;
                     applyRain(weatherRef.current ? weatherRef.current.kind : null, false);
-                    applyAlerts(alertsRef.current);
+                    applyAlerts(authUserRef.current?.role === 'cliente' ? [] : alertsRef.current);
                     // Atajos para pruebas (solo en desarrollo): window.__printDen.trigger('blackout') etc.
                     if ((import.meta as any).env?.DEV) {
                         (window as any).__printDen = {
@@ -1057,6 +1095,13 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
     const updateBoard = (list: Order[]) => {
         const b = boardRef.current;
         if (!b || b.text.destroyed || b.late.destroyed) return;
+        if (authUserRef.current?.role === 'cliente') {
+            const cName = authUserRef.current?.name || authUserRef.current?.username || 'Invitado';
+            b.text.text = `✨ ¡Hola, ${cName}!\n☕ Pasá a tomar algo`;
+            b.late.text = '🎯 Frikis y muy responsables';
+            b.late.style.fill = '#86efac';
+            return;
+        }
         const s = computeDaySummary(list, workshopNow());
         const goal = WORKSHOP_CONFIG.dailyGoal.deliveries;
         if (!goalReadyRef.current) {
@@ -1981,6 +2026,38 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
             tooltipContainerRef.current.y = Math.round((station.y + station.height + 4) * currentScaleRef.current);
         }
 
+        if (authUserRef.current?.role === 'cliente') {
+            const u = authUserRef.current;
+            const myPrinting = ordersRef.current.filter((o) => {
+                if (o.status !== 'orden') return false;
+                if (u.clientId && o.clientId) return o.clientId === u.clientId;
+                const needle = (u.name || '').toLowerCase().trim();
+                if (!needle) return true;
+                const oName = (o.clienteNombre || o.clientName || '').toLowerCase();
+                return oName ? oName.includes(needle) : false;
+            });
+            if (myPrinting.length > 0) {
+                const current = myPrinting[0];
+                const m2 = (Number(current.ancho || 1) * Number(current.alto || 1)).toFixed(2);
+                tooltipTextRef.current.text =
+                    `🖨️ ${title.toUpperCase()}\n` +
+                    `🚀 Tu trabajo en cola: OT #${current.ot || current.id}\n` +
+                    `Medidas: ${current.ancho}x${current.alto}m (${m2} m²)\n` +
+                    `Material: ${current.material || 'Impresión gran formato'}`;
+            } else {
+                const isCutting =
+                    station?.id === 'corte' ||
+                    /corte|mimaki|sticker|calco/i.test(`${station?.id || ''} ${title}`);
+                tooltipTextRef.current.text =
+                    `${isCutting ? '✂️' : '🖨️'} ${title.toUpperCase()}\n` +
+                    'Estado: EN PRODUCCIÓN ACTIVA\n' +
+                    (isCutting
+                        ? '✨ Tus próximos stickers van a cortarse aquí'
+                        : '✨ Tu próximo trabajo puede imprimirse en esta estación');
+            }
+            return;
+        }
+
         if (isOffline) {
             tooltipTextRef.current.text =
                 `🖨️ ${title.toUpperCase()}\n` +
@@ -2118,8 +2195,9 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     const isTeleOffline = tele?.status === 'offline';
 
                     // Para máquinas conectadas (RS-640), la realidad física del RIP manda: solo se mueve si está imprimiendo de verdad.
-                    // Para máquinas sin telemetría, no simular animación si están en espera.
-                    const isPlotterPrinting = isTelePrinting && !isOffline && !isTeleOffline;
+                    // Para rol cliente, las máquinas permanecen en movimiento continuo mostrando taller vivo.
+                    const isClientView = authUserRef.current?.role === 'cliente';
+                    const isPlotterPrinting = isClientView || (isTelePrinting && !isOffline && !isTeleOffline);
                     const isVip = Boolean(isTelePrinting && tele?.current_job && (
                         tele.current_job.job_name.toUpperCase().includes('VIP') ||
                         tele.current_job.job_name.toUpperCase().includes('URG')
@@ -2353,11 +2431,23 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                 const needed = ROLE_STATUS_MAP[snap.role];
                 const waiting = needed ? orders.filter((o) => o.status === needed).length : 0;
                 const orderToOpen = findOrderForWorker(sheetWorkerId);
+                const isClientMode = authUser?.role === 'cliente';
+                const cName = (authUser?.name || authUser?.username || 'Invitado').trim();
                 return (
                     <WorkerSheetCard
                         workerId={sheetWorkerId}
                         getSnapshot={getWorkerSnapshot}
                         waitingOrders={waiting}
+                        isClientMode={isClientMode}
+                        clientName={cName}
+                        onClientInteract={(kind) => {
+                            audioEngine.playClick();
+                            const pool = kind === 'snack' ? CLIENT_TALK.directSnack : CLIENT_TALK.directGreet;
+                            const tpl = pool[Math.floor(Math.random() * pool.length)];
+                            const msg = tpl.replace(/\{cliente\}/g, cName);
+                            crewRef.current?.announce([msg], 1, 'chat');
+                            showToast(`${snap.name}: «${msg}»`);
+                        }}
                         onOpenOrder={
                             orderToOpen && onSelectOrderRef.current
                                 ? () => {
@@ -2381,9 +2471,10 @@ export const WorkshopCanvasPixi: React.FC<WorkshopCanvasPixiProps> = ({
                     <StationSheetCard
                         station={st}
                         stats={computeStationStats(st, orders, workshopNow())}
-                        alerts={alerts.filter((a) => a.stationId === st.id)}
+                        alerts={authUser?.role === 'cliente' ? [] : alerts.filter((a) => a.stationId === st.id)}
                         orders={orders}
                         isMachine={isMachine}
+                        isClientMode={authUser?.role === 'cliente'}
                         canOpenDetail={!isFs}
                         onOpenDetail={() => {
                             audioEngine.playClick();

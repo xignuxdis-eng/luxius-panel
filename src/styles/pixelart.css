@@ -20,7 +20,7 @@
   --pixel-orange: #ff7700;
 
   --pixel-text: #ffffff;
-  --pixel-text-dim: #9b8ec4;
+  --pixel-text-dim: #bfb3e6;
 
   /* Fonts */
   --font-pixel-title: 'Press Start 2P', 'Silkscreen', cursive, monospace;
@@ -48,11 +48,20 @@ body.pixel-theme {
   --danger: var(--pixel-danger-red);
 
   --text-primary: #ffffff;
-  --text-secondary: var(--pixel-neon-cyan);
+  --text-secondary: #e2dcf5;
   --text-muted: var(--pixel-text-dim);
 
   --border: var(--pixel-neon-cyan);
   --border-focus: var(--pixel-gold-coin);
+
+  --border-color: var(--pixel-border-light);
+  --surface-color: var(--pixel-bg-card);
+  --bg-surface: var(--pixel-bg-card);
+  --bg-hover: rgba(0, 240, 255, 0.12);
+  --text-color: #ffffff;
+  --text-main: #ffffff;
+  --accent-color: var(--pixel-neon-cyan);
+  --primary-color: var(--pixel-neon-cyan);
 
   --radius-sm: 0px;
   --radius-md: 0px;
@@ -73,16 +82,25 @@ body.pixel-theme {
 
 /* Headings */
 [data-theme='pixel'] h1,
-[data-theme='pixel'] h2,
-[data-theme='pixel'] h3,
-body.pixel-theme h1,
-body.pixel-theme h2,
-body.pixel-theme h3 {
+body.pixel-theme h1 {
   font-family: var(--font-pixel-title) !important;
   letter-spacing: 1px !important;
+  line-height: 1.35 !important;
   text-transform: uppercase !important;
   color: var(--pixel-gold-coin) !important;
-  text-shadow: 3px 3px 0px #000 !important;
+  text-shadow: 2px 2px 0px #000 !important;
+}
+
+[data-theme='pixel'] h2,
+[data-theme='pixel'] h3,
+body.pixel-theme h2,
+body.pixel-theme h3 {
+  font-family: var(--font-pixel-ui) !important;
+  letter-spacing: 0.6px !important;
+  line-height: 1.35 !important;
+  text-transform: uppercase !important;
+  color: var(--pixel-gold-coin) !important;
+  text-shadow: 2px 2px 0px #000 !important;
 }
 
 [data-theme='pixel'] h4,
@@ -152,10 +170,6 @@ body.pixel-theme .tab-btn {
     inset 3px 3px 0px 0px rgba(255, 255, 255, 0.25),
     3px 3px 0px 0px #000000 !important;
   transition: transform 0.05s ease, box-shadow 0.05s ease !important;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
 [data-theme='pixel'] button:hover,
@@ -180,6 +194,12 @@ body.pixel-theme button:active {
 
 /* Active Tabs / Primary Buttons */
 [data-theme='pixel'] .tab-btn.active,
+[data-theme='pixel'] .tab-link.active,
+[data-theme='pixel'] .item-tab-btn.active,
+[data-theme='pixel'] .preset-btn.active,
+[data-theme='pixel'] .util-filter-btn.is-active,
+[data-theme='pixel'] .dashboard-mode-btn.is-active,
+[data-theme='pixel'] .filter-btn[aria-pressed="true"],
 [data-theme='pixel'] .btn-primary,
 body.pixel-theme .btn-primary {
   background: var(--pixel-neon-cyan) !important;
@@ -189,6 +209,20 @@ body.pixel-theme .btn-primary {
     inset -3px -3px 0px 0px rgba(0, 0, 0, 0.5),
     inset 3px 3px 0px 0px rgba(255, 255, 255, 0.4),
     3px 3px 0px 0px #000000 !important;
+}
+
+[data-theme='pixel'] .op-btn-sm,
+[data-theme='pixel'] .password-toggle-btn,
+[data-theme='pixel'] .btn-icon-sm {
+  padding: 4px 8px !important;
+}
+
+[data-theme='pixel'] .sidebar-collapse-btn {
+  padding: 0 !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 10px !important;
+  flex-shrink: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -235,10 +269,11 @@ body.pixel-theme select,
 body.pixel-theme textarea {
   font-family: var(--font-pixel-body) !important;
   font-size: 15px !important;
+  line-height: 1.4 !important;
   border: 3px solid #000 !important;
   border-radius: 0 !important;
   background-color: var(--pixel-bg-input) !important;
-  color: var(--pixel-neon-cyan) !important;
+  color: #ffffff !important;
   padding: 8px 12px !important;
   box-shadow:
     inset 3px 3px 0px 0px #000000,
@@ -311,5 +346,23 @@ body.pixel-theme .status-tag {
   background: rgba(59, 130, 246, 0.15);
   border-color: rgba(59, 130, 246, 0.4);
   color: #60a5fa;
+}
+
+[data-theme='light'] .pixel-btn-warning {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+[data-theme='light'] .pixel-btn-info {
+  background: #e0f2fe;
+  border-color: #0284c7;
+  color: #075985;
+}
+
+[data-theme='light'] .pixel-btn-primary {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
 }
 

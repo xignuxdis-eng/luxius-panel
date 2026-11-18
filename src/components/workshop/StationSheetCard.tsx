@@ -14,6 +14,7 @@ export interface StationSheetCardProps {
     alerts: StationAlert[];
     orders?: Order[];
     isMachine: boolean;
+    isClientMode?: boolean;
     /** Si es false (p. ej. pantalla completa), se oculta el botón que abre el detalle completo. */
     canOpenDetail: boolean;
     onOpenDetail: () => void;
@@ -67,6 +68,7 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
     alerts,
     orders = [],
     isMachine,
+    isClientMode = false,
     canOpenDetail,
     onOpenDetail,
     onOpenOrder,
@@ -136,11 +138,17 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
 
             {isMachine && (
                 <div style={{ marginTop: 8 }}>
-                    <span style={{ border: `1px solid ${stateColor}`, color: stateColor, borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>● {stateLabel}</span>
+                    {isClientMode ? (
+                        <span style={{ border: '1px solid #22c55e', color: '#22c55e', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+                            ● EN PRODUCCIÓN ACTIVA
+                        </span>
+                    ) : (
+                        <span style={{ border: `1px solid ${stateColor}`, color: stateColor, borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>● {stateLabel}</span>
+                    )}
                 </div>
             )}
 
-            {station.id === 'plotter1' && (() => {
+            {!isClientMode && station.id === 'plotter1' && (() => {
                 const tele = printerTelemetry.getMachine('RS-640');
                 if (!tele) return null;
                 const isPrinting = tele.status === 'printing' && Boolean(tele.current_job);
@@ -222,24 +230,46 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
             )}
 
             <div style={sectionTitle}>Ahora mismo</div>
-            <div style={box}>
-                <div>
-                    Órdenes en esta estación: <b>{stats.queue}</b>
-                </div>
-                {stats.queue > 0 && (
+            {isClientMode ? (() => {
+                const isCuttingStation = station.id === 'corte' || /corte|mimaki|sticker|calco/i.test(`${station.id} ${station.title}`);
+                return (
+                    <div style={{ ...box, borderColor: '#0284c7', background: '#091522' }}>
+                        <div style={{ color: '#38bdf8', fontWeight: 700, marginBottom: 4 }}>
+                            {isCuttingStation
+                                ? '✂️ Estación de corte activa'
+                                : isMachine
+                                    ? '🚀 Estación en producción continua'
+                                    : '⚡ Sector activo del taller'}
+                        </div>
+                        <div style={{ color: '#e2f1fb', lineHeight: 1.45 }}>
+                            {isCuttingStation
+                                ? '✨ Tus próximos stickers van a cortarse aquí.'
+                                : isMachine
+                                    ? '✨ Tu próximo trabajo puede imprimirse en esta estación.'
+                                    : '✨ Tu próximo trabajo puede procesarse en esta estación.'}
+                        </div>
+                    </div>
+                );
+            })() : (
+                <div style={box}>
                     <div>
-                        Superficie pendiente: <b>{fmtM2(stats.queueM2)} m²</b>
+                        Órdenes en esta estación: <b>{stats.queue}</b>
                     </div>
-                )}
-                {stats.todayCount !== null && stats.todayM2 !== null && (
-                    <div style={{ marginTop: 4, color: '#9ca3af' }}>
-                        Hoy en esta máquina: {stats.todayCount} {stats.todayCount === 1 ? 'orden' : 'órdenes'} · {fmtM2(stats.todayM2)} m²
-                        <div style={{ fontSize: 10, opacity: 0.8 }}>(órdenes pasadas a impreso o más, con última actualización hoy)</div>
-                    </div>
-                )}
-            </div>
+                    {stats.queue > 0 && (
+                        <div>
+                            Superficie pendiente: <b>{fmtM2(stats.queueM2)} m²</b>
+                        </div>
+                    )}
+                    {stats.todayCount !== null && stats.todayM2 !== null && (
+                        <div style={{ marginTop: 4, color: '#9ca3af' }}>
+                            Hoy en esta máquina: {stats.todayCount} {stats.todayCount === 1 ? 'orden' : 'órdenes'} · {fmtM2(stats.todayM2)} m²
+                            <div style={{ fontSize: 10, opacity: 0.8 }}>(órdenes pasadas a impreso o más, con última actualización hoy)</div>
+                        </div>
+                    )}
+                </div>
+            )}
 
-            {stats.next.length > 0 && (
+            {!isClientMode && stats.next.length > 0 && (
                 <>
                     <div style={sectionTitle}>Próximas órdenes</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -261,7 +291,7 @@ export const StationSheetCard: React.FC<StationSheetCardProps> = ({
                 </>
             )}
 
-            {canOpenDetail && (
+            {canOpenDetail && !isClientMode && (
                 <button
                     type="button"
                     onClick={onOpenDetail}

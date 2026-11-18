@@ -1,6 +1,7 @@
 // PrintManagerHUD.tsx - Styled Order Tracker HUD matching xignux print den.mp4
 import React from 'react';
 import { Order, statusLabels } from '@/types/orden';
+import { useAuthStore } from '@/store/authStore';
 
 interface PrintManagerHUDProps {
     orders: Order[];
@@ -13,7 +14,18 @@ export const PrintManagerHUD: React.FC<PrintManagerHUDProps> = ({
     orders,
     onSelectOrder
 }) => {
-    const activeOrders = orders.slice(0, 4);
+    const user = useAuthStore((s) => s.user);
+    const isClient = user?.role === 'cliente';
+    const scopedOrders = isClient
+        ? orders.filter((o) => {
+              if (user?.clientId && o.clientId) return o.clientId === user.clientId;
+              const needle = (user?.name || '').toLowerCase().trim();
+              if (!needle) return true;
+              const oName = (o.clienteNombre || o.clientName || '').toLowerCase();
+              return oName ? oName.includes(needle) : true;
+          })
+        : orders;
+    const activeOrders = scopedOrders.slice(0, 4);
 
     const getStatusTag = (status: string) => {
         switch (status) {
@@ -48,10 +60,10 @@ export const PrintManagerHUD: React.FC<PrintManagerHUDProps> = ({
                 marginBottom: '8px'
             }}>
                 <span style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--metric-cyan, #0369a1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📋 Print Manager
+                    {isClient ? '📋 Tus Trabajos' : '📋 Print Manager'}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {orders.length} Órdenes
+                    {scopedOrders.length} Órdenes
                 </span>
             </div>
 

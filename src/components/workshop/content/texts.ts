@@ -42,3 +42,35 @@ export const ORDER_TALK = {
     /** Hay una orden esperando hace {dias} días. */
     oldest: ['La orden más vieja en cola lleva {dias} días esperando.', 'Hay una esperando hace {dias} días, ¡a priorizarla!']
 };
+
+/** Diálogos cordiales y frikis dirigidos al cliente por su nombre ({cliente}). Nunca revelan datos internos. */
+export const CLIENT_TALK = {
+    welcome: [
+        '¡Hola {cliente}! ¿Te invitamos un cafecito, unos mates o algo fresco mientras sale lo tuyo? ☕🧉',
+        '¡Buenas, {cliente}! Pasá y ponete cómodo, estás en tu casa 🙌',
+        '¡Qué alegría verte por el taller, {cliente}! ¿Sale un refrigerio mientras charlamos? ☕'
+    ],
+    geekDisclaimer: [
+        'Si escuchás diálogos sin sentido, {cliente}, es porque en XignuX somos muy frikis... raros divertidos, ¡pero laboralmente muy responsables! 😄',
+        'No te asustes si nos ves modo RPG, {cliente}: somos medio raritos, pero con cada trabajo somos súper responsables 🎯',
+        'Acá somos frikis de alma, {cliente}: raros divertidos en el taller y relojitos suizos con tus impresos ✨'
+    ],
+    compliments: [
+        'Che {cliente}, ¡qué buena pinta tienen tus trabajos! Da gusto cuando entran diseños con tanta onda 🎨',
+        'Estaba viendo lo tuyo, {cliente}... los colores van a quedar espectaculares una vez impresos ✨',
+        'Siempre traés proyectos copados al taller, {cliente} 👌'
+    ],
+    hospitality: [
+        'Es divertido tenerte aquí, {cliente} 🙌',
+        'Recuerda que siempre puedes volver a tomar algo con nosotros, {cliente} ☕',
+        'Cuando quieras darte una vuelta a charlar o tomar unos mates, {cliente}, las puertas están abiertas 🧉'
+    ],
+    directGreet: [
+        '¡Hola {cliente}! Qué bueno que pasaste a saludar 🙌',
+        '¡Buenas, {cliente}! Acá andamos, cuidando cada detalle a puro píxel y tinta 🎨'
+    ],
+    directSnack: [
+        '¡Marchando ese refrigerio para {cliente}! ☕🧉 Ponete cómodo que nosotros nos ocupamos de todo.',
+        '¡Sale cafecito y algo rico para {cliente}! ☕ Recordá que siempre podés volver a tomar algo con nosotros.'
+    ]
+};

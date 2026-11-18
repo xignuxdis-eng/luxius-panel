@@ -39,7 +39,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setIsSidebarOpen(false)
     }, [location.pathname])
 
-    // FAB actions for mobile — dispatch custom events to toggle widgets
+    // FAB actions for desktop & mobile — dispatch clicks to toggle widgets
     const fabActions = [
         {
             id: 'xana',
@@ -47,36 +47,45 @@ export default function MainLayout({ children }: MainLayoutProps) {
             label: 'Xana IA',
             color: '#9333ea',
             onClick: () => {
-                // Toggle Xana assistant by simulating click on its button
-                const xanaBtn = document.querySelector('.xana-button') as HTMLButtonElement
-                if (xanaBtn) xanaBtn.click()
+                const el = document.querySelector('.xana-button, .xana-close-btn') as HTMLElement | null
+                el?.click()
             },
         },
         {
             id: 'whatsapp',
             icon: '💬',
             label: 'WhatsApp',
-            color: '#25d366',
+            color: '#15803d',
             onClick: () => window.open('https://wa.me/5493518192655', '_blank'),
+        },
+        {
+            id: 'alarm',
+            icon: '⏰',
+            label: 'Temporizador',
+            color: '#8b5cf6',
+            onClick: () => {
+                const el = document.querySelector('.minimized-alarm, .alarm-minimize') as HTMLElement | null
+                el?.click()
+            },
         },
         {
             id: 'calculator',
             icon: '🧮',
             label: 'Calculadora',
-            color: '#3b82f6',
+            color: '#2563eb',
             onClick: () => {
-                const calcBtn = document.querySelector('.calc-toggle-btn') as HTMLButtonElement
-                if (calcBtn) calcBtn.click()
+                const el = document.querySelector('.minimized-calculator, .calc-minimize') as HTMLElement | null
+                el?.click()
             },
         },
         {
             id: 'media',
             icon: '🎵',
             label: 'Reproductor',
-            color: '#f59e0b',
+            color: '#b45309',
             onClick: () => {
-                const mediaBtn = document.querySelector('.media-player-toggle') as HTMLButtonElement
-                if (mediaBtn) mediaBtn.click()
+                const el = document.querySelector('.minimized-player, .minimize-btn') as HTMLElement | null
+                el?.click()
             },
         },
     ]

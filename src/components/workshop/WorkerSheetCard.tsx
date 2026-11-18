@@ -19,6 +19,9 @@ export interface WorkerSheetCardProps {
     onClose: () => void;
     /** Se llama cuando se cierra por un clic fuera de la ficha (o Escape), antes de `onClose`. */
     onOutsideClose?: () => void;
+    isClientMode?: boolean;
+    clientName?: string;
+    onClientInteract?: (kind: 'greet' | 'snack') => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -49,7 +52,17 @@ const sectionTitle: React.CSSProperties = {
     margin: '10px 0 4px'
 };
 
-export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getSnapshot, waitingOrders, onOpenOrder, onClose, onOutsideClose }) => {
+export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({
+    workerId,
+    getSnapshot,
+    waitingOrders,
+    onOpenOrder,
+    onClose,
+    onOutsideClose,
+    isClientMode = false,
+    clientName,
+    onClientInteract
+}) => {
     const [snap, setSnap] = useState<WorkerSnapshot | undefined>(() => getSnapshot(workerId));
     const panelRef = useRef<HTMLDivElement | null>(null);
     const closeRef = useRef({ onClose, onOutsideClose });
@@ -169,12 +182,60 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                 </span>
             </div>
 
+            {isClientMode && (
+                <div style={{ marginTop: 10, background: '#14202b', border: '1px solid #0284c7', borderRadius: 6, padding: 8 }}>
+                    <div style={{ color: '#bae6fd', fontSize: 11, lineHeight: 1.4 }}>
+                        {clientName ? `¡Hola ${clientName}! ` : ''}En XignuX somos muy frikis: si ves fichas de rol o diálogos sin sentido es porque somos "raros divertidos", ¡pero laboralmente muy responsables! 😄
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <button
+                            type="button"
+                            onClick={() => onClientInteract?.('greet')}
+                            style={{
+                                flex: 1,
+                                background: '#0369a1',
+                                color: '#ffffff',
+                                border: '1px solid #38bdf8',
+                                borderRadius: 4,
+                                padding: '5px 8px',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                fontFamily: 'monospace',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            👋 Saludar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onClientInteract?.('snack')}
+                            style={{
+                                flex: 1,
+                                background: '#7c2d12',
+                                color: '#fde68a',
+                                border: '1px solid #c8a24a',
+                                borderRadius: 4,
+                                padding: '5px 8px',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                fontFamily: 'monospace',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ☕ Aceptar refrigerio
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div style={sectionTitle}>Ahora mismo</div>
             <div style={{ background: '#0c0805', border: '1px solid #3b2a14', borderRadius: 4, padding: 6, lineHeight: 1.45 }}>
                 {describeActivity(snap)}
-                <div style={{ marginTop: 4, color: '#9ca3af' }}>
-                    Órdenes esperando a su rol: <strong style={{ color: '#f8fafc' }}>{waitingOrders}</strong>
-                </div>
+                {!isClientMode && (
+                    <div style={{ marginTop: 4, color: '#9ca3af' }}>
+                        Órdenes esperando a su rol: <strong style={{ color: '#f8fafc' }}>{waitingOrders}</strong>
+                    </div>
+                )}
             </div>
 
             <div style={sectionTitle}>Estadísticas</div>
@@ -213,7 +274,7 @@ export const WorkerSheetCard: React.FC<WorkerSheetCardProps> = ({ workerId, getS
                 “{sheet.quote}”
             </div>
 
-            {onOpenOrder && (
+            {onOpenOrder && !isClientMode && (
                 <button
                     type="button"
                     onClick={onOpenOrder}

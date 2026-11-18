@@ -8,8 +8,8 @@
 .xana-button,
 .floating-whatsapp,
 .minimized-alarm,
-.calc-toggle-btn,
-.media-player-toggle {
+.minimized-calculator,
+.minimized-player {
     display: none !important;
 }
 

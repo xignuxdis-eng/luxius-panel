@@ -3,15 +3,29 @@
 
 import type { Order } from '@/types/orden';
 import { computeDaySummary, fmtM2 } from './workshopAlerts';
-import { ORDER_TALK } from './content/texts';
+import { CLIENT_TALK, ORDER_TALK } from './content/texts';
 
 const fill = (tpl: string, vars: Record<string, string | number>) =>
     tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 
 const pick = (list: string[], rng: () => number) => list[Math.floor(rng() * list.length)];
 
-/** Devuelve una frase al azar con datos del día, o null si todavía no hay órdenes cargadas. */
-export function orderTalkLine(orders: Order[], now: Date, rng: () => number = Math.random): string | null {
+/** Devuelve una frase al azar con datos del día (o diálogo cordial para cliente si se pasa clientName). */
+export function orderTalkLine(
+    orders: Order[],
+    now: Date,
+    rng: () => number = Math.random,
+    clientName?: string | null
+): string | null {
+    if (clientName) {
+        const pool = [
+            ...CLIENT_TALK.welcome,
+            ...CLIENT_TALK.geekDisclaimer,
+            ...CLIENT_TALK.compliments,
+            ...CLIENT_TALK.hospitality
+        ];
+        return fill(pick(pool, rng), { cliente: clientName });
+    }
     if (!orders.length) return null;
     const s = computeDaySummary(orders, now);
     const options: string[] = [];

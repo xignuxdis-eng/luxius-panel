@@ -84,6 +84,17 @@
     --table-row-selected: rgba(255, 107, 0, 0.08);
     --dock-bg: rgba(18, 20, 29, 0.92);
     --dock-border: rgba(255, 255, 255, 0.15);
+
+    /* Legacy & cross-module token aliases */
+    --border-color: var(--border);
+    --surface-color: var(--bg-card);
+    --bg-surface: var(--bg-card);
+    --bg-hover: var(--table-row-hover);
+    --text-color: var(--text-primary);
+    --text-main: var(--text-primary);
+    --accent-color: var(--accent);
+    --primary-color: var(--secondary);
+    --primary-rgb: 37, 99, 235;
 }
 
 [data-theme='light'] {
@@ -133,6 +144,16 @@
     --table-row-selected: #fff7ed;
     --dock-bg: rgba(250, 248, 245, 0.96);
     --dock-border: #d6d1c6;
+
+    --border-color: var(--border);
+    --surface-color: var(--bg-card);
+    --bg-surface: var(--bg-card);
+    --bg-hover: var(--table-row-hover);
+    --text-color: var(--text-primary);
+    --text-main: var(--text-primary);
+    --accent-color: var(--accent);
+    --primary-color: #1d4ed8;
+    --primary-rgb: 29, 78, 216;
 }
 
 /* Reset */
