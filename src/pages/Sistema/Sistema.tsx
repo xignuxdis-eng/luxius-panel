@@ -6,6 +6,7 @@ import GoogleDriveView from './GoogleDriveView'
 import TelegramView from './TelegramView'
 import WorkshopOnboardingView from './WorkshopOnboardingView'
 import TermsAndPrivacyView from './TermsAndPrivacyView'
+import '../ABM/ABM.css'
 import './Sistema.css'
 
 
