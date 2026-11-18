@@ -72,7 +72,7 @@ export default function TermsAndPrivacyView() {
                             </p>
                         </div>
                     </div>
-                    <div style={{ marginTop: '1rem', padding: '0.8rem 1rem', background: 'rgba(56, 139, 253, 0.1)', borderRadius: '6px', borderLeft: '4px solid #388bfd' }}>
+                    <div style={{ marginTop: '1rem', padding: '0.8rem 1rem', background: 'rgba(56, 139, 253, 0.1)', borderRadius: '6px', border: '1px solid rgba(56, 139, 253, 0.35)' }}>
                         <p style={{ margin: 0, fontSize: '0.85rem', color: '#79c0ff' }}>
                             <strong>Seguridad y Confidencialidad:</strong> Conforme al Art. 9 de la Ley 25.326, LuXius implementa Row Level Security (RLS) en la base de datos, aislamiento estricto de roles (RBAC) y registros de auditoría inmutables (<code>audit_logs</code>) que impiden accesos o alteraciones no autorizadas.
                         </p>

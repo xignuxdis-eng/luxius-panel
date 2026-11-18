@@ -271,11 +271,12 @@
 
 .stat-card.business {
     background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border-left: 4px solid var(--accent);
+    border: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
 }
 
 .stat-card.business.alert {
-    border-left-color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.4);
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, transparent 100%);
 }
 
