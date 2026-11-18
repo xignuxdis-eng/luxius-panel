@@ -153,60 +153,34 @@ export default function Dashboard() {
 
     return (
         <div className="dashboard">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="dashboard-topbar">
                 <Header
                     title="Panel de Control Luxius"
                     subtitle={`Bienvenido de nuevo, ${user?.name?.split(' ')[0] || 'Usuario'}.`}
                 />
                 {!isClient && (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="dashboard-topbar-actions">
                     <button
+                        type="button"
+                        className="dashboard-briefing-btn"
                         onClick={() => setShowBriefing(true)}
-                        style={{
-                            backgroundColor: '#059669',
-                            color: '#ffffff',
-                            border: '1px solid #10b981',
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            fontWeight: 'bold',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
-                        }}
                         title="Ver resumen matutino de taller y secuencia recomendada"
                     >
                         ☀️ Briefing del Día
                     </button>
                     <button
+                        type="button"
+                        className={`dashboard-mode-btn ${viewMode === 'workshop' ? 'is-active' : ''}`}
+                        aria-pressed={viewMode === 'workshop'}
                         onClick={() => setViewMode('workshop')}
-                        style={{
-                            backgroundColor: viewMode === 'workshop' ? '#38bdf8' : '#1e293b',
-                            color: viewMode === 'workshop' ? '#0f172a' : '#94a3b8',
-                            border: '1px solid #38bdf8',
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            fontWeight: 'bold',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
                     >
                         🎮 Taller Pixel Art
                     </button>
                     <button
+                        type="button"
+                        className={`dashboard-mode-btn ${viewMode === 'standard' ? 'is-active' : ''}`}
+                        aria-pressed={viewMode === 'standard'}
                         onClick={() => setViewMode('standard')}
-                        style={{
-                            backgroundColor: viewMode === 'standard' ? '#38bdf8' : '#1e293b',
-                            color: viewMode === 'standard' ? '#0f172a' : '#94a3b8',
-                            border: '1px solid #38bdf8',
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            fontWeight: 'bold',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                        }}
                     >
                         📊 Vista Estándar
                     </button>

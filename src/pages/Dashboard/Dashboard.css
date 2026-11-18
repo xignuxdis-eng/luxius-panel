@@ -4,6 +4,76 @@
     animation: fadeIn 0.5s ease;
 }
 
+.dashboard-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.dashboard-topbar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dashboard-briefing-btn {
+    background-color: #047857;
+    color: #ffffff;
+    border: 1px solid #065f46;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+    transition: background-color 0.15s ease;
+}
+
+.dashboard-briefing-btn:hover {
+    background-color: #065f46;
+}
+
+.dashboard-mode-btn {
+    background-color: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard-mode-btn:hover {
+    border-color: #0284c7;
+    color: var(--text-primary);
+}
+
+.dashboard-mode-btn.is-active {
+    background-color: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard {
+        animation: none;
+    }
+    .stat-card,
+    .dashboard-briefing-btn,
+    .dashboard-mode-btn {
+        transition: none;
+    }
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
@@ -40,6 +110,7 @@
     font-size: var(--fs-2xl);
     font-weight: 700;
     color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
 }
 
 .stat-value.accent {
@@ -105,6 +176,7 @@
 .quick-stat-value {
     font-weight: 600;
     color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
 }
 
 .info-card p {

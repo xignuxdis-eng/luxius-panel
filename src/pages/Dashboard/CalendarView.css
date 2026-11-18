@@ -20,9 +20,6 @@
     color: var(--text-primary);
     text-transform: capitalize;
     letter-spacing: -0.02em;
-    background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
 }
 
 .btn-icon-sm {
