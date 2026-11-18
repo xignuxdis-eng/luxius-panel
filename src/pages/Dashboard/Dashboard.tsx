@@ -264,10 +264,10 @@ export default function Dashboard() {
                     <div
                         key={stat.label}
                         className="stat-card animate-fade-in clickable"
-                        style={{ animationDelay: `${index * 0.1} s` }}
+                        style={{ animationDelay: `${index * 0.1}s` }}
                         onClick={() => navigate(stat.path)}
                     >
-                        <div className={`stat - value ${stat.color === 'accent' ? 'text-accent' : ''} `}>
+                        <div className={`stat-value ${stat.color === 'accent' ? 'accent' : ''}`}>
                             {stat.value}
                         </div>
                         <div className="stat-label">{stat.label}</div>

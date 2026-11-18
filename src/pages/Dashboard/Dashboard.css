@@ -8,9 +8,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     flex-wrap: wrap;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
+}
+
+.dashboard-topbar .header {
+    flex: 1 1 420px;
+    min-width: 0;
+    margin-bottom: 0;
+    padding: 8px 0;
 }
 
 .dashboard-topbar-actions {
@@ -274,8 +281,8 @@
 
 /* Discreet System Status */
 .system-status-compact {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 20px;
     padding: 8px 16px;
     display: flex;
@@ -360,8 +367,7 @@
 .header-title h3 {
     margin: 0;
     font-size: 1rem;
-    color: #f87171;
-    /* red-400 */
+    color: var(--danger, #dc2626);
     font-weight: 600;
 }
 
@@ -371,8 +377,8 @@
 
 .alert-count {
     font-size: 0.75rem;
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+    background: rgba(239, 68, 68, 0.14);
+    color: var(--danger, #dc2626);
     padding: 2px 8px;
     border-radius: 12px;
     font-weight: 600;
@@ -388,8 +394,8 @@
 }
 
 .alert-item {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px;
     display: flex;
