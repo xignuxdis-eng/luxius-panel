@@ -1,7 +1,7 @@
 .xana-dashboard-container {
     padding: 2rem;
     color: #e2e8f0;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     min-height: 100vh;
     background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
 }

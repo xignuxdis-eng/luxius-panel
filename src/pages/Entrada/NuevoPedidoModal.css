@@ -206,7 +206,7 @@
     font-size: 15px;
     font-weight: 800;
     color: var(--accent);
-    font-family: 'Artegra Sans', 'Outfit', sans-serif;
+    font-family: var(--font-display);
 }
 
 .meta-item-sep {
@@ -1261,4 +1261,4 @@
     border-color: #38bdf8 !important;
     background: rgba(56, 189, 248, 0.15) !important;
     box-shadow: 0 0 15px rgba(56, 189, 248, 0.3) !important;
-}
+}

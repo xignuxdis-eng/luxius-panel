@@ -130,7 +130,7 @@
 }
 
 .logo-text {
-    font-family: 'Artegra Sans', 'Outfit', sans-serif;
+    font-family: var(--font-display);
     font-size: 38px;
     font-weight: 900;
     letter-spacing: -1.5px;

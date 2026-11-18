@@ -8,7 +8,7 @@
     margin: 8px 0 4px 0;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     color: #e2e8f0;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     word-break: normal;
     overflow-wrap: normal;
     transition: border-color 0.25s ease, box-shadow 0.25s ease;
