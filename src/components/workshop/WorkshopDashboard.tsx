@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { getOrdenes, saveOrden, deductStockForOrder, revertStockForOrder } from '@/data/db';
 import { Order, OrderStatus } from '@/types/orden';
-import { WorkshopCanvas } from './WorkshopCanvas';
 import { WorkshopCanvasPixi } from './WorkshopCanvasPixi';
 import { PrintManagerHUD } from './PrintManagerHUD';
 import { XanaBoard } from './XanaBoard';
@@ -55,16 +54,7 @@ export const WorkshopDashboard: React.FC = () => {
     const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
     const [isMuted, setIsMuted] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
-    const [rendererType, setRendererType] = useState<'legacy' | 'pixi'>(() => {
-        return (localStorage.getItem('luxius_print_den_renderer') as 'legacy' | 'pixi') || 'pixi';
-    });
     const [pixiAsyncError, setPixiAsyncError] = useState<string | null>(null);
-
-    const toggleRenderer = (nextType: 'legacy' | 'pixi') => {
-        setPixiAsyncError(null);
-        setRendererType(nextType);
-        localStorage.setItem('luxius_print_den_renderer', nextType);
-    };
 
     const fetchOrders = async () => {
         try {
@@ -184,50 +174,6 @@ export const WorkshopDashboard: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    {/* Engine Switcher */}
-                    <div style={{
-                        display: 'flex',
-                        backgroundColor: 'var(--bg-main)',
-                        padding: '2px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border)'
-                    }}>
-                        <button
-                            onClick={() => toggleRenderer('legacy')}
-                            style={{
-                                backgroundColor: rendererType === 'legacy' ? '#0284c7' : 'transparent',
-                                color: rendererType === 'legacy' ? '#ffffff' : 'var(--text-secondary)',
-                                border: 'none',
-                                padding: '5px 10px',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            title="Canvas 2D Clásico (Original)"
-                        >
-                            🕹️ Canvas 2D
-                        </button>
-                        <button
-                            onClick={() => toggleRenderer('pixi')}
-                            style={{
-                                backgroundColor: rendererType === 'pixi' ? '#0284c7' : 'transparent',
-                                color: rendererType === 'pixi' ? '#ffffff' : 'var(--text-secondary)',
-                                border: 'none',
-                                padding: '5px 10px',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            title="Nuevo Motor PixiJS v8 Pixel Art HD"
-                        >
-                            ⚡ Pixi HD
-                        </button>
-                    </div>
-
                     <button
                         type="button"
                         onClick={toggleAudio}
@@ -293,51 +239,42 @@ export const WorkshopDashboard: React.FC = () => {
                 </aside>
 
                 <main className="workshop-map-column">
-                    {rendererType === 'pixi' && !pixiAsyncError ? (
+                    {!pixiAsyncError ? (
                         <WorkshopPixiErrorBoundary
                             onCatch={(err) => {
                                 console.error('Pixi Workshop Error caught by boundary:', err);
                                 setPixiAsyncError(err.message);
                             }}
                             fallback={(retry) => (
-                                <div>
-                                    <div style={{
-                                        backgroundColor: '#1e293b',
-                                        border: '1px solid #f59e0b',
-                                        borderRadius: '6px',
-                                        padding: '8px 12px',
-                                        marginBottom: '10px',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        color: '#f8fafc',
-                                        fontSize: '12px'
-                                    }}>
-                                        <span>⚠️ El motor PixiJS experimentó un reinicio. Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
-                                        <button
-                                            onClick={() => {
-                                                setPixiAsyncError(null);
-                                                retry();
-                                            }}
-                                            style={{
-                                                backgroundColor: '#38bdf8',
-                                                color: '#0f172a',
-                                                border: 'none',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            🔄 Reintentar Pixi HD
-                                        </button>
-                                    </div>
-                                    <WorkshopCanvas
-                                        orders={orders}
-                                        onSelectStation={(stationId) => setSelectedStation(stationId)}
-                                        onSelectOrder={(order) => setPreviewOrder(order)}
-                                        selectedStation={selectedStation}
-                                    />
+                                <div style={{
+                                    backgroundColor: '#1e293b',
+                                    border: '1px solid #f59e0b',
+                                    borderRadius: '6px',
+                                    padding: '12px 16px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    color: '#f8fafc',
+                                    fontSize: '12px'
+                                }}>
+                                    <span>⚠️ El motor PixiJS HD experimentó un reinicio.</span>
+                                    <button
+                                        onClick={() => {
+                                            setPixiAsyncError(null);
+                                            retry();
+                                        }}
+                                        style={{
+                                            backgroundColor: '#38bdf8',
+                                            color: '#0f172a',
+                                            border: 'none',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            fontWeight: 'bold',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        🔄 Reintentar Pixi HD
+                                    </button>
                                 </div>
                             )}
                         >
@@ -349,50 +286,34 @@ export const WorkshopDashboard: React.FC = () => {
                                 onError={(err) => setPixiAsyncError(err.message)}
                             />
                         </WorkshopPixiErrorBoundary>
-                    ) : rendererType === 'pixi' && pixiAsyncError ? (
-                        <div>
-                            <div style={{
-                                backgroundColor: '#1e293b',
-                                border: '1px solid #f59e0b',
-                                borderRadius: '6px',
-                                padding: '8px 12px',
-                                marginBottom: '10px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                color: '#f8fafc',
-                                fontSize: '12px'
-                            }}>
-                                <span>⚠️ Fallo WebGL en PixiJS ({pixiAsyncError}). Mostrando Canvas 2D de respaldo para garantizar continuidad.</span>
-                                <button
-                                    onClick={() => setPixiAsyncError(null)}
-                                    style={{
-                                        backgroundColor: '#38bdf8',
-                                        color: '#0f172a',
-                                        border: 'none',
-                                        padding: '4px 10px',
-                                        borderRadius: '4px',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    🔄 Reintentar Pixi HD
-                                </button>
-                            </div>
-                            <WorkshopCanvas
-                                orders={orders}
-                                onSelectStation={(stationId) => setSelectedStation(stationId)}
-                                onSelectOrder={(order) => setPreviewOrder(order)}
-                                selectedStation={selectedStation}
-                            />
-                        </div>
                     ) : (
-                        <WorkshopCanvas
-                            orders={orders}
-                            onSelectStation={(stationId) => setSelectedStation(stationId)}
-                            onSelectOrder={(order) => setPreviewOrder(order)}
-                            selectedStation={selectedStation}
-                        />
+                        <div style={{
+                            backgroundColor: '#1e293b',
+                            border: '1px solid #f59e0b',
+                            borderRadius: '6px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            color: '#f8fafc',
+                            fontSize: '12px'
+                        }}>
+                            <span>⚠️ Fallo WebGL en PixiJS HD ({pixiAsyncError}).</span>
+                            <button
+                                onClick={() => setPixiAsyncError(null)}
+                                style={{
+                                    backgroundColor: '#38bdf8',
+                                    color: '#0f172a',
+                                    border: 'none',
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                🔄 Reintentar Pixi HD
+                            </button>
+                        </div>
                     )}
                 </main>
             </div>
