@@ -12,7 +12,7 @@ export default function Login() {
     const navigate = useNavigate()
     const login = useAuthStore((state) => state.login)
 
-    const buildTime = '2026-10-12 15:40'
+    const buildTime = '2026-11-18 15:26'
     const [isLoading, setIsLoading] = useState(false)
     const [isWakingServer, setIsWakingServer] = useState(false)
     const [error, setError] = useState('')
